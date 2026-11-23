@@ -18,17 +18,14 @@ export { profileBackendLabels, sharedProfileFields };
 
 export const userWorkflowsDir = path.join(dataDir, "workflows");
 
-// Windows keeps these names for devices, with any extension: `con.json` can never be a file.
-const windowsReserved = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/;
-
 function safeId(value = "") {
-  const id =
+  return (
     String(value || "")
       .toLowerCase()
       .replace(/[^a-z0-9._-]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || `workflow-${crypto.randomUUID()}`;
-  return windowsReserved.test(id) ? id.replace(/^[^.]+/, "$&-1") : id;
+      .slice(0, 80) || `workflow-${crypto.randomUUID()}`
+  );
 }
 
 function readJson(file) {

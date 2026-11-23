@@ -2,39 +2,47 @@
 
 Run one Studio replica. Two schedulers must not control the same workers or SQLite database. Mount a writable data directory and use exact [released image versions](https://github.com/maxexcloo/studio/releases).
 
-The repository's [config directory](config/) holds a Docker environment example, the LibreChat server entry and starter profiles. Copy the files you need and keep your deployment's settings and credentials outside this repository.
+The [config directory](config/) holds the samples: a [Docker Compose file](config/compose.yaml), a [Kubernetes manifest](config/kubernetes.yaml), an [environment file](config/studio.env.example), the [LibreChat server entry](config/librechat.yaml) and the [sample profiles](config/profiles/). Copy the files you need and keep your deployment's settings and credentials outside this repository.
 
-Studio reads process environment variables first, then its settings file on startup. The image reads `/data/.env` and a source checkout reads `.env` in the project folder. Values an administrator saves in **Settings** apply at once. A value supplied by the deployment appears locked there.
+Studio reads process environment variables first, then its settings file on startup: `/data/.env` in the image, `.env` in the data folder under `mise run dev`, or the file `STUDIO_ENV_FILE` names. Use `NAME=value` on each line and write JSON values without shell quotes. Values an administrator saves in **Settings** apply at once; a value supplied by the deployment appears locked there. [Settings](#settings) lists every `STUDIO_*` setting.
 
 ## Docker
 
-Copy [studio.env.example](config/studio.env.example) to `.env` in your deployment directory. For the [Docker quick start](README.md#run-with-docker), pass `--env-file .env` in place of `-e HOST=127.0.0.1`. Recreate the container with the same data volume after changing the file. Use `NAME=value` on each line and write JSON values without shell quotes.
+On a Linux host, copy [compose.yaml](config/compose.yaml) and [studio.env.example](config/studio.env.example), saved as `.env`, into one folder and run `docker compose up -d`. For the [`docker run` quick start](README.md#run-with-docker), pass `--env-file .env` in place of `-e HOST=127.0.0.1`. Recreate the container with the same data volume after changing the file.
 
-The Docker example points to a ComfyUI server on the same Linux host. Edit the worker URL for your installation, or follow the [Radiance setup](#radiance). Chat integrations and the prompt assistant are optional.
+The environment example points to a ComfyUI server on the same Linux host. Edit the worker URL for your installation, or follow the [Radiance setup](#radiance). Chat integrations and the prompt assistant are optional.
 
-## Source Checkout
+## Kubernetes
 
-```bash
-HOST=127.0.0.1
-PORT=8787
-STUDIO_DATA_DIR=./data
+Start from [kubernetes.yaml](config/kubernetes.yaml): a one-replica Deployment with the `Recreate` strategy, a persistent volume at `/data`, a Service on port 8787 and probes on `/api/ping` (liveness) and `/api/ready` (readiness). Supply credentials through a Secret. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator, then set `STUDIO_ALLOWED_HOSTS` and add your HTTPS ingress.
+
+### Runtime Control
+
+Set `STUDIO_WORKERS` to connect directly to an existing worker Service. To give Studio control of GPU placement, set `STUDIO_KUBERNETES_NAMESPACES` and let it discover deployments labelled `studio.excloo.dev/kind` (`image` or `video`). Studio scales those deployments between zero and one replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool.
+
+```dotenv
+STUDIO_KUBERNETES_GPUS={"gpu":2,"gaming":1}
+STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,radiance
+STUDIO_LOCAL_TEXT_MODEL=local/auto
 ```
+
+Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `worker`, `capabilities` and `backend` (`radiance` for a Radiance worker). A `text` capability means the workload serves `STUDIO_LOCAL_TEXT_MODEL` while it runs (through the gateway), and `vision: "true"` that its text models read images. Studio sends `STUDIO_RADIANCE_KEY`, when set, to Radiance as its API key. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs the Role in the [Kubernetes sample](config/kubernetes.yaml) in each of those namespaces. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
+
+With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark available local text models in **Settings › Workers**. Studio runs them one at a time as Jobs in the workload's namespace. Its network policy must admit pods labelled `app.kubernetes.io/name: betterbench`. `STUDIO_BENCHMARK_SECRET` names the Secret in that namespace which holds the workload's key in `API_KEY`. Give Studio's service account permission to create, get and delete Jobs and list pods there.
+
+Administrators choose the running workloads in **Settings › Workers**.
 
 ## Workers
 
 Studio connects directly to ComfyUI and Radiance workers. It saves outputs to `STUDIO_MEDIA_DIR` (`<STUDIO_DATA_DIR>/media` by default) without a shared worker mount. For the packaged ComfyUI worker, set the same `STUDIO_WORKER_TOKEN` on Studio and the worker. See [Studio Worker](worker/README.md).
 
-Studio discovers image and video workers when [Kubernetes Runtime Control](#runtime-control) is enabled and `STUDIO_WORKERS` is unset. To supply worker addresses directly, use a JSON array on one line in `STUDIO_WORKERS`. The [environment example](config/studio.env.example) has one worker. Add an object for each worker reachable from Studio, or use `[]` to run with no workers.
+Studio discovers image and video workers when [Runtime Control](#runtime-control) is enabled and `STUDIO_WORKERS` is unset. To supply worker addresses directly, use a JSON array on one line in `STUDIO_WORKERS`. The [environment example](config/studio.env.example) has one worker. Add an object for each worker reachable from Studio, or use `[]` to run with no workers.
 
 Keep each `id` stable (it defaults to the lower-case name): jobs, previews, cancellation and recovery follow a job's worker by id. Capabilities are `image`, `video`, `upscale` and `models`; the `models` worker holds the model library and receives downloads, so mount its models read-write. `"backend": "radiance"` marks a Radiance worker (the default is `comfyui`).
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
-`STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` pick a fresh composer's profiles (else the first ready one).
-
-Administrators set shared Dream delays in **Settings › Administration › Dream**. Use `STUDIO_DREAM_IMAGE_IDLE_MINUTES` and `STUDIO_DREAM_VIDEO_IDLE_MINUTES` to control the wait after each account's latest generation request. `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` controls how long the shared queue must be idle before Dream changes local image models or LoRAs.
-
-Accounts choose Cloud or Local for Dream images and videos in **Settings › Where Work Runs**. Administrators can set either choice for all accounts in **Administration › Dream**.
+Administrators set the default profiles in **Settings › Studio** and Dream's delays and account overrides in **Settings › Dream** under Administration; accounts choose Cloud or Local for Dream in **Settings › Where Work Runs**. [Settings](#settings) lists the matching variables.
 
 ### Radiance
 
@@ -85,7 +93,7 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 Enable Studio accounts and create a personal MCP token in **Settings › Account**. In [LibreChat MCP Settings](https://www.librechat.ai/docs/features/mcp), add `https://studio.example.com/mcp` as Streamable HTTP with a Bearer API key supplied by each user. From other remote MCP clients, use the same URL and send the token as `Authorization: Bearer <token>`.
 
-To share the server definition across users, merge the [sample server entry](config/librechat.yaml) into your `librechat.yaml` and replace the URL. Each LibreChat user supplies their own Studio token. The example passes conversation and turn IDs so Studio can group result links. See [LibreChat’s MCP server settings](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers).
+To share the server definition across users, merge the [sample server entry](config/librechat.yaml) into your `librechat.yaml` and replace the URL. Each LibreChat user supplies their own Studio token. The example passes conversation and turn IDs so Studio can group result links. See [LibreChat's MCP server settings](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers).
 
 ### Open WebUI
 
@@ -98,19 +106,13 @@ In Open WebUI's administrator settings, open **Integrations › External Tool Se
 | Authentication | Bearer                                                  |
 | Key            | A Studio personal MCP token from **Settings › Account** |
 
-Use an ordinary Studio account for this shared connection. Every authorised Open WebUI user of that connection acts through the same Studio account. Enable the tool server in a chat and try “List the image models available in Studio”. Use a tool-capable chat model. See [Open WebUI’s MCP setup](https://docs.openwebui.com/features/extensibility/mcp/).
+Use an ordinary Studio account for this shared connection. Every authorised Open WebUI user of that connection acts through the same Studio account. Enable the tool server in a chat and try "List the image models available in Studio". Use a tool-capable chat model. See [Open WebUI's MCP setup](https://docs.openwebui.com/features/extensibility/mcp/).
 
 ## Prompt Assistant
 
 The optional prompt assistant accepts an OpenAI-compatible Chat Completions endpoint directly or through Bifrost. Set `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` to the endpoint's URL, key and model ID. Leave all three unset to run Studio without the assistant. With managed local text workloads, `STUDIO_LOCAL_TEXT_MODEL` supplies their model ID.
 
-**Background AI** (**Settings › Maintenance**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
-
-`mise run eval:assistant` replays the recorded cases in `backend/fixtures/assistant-evals/` against the live gateway; `--record` writes the replies back for review.
-
-## Characters
-
-`STUDIO_CARD_IMAGES=1` (off by default, until a live proof run) sends the images of the outfit and scene cards that MCP `generate`'s shots name as references, after the character's.
+**Background AI** (**Settings › Studio**) has a switch for each call Studio makes on its own; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
 
 ## Downloads & Imports
 
@@ -120,25 +122,7 @@ Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `H
 
 Studio's data folder is the only source of live definitions: profiles in `workflows/`, prompting guides in `guides/` and catalogue changes in `library/`. Administrators edit, approve, export and revert them in Library; every edit keeps a version.
 
-When a data folder first starts, Studio copies the [starter profiles](config/profiles/) into its workflows and records their first versions. An existing Library retains the profiles you installed, edited or removed. To use another starter profile later, import its JSON in **Library › Profiles**. Each worker still needs the model files and custom nodes that its chosen profile uses.
-
-A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the shared fields, the backend it runs on and each backend's own block, whose fields replace the shared ones of the same name:
-
-```json
-{
-  "studio": {
-    "id": "image-krea2-turbo-fast",
-    "name": "Krea 2 Turbo · Fast · 8 Steps",
-    "kind": "image",
-    "family": "krea2",
-    "backend": "radiance",
-    "backends": {
-      "comfyui": { "graph": {}, "controls": {}, "mediaInputs": [], "defaults": {} },
-      "radiance": { "graph": {}, "controls": {}, "loraStack": {}, "defaults": {} }
-    }
-  }
-}
-```
+When a data folder first starts, Studio copies the [sample profiles](config/profiles/) into its workflows and records their first versions. An existing Library retains the profiles you installed, edited or removed. The [sample profiles' page](config/profiles/README.md) describes the profile format.
 
 ## Data & Migrations
 
@@ -153,27 +137,70 @@ node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --appl
 
 The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so an older folder needs `migrate-runtime` from each release that still had its pending steps; Git history keeps them. `backend/runtime-migrations.js` lists the pending steps; each step's module says what it changes.
 
-For the Radiance 2 cutover, version profiles through the administrator editor first. With dispatch held for every account and accepted work finished, `POST /api/maintenance/radiance-queue` previews the exact waiting-job model and worker changes. Apply with `{ "apply": true, "baseHash": "<preview hash>" }`; conflicts or a changed queue refuse the entire apply, and the response confirms that other fields and queue order were preserved. Keep the hold until the profiles, workers and waiting jobs have been checked together.
+## Settings
 
-`--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results; supply it only for the one account that used Dream.
+`HOST` and `PORT` set the listening address: `0.0.0.0:8787` in the image, else `127.0.0.1:8787`. A setting with a Settings section can also be saved there unless the deployment sets it. Switches take `1` or `0`.
 
-## Runtime Control
-
-For a Kubernetes deployment, run Studio as a one-replica Deployment with the `Recreate` strategy and a writable persistent volume at `/data`. Set `STUDIO_MULTI_USER=1` and supply worker settings through a ConfigMap and credentials through a Secret. The image listens on port 8787. Use `/api/ping` for liveness and `/api/ready` for readiness. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator. Set the allowed hostname and add your HTTPS ingress after setup.
-
-Set `STUDIO_WORKERS` to connect directly to an existing worker Service. To give Studio control of GPU placement, set `STUDIO_KUBERNETES_NAMESPACES` and let it discover deployments labelled `studio.excloo.dev/kind` (`image` or `video`). Studio scales those deployments between zero and one replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool.
-
-```dotenv
-STUDIO_KUBERNETES_GPUS={"gpu":2,"gaming":1}
-STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,radiance
-STUDIO_LOCAL_TEXT_MODEL=local/auto
-```
-
-Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `worker`, `capabilities` and `backend` (`radiance` for a Radiance worker). A `text` capability means the workload serves `STUDIO_LOCAL_TEXT_MODEL` while it runs (through the gateway), and `vision: "true"` that its text models read images. Studio sends `STUDIO_RADIANCE_KEY`, when set, to Radiance as its API key. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
-
-With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark available local text models in **Settings › Workers**. Studio runs them one at a time as Jobs in the workload's namespace. Its network policy must admit pods labelled `app.kubernetes.io/name: betterbench`. `STUDIO_BENCHMARK_SECRET` names the Secret in that namespace which holds the workload's key in `API_KEY`. Give Studio's service account permission to create, get and delete Jobs and list pods there.
-
-Administrators choose the running workloads in **Settings › Workers**.
+| Setting                               | Purpose                                                                                     | Default                                      | Settings               |
+| ------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------- |
+| `STUDIO_ALLOWED_HOSTS`                | Hostnames Studio answers to, comma-separated ([Accounts](#accounts--single-sign-on))        | localhost and this machine's addresses       |                        |
+| `STUDIO_ASSISTANT_CLOUD_MODEL`        | Prompt assistant model ID ([Prompt Assistant](#prompt-assistant))                           | none                                         |                        |
+| `STUDIO_ASSISTANT_KEY`                | Prompt assistant API key                                                                    | none                                         |                        |
+| `STUDIO_ASSISTANT_URL`                | Prompt assistant Chat Completions endpoint                                                  | none: no assistant                           |                        |
+| `STUDIO_BENCHMARK_IMAGE`              | BetterBench image for text model benchmarks ([Runtime Control](#runtime-control))           | none: no benchmarks                          |                        |
+| `STUDIO_BENCHMARK_SECRET`             | Secret holding the benchmarked workload's key in `API_KEY`                                  | none                                         |                        |
+| `STUDIO_CARD_IMAGES`                  | MCP `generate` also sends the images of the outfit and scene cards its shots name           | `0`                                          |                        |
+| `STUDIO_CHAT_IMAGES_DIR`              | Folder `chat-uploads.js` watches ([MCP & Chat Gateway](#mcp--chat-gateway))                 | required by `chat-uploads.js`                |                        |
+| `STUDIO_CHAT_URL`                     | Chat site the navigation's Chat item opens                                                  | none: no Chat item                           |                        |
+| `STUDIO_CLIPROXYAPI_IMAGE_MODEL`      | Image model for a cloud profile that names none ([Cloud Models](#cloud-models))             | the provider's advertised Grok image model   |                        |
+| `STUDIO_CLIPROXYAPI_KEY`              | CLIProxyAPI key                                                                             | required with `STUDIO_CLIPROXYAPI_URL`       |                        |
+| `STUDIO_CLIPROXYAPI_URL`              | CLIProxyAPI base URL                                                                        | none: no cloud models                        |                        |
+| `STUDIO_CLIPROXYAPI_VIDEO_MODEL`      | Video model for a cloud profile that names none                                             | the provider's advertised Grok video model   |                        |
+| `STUDIO_CONTROL_MCP_API_KEY`          | Key for the MCP GPU control tools                                                           | none                                         |                        |
+| `STUDIO_DATA_DIR`                     | Data folder                                                                                 | `/data` in the image, else `data/`           |                        |
+| `STUDIO_DEFAULT_IMAGE_PROFILE`        | Profile ID new image drafts start on                                                        | the first ready profile                      | Studio                 |
+| `STUDIO_DEFAULT_TEXT_PROFILE`         | Text model for prompt writing and other text work                                           | the gateway's default                        | Studio                 |
+| `STUDIO_DEFAULT_VIDEO_PROFILE`        | Profile ID new video drafts start on                                                        | the first ready profile                      | Studio                 |
+| `STUDIO_DREAM_IMAGE_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its images          | `0`                                          | Dream (Administration) |
+| `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `2`                                          | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_ENABLED`       | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` | `local` or `cloud` for every account's Dream images                                         | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_SPICY`         | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND` | `local` or `cloud` for every account's Dream videos                                         | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_VIDEO_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its videos          | `5`                                          | Dream (Administration) |
+| `STUDIO_ENV_FILE`                     | Settings file read on startup                                                               | `/data/.env` in the image, else `.env`       |                        |
+| `STUDIO_FACE_CHECK`                   | Compare the face in each character result with the character's                              | `1`                                          | Studio                 |
+| `STUDIO_FACE_REDO`                    | Run a recent result Face Check marks as drifted once more                                   | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_CAPTIONS`             | Caption and tag new images for gallery search                                               | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_TITLES`               | Title finished images and videos                                                            | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_WHILE_BUSY`           | Run gallery work while Studio is generating                                                 | `0`                                          | Studio                 |
+| `STUDIO_IMAGE_SEARCH`                 | Gallery search also finds images that look like the words                                   | `1`                                          | Studio                 |
+| `STUDIO_KUBERNETES_GPUS`              | GPUs per node pool, as JSON                                                                 | required with `STUDIO_KUBERNETES_NAMESPACES` |                        |
+| `STUDIO_KUBERNETES_NAMESPACES`        | Namespaces whose labelled deployments Studio controls ([Runtime Control](#runtime-control)) | none: no runtime control                     |                        |
+| `STUDIO_KUBERNETES_URL`               | Kubernetes API address, such as `kubectl proxy`                                             | the in-cluster API                           |                        |
+| `STUDIO_LOCAL_TEXT_MODEL`             | Gateway model ID that text workloads serve                                                  | required with a `text` workload              |                        |
+| `STUDIO_MCP_API_KEY`                  | Shared key for a trusted chat gateway and `chat-uploads.js`                                 | none                                         |                        |
+| `STUDIO_MCP_PUBLIC_URL`               | Internet-facing base URL for personal tokens and signed links                               | the address Studio is reached at             |                        |
+| `STUDIO_MCP_SIGNING_KEY`              | Key that signs result, upload and export links                                              | generated and kept in the data folder        |                        |
+| `STUDIO_MCP_URL`                      | Studio's MCP address for `chat-uploads.js`                                                  | required by `chat-uploads.js`                |                        |
+| `STUDIO_MEDIA_DIR`                    | Where outputs are saved                                                                     | `<STUDIO_DATA_DIR>/media`                    |                        |
+| `STUDIO_MODEL_LIBRARY_URL`            | Model library worker that receives downloads ([Studio Worker](worker/README.md))            | the `models` worker                          |                        |
+| `STUDIO_MODEL_MANIFEST_PREFIX`        | Folder stripped from `config/models.json` paths ([Workers](#workers))                       | none                                         |                        |
+| `STUDIO_MULTI_USER`                   | `1` turns on accounts ([Accounts](#accounts--single-sign-on))                               | single-user                                  |                        |
+| `STUDIO_NEXT_STEPS`                   | Prepare suggestions for finished images and videos                                          | `1`                                          | Studio                 |
+| `STUDIO_OIDC_CLIENT_ID`               | Single sign-on client ID                                                                    | none: no single sign-on                      |                        |
+| `STUDIO_OIDC_CLIENT_SECRET`           | Single sign-on client secret, for confidential clients                                      | none                                         |                        |
+| `STUDIO_OIDC_ISSUER`                  | Single sign-on issuer URL                                                                   | none                                         |                        |
+| `STUDIO_OIDC_LABEL`                   | Single sign-on button label                                                                 | Single Sign-On                               |                        |
+| `STUDIO_OIDC_REDIRECT_URI`            | `https://<studio>/api/accounts/oidc/callback`                                               | none                                         |                        |
+| `STUDIO_PROMPT_IDEAS`                 | Offer ideas in the composer's AI menu                                                       | `1`                                          | Studio                 |
+| `STUDIO_RADIANCE_KEY`                 | API key Studio sends to Radiance                                                            | none                                         |                        |
+| `STUDIO_REDLIB_URL`                   | Redlib front end for Reddit imports                                                         | none: Reddit imports refused                 |                        |
+| `STUDIO_SELF_REVIEW`                  | Score recent images against their owner's rules and brief                                   | `1`                                          | Studio                 |
+| `STUDIO_SUGGESTED_PROMPTS`            | Write prompts for uploads and other items without one                                       | `1`                                          | Studio                 |
+| `STUDIO_TASTE_UPDATES`                | Summarise each account's taste as it rates                                                  | `1`                                          | Studio                 |
+| `STUDIO_WORKERS`                      | Workers as a JSON array ([Workers](#workers))                                               | discovered by runtime control, else none     |                        |
+| `STUDIO_WORKER_TOKEN`                 | Token shared with the packaged ComfyUI worker                                               | none                                         |                        |
 
 ## Troubleshooting
 
@@ -185,7 +212,7 @@ Check the interface status and Queue for the affected job's state and reason. Wh
 
 Check the configured addresses in **Settings › Workers**, then inspect that worker's container logs and network access. Worker addresses must be reachable from the Studio server. A waiting job keeps its selected backend; it does not silently switch providers.
 
-Deployment configuration owns worker placements and model paths; Studio owns editable runtime profiles. See [Configuration](#configuration) and [Worker Operations](worker/README.md).
+Deployment configuration owns worker placements and model paths; Studio owns editable runtime profiles. See [Workers](#workers) and [Studio Worker](worker/README.md).
 
 #### Studio Does Not Start
 
@@ -261,7 +288,7 @@ Masking and video input require a profile that supports those operations; changi
 
 Upscaling uses the durable queue. Check the job reason and worker's upscaler models and nodes if it fails. The original result remains available.
 
-For missing or gated Library downloads, verify the catalogue link, model licence and worker storage. Configure any required Hugging Face token server-side as described in [Configuration](#configuration). A full disk or inaccessible mount must be corrected before retrying a download.
+For missing or gated Library downloads, verify the catalogue link, model licence and worker storage. Configure any required Hugging Face token server-side as described in [Downloads & Imports](#downloads--imports). A full disk or inaccessible mount must be corrected before retrying a download.
 
 ### Accounts & Devices
 

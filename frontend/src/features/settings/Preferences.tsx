@@ -1,7 +1,6 @@
 import { Button, SegmentedControl, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import {
@@ -10,7 +9,6 @@ import {
   useSavePreferences,
   useTileCaptions,
 } from "./accountPreferences";
-import { DeleteFailedItems } from "./DeleteFailedItems";
 
 const galleryWorkChoices = [
   { value: "none", label: "None" },
@@ -86,7 +84,6 @@ export function Preferences() {
             download
             size="compact-sm"
             variant="default"
-            leftSection={<icons.download size={16} />}
           >
             Export
           </Button>
@@ -119,9 +116,6 @@ export function Preferences() {
             onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
           />
         </SettingRow>
-      </SettingGroup>
-      <SettingGroup title="Danger Zone" danger>
-        <DeleteFailedItems />
       </SettingGroup>
     </Stack>
   );

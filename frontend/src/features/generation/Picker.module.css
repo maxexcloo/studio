@@ -69,7 +69,7 @@
 .columns > .aside {
   contain: size;
   padding-left: var(--mantine-spacing-md);
-  border-left: 1px solid var(--studio-glass-border);
+  border-left: 1px solid var(--mantine-color-default-border);
 }
 
 /* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */

@@ -88,6 +88,7 @@ export function ConvertToRadiance({
     onSuccess: (data) => client.setQueryData(radianceConversionQuery.queryKey, data),
   });
   const stop = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post<{ conversion: Conversion }>("/api/profiles/radiance/cancel"),
     onSuccess: (data) => client.setQueryData(radianceConversionQuery.queryKey, data),
   });
@@ -127,11 +128,11 @@ export function ConvertToRadiance({
         ) : (
           <>
             {conversion?.status === "done" && (
-              <Alert color="green">
+              <Text size="sm" c="dimmed" role="status">
                 {conversion.applied
                   ? `Added ${conversion.name}.rad as the Radiance backend of ${conversion.note?.profile}.`
                   : `Installed ${conversion.name}.rad.`}
-              </Alert>
+              </Text>
             )}
             {conversion?.status === "failed" && (
               <Alert color="red">

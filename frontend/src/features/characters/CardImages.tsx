@@ -69,16 +69,6 @@ export function CardDialog({
       title={title}
       fullScreen={phone}
       zIndex={phone ? undefined : getDefaultZIndex("overlay")}
-      styles={{
-        content: { display: "flex", flexDirection: "column" },
-        body: {
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-        },
-      }}
     >
       <FocusTrap.InitialFocus />
       {children}

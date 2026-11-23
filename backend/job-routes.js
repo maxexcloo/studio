@@ -9,19 +9,17 @@ import { queueSchedule } from "./queue-eta.js";
  * from the queue's records. MCP reads and cancels a job through the first two.
  */
 export function registerJobRoutes(app, { store, queue }) {
-  /** Open jobs on its resource that run before a waiting job: started ones, then the queue's order by priority. */
+  /** Jobs on its resource that run before a waiting job: started ones, then those the queue puts first. */
   function aheadOf(job) {
-    const open = store.openJobs().filter((other) => other.resource === job.resource);
-    const at = open.findIndex((other) => other.id === job.id);
-    const priority = job.priority ?? 0;
-    return open.filter(
-      (other, index) =>
-        other.id !== job.id &&
-        (["running", "saving"].includes(other.status) ||
-          (other.reason !== pausedReason &&
-            ((other.priority ?? 0) < priority ||
-              ((other.priority ?? 0) === priority && index < at)))),
-    ).length;
+    const started = store
+      .openJobs()
+      .filter(
+        (other) =>
+          other.id !== job.id &&
+          other.resource === job.resource &&
+          ["starting", "running", "saving"].includes(other.status),
+      ).length;
+    return started + Math.max(0, (queue.queuePosition(job.id) ?? 1) - 1);
   }
   function generationJobResponse(account, id) {
     const queued = store.job(account?.userId || "", id);
@@ -75,14 +73,21 @@ export function registerJobRoutes(app, { store, queue }) {
   directRoute(app, "POST", "/api/jobs/:id/cancel", async (account, { params }) => {
     const ownerId = ownerIdForRequest({ studioAccount: account });
     // Another account's job answers exactly like an unknown one.
-    if (!store.job(ownerId, params.id))
-      return { status: 200, payload: { ok: true, stale: true, changed: false } };
+    const before = store.job(ownerId, params.id);
+    if (!before) return { status: 200, payload: { ok: true, stale: true, changed: false } };
+    // A finished job stays as it was; a running one may still finish after the request.
+    if (["completed", "failed", "cancelled"].includes(before.status))
+      return { status: 200, payload: { ok: true, finished: true, status: before.status } };
     try {
       await queue.cancel(ownerId, params.id);
     } catch {
       return { status: 503, payload: { ok: false, error: unconfirmedCancel } };
     }
-    return { status: 200, payload: { ok: true } };
+    const after = store.job(ownerId, params.id)?.status;
+    return {
+      status: 200,
+      payload: { ok: true, ...(after && after !== "cancelled" ? { status: after } : {}) },
+    };
   });
 
   app.post("/api/queue/cancel", async (req, res) => {

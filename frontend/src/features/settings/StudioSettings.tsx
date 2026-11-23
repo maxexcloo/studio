@@ -1,24 +1,53 @@
-import { Alert, Stack } from "@mantine/core";
+import { Alert, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import type { ComponentProps } from "react";
 
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { useAccount } from "../auth/AccountGate";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
 import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
 import { DeleteFailedItems } from "./DeleteFailedItems";
-import { type Setting, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
+import {
+  type Flag,
+  type Setting,
+  deploymentQuery,
+  lockedNote,
+  useDeploymentSetting,
+} from "./deployment";
+import { GalleryPass } from "./GalleryPass";
 
-/** Settings › Generation: the default profiles and every account's failed items. */
-export function GenerationSettings() {
+/** Background features with a catch-up pass over the gallery, which shares their row. */
+const passes: Record<
+  string,
+  Omit<ComponentProps<typeof GalleryPass>, "label" | "description" | "children">
+> = {
+  STUDIO_FACE_CHECK: {
+    route: "/api/gallery/faces",
+    remaining: "to check",
+    progressLabel: "Face Check Progress",
+  },
+  STUDIO_GALLERY_CAPTIONS: {
+    route: "/api/gallery/captions",
+    remaining: "to caption",
+    progressLabel: "Caption Progress",
+    scopeLabel: "Images to Caption",
+  },
+  STUDIO_IMAGE_SEARCH: {
+    route: "/api/gallery/embeddings",
+    remaining: "to index",
+    progressLabel: "Index Progress",
+  },
+};
+
+/** Settings › Studio: Studio-wide defaults, the work Studio does on its own, and failed items. */
+export function StudioSettings() {
   const deployment = useQuery(deploymentQuery);
   const profiles = useQuery(modelsQuery).data?.profiles ?? [];
   const save = useDeploymentSetting();
-  const multiUser = useAccount().data?.mode === "multi-user";
-  if (deployment.isPending) return <LoadingState label="Loading Generation" fill />;
+  if (deployment.isPending) return <LoadingState label="Loading Studio" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
-  const { defaults } = deployment.data;
+  const { defaults, catalogue } = deployment.data;
   const profileSelect = (kind: "image" | "video", setting: Setting) => {
     const label = kind === "image" ? "Image Profile" : "Video Profile";
     const offered = defaults.profiles.filter((profile) => profile.kind === kind);
@@ -38,6 +67,27 @@ export function GenerationSettings() {
           onChange={(profile) => save.mutate({ key: setting.key, value: profile?.id ?? "" })}
           disabled={setting.locked}
         />
+      </SettingRow>
+    );
+  };
+  const flagRow = (flag: Flag) => {
+    const toggle = (
+      <Switch
+        aria-label={flag.label}
+        checked={flag.value}
+        disabled={flag.locked}
+        onChange={(event) => save.mutate({ key: flag.key, value: event.currentTarget.checked })}
+      />
+    );
+    const description = `${flag.description}${lockedNote(flag)}`;
+    const pass = passes[flag.key];
+    return pass ? (
+      <GalleryPass key={flag.key} {...pass} label={flag.label} description={description}>
+        {toggle}
+      </GalleryPass>
+    ) : (
+      <SettingRow key={flag.key} label={flag.label} description={description}>
+        {toggle}
       </SettingRow>
     );
   };
@@ -67,11 +117,10 @@ export function GenerationSettings() {
           />
         </SettingRow>
       </SettingGroup>
-      {multiUser && (
-        <SettingGroup title="Danger Zone" danger>
-          <DeleteFailedItems others />
-        </SettingGroup>
-      )}
+      <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
+      <SettingGroup title="Danger Zone" danger>
+        <DeleteFailedItems />
+      </SettingGroup>
     </Stack>
   );
 }

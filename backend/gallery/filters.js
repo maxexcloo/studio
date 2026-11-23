@@ -95,10 +95,6 @@ export function galleryFiltersTest(filters = {}) {
   };
 }
 
-/** Whether one item passes the structured filters. */
-export const matchesGalleryFilters = (item, filters = {}) =>
-  galleryFiltersTest(filters)?.(item) ?? true;
-
 /** An item's caption tags, lowercase as the captioner writes them. */
 export const captionTags = (item) =>
   Array.isArray(item?.caption?.tags)

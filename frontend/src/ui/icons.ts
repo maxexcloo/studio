@@ -1,8 +1,10 @@
 import {
   Activity,
   ArrowDownUp,
+  ArrowLeftRight,
   Blend,
   Bookmark,
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -11,6 +13,7 @@ import {
   ContactRound,
   Copy,
   CopyPlus,
+  Dices,
   Download,
   Ellipsis,
   ExternalLink,
@@ -20,24 +23,33 @@ import {
   Files,
   Flag,
   FolderOpen,
+  FolderUp,
   GalleryHorizontalEnd,
   Gauge,
+  Image,
+  ImageDown,
+  ImageOff,
   ImagePlus,
   ImageUp,
   ImageUpscale,
   Import,
   Info,
+  KeyRound,
   Layers,
   LayoutDashboard,
+  Library,
   Link,
   List,
+  ListChecks,
   ListFilter,
   ListRestart,
   ListX,
+  LogOut,
   type LucideIcon,
   MapPinned,
   Maximize2,
   MessageCircle,
+  Minus,
   Moon,
   PanelsTopLeft,
   Pause,
@@ -48,33 +60,46 @@ import {
   Puzzle,
   Redo2,
   RefreshCw,
+  Repeat,
   Repeat2,
+  Replace,
+  Rewind,
   RotateCcw,
   RotateCw,
   Rows2,
+  ScanFace,
   ScanSearch,
   ScanText,
   ScrollText,
   Settings,
   Share,
   ShieldCheck,
+  ShieldUser,
   Shirt,
   Shuffle,
   SlidersHorizontal,
+  Snail,
   Square,
   SquareCheck,
   TextCursorInput,
+  TextQuote,
   ThumbsDown,
   ThumbsUp,
   Trash2,
   Trophy,
   Undo2,
+  Unlink,
   Upload,
+  UserCheck,
   UserRound,
+  UserX,
+  Video,
   Volume2,
   VolumeX,
   WandSparkles,
+  Waves,
   X,
+  Zap,
 } from "lucide-react";
 import { createElement, forwardRef } from "react";
 
@@ -83,12 +108,18 @@ const filled = (Icon: LucideIcon): LucideIcon =>
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
+  /** Accepting a proposal, such as an import's substitute model. */
+  accept: Check,
   account: UserRound,
   /** Adding something: a new record, such as New Character, or a reference to an empty slot. */
   add: Plus,
+  /** Making an account an administrator; Make User takes `account`. */
+  administrator: ShieldUser,
   animate: Play,
   /** Prompt assistance, including suggestions and templates. */
   assistant: WandSparkles,
+  /** Playing a video forwards then backwards (Back & Forth). */
+  backAndForth: ArrowLeftRight,
   /** Measuring a local text model's speed (Settings › Workers). */
   benchmark: Gauge,
   /** Character cards: their tab, section and Use as Character. */
@@ -104,11 +135,19 @@ export const icons = {
   compareSideBySide: Columns2,
   /** Two versions one above the other (Compare Upscale on phones). */
   compareStacked: Rows2,
+  /** Converting a profile to another backend, such as Convert to Radiance. */
+  convert: Zap,
   copy: Copy,
+  /** Copying an item's settings as text (Copy Details). */
+  copyDetails: ListChecks,
+  copyPrompt: TextQuote,
   /** Custom…: asking in one's own words, such as Custom Animation. */
   custom: PenLine,
   delete: Trash2,
+  /** Deleting an account's whole gallery. */
+  deleteGallery: ImageOff,
   details: Info,
+  disableAccount: UserX,
   /** Disliking an item hides it from the gallery; again, in its Disliked view, restores it. */
   dislike: ThumbsDown,
   download: Download,
@@ -116,17 +155,23 @@ export const icons = {
   /** Duplicating a record into a new one, such as Duplicate Profile…. */
   duplicate: Files,
   edit: Pencil,
+  enableAccount: UserCheck,
   /** A link that opens another site in a new tab. */
   external: ExternalLink,
   /** Continuing a video from its last frame. */
   extend: FastForward,
+  /** Face Detail: refining faces as part of an upscale. */
+  faceDetail: ScanFace,
   filter: ListFilter,
   /** Hiding a revealed secret again, such as the MCP token. */
   hide: EyeOff,
+  /** Image mode and image work, as against video. */
+  image: Image,
   /** Bringing something in from elsewhere: Library › Imports and the gallery's Import ▾. */
   import: Import,
   /** Keeping something: Dream's Accept and a comparison's Both. */
   keep: CircleCheck,
+  library: Library,
   like: ThumbsUp,
   /** A pasted web link, such as Import › From URL. */
   link: Link,
@@ -145,6 +190,8 @@ export const icons = {
   outfit: Shirt,
   /** A Dream project's pacing: its share of turns, pausing it or varying its results. */
   pacing: Activity,
+  /** Setting or resetting a password. */
+  password: KeyRound,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: filled(Pause),
@@ -165,7 +212,11 @@ export const icons = {
   reference: ImagePlus,
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
+  /** Rejecting a proposal, as against `accept`. */
+  reject: X,
   rename: TextCursorInput,
+  /** Putting another record in a record's place, such as a reference in its slot. */
+  replace: Replace,
   /** Report Issue…: saying what is wrong with a result so Studio fixes it. */
   report: Flag,
   /** Returning a text to where it started, such as the viewer's prompt. */
@@ -173,32 +224,52 @@ export const icons = {
   /** Starting or resuming work, beside Pause or Stop. */
   resume: filled(Play),
   retry: RotateCw,
+  /** Playing a video backwards (Reverse). */
+  reverse: Rewind,
   /** Showing a written prompt for editing before it runs (Review Prompt). */
   review: ScanText,
   /** A taste rule, a limit every prompt keeps, as Dream's Inbox proposes one. */
   rule: ShieldCheck,
+  /** Running an item again with its own seed (Run Again, Same Seed). */
+  sameSeed: Repeat,
+  /** Saving a video's frame as an image. */
+  saveFrame: ImageDown,
   /** A scene card (Library › Scenes). */
   scene: MapPinned,
+  /** A random seed. */
+  seed: Dices,
   select: SquareCheck,
   settings: Settings,
   share: Share,
   /** A character's design sheet (Make Sheet). */
   sheet: LayoutDashboard,
-  /** Revealing a hidden secret, such as the MCP token. */
+  /** Revealing something hidden: the MCP token, or the upscale in place of the original. */
   show: Eye,
   shuffle: Shuffle,
+  signOut: LogOut,
   /** Image discovery and the gallery ranked by likeness to an image (Similar). */
   similar: ScanSearch,
+  slowMotion: Snail,
+  smoothMotion: Waves,
   sort: ArrowDownUp,
   sound: Volume2,
   stop: filled(Square),
   templates: PanelsTopLeft,
   undo: Undo2,
   unfinished: ListRestart,
+  /** Removing a link to another account, such as a chat gateway identity. */
+  unlink: Unlink,
   upload: Upload,
+  uploadFolder: FolderUp,
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
   uploads: ImageUp,
   upscale: ImageUpscale,
   versions: Layers,
+  /** Video mode and video work, as against image. */
+  video: Video,
   winner: Trophy,
+  /** Zooming in, or larger gallery tiles. */
+  zoomIn: Plus,
+  /** Zooming out, or smaller gallery tiles. */
+  zoomOut: Minus,
 } satisfies Record<string, LucideIcon>;

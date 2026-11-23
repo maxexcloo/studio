@@ -238,13 +238,12 @@ export async function fixtures(page: Page) {
 
   const preferences = {
     preferences: {
-      cloudModels: true,
       loras: true,
       tileCaptions: false,
       uncensoredModels: true,
     } as Record<string, unknown>,
     saved: [] as string[],
-    grants: { cloudModels: false, loras: false, uncensoredModels: false },
+    grants: { loras: false, uncensoredModels: false },
   };
 
   await page.route("**/api/**", async (route) => {
@@ -303,7 +302,16 @@ export async function fixtures(page: Page) {
           textModels: ["cloud/auto", "local/auto"],
           profiles: [],
         },
-        catalogue: [],
+        catalogue: [
+          {
+            key: "STUDIO_GALLERY_CAPTIONS",
+            label: "Gallery Captions",
+            description: "Caption images for search.",
+            value: true,
+            source: "default",
+            locked: false,
+          },
+        ],
         dream: deploymentDream,
       });
     }
@@ -1213,7 +1221,10 @@ export async function withSettings(page: Page, steps: () => Promise<void>) {
 }
 
 /** Opens one of the gallery's views from its toolbar. */
-export async function showGalleryView(page: Page, choice: "Gallery" | "Uploads" | "Review") {
+export async function showGalleryView(
+  page: Page,
+  choice: "Gallery" | "Uploads" | "Comparisons" | "Review",
+) {
   const view = page.getByRole("button", { name: "Gallery View", exact: true });
   if ((await view.innerText()) !== choice) {
     await view.click();
@@ -1340,7 +1351,7 @@ export async function loadSaved(page: Page, name: string) {
 /** Renames the current preset from the open popup's menu. */
 export async function renamePreset(page: Page, name: string) {
   await page.getByRole("button", { name: "Preset Actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Rename Preset", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   const field = page.getByRole("combobox", { name: "Preset Name", exact: true });
   await expect(field).toBeFocused();
   await field.fill(name);

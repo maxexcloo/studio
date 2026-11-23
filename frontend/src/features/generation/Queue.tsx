@@ -19,14 +19,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  CircleAlert,
-  GripVertical,
-  Image,
-  type LucideIcon,
-  Video,
-} from "lucide-react";
+import { ChevronDown, CircleAlert, GripVertical, type LucideIcon } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useCallback, useEffect, useId, useState } from "react";
 
 import { loraName } from "../../../../shared/profiles";
@@ -433,7 +426,7 @@ function RowLead({
 }
 
 const kindIcon = (job: QueueJob, failed: boolean) =>
-  failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
+  failed ? CircleAlert : job.input?.kind === "video" ? icons.video : icons.image;
 
 function queueProfile(job: QueueJob, profiles: Profile[]) {
   const recorded = job.items?.[0]?.settings;

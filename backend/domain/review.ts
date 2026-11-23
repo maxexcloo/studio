@@ -87,6 +87,8 @@ export function reviewReply(reply: { score?: unknown; miss?: unknown }) {
  * images, and its review saved on the result. A changed brief makes recent results due again.
  */
 export function createReview(options: {
+  /** The Settings › Maintenance switch (STUDIO_SELF_REVIEW). */
+  enabled(): boolean;
   writer: ReviewWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
@@ -127,7 +129,7 @@ export function createReview(options: {
   return createIdleWork<ReviewItem>({
     ...options,
     name: "Self-review",
-    enabled: () => true,
+    off: "Self-Review is off in Settings › Maintenance.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
       vision.local = await writer.supportsVision({ side: "local", uncensored: false });

@@ -16,6 +16,7 @@ const tierWords = {
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const maxChats = 500;
+const keptReferencesMs = 30 * 60_000;
 
 /**
  * Each conversation's own choices, which a summarised chat forgets: LoRAs off, the model or tier
@@ -47,6 +48,19 @@ export function createChatChoices({ dataDir, now = Date.now }) {
       for (const old of keys.slice(0, Math.max(0, keys.length - maxChats))) delete saved[old];
       writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
     },
+    /**
+     * Remembers the references a generate call named (attached images arrive on their own turn
+     * only), or forgets them for an empty list.
+     */
+    rememberReferences(owner, chat, ids) {
+      if (!chat) return;
+      const saved = all();
+      const choices = { ...saved[key(owner, chat)] };
+      if (ids.length) choices.references = { ids, at: now() };
+      else delete choices.references;
+      saved[key(owner, chat)] = { ...choices, at: now() };
+      writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
+    },
   };
 }
 
@@ -54,9 +68,22 @@ export function createChatChoices({ dataDir, now = Date.now }) {
  * A generate call with the chat's earlier choices filled in where it left them out (the model is
  * generate's, as a model named in the request wins), and what it kept.
  */
-export function keptChoices(choices, input) {
+export function keptChoices(choices, input, at = Date.now()) {
   const next = { ...input };
   const kept = [];
+  // A follow-up ("go" after a preview) keeps the chat's recent references unless it names its own.
+  const references = choices.references;
+  if (
+    input.reference_asset_ids === undefined &&
+    !input.character &&
+    references?.ids.length &&
+    at - references.at < keptReferencesMs
+  ) {
+    next.reference_asset_ids = references.ids;
+    kept.push(
+      `references ${references.ids.join(", ")} (pass reference_asset_ids: [] to leave them out)`,
+    );
+  }
   if (input.title === undefined && choices.title) next.title = choices.title;
   if (input.loras === undefined && choices.loras === false) {
     next.loras = [];
@@ -116,7 +143,7 @@ export function projectArgs({ name, constraints }, args) {
  * Refuses prompts that name something the brief avoids, before any queues: an image model draws
  * what a prompt names, even after "no".
  */
-export function assertAvoided({ name, brief }, prompts, list = "that avoid list") {
+export function assertAvoided({ name, brief }, prompts) {
   const terms = brief.avoid
     .split(/[,;\n]+/)
     .map((term) => term.trim().replace(/^(?:no|without)\s+/i, ""))
@@ -130,7 +157,7 @@ export function assertAvoided({ name, brief }, prompts, list = "that avoid list"
     for (const { term, exact, motifs } of terms)
       if (exact.test(prompt) || motifs.some((motif) => mentionsMotif(prompt, motif)))
         throw new Error(
-          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or change ${list} if the user wants it.`,
+          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again; never remove an avoid to get past this.`,
         );
 }
 
@@ -217,11 +244,7 @@ export async function accountTaste(media, owner, signal) {
 export function assertTasteExclusions({ rules, avoid }, prompts) {
   const exclusions = [...new Set([...avoid, ...forbiddenMotifs([], rules)])];
   if (exclusions.length)
-    assertAvoided(
-      { name: "your Taste Profile", brief: { avoid: exclusions.join("\n") } },
-      prompts,
-      "your Taste Profile",
-    );
+    assertAvoided({ name: "your Taste Profile", brief: { avoid: exclusions.join("\n") } }, prompts);
 }
 
 /** Whether the account's recent results are converging on one look (domain/reflection.ts). */

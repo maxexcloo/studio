@@ -5,80 +5,86 @@ import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
+// Personal records first, then the shared Models and Prompting an administrator manages; each
+// group alphabetical, apart from Presets leading its own cards.
 export const librarySections = {
   presets: {
     label: "Presets",
     description: "Open a saved prompt or set of generation settings in Composer.",
     icon: icons.preset,
+    group: "Personal",
   },
   characters: {
     label: "Characters",
     description: "Reuse character descriptions and reference images.",
     icon: icons.character,
-    group: "Cards",
+    group: "Personal",
   },
   outfits: {
     label: "Outfits",
     description: "Reuse outfits across generations.",
     icon: icons.outfit,
-    group: "Cards",
+    group: "Personal",
   },
   scenes: {
     label: "Scenes",
     description: "Reuse locations and settings across generations.",
     icon: icons.scene,
-    group: "Cards",
-  },
-  guides: {
-    label: "Guides",
-    description: "Shared prompting guides for profiles and families. Every saved version is kept.",
-    icon: BookOpen,
-    admin: true,
-    group: "Generation",
-  },
-  loras: {
-    label: "LoRAs",
-    description: "Manage shared style and subject adapters. Choose them in Composer to generate.",
-    icon: icons.loras,
-    admin: true,
-    group: "Generation",
-  },
-  profiles: {
-    label: "Profiles",
-    description: "Shared generation profiles and workflows. Every saved version is kept.",
-    icon: FileCog,
-    admin: true,
-    group: "Generation",
-  },
-  promptInstructions: {
-    label: "Prompt Instructions",
-    description: "Read and edit the instructions Studio sends to its writers.",
-    icon: icons.prompt,
-    admin: true,
-    group: "Generation",
-  },
-  promptStyles: {
-    label: "Prompt Styles",
-    description: "Shared assistant styles and templates for Improve Prompt, Animate and Edit.",
-    icon: icons.assistant,
-    admin: true,
-    group: "Generation",
+    group: "Personal",
   },
   files: {
     label: "Files",
     description:
-      "Shared checkpoints, diffusion models, text encoders and VAEs. Choose a profile in Composer to generate.",
+      "Manage the shared checkpoints, diffusion models, text encoders and VAEs profiles use.",
     icon: Boxes,
     admin: true,
-    apart: true,
+    group: "Models",
   },
   imports: {
     label: "Imports",
-    description:
-      "Shared models and recipes from Civitai, Hugging Face or recipe images, and the files they need.",
+    description: "Import shared models and recipes from Civitai, Hugging Face or recipe images.",
     icon: icons.import,
     admin: true,
-    apart: true,
+    group: "Models",
+  },
+  loras: {
+    label: "LoRAs",
+    description: "Manage the shared style and subject adapters offered in Composer.",
+    icon: icons.loras,
+    admin: true,
+    group: "Models",
+  },
+  profiles: {
+    label: "Profiles",
+    description:
+      "Manage the shared generation profiles and workflows. Every saved version is kept.",
+    icon: FileCog,
+    admin: true,
+    group: "Models",
+  },
+  guides: {
+    label: "Guides",
+    description:
+      "Manage the prompting guides profiles and families use. Every saved version is kept.",
+    icon: BookOpen,
+    admin: true,
+    group: "Prompting",
+  },
+  promptInstructions: {
+    label: "Prompt Instructions",
+    description:
+      "Manage the instructions Studio sends to its writers. Every saved version is kept.",
+    icon: icons.prompt,
+    admin: true,
+    group: "Prompting",
+  },
+  promptStyles: {
+    label: "Prompt Styles",
+    description:
+      "Manage the assistant's styles and templates for Improve Prompt, Animate and Edit.",
+    icon: icons.assistant,
+    admin: true,
+    group: "Prompting",
   },
 };
 /** Administrators see the whole Library; other accounts only their Presets and cards. */

@@ -266,7 +266,7 @@ function MenuRows({
           link,
           onClick,
         } = action;
-        const describedBy = `${uid}-${id}`;
+        const describedBy = `${uid}-${id}-description`;
         const radioMenu = action.menu?.some((group) =>
           group.some((option) => option.selected !== undefined),
         );
@@ -352,7 +352,7 @@ function MenuRows({
             <Menu.Item
               key={id}
               {...trigger}
-              id={describedBy}
+              id={`${uid}-${id}`}
               rightSection={<ChevronRight size={14} />}
               aria-haspopup="menu"
               aria-expanded={false}

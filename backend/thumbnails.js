@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import sharp from "sharp";
+
 import { displayEdge } from "../shared/media.ts";
 import {
   comfyFileUrl,
@@ -13,7 +15,6 @@ import { logEvent } from "./crash-log.js";
 import { dataDir } from "./data-dir.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaType } from "./media-paths.js";
-import { loadSharp } from "./sharp-loader.js";
 import { digest } from "./values.js";
 
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
@@ -168,7 +169,7 @@ export async function sweepThumbnails({
       removed += 1;
       freedBytes += entry.size;
     } catch {
-      // Open elsewhere (Windows): the next sweep tries again.
+      // The next sweep tries again.
     }
   }
   return { removed, freedBytes, totalBytes: totalBytes - freedBytes };
@@ -302,8 +303,6 @@ async function build(filename, subfolder, type, size, worker) {
 
 async function writeThumbnail(key, sourceHash, source, size = "thumb") {
   const file = cachePath(key, sourceHash);
-  const sharp = await loadSharp();
-  if (!sharp) return { original: true };
   const { longestEdge, quality } = renditionOf(size);
   // .rotate() turns a phone photo (a library image) upright by its EXIF
   // orientation, which WebP doesn't carry; outputs have none and are unchanged.
@@ -324,7 +323,7 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
       fs.rmSync(path.join(thumbnailDir, entry), { force: true });
       indexRemove(entry);
     } catch {
-      /* in use (Windows); next build retries */
+      /* next build retries */
     }
   }
   indexAdd(name);
@@ -334,8 +333,7 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
 }
 
 // Concurrent requests for the same not-yet-cached image share one build instead of
-// each downloading and resizing the source independently. Without sharp there is
-// nothing to build: an earlier thumbnail, else `{ original: true }` (serve the full image).
+// each downloading and resizing the source independently.
 // `size` is a rendition: "thumb" for the grid, "display" for the viewer; `worker` holds a ComfyUI file.
 export async function getThumbnail(filename, subfolder, type, size = "thumb", worker = "") {
   const result = await findOrBuild(filename, subfolder, type, size, worker);
@@ -356,8 +354,6 @@ export function warmThumbnail(
 
 async function findOrBuild(filename, subfolder, type, size = "thumb", worker = "") {
   if (!RENDITIONS[size]) size = "thumb";
-  if (!(await loadSharp()))
-    return cachedThumbnail(cacheKey(filename, subfolder, type, size)) || { original: true };
   const dedupeKey = `${size}:${type}:${subfolder}:${filename}`;
   if (pending.has(dedupeKey)) return pending.get(dedupeKey);
   const promise = build(filename, subfolder, type, size, worker).finally(() =>

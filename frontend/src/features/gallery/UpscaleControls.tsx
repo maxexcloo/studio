@@ -5,7 +5,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Eye, ScanFace } from "lucide-react";
 
 import { titleCase } from "../../../../shared/titles";
 import {
@@ -204,7 +203,7 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
           {
             id: "upscale-face",
             label: "Face Detail",
-            icon: ScanFace,
+            icon: icons.faceDetail,
             checked: quick.faceDetail,
             disabled: !quick.faceAvailable,
             keepOpen: true,
@@ -272,7 +271,7 @@ export function useUpscaleAction(
               {
                 id: "show-upscale",
                 label: "Show Upscale",
-                icon: Eye,
+                icon: icons.show,
                 checked: Boolean(item.upscaleActive),
                 disabled: version.isPending,
                 onClick: () => version.mutate(!item.upscaleActive),

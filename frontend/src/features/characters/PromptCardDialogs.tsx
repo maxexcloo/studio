@@ -87,7 +87,7 @@ export function usePromptCardDialogs(
         <ConfirmDialog
           opened={deleting !== null}
           title={`Delete ${noun}`}
-          action={`Delete ${noun}`}
+          action="Delete"
           pending={deletion.isPending}
           error={deletion.error?.message}
           zIndex={getDefaultZIndex("overlay")}
@@ -174,7 +174,6 @@ export function PromptCardMenu({
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
 }) {
-  const { noun } = promptCardText[kind];
   const ratings = useCardRating(kind, card);
   return (
     <Menu position="bottom-end" width={menuWidth} withinPortal={withinPortal}>
@@ -186,10 +185,10 @@ export function PromptCardMenu({
       <Menu.Dropdown>
         <ActionMenuItems
           groups={[
-            [{ id: "edit", label: `Edit ${noun}`, icon: icons.edit, onClick: onEdit }],
+            [{ id: "edit", label: "Edit", icon: icons.edit, onClick: onEdit }],
             ...itemActionGroups([
               ...ratings,
-              itemAction("delete", { label: `Delete ${noun}`, onClick: onDelete }),
+              itemAction("delete", { label: "Delete", onClick: onDelete }),
             ]),
           ]}
         />

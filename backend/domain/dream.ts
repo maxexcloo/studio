@@ -62,7 +62,9 @@ import {
   forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
+  mentionsMotif,
   motifWindow,
+  namedMotif,
   normalised,
   phraseWords,
   recentPromptCharacters,
@@ -101,6 +103,8 @@ export interface DreamOrigin {
   spicy?: true;
   /** Named card details quoted from the written prompt. */
   cardContext?: ResultContext;
+  /** A new idea's optional motifs, paused for later ideas once it is passed as too similar. */
+  motifs?: string[];
   pair?: DreamPair;
   /**
    * How the idea came about: "exploit", "explore:<axis>" for the first thing it tried,
@@ -119,7 +123,7 @@ export interface DreamOrigin {
   state?: "draft";
 }
 /**
- * A series: Dream follows a liked or kept image's character through one night, a later time
+ * A series: Dream follows a liked or kept image's character through one night or day, a later time
  * and a new place each result, on its profile with its LoRAs, size and references, grouped as one
  * result set.
  */
@@ -128,7 +132,7 @@ interface DreamSeries {
   /** The liked or kept image it follows. */
   itemId: string;
   title: string;
-  /** Each result's place and time of night, in order. */
+  /** Each result's place and time of night or day (`night`), in order. */
   stops: { title: string; place: string; night: string }[];
   /** The next result's position in the set. */
   index: number;
@@ -302,7 +306,7 @@ interface DreamWriting {
   /** A prompt to continue, changing only `vary` (a `continueAxes` key) or a series' place and time. */
   seed?: string;
   vary?: string;
-  /** A series' next result, following `seed`: its set, place and time of night (DreamSeries). */
+  /** A series' next result, following `seed`: its set, place and time of night or day (DreamSeries). */
   series?: {
     id: string;
     place: string;
@@ -424,7 +428,8 @@ const seriesShare = 2;
 const extendShare = 35;
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
-const videoExploreDraw = 3;
+/** One video in this many runs on another video model than the account's default, so videos vary. */
+const videoExploreDraw = 2;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
@@ -467,6 +472,31 @@ const seriesNights: [string, string][] = [
   ["Small Hours", "the small hours"],
   ["Before Dawn", "just before dawn"],
 ];
+const seriesDayPlaces: [string, string][] = [
+  ["Farmers Market", "a busy farmers market"],
+  ["Hiking Trail", "a hiking trail above a lake"],
+  ["Park", "a sunny city park"],
+  ["Boardwalk", "a seaside boardwalk"],
+  ["Botanical Garden", "a botanical garden glasshouse"],
+  ["Cafe Terrace", "a sidewalk cafe terrace"],
+  ["Sailboat", "a small sailboat on open water"],
+  ["Flower Field", "a field of wildflowers"],
+  ["Old Town Square", "an old town square"],
+  ["Beach", "a bright beach at midday"],
+];
+const seriesDays: [string, string][] = [
+  ["Early Morning", "early morning, soft low sun"],
+  ["Morning", "mid-morning"],
+  ["Midday", "midday"],
+  ["Afternoon", "early afternoon"],
+  ["Late Afternoon", "late afternoon"],
+  ["Golden Hour", "golden hour"],
+];
+/** A series spends one night out or one day out, each through its own places and times. */
+const seriesOutings = [
+  { title: "Night Out", places: seriesPlaces, times: seriesNights },
+  { title: "Day Out", places: seriesDayPlaces, times: seriesDays },
+];
 /**
  * Projects share Dream's turns by how their results fare (`turnShares`). Stats read the newest
  * `read` Dream results and last `keptMs`; a project card shows its newest `results`.
@@ -480,6 +510,13 @@ const usedLimit = 500;
 const recentIdeas = 100;
 /** The writer avoids this many of the latest disliked subjects. */
 const avoidDislikes = 8;
+/** The writer sees this many recent subjects, and this many recent prompts cut to this length. */
+const writerSubjects = 30;
+const writerPrompts = { count: 10, characters: 200 };
+/** Profiles and LoRAs weigh by their keep rate over this many of the latest judged Dream images. */
+const judgedRates = 200;
+/** Dream revisits a concept only once it is liked more than twice. */
+const featuredLikes = 3;
 /**
  * Calibration seeds and the writer's liked prompts draw from the account's likes. Calibration
  * sometimes includes Dream's own results and keeps.
@@ -710,6 +747,8 @@ export function createDream(options: {
   remove(ownerId: string, itemIds: string[]): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
+  /** The LoRAs the catalogue marks uncensored; Dream loads them only with Uncensored. */
+  uncensoredLoras(): ReadonlySet<string>;
   /**
    * The LoRAs that can run on the profile (its model family), strengths within published ranges;
    * one without a strength starts at its recommended one.
@@ -880,27 +919,25 @@ export function createDream(options: {
   }
   /** Comparisons and sets are ready when the rest of their work has finished. */
   function readyUnseen<T extends DreamReadiness>(ownerId: string, all: T[], openSeries?: string) {
-    const pendingPairs = new Set<string>();
     const pendingSets = new Set(openSeries ? [openSeries] : []);
-    const triples = new Map<string, T[]>();
+    const finished = new Map<string, T[]>();
     for (const item of all) {
       const pair = item.dream?.pair;
-      if (pair?.size === 3 && item.status === "done") {
-        const members = triples.get(pair.id) ?? [];
+      if (pair && item.status === "done") {
+        const members = finished.get(pair.id) ?? [];
         members.push(item);
-        triples.set(pair.id, members);
+        finished.set(pair.id, members);
       }
       if (finishedItemStatuses.has(item.status || "")) continue;
-      if (pair) pendingPairs.add(pair.id);
       const set = dreamSet(item);
       if (set) pendingSets.add(set.id);
     }
     const incomplete = new Set(
-      [...triples]
+      [...finished]
         .filter(([, items]) => !completeComparison(orderedSides(items)))
         .map(([id]) => id),
     );
-    const runningTriples = new Set(
+    const running = new Set(
       incomplete.size ? store.openDreamJobs(ownerId).map((job) => job.pairId) : [],
     );
     return all.flatMap((item) => {
@@ -908,21 +945,27 @@ export function createDream(options: {
       const pair = item.dream?.pair;
       if (pair) {
         if (admittingComparisons.has(pair.id)) return [];
-        // A failed or interrupted triple leaves its finished results for individual review.
+        // A failed or interrupted comparison leaves its finished results for individual review.
         if (incomplete.has(pair.id))
-          return runningTriples.has(pair.id)
+          return running.has(pair.id)
             ? []
             : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
-        return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
+        return [item];
       }
       const set = dreamSet(item);
       return !set || !pendingSets.has(set.id) ? [item] : [];
     });
   }
+  /** The series Dream is still adding to, whose results wait until it ends; none once images stop. */
+  const openSeries = ({ series, settings }: DreamRecord) =>
+    settings.enabled && settings.images && settings.dailyImages > 0 ? series?.id : undefined;
   function unseen(ownerId: string) {
     const all = pool(ownerId, "unseen");
-    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
-    return readyUnseen(ownerId, all, openSeries).reverse();
+    return readyUnseen(
+      ownerId,
+      all,
+      all.some(dreamSet) ? openSeries(read(ownerId)) : undefined,
+    ).reverse();
   }
   let considering: { ownerId: string; latest?: DreamItem[] } | undefined;
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
@@ -941,9 +984,33 @@ export function createDream(options: {
   }
   /**
    * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
-   * latest images within a day (`diversity`).
+   * latest images within a day (`diversity`), times its keep rate among the latest judged ones: a
+   * pass for any reason but likeness counts weakly against it, as a keep counts for it.
    */
   function spread(ownerId: string) {
+    const judged = new Map<string, { kept: number; total: number }>();
+    for (const item of options.gallery(ownerId, {
+      dreamState: ["kept", "discarded"],
+      type: "image",
+      limit: judgedRates,
+    })) {
+      if (item.dream?.passReason === "similar") continue;
+      const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
+      for (const key of [
+        `profile:${item.settings?.profileId}`,
+        ...loras.map((lora) => `lora:${(lora as { name?: string })?.name}`),
+      ]) {
+        const entry = judged.get(key) ?? { kept: 0, total: 0 };
+        entry.total++;
+        if (item.dream?.state === "kept") entry.kept++;
+        judged.set(key, entry);
+      }
+    }
+    // Laplace's rule: an untried profile or LoRA starts at one half.
+    const keepRate = (key: string) => {
+      const { kept, total } = judged.get(key) ?? { kept: 0, total: 0 };
+      return (kept + 1) / (total + 2);
+    };
     const jobs = store
       .dreamJobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
       .filter((job) => kindOf(job) === "image")
@@ -958,7 +1025,8 @@ export function createDream(options: {
         used.set(key, (used.get(key) || 0) + 1);
     }
     return (key: string) =>
-      Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
+      Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1)) *
+      keepRate(key);
   }
   /**
    * Profiles whose last `streak` Dream jobs within `failWindowMs` all failed on their worker, so
@@ -1029,10 +1097,26 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
-  /** One of the person's own shapes or tags where they set them, else one drawn by its score. */
-  const favourite = (taste: TasteRecord, field: "shapes" | "tags", prefix: string) => {
-    const own = taste.preferences[field];
-    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, prefix);
+  /** One of the person's own shapes where they set them, else one drawn by its score. */
+  const favouriteShape = (taste: TasteRecord) => {
+    const own = taste.preferences.shapes;
+    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, "aspect:");
+  };
+  /**
+   * A tag to feature: one of the person's own where they set them, else one drawn by its score
+   * among those liked at least `featuredLikes` times; never one their rules leave out or that is
+   * cooling down (`motifs`).
+   */
+  const featuredTag = (taste: TasteRecord, motifs: string[]) => {
+    const open = (tag: string) => !motifs.some((motif) => mentionsMotif(tag, motif));
+    const own = taste.preferences.tags;
+    if (own) return drawn(own.filter(open).map((value) => [value, 1]));
+    return drawn(
+      [...taste.scores]
+        .filter(([attribute, { liked }]) => attribute.startsWith("tag:") && liked >= featuredLikes)
+        .map(([attribute, { score }]): [string, number] => [attribute.slice(4), score])
+        .filter(([tag]) => open(tag)),
+    );
   };
   /**
    * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (evenly
@@ -1128,7 +1212,7 @@ export function createDream(options: {
   }
   /**
    * The series to continue, or for a share of images a new one following a drawn liked or kept
-   * image (`seedPick`) through a night: from a drawn time on, through places from the account's
+   * image (`seedPick`) through a night or a day (`seriesOutings`): from a drawn time on, through places from the account's
    * scene cards and drawn ones. Null otherwise; a series whose image is no longer liked or kept,
    * or whose profile is gone, ends.
    */
@@ -1146,6 +1230,7 @@ export function createDream(options: {
     }
     const seed = await seedPick(ownerId, record, profiles);
     if (!seed || !chance(seriesShare)) return null;
+    const outing = pick(seriesOutings);
     const scenes = suggestedCards(options.cards(ownerId)?.scenes || []).filter(
       (scene) => scene.description,
     );
@@ -1156,20 +1241,18 @@ export function createDream(options: {
     const favourites = scenes.filter((scene) => scene.rating === "liked").map(placeOf);
     const places = [
       ...scenes.filter((scene) => scene.rating !== "liked").map(placeOf),
-      ...seriesPlaces,
+      ...outing.places,
     ];
-    const first = random(seriesNights.length - dreamSeriesLength + 1);
-    const stops = seriesNights
-      .slice(first, first + dreamSeriesLength)
-      .map(([nightTitle, night]) => {
-        const pool = favourites.length ? favourites : places;
-        const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
-        return { title: `${placeTitle}, ${nightTitle}`, place, night };
-      });
+    const first = random(outing.times.length - dreamSeriesLength + 1);
+    const stops = outing.times.slice(first, first + dreamSeriesLength).map(([timeTitle, night]) => {
+      const pool = favourites.length ? favourites : places;
+      const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
+      return { title: `${placeTitle}, ${timeTitle}`, place, night };
+    });
     const series: DreamSeries = {
       id: randomUUID(),
       itemId: String(seed.item.id),
-      title: seed.item.title ? `${seed.item.title} · Night Out`.slice(0, 80) : "Night Out",
+      title: seed.item.title ? `${seed.item.title} · ${outing.title}`.slice(0, 80) : outing.title,
       stops,
       index: 0,
       length: dreamSeriesLength,
@@ -1413,10 +1496,14 @@ export function createDream(options: {
   const repeats = (item: DreamItem, recent: DreamItem[]) =>
     recent.some((prior) => related(item, prior) || sameConcept(item, prior));
 
+  /** The optional motifs of ideas passed as too similar lately, paused for new ideas. */
+  const pausedMotifs = (similar: DreamItem[]) =>
+    similar.flatMap((item) => item.dream?.motifs ?? []);
   const seedMotifs = (ownerId: string, record: DreamRecord) => {
     const { preferences, rules } = options.taste.read(ownerId);
-    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules);
-    return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden)];
+    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules, true);
+    const paused = pausedMotifs(similarPasses(ownerId));
+    return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden, paused)];
   };
 
   /** Three independent Super Likes on the same concept can seed an automatic variant. */
@@ -1578,7 +1665,7 @@ export function createDream(options: {
       ? drawnValue(taste, `steps:${profile.id}:`)
       : undefined;
     const cfg = drawnValue(taste, `cfg:${profile.id}:`);
-    const aspect = Number(kind === "image" && favourite(taste, "shapes", "aspect:"));
+    const aspect = Number(kind === "image" && favouriteShape(taste));
     const area = Number(profile.defaults?.width) * Number(profile.defaults?.height);
     // Sizes keep to multiples of 64, as the models' trained buckets do.
     const side = (length: number) => Math.max(64, Math.round(length / 64) * 64);
@@ -1717,10 +1804,13 @@ export function createDream(options: {
     const spicy =
       (job.input.writing as DreamWriting).spicy && record.settings.spicy && access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
-    const { summary, rules, likes, styles, avoid, preferences } = options.taste.read(ownerId);
+    const { summary, rules, likes, styles, preferences, learnt } = options.taste.read(ownerId);
+    // Their own avoids and those Studio learnt both steer the idea; only their own are enforced.
+    const avoid = [...new Set([...(preferences.avoid ?? []), ...learnt.avoid])];
     const forbidden = forbiddenMotifs(
       [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
       [...rules, project?.brief.rules ?? ""],
+      true,
     );
     const contentTaste = [
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
@@ -1753,7 +1843,10 @@ export function createDream(options: {
       ...brief.filter(([label]) => label !== "Avoid").map(([, value]) => value),
       ...rules,
     ].join("\n");
-    const cooling = newConcept ? cooledMotifs(record, fixed, forbidden) : [];
+    // More Like This follows its source; other ideas move away from what was passed as too similar.
+    const similar = like ? [] : similarPasses(ownerId);
+    const paused = pausedMotifs(similar);
+    const cooling = newConcept ? cooledMotifs(record, fixed, forbidden, paused) : [];
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}.`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
@@ -1793,7 +1886,7 @@ export function createDream(options: {
             ...(loras.length ? [`It loads these LoRAs: ${loras.join(", ")}`] : []),
             ...ruleLines,
             `Place: ${series.place}`,
-            `Time of night: ${series.night}`,
+            `Time: ${series.night}`,
             "Results so far:",
             ...(shots.length ? shots.map((shot) => `- ${clean(shot, 300)}`) : ["(none yet)"]),
           ].join("\n"),
@@ -1843,8 +1936,14 @@ export function createDream(options: {
         { role: "user", content: `Prompt: ${reword}` },
       ];
     else {
-      const liked = await tastePrompts(ownerId);
-      const library = project ? options.cards(ownerId) : null;
+      // Liked prompts that name what is excluded, cooling or passed as too similar would lead back to it.
+      const liked = (await tastePrompts(ownerId)).filter(
+        (prompt) =>
+          !namedMotif(prompt, forbidden) &&
+          !repeatedMotif(prompt, cooling) &&
+          !similar.some((item) => similarPrompt(prompt, item.prompt || item.dream?.prompt)),
+      );
+      const library = options.cards(ownerId);
       const openCards = library
         ? (["outfits", "scenes"] as const).flatMap((kind) =>
             pins?.[kind]
@@ -1871,7 +1970,6 @@ export function createDream(options: {
       noveltyPrompts.push(...liked);
       // More Like This follows its source; other ideas move away from what repeats.
       const repeats = like ? [] : lookalikes(ownerId);
-      const similar = like ? [] : similarPasses(ownerId);
       noveltyPrompts.push(...similar.map((item) => clean(item.prompt || item.dream?.prompt, 300)));
       const passed = options
         .gallery(ownerId, { rating: "disliked", limit: avoidDislikes })
@@ -1928,13 +2026,17 @@ export function createDream(options: {
             ...(!like
               ? [
                   "Recent Dream ideas to avoid:",
-                  ...(subjects.length ? subjects.map((subject) => `- ${subject}`) : ["(none yet)"]),
+                  ...(subjects.length
+                    ? subjects.slice(0, writerSubjects).map((subject) => `- ${subject}`)
+                    : ["(none yet)"]),
                 ]
               : []),
             ...(!like && recent.length
               ? [
                   "Recent prompts: avoid their underlying concepts, even with different wording:",
-                  ...recent.slice(0, diversity.results).map((prompt) => `- ${prompt}`),
+                  ...recent
+                    .slice(0, writerPrompts.count)
+                    .map((prompt) => `- ${clean(prompt, writerPrompts.characters)}`),
                 ]
               : []),
             ...(cooling.length
@@ -1964,7 +2066,7 @@ export function createDream(options: {
         },
       ];
     }
-    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects);
+    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed);
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
@@ -1974,7 +2076,7 @@ export function createDream(options: {
       const minor = options.minorAge(prompt);
       if (minor)
         return `"${minor}" reads as someone under 18; drop it, without adding "adult" or an age.`;
-      const excluded = repeatedMotif(prompt, forbidden);
+      const excluded = namedMotif(prompt, forbidden);
       if (excluded)
         return `Your prompt includes "${excluded}", which their rules or brief say to avoid.`;
       if (series)
@@ -2023,7 +2125,7 @@ export function createDream(options: {
               idea,
               title,
               chosenMotifs,
-              newConcept && latest ? cooledMotifs(latest, fixed, forbidden) : [],
+              newConcept && latest ? cooledMotifs(latest, fixed, forbidden, paused) : [],
             );
       if (!wrong) {
         if (latest) {
@@ -2055,10 +2157,11 @@ export function createDream(options: {
           thinking,
           model,
           ...(title ? { title } : {}),
+          ...(chosenMotifs.length ? { motifs: chosenMotifs } : {}),
           ...(cardContext && Object.keys(cardContext).length ? { cardContext } : {}),
         };
       }
-      if (attempt) throw new Error("The text model's idea was unusable.");
+      if (attempt) throw new Error(`The text model's idea was unusable: ${wrong}`);
       onThinking("\n");
       onDelta("\n");
       messages = [
@@ -2162,14 +2265,27 @@ export function createDream(options: {
       }
       const available = await options.catalogue(ownerId, access.account);
       const failing = failingProfiles(ownerId);
+      const hidden = allowUncensored ? new Set<string>() : options.uncensoredLoras();
       const catalogue = {
         ...available,
-        profiles: available.profiles.filter(
-          (profile) =>
-            isCloudProfile(profile) === (backend === "cloud") &&
-            (allowUncensored || !uncensoredDreamProfile(profile)) &&
-            !failing.has(profile.id),
-        ),
+        profiles: available.profiles
+          .filter(
+            (profile) =>
+              isCloudProfile(profile) === (backend === "cloud") &&
+              (allowUncensored || !uncensoredDreamProfile(profile)) &&
+              !failing.has(profile.id),
+          )
+          .map((profile) =>
+            hidden.size && profile.options?.loras
+              ? {
+                  ...profile,
+                  options: {
+                    ...profile.options,
+                    loras: profile.options.loras.filter((name) => !hidden.has(name)),
+                  },
+                }
+              : profile,
+          ),
       };
       const steer = kind === "image" && record.steer?.remaining ? record.steer : undefined;
       const restrictedSource =
@@ -2359,11 +2475,13 @@ export function createDream(options: {
             source: "character",
           },
         ];
-      // Extended Themes goes to a share of ideas, so the rest stay plain.
+      // Uncensored goes to a share of ideas, so the rest stay plain.
       const spicy = spicyShare(record, access);
       const explore = Boolean(axis);
       const feature =
-        steer || seed || axis === "prompt" ? undefined : favourite(taste, "tags", "tag:");
+        steer || seed || axis === "prompt"
+          ? undefined
+          : featuredTag(taste, seedMotifs(ownerId, record));
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
       const writing: DreamWriting = {
         kind: "dream",
@@ -2610,8 +2728,12 @@ export function createDream(options: {
       sample: seedSample,
     });
     const candidates = [];
+    // As comparisons do (pairBase), skip what is cooling, excluded or passed as too similar.
+    const recent = cooled(ownerId, record);
+    const motifs = seedMotifs(ownerId, record);
+    const hidden = allowsUncensored(ownerId) ? new Set<string>() : options.uncensoredLoras();
     for (const item of liked) {
-      if (!item.id || item.dream?.arm === "recreate") continue;
+      if (!item.id || item.dream?.arm === "recreate" || repeats(item, recent)) continue;
       const idBase = `dream-recreate-${createHash("sha256")
         .update(JSON.stringify([ownerId, item.id]))
         .digest("hex")}`;
@@ -2651,6 +2773,7 @@ export function createDream(options: {
       } = sizing;
       const prompt =
         typeof saved.typedPrompt === "string" ? saved.typedPrompt : String(source.input.prompt);
+      if (repeatedMotif(prompt, motifs)) continue;
       const base = {
         ...input,
         ...settingsOf(saved),
@@ -2666,6 +2789,8 @@ export function createDream(options: {
         { ...sizing, ...saved, referenceAssets, referenceRole },
         size,
       );
+      const stack = requestedLoras(base);
+      if (stack.some((lora) => hidden.has(lora.name))) continue;
       candidates.push({
         idBase,
         itemId: item.id,
@@ -2675,7 +2800,7 @@ export function createDream(options: {
         seed: hasSeed ? seed : undefined,
         size,
         target,
-        stack: requestedLoras(base),
+        stack,
         resolutionTier: saved.resolutionTier ?? sourceTier,
       });
     }
@@ -2731,7 +2856,7 @@ export function createDream(options: {
     return false;
   }
 
-  /** Whether a job is Extended Themes: a share of them, where the setting and Uncensored Models allow. */
+  /** Whether a job is Uncensored: a share of them, where the setting and Uncensored Models allow. */
   function spicyShare(record: DreamRecord, access: DreamAccess) {
     return record.settings.spicy && access.uncensored && chance(shares.spicy);
   }
@@ -3492,9 +3617,10 @@ export function createDream(options: {
     },
     unseen,
     unseenCount(ownerId: string) {
-      const { settings, series } = read(ownerId);
+      const record = read(ownerId);
+      const { settings } = record;
       const items = settings.enabled
-        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), series?.id)
+        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), openSeries(record))
         : [];
       return dreamCardCounts(items, settings);
     },
@@ -3514,8 +3640,9 @@ export function createDream(options: {
           (set && items.some((other) => other !== item && dreamSet(other)?.id === set.id))
         )
           throw failure("Choose a verdict for the whole card.", 409);
+        // As saved: an unfinished comparison's side shows without its pair, which it keeps.
         const mark: DreamMark = {
-          ...item.dream!,
+          ...find(ownerId, itemId).dream!,
           state: "kept",
           decidedAt: stamp(),
           superLiked: true,
@@ -3546,7 +3673,12 @@ export function createDream(options: {
           options.mark(
             ownerId,
             String(item.id),
-            { ...item.dream!, state: "discarded", decidedAt, passReason: reason },
+            {
+              ...find(ownerId, String(item.id)).dream!,
+              state: "discarded",
+              decidedAt,
+              passReason: reason,
+            },
             rating,
           );
         if (reason === "taste")

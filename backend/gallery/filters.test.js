@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { matchesGalleryFilters, topCaptionTags } from "./filters.js";
+import { aspectOf, galleryFiltersTest, sizeBandOf, topCaptionTags } from "./filters.js";
+
+const matchesGalleryFilters = (item, filters = {}) => galleryFiltersTest(filters)?.(item) ?? true;
 
 const item = {
   model: "flux.safetensors",
@@ -43,7 +45,6 @@ test("pending jobs remain visible while filtering completed media", () => {
 });
 
 test("size bands follow the long edge without overlap, and aspects are orientations with a square tolerance", async () => {
-  const { aspectOf, matchesGalleryFilters, sizeBandOf } = await import("./filters.js");
   const item = (width, height, extra = {}) => ({ status: "done", width, height, ...extra });
   assert.deepEqual(
     [1024, 1025, 1536, 1537, 2048, 2049].map((edge) => sizeBandOf(item(edge, 512))),

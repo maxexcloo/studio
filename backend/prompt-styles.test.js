@@ -43,13 +43,13 @@ test("saved theme labels follow the built-in names and preserve custom labels an
       label: style.kind === "animate" ? "Spicy" : "My Rewrite",
     }));
   const editable = styles.save(previous, { origin: "chat", aiDrafted: true });
-  assert.equal(styles.style("animate", "spicy").label, "Extended Themes");
+  assert.equal(styles.style("animate", "spicy").label, "Uncensored");
   assert.equal(styles.style("improve", "spicy").label, "My Rewrite");
   assert.deepEqual(
     editable.styles.find((style) => style.kind === "animate"),
     {
       ...previous.find((style) => style.kind === "animate"),
-      label: "Extended Themes",
+      label: "Uncensored",
     },
   );
   const before = fs.readFileSync(styles.file, "utf8");
@@ -93,10 +93,10 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
     "body-bounce",
     "cinematic",
     "dialogue",
-    "spicy",
     "hip-sway",
     "living",
     "reaction",
+    "spicy",
     "custom",
   ]);
   assert.deepEqual(ids("change"), [

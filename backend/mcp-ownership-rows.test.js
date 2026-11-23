@@ -76,5 +76,5 @@ test("mcpOwnership moves MCP's records into rows, and its links, numbers and res
   assert.deepEqual(media.promptRecord("job-a"), { prompt: "a lighthouse" });
   assert.equal(media.uploads.resolve("upload-link:abcdefghijklmnop"), "asset-1");
   assert.doesNotThrow(() => media.own("owner-2", "asset-2", "assets"));
-  assert.throws(() => media.own("owner-2", "job-a"), /submitted by this account/);
+  assert.throws(() => media.own("owner-2", "job-a"), /No job "job-a" was found for this account/);
 });

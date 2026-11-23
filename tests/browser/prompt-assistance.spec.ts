@@ -234,22 +234,25 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await expect(picker.getByRole("alert").filter({ hasText: failure })).toBeVisible();
   await expect(page.getByText(failure, { exact: true })).toHaveCount(1);
   await showLoraStack(page);
-  await expect(picker.getByRole("alert").filter({ hasText: failure })).toBeVisible();
-  await suggest.click();
-  await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();
-  // The backend adds trigger words when it runs; the prompt stays as written.
-  await expect(
-    page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
-  ).toBeDisabled();
-  await expect(prompt).toHaveValue("My later direction in warm light");
+  await expect(page.getByRole("alert").filter({ hasText: failure })).toBeVisible();
   if (testInfo.project.use.isMobile)
     await page.getByRole("button", { name: "Add LoRAs", exact: true }).click();
+  // A suggestion joins the stack at once; the backend adds trigger words when it runs.
+  await suggest.click();
+  await expect(prompt).toHaveValue("My later direction in warm light");
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await showLoraStack(page);
+  await expect(
+    page.getByRole("switch", { name: "Enable Detail Slider", exact: true }),
+  ).toBeChecked();
   await closeLoras(page);
-  await undoAssistance(page, "LoRA applied");
+  await undoAssistance(page, "LoRA added");
   await expect(prompt).toHaveValue("My later direction in warm light");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Enable Detail Slider", exact: true })).toHaveCount(
+    0,
+  );
   await closeLoras(page);
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -336,8 +339,9 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
     await expect(tools.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
     await expect(tools.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
   }
+  // Suggestions greys with its reason until it has options.
   await expect(menu.getByRole("menuitem")).toHaveText([
-    "Suggestions",
+    /^Suggestions/,
     "Templates",
     "Custom…",
     "Refresh",
@@ -402,16 +406,23 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(dialog).toBeHidden();
   await expect(prompt).toHaveValue("A castle at night");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
-  expect(asked).toEqual([
-    {
-      surface: "draft",
-      kind: "image",
-      profileId: "image:test",
-      prompt: "A castle at noon",
-      request: "make it night",
-      actions: ["recreate"],
-    },
-  ]);
+  // Opening the AI menu asked for the draft's suggestions before Custom… sent its request.
+  const suggestionsAsked = {
+    surface: "draft",
+    kind: "image",
+    profileId: "image:test",
+    prompt: "A castle at noon",
+    fresh: false,
+  };
+  const night = {
+    surface: "draft",
+    kind: "image",
+    profileId: "image:test",
+    prompt: "A castle at noon",
+    request: "make it night",
+    actions: ["recreate"],
+  };
+  expect(asked).toEqual([suggestionsAsked, night]);
   // Undo restores the draft; Custom… keeps the request for the next time.
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A castle at noon");
@@ -420,20 +431,16 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(request).toHaveValue("make it night");
   await request.press("Enter");
   await expect(prompt).toHaveValue("A castle at night");
-  // A suggestion fits the draft as it was before the proposal and asks at once.
+  // A suggestion fits the draft as it was before the proposal, reusing the menu's answer, and asks
+  // at once.
   await assist(page, "Custom…");
-  await promptMenu(dialog, "Change");
+  const change = await promptMenu(dialog, "Change");
+  await expandAssistantMenu(change, "Suggestions");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => asked.length).toBe(4);
   expect(asked.slice(2)).toEqual([
-    {
-      surface: "draft",
-      kind: "image",
-      profileId: "image:test",
-      prompt: "A castle at noon",
-      fresh: false,
-    },
+    night,
     {
       surface: "draft",
       kind: "image",

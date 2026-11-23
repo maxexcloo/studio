@@ -37,6 +37,7 @@ test("review scores each unseen project image against its brief and saves it", a
     { id: "beach", type: "image", status: "done", dream: { state: "unseen", projectId: "beach" } },
   ];
   const review = createReview({
+    enabled: () => true,
     writer: {
       supportsVision: async () => true,
       review: async ({ brief, explicit }) => (
@@ -84,6 +85,7 @@ test("review checks recent images against their owner's rules, again once the ru
     { id: "new", type: "image", status: "done", createdAt: made(1), prompt: "a fox" },
   ];
   const review = createReview({
+    enabled: () => true,
     writer: {
       supportsVision: async () => true,
       review: async ({ brief }) => (

@@ -118,6 +118,10 @@ const parkedReason = (label: string) =>
   `${label} is stopped: an administrator can start it in Settings › Workers.`;
 /** How long a swap for ComfyUI work outlasts its last waiting or running job. */
 const swapIdleMs = 2 * 60_000;
+/** How long automatic swaps wait after one to ComfyUI failed, and after Radiance returned. */
+const swapRetryMs = 5 * 60_000;
+const swapSettleMs = 60_000;
+const noSwapWork = "No ComfyUI work waits for the swap any more.";
 /** Waiting work asks for its workload every second; an older ask has moved or gone. */
 const wantedMs = 30_000;
 /** How long Radiance has had no work before Studio restarts it to free host memory. */
@@ -150,6 +154,8 @@ export class RuntimeController {
   private wanted = new Map<string, number>();
   /** When ComfyUI work last waited or finished; a swap outlasts it by swapIdleMs. */
   private comfyUsedAt: number;
+  /** Until when waiting ComfyUI work doesn't swap the GPUs, and why it waits. */
+  private swapHold?: { until: number; reason: string };
   /** When work last started or finished on each workload. */
   private usedAt = new Map<string, number>();
   private stopping = new Set<string>();
@@ -303,6 +309,23 @@ export class RuntimeController {
     ).then((ids) => new Set(ids.filter(Boolean)));
     this.parkedCache = { until: this.now() + 5000, result };
     return result;
+  }
+
+  private admissionStates = new Map<string, { until: number; state: Promise<DeploymentState> }>();
+  /**
+   * A workload's state as admission reads it, shared for two seconds by the jobs that wait on it
+   * each queue tick; a change forgets it (begin).
+   */
+  private admissionState(workload: Workload) {
+    const kept = this.admissionStates.get(workload.id);
+    if (kept && kept.until > this.now()) return kept.state;
+    const state = this.engine.state(workload);
+    const entry = { until: this.now() + 2000, state };
+    this.admissionStates.set(workload.id, entry);
+    state.catch(() => {
+      if (this.admissionStates.get(workload.id) === entry) this.admissionStates.delete(workload.id);
+    });
+    return state;
   }
 
   private async states() {
@@ -523,6 +546,7 @@ export class RuntimeController {
     if (type === "apply") this.record.desired = plan.target;
     this.save();
     this.current = operation;
+    this.admissionStates.clear();
     for (const id of plan.stop) this.stopping.add(id);
     this.settled = this.run(operation, plan);
     return structuredClone(operation);
@@ -568,6 +592,8 @@ export class RuntimeController {
           // Work can't run on a workload without pods, so its leases hold nothing back.
           const states = await this.states();
           const swapTier = this.swapTier();
+          // The ComfyUI work the swap was for was cancelled or moved: Radiance stays.
+          if (swapTier === Infinity) throw new Error(noSwapWork);
           if (
             swapTier !== undefined &&
             plan.stop.some(
@@ -632,6 +658,7 @@ export class RuntimeController {
     } finally {
       this.stopping.clear();
       this.forced.clear();
+      this.admissionStates.clear();
       this.draining = false;
       operation.finishedAt = this.timestamp();
       operation.after = await this.states().then(
@@ -662,7 +689,7 @@ export class RuntimeController {
   async acquire(candidates: string | string[], priority?: number): Promise<RuntimeLease> {
     const choices = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!choices.length) throw new RuntimeUnavailable("The selected workload is not configured.");
-    const states = await Promise.all(choices.map((workload) => this.engine.state(workload)));
+    const states = await Promise.all(choices.map((workload) => this.admissionState(workload)));
     // Checked after reading state, so an operation that began meanwhile still blocks admission.
     const swapTier = this.swapTier();
     const ready = choices.find(
@@ -697,8 +724,9 @@ export class RuntimeController {
         this.wanted.set(workload.id, this.now());
         this.comfyUsedAt = this.now();
         void this.swapOnDemand().catch(() => {});
+        const held = this.swapHold && this.swapHold.until > this.now();
         throw new RuntimeUnavailable(
-          `Waiting for ${workload.label} — Studio is switching the GPUs.`,
+          `Waiting for ${workload.label} — ${held ? this.swapHold!.reason : "Studio is switching the GPUs."}`,
         );
       }
       if (this.record.home)
@@ -795,6 +823,7 @@ export class RuntimeController {
       const comfy = this.workloads.filter(isComfy).map((item) => item.id);
       let target: string[];
       if (this.wanted.size) {
+        if (this.swapHold && this.swapHold.until > now) return;
         const fits = (ids: string[]) =>
           Object.entries(this.pools).every(([pool, capacity]) => this.usage(ids, pool) <= capacity);
         const placedFirst = [...this.wanted.keys()].sort(
@@ -814,13 +843,29 @@ export class RuntimeController {
       const states = await this.states();
       this.record.home = home;
       const names = (ids: string[]) => ids.map((id) => this.workload(id).label).join(", ");
-      this.begin(
+      const back = target === home;
+      const { id } = this.begin(
         "apply",
         this.plan(target, states),
-        target === home
+        back
           ? `automatic: back to ${names(home)} after ${minutes(swapIdleMs)} without ComfyUI work`
           : `automatic: switching to ${names(target)} for waiting ComfyUI work`,
       );
+      // Swapping straight back after Radiance returns, or retrying a failed swap at once, only
+      // churns the GPUs.
+      void this.settled.then(() => {
+        const { status, error } = this.operation(id);
+        if (back && status === "completed")
+          this.swapHold = {
+            until: this.now() + swapSettleMs,
+            reason: "Studio switched the GPUs back moments ago.",
+          };
+        else if (!back && status === "failed" && error !== noSwapWork)
+          this.swapHold = {
+            until: this.now() + swapRetryMs,
+            reason: `Studio couldn't switch the GPUs (${error}) and tries again in ${minutes(swapRetryMs)}.`,
+          };
+      });
     } finally {
       this.claimed = false;
     }

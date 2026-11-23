@@ -149,6 +149,8 @@ test("prompts naming what the brief avoids are refused before queuing", () => {
 test("projectPatch refuses unknown fields and values outside the constraints", () => {
   assert.throws(() => projectPatch({ colour: "red" }), /Unknown field colour/);
   assert.throws(() => projectPatch({ constraints: { aspect: "5:4" } }), /Set aspect/);
+  for (const aspect of ["3:4", "4:3"])
+    assert.deepEqual(projectPatch({ constraints: { aspect } }).constraints, { aspect });
   assert.throws(() => projectPatch({ constraints: { loras: "no" } }), /Set loras/);
   assert.throws(() => projectPatch({ name: " " }), /Name the project/);
   assert.deepEqual(projectPatch({ name: " Coast ", constraints: { profiles: ["a", "a"] } }), {
@@ -229,6 +231,16 @@ test("the project tool creates, attaches, updates and shows a chat's project", a
   assert.deepEqual((await call({ action: "detach" })).project, null);
   assert.equal((await call({ action: "attach", project: "coast" })).project.name, "Coast");
   await assert.rejects(call({ action: "attach", project: "Harbour" }), /No project "Harbour"/);
+});
+
+test("project names stay unique per account, in any case", (t) => {
+  const projects = createProjects({ dataDir: dataDir(t) });
+  const coast = projects.create("alice", { name: "Coast" });
+  const harbour = projects.create("alice", { name: "Harbour" });
+  assert.throws(() => projects.create("alice", { name: "coast" }), /already have a project/);
+  assert.throws(() => projects.update("alice", harbour.id, { name: "COAST" }, "you"), /already/);
+  assert.equal(projects.update("alice", coast.id, { name: "Coast" }, "you").name, "Coast");
+  assert.equal(projects.create("bob", { name: "Coast" }).name, "Coast");
 });
 
 test("the project tool needs a conversation id to hold a project", async (t) => {

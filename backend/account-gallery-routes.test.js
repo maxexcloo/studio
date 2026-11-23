@@ -699,7 +699,11 @@ test("search adds images that look like it to the text matches, and filters stil
     { ...item("account-a", "job-prompt"), model: "flux", prompt: "ginger cat" },
     { ...item("account-a", "job-other"), model: "flux" },
   ]);
-  near = (q) => (q === "ginger cat" ? (record) => record.jobId.startsWith("job-cat") : null);
+  const looksLike = new Set(["/files/job-cat.png", "/files/job-cat-sdxl.png"]);
+  near = (q) =>
+    q === "ginger cat"
+      ? Object.assign((record) => looksLike.has(record.url), { keys: looksLike })
+      : null;
   const ids = async (query) =>
     (
       await call(routes["/api/gallery"], {

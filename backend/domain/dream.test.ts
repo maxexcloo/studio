@@ -270,6 +270,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       );
     },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
+    uncensoredLoras: () => new Set(["explicit.safetensors"]),
     // As the LoRA policy would: klein.safetensors is for another model family, and film
     // recommends 0.6.
     fitLoras: (_profile, loras) =>
@@ -691,13 +692,13 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.deepEqual([writing.kind, writing.theme, writing.source], ["animate", "custom", "dream 2"]);
   assert.match(writing.instruction, /One continuous shot of one simple, coherent action/);
   assert.match(writing.instruction, /no cuts, scene changes/);
-  assert.match(writing.instruction, /natural, relaxed, believable expressions/);
+  assert.match(writing.instruction, /believable expressions that suit the moment/);
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").status, "capped");
   assert.equal(live().length, 0);
 });
 
-test("Dream draws a ready profile by its taste, explores concepts alongside profiles and LoRAs and keeps Extended Themes to accounts with Uncensored Models", async (t) => {
+test("Dream draws a ready profile by its taste, explores concepts alongside profiles and LoRAs and keeps Uncensored to accounts with Uncensored Models", async (t) => {
   const { dream, state, taste, dreamOnce, generated } = fixture(t);
   const liked = (id: string, profileId: string) => {
     generated({
@@ -713,6 +714,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   };
   liked("a", "qwen");
   liked("b", "qwen");
+  liked("d", "qwen");
   taste.record("alice", [tasteSignal("discard", "c", { profileId: "flux" })]);
   await dream.save("alice", { enabled: true, spicy: true });
   const job = await dreamOnce();
@@ -721,13 +723,13 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.match(state.calls[0].user, /- liked [ab]/);
   // An exploited idea features something they like.
   assert.match(state.calls[0].system, /Keep this taste they like: fox\./);
-  // No uncensored grant: Extended Themes never applies, whatever the setting says.
+  // No uncensored grant: Uncensored never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
   state.access.alice!.uncensored = true;
   const spicy = await dreamOnce();
   assert.equal(state.calls[1].model, "writer");
-  assert.match(state.calls[1].system, /Extended Themes/);
+  assert.match(state.calls[1].system, /Uncensored: sensual/);
   assert.equal(spicy?.dream?.spicy, true);
   // Losing the grant after queueing: the job is written safe for work.
   state.access.alice!.uncensored = false;
@@ -742,7 +744,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
   assert.equal(explored?.dream?.arm, "explore:profile");
-  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.match(state.calls.at(-1)!.system, /change at least three/);
   assert.equal((explored?.input.writing as { explore?: boolean })?.explore, true);
   assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You like foxes.");
   // The next explores a concept from a Library import, on its profile with its LoRAs, for
@@ -788,6 +790,28 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.match(state.calls.at(-1)!.system, /Explore a fresh idea within their taste/);
 });
 
+test("Dream favours the set model they keep over one they pass", async (t) => {
+  const { dream, taste, dreamOnce, generated } = fixture(t);
+  taste.edit("alice", { models: ["flux", "qwen"] });
+  for (const [index, profileId, state] of [
+    [0, "flux", "discarded"],
+    [1, "flux", "discarded"],
+    [2, "flux", "discarded"],
+    [3, "qwen", "kept"],
+  ] as const)
+    generated({
+      id: `judged-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `judged ${index}`,
+      settings: { profileId },
+      dream: { prompt: `judged ${index}`, why: "", at: "", state, passReason: "skip" },
+    });
+  await dream.save("alice", { enabled: true });
+  assert.equal((await dreamOnce())?.input.profileId, "qwen");
+});
+
 test("Dream draws from the models and tags a person set over those it learnt", async (t) => {
   const { dream, state, taste, dreamOnce } = fixture(t);
   taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen", tags: ["fox"] })]);
@@ -811,7 +835,7 @@ test("Dream draws from the models and tags a person set over those it learnt", a
     /Avoids: surreal props\nLikes: quiet candid portraits\nPreferred Styles: documentary photography/,
   );
   assert.match(system, /Treat recurring props and settings as incidental/);
-  assert.match(system, /Use at most one/);
+  assert.match(system, /Build the idea around one of these starting points/);
   assert.doesNotMatch(system, /Possible starting points:.*(?:\bsubject:|medium or style:)/);
 });
 
@@ -832,8 +856,8 @@ test("Fresh concepts rotate anchors and inspirations without overriding a model 
     assert.ok(job);
     assert.equal((job.input.writing as { explore?: boolean }).explore, true);
     seen.push((job.input.writing as { inspiration: string }).inspiration);
-    anchors.push(dream.read("alice").anchors!.slice(0, 8));
-    assert.match(state.calls.at(-1)!.system, /Change at least three/);
+    anchors.push(dream.read("alice").anchors!.slice(0, 10));
+    assert.match(state.calls.at(-1)!.system, /change at least three/);
     assert.match(
       state.calls.at(-1)!.system,
       /Do not copy its complete concept or merely paraphrase it/,
@@ -961,7 +985,7 @@ test("Motif cooldowns recognise unlabelled laundry and smoking across different 
   assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
-test("Dream retries explicit avoids without cooling required or explicitly absent motifs", async (t) => {
+test("Dream retries explicit avoids, even negated ones, without cooling required motifs", async (t) => {
   const { dataDir, dream, projects, state, taste, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   taste.edit("alice", { avoid: ["smoking"] });
@@ -979,17 +1003,14 @@ test("Dream retries explicit avoids without cooling required or explicitly absen
   });
 
   const kept = [
-    {
-      prompt: "A poet reads by a paper lantern, no smoking, cigarettes or laundry.",
-      motifs: ["paper lantern", "cigarette", "laundry"],
-    },
+    { prompt: "A poet reads by a paper lantern in a quiet study.", motifs: ["paper lantern"] },
     { prompt: "A paper lantern lights an astronomer under a sandstone arch as lightning strikes." },
     { prompt: "A paper lantern leads a night parade across a castle's drawbridge." },
   ];
   state.replies = [
     { prompt: "A washing machine hums in the corner of a spaceship." },
     kept[0],
-    { prompt: "There is no smoking indoors, but she lights a cigarette on the balcony." },
+    { prompt: "A quiet balcony at night, with no smoking allowed." },
     kept[1],
     { prompt: "Neon signs light a flooded road in the distance." },
     kept[2],
@@ -1198,7 +1219,7 @@ test("More Like This permits close iterations while keeping species and source i
   const next = await dreamOnce();
   assert.equal(next?.input.prompt, iteration);
   assert.match(state.calls.at(-1)!.system, /including species and breed/);
-  assert.doesNotMatch(state.calls.at(-1)!.system, /Change at least three/);
+  assert.doesNotMatch(state.calls.at(-1)!.system, /change at least three/);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Recent Dream ideas to avoid/);
 });
 
@@ -2213,7 +2234,7 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   const tried = (await dreamOnce())!;
   assert.deepEqual(loras(tried), [["ink.safetensors", 1]]);
   assert.equal(tried.dream?.arm, "explore:lora");
-  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.match(state.calls.at(-1)!.system, /change at least three/);
   assert.equal((tried.input.writing as { explore?: boolean }).explore, true);
   assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
@@ -2222,12 +2243,25 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
 
+test("Dream loads uncensored LoRAs only with Uncensored on", async (t) => {
+  const explicit = { ...profiles[0], options: { loras: ["explicit.safetensors"] } };
+  const { dream, state, store, dreamOnce } = fixture(t, [explicit]);
+  state.loras.alice = { ratings: { "explicit.safetensors": "liked" } };
+  state.access.alice!.uncensored = true;
+  const lorasOf = (job: { id: string }) =>
+    (store.job("alice", job.id)!.input.loras as { name: string }[]).map((lora) => lora.name);
+  await dream.save("alice", { enabled: true });
+  assert.deepEqual(lorasOf((await dreamOnce())!), []);
+  await dream.save("alice", { enabled: true, spicy: true });
+  assert.deepEqual(lorasOf((await dreamOnce())!), ["explicit.safetensors"]);
+});
+
 test("Dream asks for natural expressions and adds face terms only to a recommended negative", async (t) => {
   const { dream, state, dreamOnce } = fixture(t, [profiles[0]]);
   state.negatives.flux = "blurry";
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
-  assert.match(state.calls[0].system, /natural, relaxed, believable expressions/);
+  assert.match(state.calls[0].system, /believable expressions that suit the moment/);
   assert.equal(
     job.input.negative,
     "blurry, exaggerated expression, grimace, distorted face, tongue out, gaping mouth",
@@ -2425,6 +2459,9 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
   assert.ok(surviving.every((item) => !item.dream?.pair));
   assert.equal((await request(answer, { answer: "a" })).status, 404);
   assert.equal(taste.read("alice").signals.length, 0);
+  // A surviving side takes a single verdict and keeps its comparison record.
+  dream.superLike("alice", String(surviving[0].id));
+  assert.equal(items.find(({ id }) => id === surviving[0].id)!.dream?.pair?.size, 3);
 });
 
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
@@ -2862,6 +2899,61 @@ test("Independent matching named results save a card with Undo, while weaker evi
   assert.equal(inbox.read("alice").savedCards, undefined);
 });
 
+test("A saved card stays gone once deleted, its images under another name wait, and a bare dismissal teaches", async (t) => {
+  const { state, generated, inbox } = fixture(t);
+  const account = state.access.alice!.account!;
+  const liked = (id: string, outfit?: string) => ({
+    id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    prompt: `By the ferry ${id}`,
+    rating: "liked",
+    jobId: `job-${id}`,
+    ...(outfit && {
+      resultSet: {
+        id: `set-${id}`,
+        title: "Ferryside",
+        index: 0,
+        context: { outfit: { name: outfit, description: "Green boiled wool" } },
+      },
+    }),
+  });
+  generated(
+    liked("1", "Green Wool Coat"),
+    liked("2", "Green Wool Coat"),
+    ...["3", "4", "5", "6"].map((id) => liked(id)),
+  );
+  state.online.text = true;
+  const mara = [
+    { kind: "character", name: "Mara", description: "red hair", results: [3, 4] },
+    { kind: "character", name: "Her Mara", description: "red-haired woman", results: [4, 5] },
+  ];
+  state.ideas = {
+    projects: [],
+    cards: [{ kind: "outfit", name: "Wool Coat", description: "green", results: [1, 2] }, ...mara],
+  };
+  await inbox.propose("alice", account);
+  assert.deepEqual(
+    state.cards!.outfits.map(({ name }) => name),
+    ["Green Wool Coat"],
+  );
+  const [proposal] = inbox.read("alice").proposals;
+  assert.deepEqual(
+    inbox.read("alice").proposals.map(({ title }) => title),
+    ["Mara"],
+  );
+  await inbox.dismiss("alice", proposal.id);
+  state.cards!.outfits = [];
+  state.ideas = { projects: [], cards: mara };
+  state.clock += 6 * 3_600_000;
+  await inbox.propose("alice", account);
+  assert.deepEqual(state.cards!.outfits, []);
+  assert.deepEqual(inbox.read("alice").proposals, []);
+  const asked = state.calls.filter((call) => call.system.startsWith("You find")).at(-1)!;
+  assert.match(asked.user, /turned these down.*\n- Mara$/m);
+});
+
 test("Dream keeps card evidence quoted from its prompts and learns from two kept runs", async (t) => {
   const { dream, state, dreamOnce, inbox } = fixture(t);
   const outfit = { name: "Green Wool Coat", description: "heavy wool with three brass toggles" };
@@ -3083,12 +3175,9 @@ test("A series follows a Super Liked concept, visiting liked scene cards first",
   assert.match(written[0].system, /result 1 of 4 in a series/);
   assert.match(
     written[0].user,
-    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: Pier: a pier over dark water\nTime of night: dusk/,
+    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: Pier: a pier over dark water\nTime: dusk/,
   );
-  assert.match(
-    written[1].user,
-    /Place: a rooftop bar above the city\nTime of night: early evening/,
-  );
+  assert.match(written[1].user, /Place: a rooftop bar above the city\nTime: early evening/);
   assert.ok(written.every(({ user }) => !user.includes("a corrugated iron shed")));
   assert.match(written[3].user, /Results so far:\n- dream 1\n- dream 2\n- dream 3/);
   assert.match(
@@ -3590,7 +3679,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     status: "done",
     rating: "liked",
   });
-  fx.state.draws[3] = [1];
+  fx.state.draws[2] = [1];
   const varied = await fx.dreamOnce();
   assert.equal(varied?.input.profileId, alternate.id);
   assert.equal(varied.parentItemId, "other-still");

@@ -2,8 +2,8 @@ import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 /**
  * The migrate-runtime step that drops the automatic GPU control settings (automatic, Idle After,
- * Run When Idle, Let Everyone Swap Models) from the `runtime-operations` document; Studio no longer
- * switches GPU workloads on its own. Needs Studio stopped: the runtime controller holds the
+ * Run When Idle, Let Everyone Swap Models) from the `runtime-operations` document; automatic swaps
+ * now follow the administrator's placement without settings (runtime/controller.ts). Needs Studio stopped: the runtime controller holds the
  * document and writes it back whole. Plans by default; `apply` writes. A second run finds nothing.
  */
 export function runtimeSettings(dataDir, { apply = false } = {}) {

@@ -511,25 +511,21 @@ test("Dream explains itself while off and saves its settings in Settings", async
 
   await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
-  const imageSettings = settings.getByRole("region", { name: "Images", exact: true });
-  const videoSettings = settings.getByRole("region", { name: "Videos", exact: true });
-  const videos = videoSettings.getByRole("switch", { name: "Enable", exact: true });
-  const videoAmount = videoSettings.getByRole("textbox", { name: "Daily Amount", exact: true });
+  const videos = settings.getByRole("switch", { name: "Videos", exact: true });
+  const videoAmount = settings.getByRole("textbox", { name: "Daily Videos", exact: true });
   await expect(videoAmount).toBeDisabled();
   await videos.click({ force: true });
   await expect(videos).toBeChecked();
   await expect(videoAmount).toBeEnabled();
-  const images = imageSettings.getByRole("textbox", { name: "Daily Amount", exact: true });
+  const images = settings.getByRole("textbox", { name: "Daily Images", exact: true });
   await images.fill("200");
   await images.press("Enter");
   await expect.poll(() => dream.settings.dailyImages).toBe(200);
-  await expect(
-    settings.getByRole("switch", { name: "Extended Themes", exact: true }),
-  ).toBeVisible();
+  await expect(settings.getByRole("switch", { name: "Uncensored", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
     .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
-  await imageSettings.getByRole("switch", { name: "Enable", exact: true }).click({ force: true });
+  await settings.getByRole("switch", { name: "Images", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
 });
@@ -574,14 +570,8 @@ test("Dream settings an administrator forces stay locked for the account", async
   await expect(page.getByRole("button", { name: "Turn On", exact: true })).toHaveCount(0);
   await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
-  await expect(
-    settings
-      .getByRole("region", { name: "Dream", exact: true })
-      .getByRole("switch", { name: "Enable", exact: true }),
-  ).toBeDisabled();
-  await expect(
-    settings.getByRole("switch", { name: "Extended Themes", exact: true }),
-  ).toBeEnabled();
+  await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
+  await expect(settings.getByRole("switch", { name: "Uncensored", exact: true })).toBeEnabled();
   await section(page, "Settings", "Where Work Runs");
   await expect(
     page
@@ -745,8 +735,9 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(
     profile.getByText("Quiet coastal scenes in soft, misty light.", { exact: true }),
   ).toBeVisible();
-  await profile.getByRole("button", { name: "Clear", exact: true }).scrollIntoViewIfNeeded();
-  await profile.getByRole("button", { name: "Clear", exact: true }).click();
+  const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
+  await danger.getByRole("button", { name: "Clear", exact: true }).scrollIntoViewIfNeeded();
+  await danger.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(
     page.getByRole("dialog", { name: "Clear Taste Profile", exact: true }),
   ).toBeVisible();
@@ -780,8 +771,8 @@ test("Dream navigation orders its views and History shows retained activity and 
     "Library",
     "Projects",
     "Taste",
-    "History",
     "Discards",
+    "History",
   ]);
   await page.getByRole("menuitem", { name: "History", exact: true }).click();
   await expect(page).toHaveURL(/\/dream\/history$/);
@@ -1792,7 +1783,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
     page.getByRole("button", { name: "View Dream prompt discard-image", exact: true }),
   ).toBeHidden();
   await page.reload();
-  await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^Videos \(\d+\)$/ })).toBeChecked();
   await showView(page, "Dream");
   await expect(pair).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();

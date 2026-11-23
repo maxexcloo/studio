@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 import {
   characterImage,
   characterImageIds,
@@ -12,9 +14,9 @@ import { slotCapacity, slotGroups } from "../shared/profiles.ts";
 import { listCards, refusal, shownCard, updateCharacter } from "./cards.js";
 import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
+import { storedChatRecord } from "./gallery/records.js";
 import { isGalleryHidden } from "./gallery/store.js";
 import { publicGalleryBuffer, saveUpload } from "./references.js";
-import { loadSharp } from "./sharp-loader.js";
 
 /**
  * Make Sheet: a character's first image redrawn as a character design sheet by Qwen-Image 2.1, which
@@ -70,8 +72,6 @@ function runs(counts, noise, gap) {
  * found by the background between them; where the gaps aren't clear, by the layout's proportions.
  */
 export async function sheetPanels(buffer) {
-  const sharp = await loadSharp();
-  if (!sharp) throw new Error("Image resizing is off, so the sheet can't be split.");
   const { width, height } = await sharp(buffer).metadata();
   const scale = Math.min(1, readWidth / width);
   const w = Math.round(width * scale);
@@ -262,8 +262,11 @@ function withCharacterImages(references, slot, card, profile) {
 export function createCharacterSheets({ admit, profiles, account: accountFor }) {
   const splitting = new Set();
 
-  /** Queues `card`'s sheet from its first image, as admit answers, with the profile it runs on. */
-  async function queueSheet(account, card) {
+  /**
+   * Queues `card`'s sheet from its first image, as admit answers, with the profile it runs on;
+   * `chat` is the chat that asked for it, so the sheet shows among the chat's results.
+   */
+  async function queueSheet(account, card, chat = null) {
     const profile = sheetProfile(await profiles(account));
     if (!profile)
       return {
@@ -286,6 +289,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
         seed: "",
         count: 1,
         writing: { kind: "sheet", name: card.name, description: card.description },
+        ...(chat ? { chat } : {}),
       },
       account,
     );
@@ -316,7 +320,6 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
   /** Cuts a finished sheet into its panels and keeps them on its character. */
   async function keep(ownerId, card, item) {
     const { buffer } = await publicGalleryBuffer(item);
-    const sharp = await loadSharp();
     const found = await sheetPanels(buffer);
     const panels = [{ role: "sheet", referenceId: item.id }];
     for (const { role, ...box } of found) {
@@ -341,7 +344,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
   return {
     register(app) {
       // Queues the card's sheet from its first image; the card follows it until its panels are kept.
-      directRoute(app, "POST", "/api/characters/:id/sheet", async (account, { params }) => {
+      directRoute(app, "POST", "/api/characters/:id/sheet", async (account, { params, body }) => {
         const refused = refusal(account);
         if (refused) return refused;
         const ownerId = account?.userId || "";
@@ -356,7 +359,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
             status: 409,
             payload: { ok: false, error: `${card.name} has no image to draw a sheet from yet.` },
           };
-        const queued = await queueSheet(account, card);
+        const queued = await queueSheet(account, card, storedChatRecord(body?.chat));
         if (queued.status >= 400) return queued;
         return {
           status: 200,

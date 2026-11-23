@@ -1,6 +1,6 @@
 // The prompt assistant's MCP tools: rewrite_prompt, suggest_negative and suggest_loras. Each one calls
 // Studio's own /api/assistant routes with the account's credential, so the chat and the composer
-// share one engine and one set of rules (Prompt Assistant, Uncensored Models for Extended Themes, LoRAs, the
+// share one engine and one set of rules (Prompt Assistant, Uncensored Models for Uncensored, LoRAs, the
 // account's profiles). What the chat used is remembered for six hours, in studio.sqlite (the
 // mcp-assistant document, beside MCP's ownership), so a generate with that prompt records it on the
 // result (`assistant`, source "chat") for Details and Recreate, even across a restart.

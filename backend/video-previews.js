@@ -15,7 +15,7 @@ import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { digest } from "./values.js";
 
-const encoder = process.env.STUDIO_FFMPEG_PATH || "ffmpeg";
+const encoder = "ffmpeg";
 const dir = path.join(dataDir, ".video-previews");
 // Grid tiles run up to ~700 CSS px on a 2x screen: 720 keeps them sharp at a few MB per clip.
 const version = "v2-720-24-8";
@@ -25,39 +25,38 @@ const maxSourceBytes = 512 * 1024 * 1024;
 export const maxCacheBytes = 512 * 1024 * 1024;
 const pending = new Map();
 const remoteVersions = new Map();
-const queue = [];
-let running = false;
 let lastSweep = 0;
 
 /**
- * One encoder at a time, posters first: a still is a fraction of a second and
- * is what a paused or waiting tile shows. Nothing is turned away; a grid of
- * hundreds of imported videos simply works down the list.
+ * One encoder at a time in each lane, so a still (a fraction of a second, and what a paused or
+ * waiting tile shows) never waits for a grid preview or a viewer's playback copy. Nothing is turned
+ * away; a grid of hundreds of imported videos simply works down the list.
  */
-const posterQueue = [];
-function queued(work, { poster = false } = {}) {
+const lanes = { play: [], poster: [], preview: [] };
+const running = new Set();
+function queued(work, { lane = "preview" } = {}) {
   return new Promise((resolve, reject) => {
-    (poster ? posterQueue : queue).push({ work, resolve, reject });
-    void drain();
+    lanes[lane].push({ work, resolve, reject });
+    void drain(lane);
   });
 }
-async function drain() {
-  if (running) return;
-  running = true;
-  while (posterQueue.length || queue.length) {
-    const job = posterQueue.shift() || queue.shift();
+async function drain(lane) {
+  if (running.has(lane)) return;
+  running.add(lane);
+  while (lanes[lane].length) {
+    const job = lanes[lane].shift();
     try {
       job.resolve(await job.work());
     } catch (error) {
       job.reject(error);
     }
   }
-  running = false;
+  running.delete(lane);
 }
 
 /** Nothing encoding or waiting to: background work (media-warmup.js) goes only then. */
 export function encoderIdle() {
-  return !running && !posterQueue.length && !queue.length;
+  return !running.size && Object.values(lanes).every((jobs) => !jobs.length);
 }
 
 /** Only one low-priority, single-threaded child encodes at a time. */
@@ -118,7 +117,8 @@ async function sweep() {
   const entries = (
     await Promise.all(
       names
-        .filter((n) => /\.(mp4|jpg)$/.test(n))
+        // Stills stay: they are small, and a tile shows nothing without one.
+        .filter((n) => n.endsWith(".mp4"))
         .map(async (name) => {
           const file = path.join(dir, name);
           const stat = await fs.promises.stat(file);
@@ -476,16 +476,37 @@ export async function getFileVideoPoster(file, identity = file) {
         await fs.promises.rm(temporary, { force: true });
       }
     },
-    { poster: true },
+    { lane: "poster" },
   );
 }
 
-/** An output's still: from the file when it's on this computer, else from its preview. */
+/**
+ * An output's still: from the file when it's on this computer, else read by ffmpeg straight from
+ * `worker`'s ComfyUI, which fetches only what the first frame needs.
+ */
 export async function getComfyVideoPoster(filename, subfolder, type, worker = "") {
   const local = localOutputFile(filename, subfolder, type);
   if (local) return getFileVideoPoster(local, sourceIdentity(filename, subfolder, type));
   if (type === mediaType) throw new Error("Source video is unavailable.");
-  return getVideoPoster(await getComfyVideoPreview(filename, subfolder, type, worker));
+  const key = identityKey(sourceIdentity(filename, subfolder, type, worker));
+  const output = path.join(dir, `${key}.jpg`);
+  if (fs.existsSync(output)) return output;
+  return coalesce(
+    `poster:${key}`,
+    async () => {
+      await fs.promises.mkdir(dir, { recursive: true });
+      const temporary = `${output}.${crypto.randomUUID()}.part`;
+      try {
+        const source = comfyFileUrl({ filename, subfolder, type, worker });
+        await fs.promises.writeFile(temporary, await extractPoster(source));
+        await fs.promises.rename(temporary, output);
+        return output;
+      } finally {
+        await fs.promises.rm(temporary, { force: true });
+      }
+    },
+    { lane: "poster" },
+  );
 }
 
 /** An output's preview: from the file when it's on this computer, else from `worker`'s ComfyUI. */
@@ -690,7 +711,7 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
         await fs.promises.rm(temporary, { force: true });
       }
     },
-    { poster: true },
+    { lane: "play" },
   );
   return { file, original: false };
 }
@@ -766,7 +787,7 @@ export async function extractFrame(buffer, at = "last") {
         if (code !== 0 || !stdout.length) throw new Error("The video's frame couldn't be read.");
         return stdout;
       }),
-    { poster: true },
+    { lane: "poster" },
   );
 }
 
@@ -816,7 +837,9 @@ async function getVideoPoster(preview) {
     if (file) await fs.promises.writeFile(file, stdout);
     return file || stdout;
   };
-  return file ? coalesce(`poster:${file}`, work, { poster: true }) : queued(work, { poster: true });
+  return file
+    ? coalesce(`poster:${file}`, work, { lane: "poster" })
+    : queued(work, { lane: "poster" });
 }
 
 /** Sends a still: a cached file, or bytes in memory. `preview` may already be the still. */

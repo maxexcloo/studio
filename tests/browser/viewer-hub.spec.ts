@@ -13,6 +13,7 @@ import {
   image,
   pressGenerate,
   profiles,
+  promptMenu,
   serveProfiles,
   showViewerThumbnails,
   stamp,
@@ -329,16 +330,16 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   await expect(fix).toBeDisabled();
   await report.getByText("Hands", { exact: true }).click();
   await expect(report.getByRole("checkbox", { name: "Hands", exact: true })).toBeChecked();
-  await report.getByRole("button", { name: "Inspect Image", exact: true }).click();
-  await expect(report.getByRole("status")).toHaveText("six toes");
+  await promptMenu(report, "Details");
+  await page.getByRole("menuitem", { name: "Inspect Image", exact: true }).click();
+  // The finding fills the details in place, with Undo.
+  const details = report.getByRole("textbox", { name: "Details", exact: true });
+  await expect(details).toHaveValue("six toes");
+  await expect(report.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
   expect(inspected).toEqual([{ jobId: "job-hub", itemId: "hub", upscaled: false }]);
   expect(state.jobs).toHaveLength(1);
   expect(state.gallery.find((item) => item.id === "hub")?.rating).toBeUndefined();
   await expect(fix).toBeEnabled();
-  await report.getByRole("button", { name: "Add to Details", exact: true }).click();
-  await expect(report.getByRole("textbox", { name: "Details", exact: true })).toHaveValue(
-    "six toes",
-  );
   let refuse = true;
   const refusal = "The worker cannot accept the replacement yet.";
   await page.route("**/api/sessions/*/generations", (route) =>
@@ -595,7 +596,7 @@ test("Custom Animation edits and submits in one dialog with its text tools", asy
   }
   await more.click();
   const tools = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
-  await expect(tools.getByText("Suggestions", { exact: true })).toBeVisible();
+  await expect(tools.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -898,9 +899,9 @@ test("Details shows the source, exact set, original chat and applied reference",
   await expect(
     page.getByRole("link", { name: "Results From This Chat", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Identity", { exact: true })).toBeVisible();
-  await expect(page.getByText("Heron Upload", { exact: true })).toBeVisible();
-  await expect(page.getByText("Strength 0.7", { exact: true })).toBeVisible();
+  // References show their thumbnails alone, named by their role.
+  await expect(page.getByRole("link", { name: "Open Identity", exact: true })).toBeVisible();
+  await expect(page.getByText("Strength 0.7", { exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Bird Studies", exact: true }).click();
   await expect(page.getByRole("button", { name: "Remove Set: Bird Studies Filter" })).toBeVisible();
   await expect(
@@ -1138,7 +1139,7 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
   const { state, viewer } = await seed(page);
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "Extended Themes", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Uncensored", exact: true })).toHaveCount(0);
   await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -1783,7 +1784,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect(page.getByRole("menuitem", { name: /Back & Forth/ })).toHaveCount(0);
 });
 
-test("Details keep the caption, run notes and source ahead of model and prompts", async ({
+test("Details keep the caption, run notes and source ahead of LoRAs and prompts", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -1859,7 +1860,7 @@ test("Details keep the caption, run notes and source ahead of model and prompts"
     details.getByRole("heading", {
       name: /^(Caption|Lineage|Model|LoRAs|Prompt|Negative Prompt)$/,
     }),
-  ).toHaveText(["Caption", "Lineage", "Model", "LoRAs", "Prompt", "Negative Prompt"]);
+  ).toHaveText(["Caption", "Lineage", "LoRAs", "Prompt", "Negative Prompt"]);
   await expect(details.getByText(notes, { exact: true })).toBeVisible();
   await expect(details.getByText(runCaption, { exact: true })).toBeVisible();
   await expect(details.getByRole("link", { name: "Original Bird", exact: true })).toHaveAttribute(

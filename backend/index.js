@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 import express from "express";
+import sharp from "sharp";
 
 import { cardKinds, characterImageIds } from "../shared/characters.ts";
 import {
@@ -53,7 +54,6 @@ import {
   networkListening,
   optionsFor,
   port,
-  root,
   setListeningPort,
 } from "./comfy/comfy.js";
 import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
@@ -61,7 +61,7 @@ import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
-import { appVersion, dataDir } from "./data-dir.js";
+import { appVersion, dataDir, projectRoot } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
@@ -151,7 +151,13 @@ import { importStore } from "./library/imports.js";
 import { fillVideoSizes } from "./library/library.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
-import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
+import {
+  catalogueLoraInfo,
+  familiesFromMetadata,
+  loraCatalogue,
+  loraInfos,
+  uncensoredLoraNames,
+} from "./lora/info.js";
 import { recommendedNegative } from "./lora/prompts.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
@@ -209,7 +215,6 @@ import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { servesText } from "./runtime/controller.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
-import { loadSharp } from "./sharp-loader.js";
 import { installShutdown } from "./shutdown.js";
 import { registerStatusRoutes } from "./status-routes.js";
 import { registerUpscaleRoutes } from "./upscale/routes.js";
@@ -235,6 +240,8 @@ let drainServer = async () => {};
 installShutdown({ drain: () => drainServer() });
 
 watchEventLoop();
+// libvips' operation cache keeps recent images for reuse Studio's one-off resizes never get.
+sharp.cache(false);
 const app = express();
 const stopping = new AbortController();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
@@ -1014,6 +1021,7 @@ const dream = createDream({
     if (account && !mayUseFeature(account, "loras")) return null;
     return loadLoraLibrary(ownerId);
   },
+  uncensoredLoras: uncensoredLoraNames,
   // As submit validation (validation.js) would judge them: another family's LoRA is dropped.
   loraName: (name) => loraName(name, catalogueLoraInfo(name)),
   fitLoras: (profile, loras) =>
@@ -1123,10 +1131,8 @@ function promptWriterOwner(ownerId) {
   if (!multiUserEnabled) return true;
   return Boolean(ownerId && mayUseFeature(accountAccessForId(ownerId), "promptAssistant"));
 }
-/** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
+/** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model. */
 async function smallImage(item, upscaled = false) {
-  const sharp = await loadSharp();
-  if (!sharp) return null;
   const version = upscaled ? item.upscale : undefined;
   if (upscaled && (version?.status !== "done" || !version.url)) return null;
   const buffer = version
@@ -1168,6 +1174,7 @@ const captioner = createCaptioner({
 registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
 // Self-review (domain/review.ts): recent results scored against their owner's rules and any project's brief.
 const selfReview = createReview({
+  enabled: () => flagEnabled("STUDIO_SELF_REVIEW"),
   writer: assistantEngine,
   text: textWriter,
   idle: galleryIdle,
@@ -1332,7 +1339,7 @@ registerGalleryDeleteRoute(app, {
 
 registerComfyMediaRoutes(app);
 
-const dist = path.join(root, "dist");
+const dist = path.join(projectRoot, "dist");
 // An unknown API route must fail as JSON, never fall through to the app page.
 app.all("/api/*splat", (_req, res) =>
   res

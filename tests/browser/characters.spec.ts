@@ -6,6 +6,7 @@ import {
   closeTextEditor,
   create,
   editorMenu,
+  expandAssistantMenu,
   fixtures,
   image,
   openReferenceChoices,
@@ -453,22 +454,26 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   ).toBeVisible();
   // Name and Description each offer ideas written from the images; a pick has Undo.
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
-  await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
-  await expect(page.getByRole("menuitem")).toHaveText([
+  const suggestName = async () => {
+    await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
+    await expect(page.getByRole("menuitem")).toHaveText(["Suggestions", "Custom…", "Refresh"]);
+    await expandAssistantMenu(page, "Suggestions");
+  };
+  const suggested = page.getByRole("group", { name: "Suggestions", exact: true });
+  await suggestName();
+  await expect(suggested.getByRole("menuitem")).toHaveText([
     "Ash",
     "Ivy",
     "Mara",
     "Rook",
     "Sloane",
     "Wren",
-    "Refresh",
-    "Custom…",
   ]);
   await page.getByRole("menuitem", { name: "Wren", exact: true }).click();
   await expect(name).toHaveValue("Wren");
   await editor.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(name).toHaveValue("");
-  await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
+  await suggestName();
   await page.getByRole("menuitem", { name: "Mara", exact: true }).click();
   await expect(name).toHaveValue("Mara");
   if (
@@ -476,17 +481,16 @@ test("Use as Character starts a card from a gallery image in Library › Charact
       .getByRole("textbox", { name: "Description", exact: true })
       .getAttribute("inputmode")) === "none"
   )
-    await editorMenu(editor, "Description", "Suggested");
+    await editorMenu(editor, "Description", "Suggestions");
   else await promptMenu(editor, "Description");
-  await expect(page.getByRole("menuitem")).toHaveText([
+  await expandAssistantMenu(page, "Suggestions");
+  await expect(suggested.getByRole("menuitem")).toHaveText([
     "freckled redhead, slim build",
     "green-eyed ranger",
     "red-haired ranger, green cloak",
     "scarred ranger",
     "tall ranger",
     "young ranger",
-    "Refresh",
-    "Custom…",
   ]);
   await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();
   await closeTextEditor(page, "Description");
@@ -513,10 +517,10 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   );
   // Delete asks first and leaves the gallery image.
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete Character", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Character", exact: true })
-    .getByRole("button", { name: "Delete Character", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
   expect(state.characters).toEqual([]);
@@ -647,7 +651,7 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await expect(page.getByRole("dialog")).toHaveCount(1);
   // The editor shows the sheet too, and makes it again.
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit Character", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
   const sheet = editor.getByRole("region", { name: "Sheet", exact: true });
   await expect(

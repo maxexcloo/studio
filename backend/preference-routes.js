@@ -8,8 +8,8 @@ import {
 import { groupGrants } from "./account-store.js";
 
 /**
- * Settings › Preferences: the caller's own preferences, and which personal features (Cloud Models,
- * LoRAs, Uncensored Models) its role or group grants, which it may turn off for itself.
+ * Settings › Preferences: the caller's own preferences, and which personal features (LoRAs,
+ * Uncensored Models) its role or group grants, which it may turn off for itself.
  */
 export function registerPreferenceRoutes(app) {
   const show = (req) => {

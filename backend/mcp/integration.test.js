@@ -815,7 +815,7 @@ test("account signed result links survive restart without persisting bearer toke
     outputs: [{ url: "/comfy/view?filename=restart-result.png" }],
   });
   const result = await call(client, "result", { job_id: id });
-  const [link] = links(result);
+  const [link] = files(result);
   assert.ok(link);
 
   let available = true;
@@ -902,6 +902,10 @@ function previews(result) {
   return [...texts(result).matchAll(/\[!\[[^\]]*\]\((https?:\/\/[^)]+)\)\]/g)].map(
     (match) => match[1],
   );
+}
+/** The original files behind a reply's image previews (the images themselves link to Studio's page). */
+function files(result) {
+  return previews(result).map((preview) => preview.replace(/\.jpg$/, ""));
 }
 /** Runs a change once the fixture reaches a state, such as every job of a submission existing. */
 const once = (ready, change) => {
@@ -1293,10 +1297,15 @@ test("Models and Generate follow the run's backend: its sizes, reference limit a
   assert.deepEqual(detail.controls.aspect.options, { "16:9": "1344×768" });
   assert.equal(detail.defaults.size, "1008×1344");
   // Five references are past Radiance's four slots: refused, naming the limit.
+  const uploaded = [];
+  for (let index = 0; index < 5; index++)
+    uploaded.push(
+      data(await call(client, "upload", { content_base64: png.toString("base64") })).asset.id,
+    );
   const many = await call(client, "generate", {
     profile_id: "custom:qwen",
     prompts: ["A fox"],
-    reference_asset_ids: ["asset-1", "asset-2", "asset-3", "asset-4", "asset-5"],
+    reference_asset_ids: uploaded,
   });
   assert.equal(many.isError, true);
   assert.match(texts(many), /Qwen · Fast on Radiance takes at most 4 references; pass 4 or fewer/);
@@ -1930,6 +1939,18 @@ test("create_characters saves each card with its story and queues its portrait, 
   await failure(client, "create_characters", {
     characters: [{ name: "mara", description: "Ranger", portrait: "A ranger" }],
   });
+  // So is the same name with a word added, or the same looks under another name.
+  const renamed = await call(client, "create_characters", {
+    characters: [{ name: "Her Mara", description: "Ranger", portrait: "A ranger" }],
+  });
+  assert.equal(renamed.isError, true);
+  assert.match(texts(renamed), /Her Mara looks like Mara/);
+  await failure(client, "create_characters", {
+    characters: [
+      { name: "Cora", description: "Ranger", portrait: "A ranger" },
+      { name: "Wren", description: " ranger", portrait: "A smith" },
+    ],
+  });
   await failure(client, "create_characters", {
     characters: [
       { name: "Cora", description: "Ranger", portrait: "A ranger" },
@@ -2262,10 +2283,14 @@ test("image Result returns one short linked preview that opens the unchanged ori
     result.content.map((item) => item.type),
     ["text"],
   );
-  const [link] = links(result);
+  const [link] = files(result);
   const [preview] = previews(result);
   assert.match(link, /^https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}$/);
   assert.equal(preview, `${link}.jpg`);
+  // The image opens its page in Studio, not the bare file.
+  const page = await fetch(localLink(f, links(result)[0]), { redirect: "manual" });
+  assert.notEqual(links(result)[0], link);
+  assert.equal(page.headers.get("content-type")?.startsWith("image/"), false);
   assert.match(
     result.content[0].text,
     /\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
@@ -2483,7 +2508,7 @@ test("hiding a completed output revokes existing signed links and prevents resul
     outputs: [{ url: "/comfy/view?filename=visible.png" }],
   });
   const result = await call(client, "result", { job_id: id });
-  const [link] = links(result);
+  const [link] = files(result);
   assert.ok(link);
   f.jobs.get(id).gallery = [];
   const before = f.downloads.length;
@@ -2715,7 +2740,7 @@ test("background Result collects a later completion without another submission",
     /\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/,
   );
   assert.match(message.text, /Stop here unless the user asked for a review\./);
-  const original = await fetch(localLink(f, links(result)[0]));
+  const original = await fetch(localLink(f, files(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
   assert.equal(data(result).ref, "#1");
@@ -2776,7 +2801,7 @@ test("signed links do not expire, preserve the configured public path and cannot
     status: "done",
     outputs: [{ url: "/comfy/view?filename=original.png" }],
   });
-  const [url] = links(await call(client, "result", { job_id: id }));
+  const [url] = files(await call(client, "result", { job_id: id }));
   assert.match(url, /^https:\/\/studio\.example\.test\/nested\/studio\/mcp\/results\//);
   const local = f.base + new URL(url).pathname.replace("/nested/studio", "");
   assert.equal((await fetch(local)).status, 200);
@@ -3531,6 +3556,46 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   );
   await ask(await conversation("conversation-b"), {});
   assert.equal(f.submitted.at(-1).count, 1);
+  // A preview teaches nothing; the call that confirms it keeps the preview's reference.
+  const third = await conversation("conversation-c");
+  const { asset } = data(await call(third, "upload", { content_base64: png.toString("base64") }));
+  const preview = await ask(third, { count: 5, preview: true, reference_asset_ids: [asset.id] });
+  assert.match(texts(preview), new RegExp(`References: ${asset.id}\\.`));
+  const confirmed = await ask(third, {});
+  assert.match(texts(confirmed), /Kept from earlier: references/);
+  assert.deepEqual(
+    f.submitted.at(-1).referenceAssets.map((item) => item.assetId),
+    [asset.id],
+  );
+  assert.notEqual(f.submitted.at(-1).count, 5);
+  await ask(third, { reference_asset_ids: [] });
+  assert.deepEqual(f.submitted.at(-1).referenceAssets, []);
+  // A bare number could be an attachment's place, so a result reference needs its #.
+  const bare = await ask(third, { reference_asset_ids: ["1"] });
+  assert.equal(bare.isError, true);
+  assert.match(texts(bare), /ambiguous: pass #1/);
+  // A preview already says when a reference is no image Studio knows for the chat.
+  const unknown = await ask(third, { preview: true, reference_asset_ids: ["made-up"] });
+  assert.match(texts(unknown), /"made-up" isn't an image Studio knows/);
+});
+
+test("a chat turn stops at the number of images asked for and its later calls bring new prompts", async (t) => {
+  const f = await fixture(t);
+  const client = await chat(t, f, "alice", "conversation-a", "turn-1");
+  const ask = (prompts) =>
+    call(client, "generate", {
+      profile_id: imageProfile.id,
+      prompts,
+      count: 1,
+      request: "make 3 more images",
+    });
+  assert.notEqual((await ask(["A lake at dawn", "A pier in fog"])).isError, true);
+  const repeated = await ask(["A pier in fog"]);
+  assert.match(texts(repeated), /prompt 1 repeats set 1/);
+  const over = await ask(["A heron in reeds", "A boat at night"]);
+  assert.match(texts(over), /asked for 3 images and this turn has queued 2; queue at most 1 more/);
+  assert.notEqual((await ask(["A heron in reeds"])).isError, true);
+  assert.equal(f.submitted.length, 3);
 });
 
 test("a chat picks a profile that takes its photo when the remembered profile can't", async (t) => {
@@ -5741,11 +5806,23 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.deepEqual(await size({ aspect: "portrait" }), [768, 1360]);
   assert.deepEqual(await size({ aspect: "square" }), [1024, 1024]);
   assert.deepEqual(await size({ aspect: "4:3" }), [1184, 880]);
-  assert.deepEqual(await size({ aspect: "landscape", resolution: "1K" }), [1024, 576]);
+  // 1K is this profile's own tier, so it keeps the preset rather than shrinking to 1024.
+  assert.deepEqual(await size({ aspect: "landscape", resolution: "1K" }), [1360, 768]);
   assert.deepEqual(await size({ aspect: "landscape", resolution: "2K" }), [2048, 1152]);
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
+  // The account's Settings size starts a run the chat sized no further, as in the composer.
+  await f.profiles(
+    [{ ...native, imageSizePreference: { imageAspect: "16:9", imageResolution: "2K" } }],
+    { defaults: { image: "native", video: videoProfile.id } },
+  );
+  assert.deepEqual(await size({}), [2048, 1152]);
+  assert.deepEqual(await size({ aspect: "square" }), [2048, 2048]);
+  assert.deepEqual(await size({ resolution: "1K" }), [1360, 768]);
+  await f.profiles([native, { ...structuredClone(imageProfile), label: "Plain · Quality" }], {
+    defaults: { image: "native", video: videoProfile.id },
+  });
   const original = await call(client, "generate", {
     prompts: ["An egg on a shelf"],
     aspect: "9:16",
