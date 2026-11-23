@@ -339,7 +339,10 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   await expect(details).toHaveValue("six toes");
   await promptMenu(report, "Details");
   await expect(page.getByRole("menuitem", { name: "Undo", exact: true })).toBeVisible();
+  // Escape closes only the menu, not the dialog beneath it.
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(report).toBeVisible();
   expect(inspected).toEqual([{ jobId: "job-hub", itemId: "hub", upscaled: false }]);
   expect(state.jobs).toHaveLength(1);
   expect(state.gallery.find((item) => item.id === "hub")?.rating).toBeUndefined();

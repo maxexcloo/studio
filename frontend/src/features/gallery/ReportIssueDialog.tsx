@@ -1,11 +1,12 @@
 import { Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import type { ImageInspection } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { proposalUndo } from "../generation/AskChange";
@@ -80,6 +81,7 @@ export function ReportIssueDialog({
   onQueued?: (jobId: string) => void;
   onClose: () => void;
 }) {
+  const id = useId();
   const phone = usePhone();
   const fix = useReportIssue(item, onQueued, true);
   const [picked, setPicked] = useState<string[]>([]);
@@ -115,7 +117,14 @@ export function ReportIssueDialog({
   const canInspect = item.type === "image" && Boolean(item.jobId);
   const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
-    <Modal opened onClose={onClose} title="Report Issue" size="sm" fullScreen={phone}>
+    <Modal
+      id={id}
+      opened
+      onClose={closeWhenTop(id, onClose)}
+      title="Report Issue"
+      size="sm"
+      fullScreen={phone}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
