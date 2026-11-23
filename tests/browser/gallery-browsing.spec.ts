@@ -241,21 +241,21 @@ test("Select All takes every match across pages, and the search and Liked stay w
     });
     await page.evaluate(() => window.scrollBy(0, 800));
     await expect(status).toBeInViewport({ ratio: 1 });
-    const unlike = actions.getByRole("button", { name: "Unlike", exact: true });
+    const like = actions.getByRole("button", { name: "Like", pressed: true, exact: true });
     // Scroll the row itself sideways; the page stays where it is.
-    await unlike.evaluate((el) => el.scrollIntoView({ block: "nearest", inline: "center" }));
-    await expect(unlike).toBeInViewport({ ratio: 1 });
-    expect((await unlike.boundingBox())!.y).toBeLessThan((await status.boundingBox())!.y + 20);
+    await like.evaluate((el) => el.scrollIntoView({ block: "nearest", inline: "center" }));
+    await expect(like).toBeInViewport({ ratio: 1 });
+    expect((await like.boundingBox())!.y).toBeLessThan((await status.boundingBox())!.y + 20);
     // Phones end the selection with Select, which stays in sight while it applies.
     await expect(select).toBeInViewport({ ratio: 1 });
     await expect(
       selection.getByRole("button", { name: "Clear Selection", exact: true }),
     ).toHaveCount(0);
   }
-  const unlike = page.waitForRequest("**/api/gallery/favorite");
-  await selectionAction(page, "Unlike").click();
-  expect((await unlike).postDataJSON()).toMatchObject({ rating: null });
-  expect((await unlike).postDataJSON().ids).toHaveLength(65);
+  const clearRating = page.waitForRequest("**/api/gallery/favorite");
+  await selectionAction(page, "Like").click();
+  expect((await clearRating).postDataJSON()).toMatchObject({ rating: null });
+  expect((await clearRating).postDataJSON().ids).toHaveLength(65);
   // A finished action ends the selection.
   await expect(select).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
@@ -2163,7 +2163,9 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     await page.keyboard.press("Space");
     await expect.poll(() => state.gallery[1].rating).toBe("disliked");
     await saved;
-    await expect(viewer.getByRole("button", { name: "Undo Dislike", exact: true })).toBeFocused();
+    await expect(
+      viewer.getByRole("button", { name: "Dislike", pressed: true, exact: true }),
+    ).toBeFocused();
     await expect(
       page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
     ).toHaveCount(0);

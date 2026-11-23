@@ -261,9 +261,9 @@ export function usePromptHistory({
                         {entry.uses} {entry.uses === 1 ? "Use" : "Uses"}
                       </Text>
                     </Combobox.Option>
-                    <Tooltip label={entry.liked ? "Unlike Prompt" : "Like Prompt"}>
+                    <Tooltip label="Like Prompt">
                       <ActionIcon
-                        aria-label={entry.liked ? "Unlike Prompt" : "Like Prompt"}
+                        aria-label="Like Prompt"
                         aria-pressed={Boolean(entry.liked)}
                         variant={entry.liked ? "light" : "subtle"}
                         color={entry.liked ? undefined : "gray"}

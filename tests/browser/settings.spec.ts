@@ -402,8 +402,18 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   await expect(page.getByRole("list", { name: "Workers", exact: true })).toContainText(
     "Image Worker",
   );
+  await page.route("**/api/stats", (route) =>
+    route.fulfill({ json: { version: "ef19c18", releaseVersion: "v2026.1.1.1" } }),
+  );
   await section(page, "Settings", "About");
-  await expect(page.getByText("Development", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "v2026.1.1.1", exact: true })).toHaveAttribute(
+    "href",
+    /\/releases\/tag\/v2026\.1\.1\.1$/,
+  );
+  await expect(page.getByRole("link", { name: "ef19c18", exact: true })).toHaveAttribute(
+    "href",
+    /\/commit\/ef19c18$/,
+  );
   await expect(page.getByRole("link", { name: "Licence", exact: true })).toHaveAttribute(
     "href",
     /\/LICENSE$/,

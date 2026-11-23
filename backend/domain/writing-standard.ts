@@ -10,7 +10,7 @@ export const precedence =
 
 /** Generation models read and voice American English; other spellings read and sound wrong to them. */
 export const americanEnglish =
-  "Write prompt text in American English (color, gray, center), whatever spelling the input or these instructions use; quoted text stays as written.";
+  "Use American English spelling for English prompt text (color, gray, center). Keep quoted text and any requested language exactly as given.";
 
 /** What the writer may add: only what the input states or implies. */
 export const fidelity =
@@ -23,16 +23,13 @@ export const keepDescriptions =
 export const standalonePrompt =
   'Describe each new scene fully in the guide format. The generation model cannot read the chat or earlier prompts, so spell out details instead of saying "same as above." For edits or animation with an attached reference, follow the guide for that mode and describe what changes or moves.';
 
-/** A person's age and ethnicity lead and stay, since a late or dropped one is often lost in the image. */
+/** Lead with known identity cues, preserving details without inferring demographics. */
 export const subjectFirst =
-  "Name each person's age and ethnicity in the prompt's first words, show the ethnicity in their face (eye shape, nose, skin tone) and keep both through every rewrite and change.";
+  "Lead with each subject's given identity and defining appearance, including any supplied age and ethnicity. Preserve identifying details from attached references. Do not infer age or ethnicity from appearance.";
 
-/**
- * A person's rules applied in proportion, so a batch keeps what they like: an attractiveness word
- * and one small real mark score best, a face rewritten plain or older worst.
- */
+/** Apply specific appearance preferences without changing the rest of the brief. */
 export const proportionate =
-  "Apply each rule in proportion: real flaws means subtle texture (pores, slight asymmetry, a freckle or small mark) on the face asked for, never a plainer, older, harsher or more masculine one; keep the asked-for age, attractiveness and style, and vary a batch within the brief, never away from it.";
+  "Apply each rule in proportion. If the person asks for realistic imperfections, use the requested traits or a small visible detail such as skin texture, slight asymmetry, or a freckle. Preserve their requested appearance and vary only what the brief leaves open.";
 
 /**
  * How a requested change is written into a prompt so it lands: edited in place and in absolute

@@ -946,7 +946,7 @@ export function registerGenerateTools({
     if (rules.length && review(`rules:${JSON.stringify(rules)}`))
       projectNote = `${rulesLine(rules)}${projectNote}`;
     if (alike && review("converging"))
-      projectNote = `Recent results are converging on one look; vary face, setting, light and pose between prompts while keeping the user's rules. ${projectNote}`;
+      projectNote = `Recent results are converging on one look. Vary the open choices in setting, light, framing, action or styling. Keep identities and details fixed by the user's instructions or references. ${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)

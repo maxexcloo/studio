@@ -93,7 +93,7 @@ const cacheLimit = 500;
 const suggestionRevision = 2;
 const motionRevision = 3;
 /** Ideas avoid this many of the latest shown in the same menu. */
-const shownIdeas = 9;
+const shownIdeas = maxSuggestions;
 const maxIdea = 160;
 const maxRequest = 500;
 const directionRequests: Record<VariationDirection, string> = {
@@ -144,8 +144,11 @@ const stepAreas = [
   "expression",
   "outfit",
   "action",
+  "interaction",
   "setting",
+  "weather or season",
   "lighting",
+  "color palette",
   "framing",
   "style",
 ] as const;
@@ -175,6 +178,8 @@ const motionAngles = [
   "a change of expression",
   "a reveal",
   "the sound",
+  "a foreground detail moving",
+  "a background element moving",
 ];
 /** `count` different angles in random order. */
 function angles(list: readonly string[], count: number) {
@@ -197,6 +202,8 @@ const targetLines = (target: WritingTarget | null | undefined) =>
     : [];
 const clean = (value: unknown, limit = Infinity) =>
   (typeof value === "string" ? value : "").replace(/\s+/g, " ").trim().slice(0, limit);
+const promptText = (value: unknown) =>
+  typeof value === "string" ? value.trim().slice(0, maxPromptCharacters) : "";
 const json = (text: string) => {
   try {
     return JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] || "");
@@ -231,7 +238,7 @@ function describeItem(item: SuggestionItem) {
     `Model: ${clean(settings.profileName || settings.profileId, 120) || "unknown"}`,
     item.width && item.height ? `Size: ${item.width} × ${item.height}` : "",
     loras.length ? `LoRAs: ${loras.join(", ")}` : "",
-    `Prompt: ${clean(item.prompt || item.suggestedPrompt, maxPromptCharacters)}`,
+    `Prompt: ${promptText(item.prompt || item.suggestedPrompt)}`,
     item.caption?.text ? `What it shows: ${clean(item.caption.text, 600)}` : "",
   ]
     .filter(Boolean)
@@ -461,7 +468,7 @@ export function createSuggestions({
       const ideas = (Array.isArray(reply?.ideas) ? reply.ideas : [])
         .map((idea: Record<string, unknown>) => ({
           label: shortTitle(clean(idea?.label, 40), 4),
-          prompt: clean(idea?.prompt, maxPromptCharacters),
+          prompt: promptText(idea?.prompt),
         }))
         .filter(({ label, prompt }: PromptIdea) => {
           const title = sameLabel(label);
@@ -481,7 +488,7 @@ export function createSuggestions({
     const steps = (Array.isArray(reply?.steps) ? reply.steps : [])
       .map((step: Record<string, unknown>): NextStep => {
         const request = clean(step?.request, 160);
-        const prompt = surface === "animate" ? request : clean(step?.prompt, maxPromptCharacters);
+        const prompt = surface === "animate" ? request : promptText(step?.prompt);
         return { label: shortTitle(clean(step?.label, 40), 4), request, ...(prompt && { prompt }) };
       })
       .filter((step: NextStep) => {
@@ -659,12 +666,12 @@ export function createSuggestions({
     }
     const reply = json(text);
     if (directions) {
-      const original = clean(source.prompt, maxPromptCharacters);
+      const original = promptText(source.prompt);
       const suggestions = directions.map((direction) => ({
         action: "recreate" as const,
         label: shortTitle(clean(reply?.[direction]?.label, 40), 4),
         request: direction,
-        prompt: clean(reply?.[direction]?.prompt, maxPromptCharacters),
+        prompt: promptText(reply?.[direction]?.prompt),
       }));
       if (
         suggestions.some(({ label, prompt }) => !label || !prompt || prompt === original) ||
@@ -677,11 +684,8 @@ export function createSuggestions({
     const action = actions.find((known) => known === reply?.action);
     const prompt =
       action === "upscale"
-        ? clean(
-            source.prompt || (!("draft" in source) && source.suggestedPrompt),
-            maxPromptCharacters,
-          )
-        : clean(reply?.prompt, maxPromptCharacters);
+        ? promptText(source.prompt || (!("draft" in source) && source.suggestedPrompt))
+        : promptText(reply?.prompt);
     const label = shortTitle(clean(reply?.label, 40), 4);
     if (!action || !label || (!prompt && action !== "upscale"))
       return empty("The text model's reply was unusable.");
@@ -854,7 +858,7 @@ export function createSuggestions({
             ? {
                 draft: true,
                 kind: body.kind as Draft["kind"],
-                prompt: clean(body.prompt, maxPromptCharacters),
+                prompt: promptText(body.prompt),
               }
             : item(ownerId, body.jobId as string, itemId);
         if (!source) throw failure("Result not found.", 404);
@@ -925,7 +929,7 @@ export function createSuggestions({
       const { known, lines, motionLines } = tasteContext(ownerId);
       const drafted = surface === "composer" || surface === "draft";
       const kind = drafted ? (body.kind as "image" | "video") : "image";
-      const prompt = drafted || edited ? clean(body.prompt, maxPromptCharacters) : "";
+      const prompt = drafted || edited ? promptText(body.prompt) : "";
       if (surface === "draft" && !prompt) return empty("Write a prompt to change first.");
       let cardDraft: string | undefined;
       let appliedCards: string[] = [];
@@ -988,7 +992,7 @@ export function createSuggestions({
               ...motionLines,
               "",
               "Opening frame:",
-              `Prompt: ${clean(source.prompt || source.suggestedPrompt, maxPromptCharacters)}`,
+              `Prompt: ${promptText(source.prompt || source.suggestedPrompt)}`,
               ...(source.caption?.text
                 ? [`What it shows: ${clean(source.caption.text, 600)}`]
                 : []),

@@ -111,7 +111,11 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
     return route.fulfill({
       json: {
         suggestions: [
-          { label: "Later Light", request: "change the light", prompt: "Bird at dusk" },
+          ...Array.from({ length: 9 }, (_, index) => ({
+            label: `Idea ${index + 1}`,
+            request: `try direction ${index + 1}`,
+          })),
+          { label: "Later Light", request: "change the light" },
         ],
       },
     });

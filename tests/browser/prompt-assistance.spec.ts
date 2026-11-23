@@ -469,8 +469,9 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await negative.fill("Keep these exclusions");
   await promptTool(page, "Prompt", "Recent Prompts");
   let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
-  await panel.getByRole("button", { name: "Like Prompt", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Unlike Prompt", exact: true })).toBeVisible();
+  const like = panel.getByRole("button", { name: "Like Prompt", exact: true });
+  await like.click();
+  await expect(like).toHaveAttribute("aria-pressed", "true");
   const historySearch = panel.getByRole("textbox", { name: "Search Prompt History", exact: true });
   await historySearch.fill("landscape");
   await historySearch.press("ArrowDown");
@@ -518,8 +519,9 @@ test("Recent Prompts likes and switches at once, and a refused change is undone"
   await promptTool(page, "Prompt", "Recent Prompts");
   const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   // The like shows while the server is still answering.
-  await panel.getByRole("button", { name: "Like Prompt", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Unlike Prompt", exact: true })).toBeVisible();
+  const like = panel.getByRole("button", { name: "Like Prompt", exact: true });
+  await like.click();
+  await expect(like).toHaveAttribute("aria-pressed", "true");
   release();
   const save = panel.getByRole("switch", { name: "Keep Recent Prompts", exact: true });
   await save.click();
