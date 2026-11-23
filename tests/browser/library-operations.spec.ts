@@ -424,6 +424,8 @@ test("An available LoRA can be installed from the catalogue and moves to Install
   await expect(row).toHaveCount(0);
   await chooseView(page, "LoRAs", "Installed");
   await expect(row).toContainText("Installed");
+  await chooseView(page, "LoRAs", "Outdated");
+  await expect(page.getByText("Everything Is Up to Date", { exact: true })).toBeVisible();
 });
 
 test("A checkpoint profile draft can be retried after failure and refreshed into the model choices", async ({
