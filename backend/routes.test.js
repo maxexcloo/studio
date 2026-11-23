@@ -150,6 +150,7 @@ test("a ready profile runs a generate request to the gallery", async () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.equal(job.status, "done", JSON.stringify(job.failure || job));
+  assert.equal(job.progress, undefined);
   const gallery = await api("/api/gallery?limit=20");
   const item = gallery.body.items.find((entry) => entry.jobId === jobId);
   assert.equal(item.status, "done");

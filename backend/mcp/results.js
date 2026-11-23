@@ -211,6 +211,7 @@ export function registerResultTools({
         rating: item.rating || "unrated",
         ...(item.resultSet?.caption ? { caption: item.resultSet.caption } : {}),
       }));
+      const modelOf = await media.itemModels(owner);
       // A line each: its ref, then a gist; Details and the link keep the whole prompt.
       const lines = hits.map((item, position) => {
         const { ref, link } = results[position];
@@ -218,7 +219,7 @@ export function registerResultTools({
           `- [${ref}](${link})${item.rating === "liked" ? " ♥" : ""}`,
           `user feedback: ${item.rating || "unrated"}`,
           shortPrompt(item.resultSet?.caption || item.title || item.prompt || "", 80),
-          item.settings?.modelName || item.model || item.settings?.profileId,
+          modelOf(item),
           String(item.createdAt || "").slice(0, 10),
         ]
           .filter(Boolean)

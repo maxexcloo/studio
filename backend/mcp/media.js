@@ -15,6 +15,7 @@ import { selectedResolution, withResolution } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
 import { step } from "../event-loop.js";
+import { families } from "../family-catalogue.js";
 import { topCaptionTags } from "../gallery/filters.js";
 import { profileAspectSize } from "../generation-defaults.js";
 import { compatibleLoras } from "../lora/policy.js";
@@ -347,6 +348,34 @@ export class McpMedia {
   invalidateProfiles() {
     this.profileGeneration = (this.profileGeneration || 0) + 1;
     this.profileCache?.clear();
+  }
+  /**
+   * A lookup from profile id to its short name, as its label reads before the first ' · ', or ""
+   * for a profile the catalogue no longer has.
+   */
+  async profileNames(owner) {
+    const profiles = await this.catalogue(owner).then(
+      (models) => models.profiles || [],
+      () => [],
+    );
+    const names = new Map(
+      profiles.map((profile) => [
+        profile.id,
+        String(profile.displayName || profile.label || "")
+          .split(/\s*·\s*/)[0]
+          .trim(),
+      ]),
+    );
+    return (id) => names.get(id) || "";
+  }
+  /** A gallery item's readable model: its profile's short name, else what the item recorded. */
+  async itemModels(owner) {
+    const named = await this.profileNames(owner);
+    return (item) =>
+      named(item.settings?.profileId) ||
+      item.settings?.modelName ||
+      item.model ||
+      item.settings?.profileId;
   }
   async profiles(kind = "all", owner = "") {
     const models = await this.catalogue(owner);
@@ -737,6 +766,10 @@ export class McpMedia {
       );
       Object.assign(body, fitted);
     }
+    // Plain img2img samples at its staged reference's size (generation-routes.js), which the gallery records.
+    const family = families[profile.family];
+    if (reference_asset_ids.length && family?.img2img && !family.references)
+      changes.push(`Its reference sets the size, so it won't draw ${body.width}×${body.height}.`);
     validate?.(profile, body);
     const ignored = changes.filter(Boolean).join(" ");
     // Large draws decode in tiles, matching the browser's generation path.
@@ -1052,12 +1085,11 @@ export class McpMedia {
         .slice(0, summaryTop)
         .map(([name, count]) => ({ name, count }));
     };
+    const modelOf = await this.itemModels(owner);
     return {
       count: items.length,
       ...(cursor ? { more: true } : {}),
-      profiles: top(
-        items.map((item) => item.settings?.modelName || item.model || item.settings?.profileId),
-      ),
+      profiles: top(items.map(modelOf)),
       loras: top(
         items.flatMap((item) =>
           (item.settings?.loras || [])
@@ -2126,15 +2158,7 @@ export class McpMedia {
       ),
     );
     const [{ job }] = entries;
-    const profile = job.profileId
-      ? (await this.profiles("all", owner).catch(() => [])).find(
-          (item) => item.id === job.profileId,
-        )
-      : undefined;
-    // The profile's short name, as its label reads before the first ' · '.
-    const name = String(profile?.displayName || profile?.label || "")
-      .split(/\s*·\s*/)[0]
-      .trim();
+    const name = job.profileId ? (await this.profileNames(owner))(job.profileId) : "";
     const header = (caption) => [`**${caption}**`, name].filter(Boolean).join(" · ");
     const captions = (values) =>
       [...new Set(values.filter(Boolean))]
@@ -2274,8 +2298,13 @@ export class McpMedia {
     ]
       .filter(Boolean)
       .join("\n\n");
+    // Each image or video is its own numbered result, however many a job made.
+    const ready = shown.reduce(
+      (sum, { job }) => sum + job.outputs.filter((item) => mcpOutputPath(item?.url)).length,
+      0,
+    );
     const message = shown.length
-      ? `${shown.length === 1 ? "One result is" : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ""}. ${replyRule}`
+      ? `${ready === 1 ? "One result is" : `${ready} results are`} ready${pending.length ? `, ${pending.length} still running` : ""}. ${replyRule}`
       : "No result has finished yet. Share the links below and end your turn; do not poll.";
     return {
       content: [

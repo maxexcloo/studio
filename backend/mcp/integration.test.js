@@ -1321,6 +1321,25 @@ test("Models and Generate follow the run's backend: its sizes, reference limit a
   assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [2048, 1152]);
 });
 
+test("Generate says a plain img2img reference sets the size", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([{ ...structuredClone(imageProfile), family: "sdxl" }]);
+  const client = await f.client();
+  const asset = data(await call(client, "upload", { content_base64: png.toString("base64") })).asset
+    .id;
+  const reply = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A fox"],
+    count: 1,
+    reference_asset_ids: [asset],
+  });
+  assert.match(texts(reply), /Its reference sets the size, so it won't draw \d+×\d+\./);
+  assert.doesNotMatch(
+    texts(await call(client, "generate", { profile_id: imageProfile.id, prompts: ["A fox"] })),
+    /reference sets the size/,
+  );
+});
+
 test("Generate attaches a compact guide once per account unless it read the selected profile's whole guide, not its gist, discovery or another profile", async (t) => {
   const f = await fixture(t);
   await f.profiles([
@@ -1330,6 +1349,8 @@ test("Generate attaches a compact guide once per account unless it read the sele
         id: "fixture-guide",
         summary: "Subject first",
         rules: ["Describe the subject first"],
+        pitfalls: ["Stacked adjectives blur"],
+        example: "A lighthouse at dusk",
         sources: ["https://example.test/guide"],
       },
     },
@@ -4656,7 +4677,7 @@ test("Search finds the account's own finished work through the gallery search, a
     settings: {
       prompt: "Red waves rolling in",
       profileId: videoProfile.id,
-      modelName: "Fixture Video",
+      modelName: "fixture-video.safetensors",
       loras: [{ name: "styles/fixture-effect.safetensors", strength: 0.8 }],
     },
   });
@@ -4681,7 +4702,7 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.match(texts(result), /^4 of 6 matches, newest first\./);
   assert.match(
     texts(result),
-    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · fixture-image$/m,
+    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · Fixture Image$/m,
   );
   assert.match(texts(result), /\[#1\]\([^)]+\) · .*A red heron/);
   // The images come as one contact sheet, drawn when opened.
@@ -5572,7 +5593,7 @@ test("a Generate count is one batched job where the profile batches, else a job 
   assert.equal(f.submitted.length, 19);
 });
 
-test("each conversation gets a profile guide once, whole, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
+test("each conversation gets a profile guide once, every rule of it, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
   const f = await fixture(t);
   const long = {
     id: "long-guide",
@@ -5596,7 +5617,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   );
   const guided = replies.filter((reply) => guideOf(reply));
   assert.equal(guided.length, 1, "concurrent calls attach the guide once");
-  assert.match(guideOf(guided[0]), /Rule 40 explains/, "the whole guide, not a gist");
+  assert.match(guideOf(guided[0]), /Rule 40 explains/, "every rule, not a gist");
   assert.equal(texts(guided[0]).includes("example.test/guide"), false);
   for (const reply of replies.filter((reply) => !guideOf(reply)))
     assert.ok(texts(reply).length < 570, `${texts(reply).length} characters`);
@@ -7820,6 +7841,21 @@ test("Models tells a chat when a profile does best without LoRAs", async (t) => 
   assert.match(details.loras_note, /does best without LoRAs: add one only when the user names it/);
 });
 
+test("a set's note offers only the image names the set has", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  await call(client, "models", { profile_id: imageProfile.id });
+  const generated = (args) =>
+    call(client, "generate", { profile_id: imageProfile.id, ...args }).then(texts);
+  const one = await generated({ prompts: ["A red barn"], count: 1 });
+  assert.match(one, /Set 1\. /);
+  assert.doesNotMatch(one, /"set 1 /);
+  assert.match(
+    await generated({ prompts: ["A blue barn", "A green barn"], count: 2 }),
+    /Set 2 \("set 2 B": second image; "set 2 2b": item 2, image b\)\. /,
+  );
+});
+
 test("a generate call is a set its ref reruns, reviews, shows and rates, wholly or by item and letter", async (t) => {
   const f = await fixture(t);
   f.app.post("/api/gallery/favorite", (_req, res) => res.json({ ok: true }));
@@ -7844,7 +7880,9 @@ test("a generate call is a set its ref reruns, reviews, shows and rates, wholly 
       outputs: [0, 1].map((index) => ({ url: `/comfy/view?filename=${job.id}-${index}.png` })),
     });
   assert.equal(reviewed(await call(client, "review", { job_id: "set 1" })).length, 4);
-  assert.match(texts(await call(client, "result", { job_id: "set 1" })), /\*\*#1–#4\*\*/);
+  const shown = texts(await call(client, "result", { job_id: "set 1" }));
+  assert.match(shown, /\*\*#1–#4\*\*/);
+  assert.match(shown, /^4 results are ready\./m);
   // "set 1 2b" is the second item's second image.
   assert.equal(
     (await call(client, "gallery", { action: "like", results: ["set 1 2b"] })).isError,
