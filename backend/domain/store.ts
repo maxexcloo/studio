@@ -79,6 +79,8 @@ export const everyone = "*";
 /** Not yet done: pending, or handed to a provider. */
 const openStatuses = [...pendingStatuses, ...activeStatuses];
 const jobPriority = "json_extract(record, '$.priority')";
+const jobResource = "json_extract(record, '$.resource')";
+const jobTier = `COALESCE(${jobPriority}, ${queuePriority.manual})`;
 const dreamPriority = `${jobPriority} = ${queuePriority.dream}`;
 const pendingMemoryRecovery = `status = 'failed'
   AND json_extract(record, '$.memoryRecovery') IS NOT NULL
@@ -139,6 +141,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS studio_queue_session ON studio_queue(session_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_set ON studio_queue(json_extract(record, '$.queueSet'));
       CREATE INDEX IF NOT EXISTS studio_queue_priority ON studio_queue(status, ${jobPriority});
+      CREATE INDEX IF NOT EXISTS studio_queue_overtakes ON studio_queue(${jobResource}, ${jobTier}, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_dream_recent ON studio_queue(owner_id, created_at) WHERE ${dreamPriority};
       CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
@@ -682,9 +685,9 @@ export class Store {
     // A cancelled job never started, so it overtook nothing.
     const startedFinished = [...terminalStatuses].filter((status) => status !== "cancelled");
     const later = this.db.prepare(
-      `SELECT rowid, created_at, record FROM studio_queue WHERE status IN (${placeholders(startedFinished)})
-        AND created_at >= ? AND json_extract(record, '$.resource') = ?
-        AND COALESCE(json_extract(record, '$.priority'), ${queuePriority.manual}) = ?
+      `SELECT rowid, created_at, record FROM studio_queue INDEXED BY studio_queue_overtakes
+        WHERE status IN (${placeholders(startedFinished)})
+        AND created_at >= ? AND ${jobResource} = ? AND ${jobTier} = ?
         ORDER BY created_at DESC, rowid DESC LIMIT ?`,
     );
     for (const { resource, tier, since } of oldest.values())
