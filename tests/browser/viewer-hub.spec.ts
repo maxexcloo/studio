@@ -335,7 +335,9 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   // The finding fills the details in place, with Undo.
   const details = report.getByRole("textbox", { name: "Details", exact: true });
   await expect(details).toHaveValue("six toes");
-  await expect(report.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+  await promptMenu(report, "Details");
+  await expect(page.getByRole("menuitem", { name: "Undo", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   expect(inspected).toEqual([{ jobId: "job-hub", itemId: "hub", upscaled: false }]);
   expect(state.jobs).toHaveLength(1);
   expect(state.gallery.find((item) => item.id === "hub")?.rating).toBeUndefined();

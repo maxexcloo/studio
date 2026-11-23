@@ -8,7 +8,6 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { UndoButton, proposedClass } from "../generation/AskChange";
 import { changeSummary } from "../generation/changeSummary";
 import { inspectImage } from "../taste/suggestions";
 import { mediaSource } from "./mediaSource";
@@ -151,21 +150,24 @@ export function ReportIssueDialog({
                       disabled: inspect.isPending || fix.isPending,
                       onClick: inspectImageIssue,
                     },
+                    // An inspection that filled the box can be taken back from the same menu.
+                    ...(current
+                      ? [
+                          {
+                            id: "undo",
+                            label: "Undo",
+                            icon: icons.undo,
+                            onClick: () => {
+                              setDetails(current.before);
+                              setProposal(null);
+                            },
+                          },
+                        ]
+                      : []),
                   ]
                 : []
             }
             busy={inspect.isPending ? "Inspecting Image…" : undefined}
-            className={current ? proposedClass : undefined}
-            send={
-              current && (
-                <UndoButton
-                  onClick={() => {
-                    setDetails(current.before);
-                    setProposal(null);
-                  }}
-                />
-              )
-            }
             below={
               current ? (
                 <Text size="xs" c="dimmed">
