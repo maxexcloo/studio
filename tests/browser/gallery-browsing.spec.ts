@@ -13,6 +13,7 @@ import {
   showOnly,
   showViewerThumbnails,
   stamp,
+  toggleGalleryFilter,
   toolbarSearch,
   touch,
 } from "./fixtures";
@@ -204,9 +205,7 @@ test("Select All takes every match across pages, and the search and Liked stay w
     });
   });
   await page.goto("/images");
-  const liked = page.getByRole("button", { name: "Liked", exact: true });
-  await liked.click();
-  await expect(liked).toHaveAttribute("aria-pressed", "true");
+  await showOnly(page, "Liked");
   await (await toolbarSearch(page)).fill("Browse");
   await expect.poll(() => requests.at(-1)?.get("q")).toBe("Browse");
   const select = page.getByRole("button", { name: "Select Items", exact: true });
@@ -1645,10 +1644,9 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.goto("/images");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
   await expect(filter).toHaveAttribute("aria-expanded", "false");
-  // Disliked is a filter in the panel, while Liked stays in the toolbar.
+  // Liked and Disliked are filters in the panel, not toolbar buttons.
+  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
-  // The toolbar's Liked, not the Filters popup's while it fades out.
-  const liked = page.getByRole("button", { name: "Liked", exact: true }).first();
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
@@ -1661,18 +1659,18 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   await expect(selectionAction(page, "Download")).toBeInViewport({ ratio: 1 });
   await page.keyboard.press("Escape");
-  await expect(liked).toBeInViewport({ ratio: 1 });
   await expect(filter).toBeInViewport({ ratio: 1 });
   await filter.click();
   await expect(page.getByRole("combobox", { name: "Models", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   const search = await toolbarSearch(page);
   await search.fill("Browse");
-  await liked.click();
-  await filter.click();
-  await page.getByRole("button", { name: "Disliked", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(liked).toHaveAttribute("aria-pressed", "false");
+  await toggleGalleryFilter(page, "Liked");
+  const likedChip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
+  await expect(likedChip).toBeVisible();
+  // Disliked takes Liked's place.
+  await toggleGalleryFilter(page, "Disliked");
+  await expect(likedChip).toHaveCount(0);
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));
@@ -1685,10 +1683,10 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
   await page.keyboard.press("Escape");
-  // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
+  // Clear All takes every filter, Disliked included.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
   await expect(dislikedChip).toHaveCount(0);
-  await liked.click();
+  await toggleGalleryFilter(page, "Liked");
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
   await page.keyboard.press("Escape");
@@ -1796,9 +1794,8 @@ test("Incoming results wait behind New Results while scrolled, keeping loaded pa
     .toBeLessThan(2);
   // An arrival during a tap must keep the hit target over the gallery, not a toolbar filter.
   await page.mouse.up();
-  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
+  await expect(page.getByRole("button", { name: "Remove Liked Filter", exact: true })).toHaveCount(
+    0,
   );
   await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
     "Gallery",
