@@ -188,7 +188,6 @@ function fixture(t: TestContext, catalogue = profiles) {
             [query.dreamArm].flat().some((arm) => item.dream?.arm?.startsWith(arm))) &&
           (query.notDreamArm === undefined || item.dream?.arm !== query.notDreamArm) &&
           (query.dreamPair !== false || !item.dream?.pair) &&
-          (!query.dreamSuperLiked || item.dream?.superLiked) &&
           (!query.dreamPassReason || item.dream?.passReason === query.dreamPassReason) &&
           (!query.dreamDecidedSince || (item.dream?.decidedAt || "") >= query.dreamDecidedSince) &&
           (query.dreamProject === undefined || item.dream?.projectId === query.dreamProject) &&
@@ -1588,7 +1587,7 @@ test("Dream varies a project after its chat hands it over, with the source setti
   assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
 });
 
-test("Three independent Dream Super Likes seed a concept and Too Similar puts it aside temporarily", async (t) => {
+test("Three independent likes, in the gallery or Super Likes, seed a concept and Too Similar puts it aside temporarily", async (t) => {
   const fx = fixture(t);
   const { dream, state, store, dreamOnce, taste } = fx;
   state.owners = ["alice"];
@@ -1619,14 +1618,12 @@ test("Three independent Dream Super Likes seed a concept and Too Similar puts it
     assert.equal((await request(`/${id}/super-like`, {})).status, 200);
     assert.equal(item.dream!.superLiked, true);
   }
-  const likedNormally = picture("ordinary");
+  assert.doesNotMatch(String((await dreamOnce())?.dream?.arm), /^continue:/);
+
+  const likedNormally = picture("third");
   likedNormally.rating = "liked";
   dream.rated("alice", [likedNormally]);
   assert.equal(likedNormally.dream!.superLiked, undefined);
-  assert.doesNotMatch(String((await dreamOnce())?.dream?.arm), /^continue:/);
-
-  picture("third");
-  assert.equal((await request("/third/super-like", {})).status, 200);
   const passed = picture("repeat");
   dream.pass("alice", ["repeat"], "similar");
   assert.equal(passed.rating, undefined);

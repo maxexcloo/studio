@@ -522,7 +522,7 @@ export function registerGenerateTools({
       count: jobCount
         .optional()
         .describe(
-          `Repeats each prompt with new seeds (default ${mcpGenerationCount} for one image prompt, else 1). For distinct results provide separate prompts.`,
+          `Repeats each prompt with new seeds (default ${mcpGenerationCount}). For distinct results provide separate prompts.`,
         ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),
@@ -1041,11 +1041,7 @@ export function registerGenerateTools({
       throw new Error(
         `${unable.map(({ profile }) => profile.label || profile.id).join(", ")} can't hold ${card.name}'s face: it takes no reference to edit with, so each image would show someone else. Leave the model out (Studio picks ${keeper ? keeper.label || keeper.id : "one that edits with references"}), or pass any_model: true only if the user insists on it.`,
       );
-    // Several prompts or models are already the images asked for; one image gets a pick of a few.
-    const count = (args.count ??=
-      args.prompts.length === 1 && targets.length === 1 && targets[0].profile.kind === "image"
-        ? mcpGenerationCount
-        : 1);
+    const count = (args.count ??= mcpGenerationCount);
     const jobs = targets.length * (args.prompts?.length || 1) * count;
     if (jobs > maxSplitJobs)
       throw new Error(
