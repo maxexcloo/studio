@@ -48,12 +48,12 @@ export const captionVersion = () => captionPrompt().version;
 
 /**
  * Captions finished gallery images, Dream's pool included, while Studio is idle
- * (domain/idle-work.ts): a trickle of new images, or an administrator's Caption Gallery pass, which
+ * (domain/idle-work.ts): a trickle of new images, or an administrator's Gallery Captions catch-up, which
  * also redoes captions from an older format, on the text model where the owner runs text (`text`)
  * while it reads images.
  */
 export function createCaptioner(options: {
-  /** The Settings › Maintenance switch (STUDIO_GALLERY_CAPTIONS). */
+  /** The Settings › Studio switch (STUDIO_GALLERY_CAPTIONS). */
   enabled(): boolean;
   writer: CaptionWriter | null;
   idle(): boolean;
@@ -79,7 +79,7 @@ export function createCaptioner(options: {
     name: "Gallery captions",
     dailyCap: false,
     revision: captionVersion,
-    off: "Gallery Captions is off in Settings › Maintenance.",
+    off: "Gallery Captions is off in Settings › Studio.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
       vision.local = await writer.supportsVision({ side: "local", uncensored: false });

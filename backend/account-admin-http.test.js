@@ -95,43 +95,32 @@ after(async () => {
 });
 
 test(
-  "a member turns granted Cloud Models, LoRAs and Uncensored Models off for itself",
+  "a member turns granted LoRAs and Uncensored Models off for itself",
   { timeout: 30_000 },
   async () => {
     const { cookie } = await member("chooser");
     const features = async () =>
       (await call("/api/accounts/status", { cookie })).body.account.features;
     const shown = await call("/api/preferences", { cookie });
-    assert.deepEqual(shown.body.grants, {
-      cloudModels: true,
-      loras: true,
-      uncensoredModels: true,
-    });
+    assert.deepEqual(shown.body.grants, { loras: true, uncensoredModels: true });
     assert.deepEqual(shown.body.saved, []);
-    assert.equal((await features()).cloudModels, true);
     const off = await call("/api/preferences", {
       method: "PATCH",
       cookie,
-      body: { cloudModels: false, loras: false, tileCaptions: true },
+      body: { loras: false, tileCaptions: true },
     });
     assert.equal(off.status, 200, off.body.error);
-    assert.deepEqual(off.body.saved, ["cloudModels", "loras", "tileCaptions"]);
-    assert.equal((await features()).cloudModels, false);
+    assert.deepEqual(off.body.saved, ["loras", "tileCaptions"]);
     assert.equal((await features()).loras, false);
     assert.equal((await features()).uncensoredModels, true);
-    // A saved Cloud reads as unsaved while Cloud Models is off, and counts again once it is on.
-    const cloud = await call("/api/preferences", {
+    // Cloud Models follows the group alone.
+    assert.equal((await features()).cloudModels, true);
+    const retired = await call("/api/preferences", {
       method: "PATCH",
       cookie,
-      body: { images: "cloud" },
+      body: { cloudModels: false },
     });
-    assert.equal(cloud.body.preferences.images, undefined);
-    const back = await call("/api/preferences", {
-      method: "PATCH",
-      cookie,
-      body: { cloudModels: true },
-    });
-    assert.equal(back.body.preferences.images, "cloud");
+    assert.equal(retired.status, 400);
     // Where videos run is one of its choices, not on or off.
     const videos = await call("/api/preferences", {
       method: "PATCH",
@@ -171,7 +160,6 @@ test(
     const own = async () =>
       (await call("/api/accounts/status", { cookie: admin })).body.account.features;
     assert.deepEqual((await call("/api/preferences", { cookie: admin })).body.grants, {
-      cloudModels: true,
       loras: true,
       uncensoredModels: true,
     });

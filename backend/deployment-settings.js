@@ -29,7 +29,7 @@ const flag = (key, label, description, defaultOn = true) => ({
   defaultOn,
 });
 
-/** Settings › Maintenance switches for gallery work, prompt assistance and taste. */
+/** Settings › Studio switches for gallery work, prompt assistance and taste. */
 export const catalogueFlags = [
   flag(
     "STUDIO_FACE_CHECK",
@@ -84,7 +84,7 @@ export const catalogueFlags = [
   ),
 ];
 
-/** The default profiles Settings › Generation saves. */
+/** The default profiles Settings › Studio saves. */
 export const defaultProfileKeys = [
   ...Object.values(mediaDefaultProfileKeys),
   defaultTextProfileKey,

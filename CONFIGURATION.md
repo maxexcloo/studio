@@ -42,7 +42,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
-Administrators set the default profiles in **Settings › Generation** and Dream's delays and account overrides in **Settings › Dream** under Administration; accounts choose Cloud or Local for Dream in **Settings › Where Work Runs**. [Settings](#settings) lists the matching variables.
+Administrators set the default profiles in **Settings › Studio** and Dream's delays and account overrides in **Settings › Dream** under Administration; accounts choose Cloud or Local for Dream in **Settings › Where Work Runs**. [Settings](#settings) lists the matching variables.
 
 ### Radiance
 
@@ -112,7 +112,7 @@ Use an ordinary Studio account for this shared connection. Every authorised Open
 
 The optional prompt assistant accepts an OpenAI-compatible Chat Completions endpoint directly or through Bifrost. Set `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` to the endpoint's URL, key and model ID. Leave all three unset to run Studio without the assistant. With managed local text workloads, `STUDIO_LOCAL_TEXT_MODEL` supplies their model ID.
 
-**Background AI** (**Settings › Maintenance**) has a switch for each call Studio makes on its own; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
+**Background AI** (**Settings › Studio**) has a switch for each call Studio makes on its own; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
 
 ## Downloads & Imports
 
@@ -158,23 +158,23 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_CLIPROXYAPI_VIDEO_MODEL`      | Video model for a cloud profile that names none                                             | the provider's advertised Grok video model   |                        |
 | `STUDIO_CONTROL_MCP_API_KEY`          | Key for the MCP GPU control tools                                                           | none                                         |                        |
 | `STUDIO_DATA_DIR`                     | Data folder                                                                                 | `/data` in the image, else `data/`           |                        |
-| `STUDIO_DEFAULT_IMAGE_PROFILE`        | Profile ID new image drafts start on                                                        | the first ready profile                      | Generation             |
-| `STUDIO_DEFAULT_TEXT_PROFILE`         | Text model for prompt writing and other text work                                           | the gateway's default                        | Generation             |
-| `STUDIO_DEFAULT_VIDEO_PROFILE`        | Profile ID new video drafts start on                                                        | the first ready profile                      | Generation             |
+| `STUDIO_DEFAULT_IMAGE_PROFILE`        | Profile ID new image drafts start on                                                        | the first ready profile                      | Studio                 |
+| `STUDIO_DEFAULT_TEXT_PROFILE`         | Text model for prompt writing and other text work                                           | the gateway's default                        | Studio                 |
+| `STUDIO_DEFAULT_VIDEO_PROFILE`        | Profile ID new video drafts start on                                                        | the first ready profile                      | Studio                 |
 | `STUDIO_DREAM_IMAGE_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its images          | `0`                                          | Dream (Administration) |
 | `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `2`                                          | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_ENABLED`       | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` | `local` or `cloud` for every account's Dream images                                         | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_SPICY`         | Extended Themes on or off for every account                                                 | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_SPICY`         | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND` | `local` or `cloud` for every account's Dream videos                                         | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_VIDEO_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its videos          | `5`                                          | Dream (Administration) |
 | `STUDIO_ENV_FILE`                     | Settings file read on startup                                                               | `/data/.env` in the image, else `.env`       |                        |
-| `STUDIO_FACE_CHECK`                   | Compare the face in each character result with the character's                              | `1`                                          | Maintenance            |
-| `STUDIO_FACE_REDO`                    | Run a recent result Face Check marks as drifted once more                                   | `1`                                          | Maintenance            |
-| `STUDIO_GALLERY_CAPTIONS`             | Caption and tag new images for gallery search                                               | `1`                                          | Maintenance            |
-| `STUDIO_GALLERY_TITLES`               | Title finished images and videos                                                            | `1`                                          | Maintenance            |
-| `STUDIO_GALLERY_WHILE_BUSY`           | Run gallery work while Studio is generating                                                 | `0`                                          | Maintenance            |
-| `STUDIO_IMAGE_SEARCH`                 | Gallery search also finds images that look like the words                                   | `1`                                          | Maintenance            |
+| `STUDIO_FACE_CHECK`                   | Compare the face in each character result with the character's                              | `1`                                          | Studio                 |
+| `STUDIO_FACE_REDO`                    | Run a recent result Face Check marks as drifted once more                                   | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_CAPTIONS`             | Caption and tag new images for gallery search                                               | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_TITLES`               | Title finished images and videos                                                            | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_WHILE_BUSY`           | Run gallery work while Studio is generating                                                 | `0`                                          | Studio                 |
+| `STUDIO_IMAGE_SEARCH`                 | Gallery search also finds images that look like the words                                   | `1`                                          | Studio                 |
 | `STUDIO_KUBERNETES_GPUS`              | GPUs per node pool, as JSON                                                                 | required with `STUDIO_KUBERNETES_NAMESPACES` |                        |
 | `STUDIO_KUBERNETES_NAMESPACES`        | Namespaces whose labelled deployments Studio controls ([Runtime Control](#runtime-control)) | none: no runtime control                     |                        |
 | `STUDIO_KUBERNETES_URL`               | Kubernetes API address, such as `kubectl proxy`                                             | the in-cluster API                           |                        |
@@ -187,17 +187,17 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_MODEL_LIBRARY_URL`            | Model library worker that receives downloads ([Studio Worker](worker/README.md))            | the `models` worker                          |                        |
 | `STUDIO_MODEL_MANIFEST_PREFIX`        | Folder stripped from `config/models.json` paths ([Workers](#workers))                       | none                                         |                        |
 | `STUDIO_MULTI_USER`                   | `1` turns on accounts ([Accounts](#accounts--single-sign-on))                               | single-user                                  |                        |
-| `STUDIO_NEXT_STEPS`                   | Prepare suggestions for finished images and videos                                          | `1`                                          | Maintenance            |
+| `STUDIO_NEXT_STEPS`                   | Prepare suggestions for finished images and videos                                          | `1`                                          | Studio                 |
 | `STUDIO_OIDC_CLIENT_ID`               | Single sign-on client ID                                                                    | none: no single sign-on                      |                        |
 | `STUDIO_OIDC_CLIENT_SECRET`           | Single sign-on client secret, for confidential clients                                      | none                                         |                        |
 | `STUDIO_OIDC_ISSUER`                  | Single sign-on issuer URL                                                                   | none                                         |                        |
 | `STUDIO_OIDC_LABEL`                   | Single sign-on button label                                                                 | Single Sign-On                               |                        |
 | `STUDIO_OIDC_REDIRECT_URI`            | `https://<studio>/api/accounts/oidc/callback`                                               | none                                         |                        |
-| `STUDIO_PROMPT_IDEAS`                 | Offer ideas in the composer's AI menu                                                       | `1`                                          | Maintenance            |
+| `STUDIO_PROMPT_IDEAS`                 | Offer ideas in the composer's AI menu                                                       | `1`                                          | Studio                 |
 | `STUDIO_RADIANCE_KEY`                 | API key Studio sends to Radiance                                                            | none                                         |                        |
 | `STUDIO_REDLIB_URL`                   | Redlib front end for Reddit imports                                                         | none: Reddit imports refused                 |                        |
-| `STUDIO_SUGGESTED_PROMPTS`            | Write prompts for uploads and other items without one                                       | `1`                                          | Maintenance            |
-| `STUDIO_TASTE_UPDATES`                | Summarise each account's taste as it rates                                                  | `1`                                          | Maintenance            |
+| `STUDIO_SUGGESTED_PROMPTS`            | Write prompts for uploads and other items without one                                       | `1`                                          | Studio                 |
+| `STUDIO_TASTE_UPDATES`                | Summarise each account's taste as it rates                                                  | `1`                                          | Studio                 |
 | `STUDIO_WORKERS`                      | Workers as a JSON array ([Workers](#workers))                                               | discovered by runtime control, else none     |                        |
 | `STUDIO_WORKER_TOKEN`                 | Token shared with the packaged ComfyUI worker                                               | none                                         |                        |
 

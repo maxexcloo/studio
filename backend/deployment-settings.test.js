@@ -205,11 +205,7 @@ test("Generation administration validates and applies Dream overrides and the de
     assert.equal(readRuntimeDocument(temporary, "settings")[key], "local/text-default");
 
     const model = (preferences = {}) =>
-      assistantEngine.model(
-        "rewrite",
-        false,
-        promptWriter(undefined, { cloudModels: true, ...preferences }),
-      );
+      assistantEngine.model("rewrite", false, promptWriter(undefined, preferences));
     assert.equal(await model({ textCloud: "cloud/personal" }), "cloud/personal");
     local = { model: "local/auto" };
     assert.equal(await model(), "local/text-default");

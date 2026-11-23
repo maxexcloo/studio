@@ -311,6 +311,8 @@ export function LibraryCatalogueTable({
               <>
                 <TableRecord
                   name={resourceName(item)}
+                  openLabel={`Edit ${resourceName(item)}`}
+                  onOpen={onEdit && (() => onEdit(item))}
                   detail={
                     phone &&
                     [familySummary(item), typeLabel(item)]
@@ -407,18 +409,12 @@ export function LibraryCatalogueTable({
               : item.install?.state === "paused"
                 ? { label: "Resume Install", icon: icons.resume }
                 : { label: "Install", icon: icons.download };
-          const edit = onEdit && (
-            <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
-              Edit
-            </Menu.Item>
-          );
           return (
             <>
-              {models && edit && (
-                <>
-                  {edit}
-                  <Menu.Divider />
-                </>
+              {onEdit && (
+                <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
+                  Edit
+                </Menu.Item>
               )}
               <Menu.Item
                 leftSection={<icons.copy size={16} />}
@@ -477,19 +473,16 @@ export function LibraryCatalogueTable({
                     {latest?.unavailable?.note || "This update cannot be downloaded."}
                   </Menu.Item>
                 ))}
-              {!models && (edit || onDelete) && (
+              {onDelete && (
                 <>
                   <Menu.Divider />
-                  {edit}
-                  {onDelete && (
-                    <Menu.Item
-                      color="red"
-                      leftSection={<icons.delete size={16} />}
-                      onClick={() => onDelete(item)}
-                    >
-                      Delete
-                    </Menu.Item>
-                  )}
+                  <Menu.Item
+                    color="red"
+                    leftSection={<icons.delete size={16} />}
+                    onClick={() => onDelete(item)}
+                  >
+                    Delete
+                  </Menu.Item>
                 </>
               )}
             </>

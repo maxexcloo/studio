@@ -517,10 +517,10 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   );
   // Delete asks first and leaves the gallery image.
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete Character", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Character", exact: true })
-    .getByRole("button", { name: "Delete Character", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
   expect(state.characters).toEqual([]);
@@ -651,7 +651,7 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await expect(page.getByRole("dialog")).toHaveCount(1);
   // The editor shows the sheet too, and makes it again.
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit Character", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
   const sheet = editor.getByRole("region", { name: "Sheet", exact: true });
   await expect(

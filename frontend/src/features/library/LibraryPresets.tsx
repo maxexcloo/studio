@@ -1,4 +1,4 @@
-import { Alert, Anchor, Button, Group, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
@@ -6,6 +6,7 @@ import { DataTable, TableRecord } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { SelectionBar } from "../../ui/SelectionBar";
 import { usePhone } from "../../ui/usePhone";
 import {
   defaultProfile,
@@ -83,6 +84,10 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
     );
     openComposer(kind);
   };
+  const open = (preset: Preset) => {
+    if (loading(preset).replaces) setReplacing(preset);
+    else edit(preset);
+  };
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -107,16 +112,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
         />
       </SectionHeader>
       {selection && (
-        <Group
-          gap="xs"
-          justify="space-between"
-          role="group"
-          aria-label="Preset Selection"
-          aria-busy={bulkDelete.isPending}
-        >
-          <Text size="sm" c="dimmed" aria-live="polite">
-            {selected.length} selected
-          </Text>
+        <SelectionBar label="Preset Selection" count={selected.length} busy={bulkDelete.isPending}>
           <ToolbarAction
             label="Delete"
             icon={icons.delete}
@@ -125,7 +121,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
             disabled={!selected.length || bulkDelete.isPending}
             onClick={() => setDeleting("selected")}
           />
-        </Group>
+        </SelectionBar>
       )}
       {failed.length > 0 && (
         <Alert color="red" role="alert">
@@ -168,27 +164,13 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               header: "Name",
               main: true,
               sortValue: (preset) => preset.title,
-              cell: (preset) =>
-                selection ? (
-                  <TableRecord name={preset.title} />
-                ) : (
-                  <Anchor
-                    component="button"
-                    type="button"
-                    size="sm"
-                    fw={500}
-                    maw="100%"
-                    ta="start"
-                    style={{ overflowWrap: "anywhere" }}
-                    aria-label={`Edit ${preset.title} in Composer`}
-                    onClick={() => {
-                      if (loading(preset).replaces) setReplacing(preset);
-                      else edit(preset);
-                    }}
-                  >
-                    {preset.title}
-                  </Anchor>
-                ),
+              cell: (preset) => (
+                <TableRecord
+                  name={preset.title}
+                  openLabel={`Edit ${preset.title} in Composer`}
+                  onOpen={selection ? undefined : () => open(preset)}
+                />
+              ),
             },
             {
               key: "holds",
@@ -216,6 +198,9 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               ? undefined
               : (preset) => (
                   <>
+                    <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => open(preset)}>
+                      Edit in Composer
+                    </Menu.Item>
                     <Menu.Item
                       leftSection={<icons.rename size={16} />}
                       onClick={() => {

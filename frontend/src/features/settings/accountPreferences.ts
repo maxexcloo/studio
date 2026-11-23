@@ -17,17 +17,16 @@ type DefaultModelKey = (typeof defaultModelKeys)[WorkKind][SidePreference];
 export type GalleryWorkPreference = "none" | "running" | "queued";
 /** The account's own preferences (backend/account-preferences.js). */
 interface PreferenceValues {
-  cloudModels: boolean;
   loras: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
   /** Which unfinished work the gallery shows; unsaved, none. */
   galleryWork?: GalleryWorkPreference;
-  /** Where images run by default; unsaved (and Cloud while Cloud Models is off), Local. */
+  /** Where images run by default; unsaved, Local. */
   images?: SidePreference;
-  /** Where text runs; unsaved, Cloud (Local while Cloud Models is off). */
+  /** Where text runs; unsaved, the side of Studio's default text model. */
   text?: SidePreference;
-  /** Where videos and Animate run by default; unsaved (and Cloud while Cloud Models is off), Local. */
+  /** Where videos and Animate run by default; unsaved, Local. */
   videos?: SidePreference;
   /** The header's Appearance settings; unsaved, the browser's. */
   appearance?: Partial<Appearance>;
@@ -41,7 +40,7 @@ export interface PreferencesStatus {
   /** The preferences the account has saved itself. */
   saved: (keyof Preferences)[];
   /** What the account's role or group grants, which it may turn off for itself. */
-  grants: Pick<Preferences, "cloudModels" | "loras" | "uncensoredModels">;
+  grants: Pick<Preferences, "loras" | "uncensoredModels">;
 }
 export const preferencesQuery = queryOptions({
   queryKey: ["preferences"],
@@ -62,11 +61,9 @@ export function useSavePreferences() {
     onSuccess: (status, patch) => {
       client.setQueryData(preferencesQuery.queryKey, status);
       // Model choices change what the account may use everywhere.
-      if ("cloudModels" in patch || "loras" in patch || "uncensoredModels" in patch)
+      if ("loras" in patch || "uncensoredModels" in patch)
         for (const queryKey of [accountQuery.queryKey, modelsQuery.queryKey])
           void client.invalidateQueries({ queryKey });
-      // Cloud Models decides whether a saved Cloud counts.
-      if ("cloudModels" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
       // Uncensored Models decides whether suggestions may be worded explicitly.
       if ("uncensoredModels" in patch) void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.

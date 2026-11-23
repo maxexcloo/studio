@@ -509,7 +509,7 @@ interface Response {
 type Handler = (req: Request, res: Response) => unknown;
 
 /**
- * An administrator's pass in Settings › Maintenance, such as Caption Gallery at
+ * An administrator's pass in Settings › Studio, such as Gallery Captions at
  * `/api/gallery/captions`: its status there, and `/start` (with a `scope`, Out of Date when none)
  * and `/stop`.
  */

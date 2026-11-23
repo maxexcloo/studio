@@ -24,6 +24,7 @@ export function useCardFrom(start: (asset: ReferenceAsset, named?: CardNamed) =>
   const from = state?.cardFrom;
   // The name travels with the call: the route state is cleared before the image is taken.
   const take = useMutation({
+    meta: { inlineError: true },
     mutationFn: ({ galleryItemId }: { galleryItemId: string; named?: CardNamed }) =>
       post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", { galleryItemId }),
     onSuccess: ({ asset }, { named }) => start(asset, named),

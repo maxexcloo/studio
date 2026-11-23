@@ -10,9 +10,8 @@ import {
 
 /**
  * Each account's own preferences, the `preferences:<account id>` document in studio.sqlite
- * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
- * what the account's group grants (account-policy.js); they start on wherever the group grants
- * them. Uncensored Models also lets prompt writing word what it offers explicitly.
+ * (`preferences:` in single-user mode). LoRAs and Uncensored Models only narrow what the
+ * account's group grants (account-policy.js); they start on wherever the group grants them. Uncensored Models also lets prompt writing word what it offers explicitly.
  * `images`, `videos` and `text` say where each kind runs by default, Cloud or Local (`sideOf`), and
  * `<kind>Cloud` and `<kind>Local` its default model on each side: an image or video profile ID, or
  * a gateway text model. Unsaved, a default is the deployment's (model/catalogue.js,
@@ -22,7 +21,6 @@ import {
  * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
  */
 const preferenceDefaults = Object.freeze({
-  cloudModels: true,
   loras: true,
   tileCaptions: false,
   uncensoredModels: true,
@@ -58,11 +56,7 @@ function saved(ownerId = "") {
 }
 
 export function accountPreferences(ownerId = "") {
-  const preferences = { ...preferenceDefaults, ...saved(ownerId) };
-  if (!preferences.cloudModels)
-    for (const key of ["images", "text", "videos"])
-      if (preferences[key] === "cloud") delete preferences[key];
-  return preferences;
+  return { ...preferenceDefaults, ...saved(ownerId) };
 }
 
 export const defaultTextProfileKey = "STUDIO_DEFAULT_TEXT_PROFILE";
@@ -71,9 +65,7 @@ export const defaultTextSide = (environment = process.env) =>
 
 /** Where a kind runs if an account has not chosen a side. */
 export function sideOf(preferences, kind) {
-  return (
-    preferences[kind] || (kind === "text" && preferences.cloudModels ? defaultTextSide() : "local")
-  );
+  return preferences[kind] || (kind === "text" ? defaultTextSide() : "local");
 }
 
 /** A kind's chosen side and the default model saved for each side, if any. */

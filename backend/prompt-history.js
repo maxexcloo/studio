@@ -12,7 +12,7 @@ import {
  * A prompt used again moves to the top instead of appearing twice; liked ones stay no matter how
  * many follow.
  *
- * It can be turned off (Settings › Generation): then nothing new is kept and
+ * It can be turned off (Settings › Preferences): then nothing new is kept and
  * the recent ones are forgotten; liked prompts stay until unliked.
  */
 

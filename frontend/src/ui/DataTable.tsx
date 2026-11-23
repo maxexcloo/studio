@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Anchor,
   Box,
   Button,
   Checkbox,
@@ -57,12 +58,42 @@ export const compareNames = new Intl.Collator(undefined, {
   sensitivity: "base",
 }).compare;
 
-export function TableRecord({ name, detail }: { name: ReactNode; detail?: ReactNode }) {
+/**
+ * A record's name and detail in its table's main cell; with `onOpen` the name opens the record
+ * (its row menu's first action, named by `openLabel`).
+ */
+export function TableRecord({
+  name,
+  detail,
+  onOpen,
+  openLabel,
+}: {
+  name: ReactNode;
+  detail?: ReactNode;
+  onOpen?: () => void;
+  openLabel?: string;
+}) {
   return (
     <>
-      <Text size="sm" fw={500} className={classes.recordText}>
-        {name}
-      </Text>
+      {onOpen ? (
+        <Anchor
+          component="button"
+          type="button"
+          size="sm"
+          fw={500}
+          maw="100%"
+          ta="start"
+          className={classes.recordText}
+          aria-label={openLabel}
+          onClick={onOpen}
+        >
+          {name}
+        </Anchor>
+      ) : (
+        <Text size="sm" fw={500} className={classes.recordText}>
+          {name}
+        </Text>
+      )}
       {detail && (
         <Text size="xs" c="dimmed" className={classes.recordText}>
           {detail}
