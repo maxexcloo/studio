@@ -361,7 +361,7 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   await expect(tile(2)).toHaveCount(0);
   await tile(0).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(viewer.getByText(/^[12] \/ 2$/)).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText(/^[12] \/ 2$/);
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
   await modes.getByRole("link", { name: "Videos", exact: true }).click();
