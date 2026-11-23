@@ -261,7 +261,7 @@ export function MediaViewer({
   sideBySide?: boolean;
   /** Only the media and its navigation, over any dialog: no details, actions or item keys. */
   bare?: boolean;
-  /** The gallery opens with its actions and leaves thumbnails collapsed. */
+  /** On phones the gallery opens with its actions and leaves thumbnails collapsed. */
   quiet?: boolean;
 }) {
   const phone = usePhone();
@@ -288,9 +288,10 @@ export function MediaViewer({
   const [sheet, setSheet] = useState(false);
   const detailsOpen = phone ? sheet : details;
   const [chrome, setChrome] = useState<"standard" | "full" | "image">("standard");
-  const immersive = quiet && chrome === "image";
+  const cycling = phone && quiet;
+  const immersive = cycling && chrome === "image";
   const actionsOpen = !immersive && !sheet;
-  const thumbnailsOpen = !quiet || chrome === "full";
+  const thumbnailsOpen = !cycling || chrome === "full";
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
   function cycleChrome() {
@@ -353,10 +354,7 @@ export function MediaViewer({
       : undefined;
   function showDetails() {
     if (phone) setSheet(true);
-    else {
-      if (immersive) setChrome("standard");
-      setDetails(true);
-    }
+    else setDetails(true);
   }
   const position =
     canNavigate && itemLabel
@@ -555,7 +553,7 @@ export function MediaViewer({
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             showDetails();
-          } else if (quiet && event.key.toLowerCase() === "c") {
+          } else if (cycling && event.key.toLowerCase() === "c") {
             event.preventDefault();
             if (!event.repeat) cycleChrome();
           } else if (canNavigate && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
@@ -579,17 +577,7 @@ export function MediaViewer({
           <div
             className={classes.main}
             data-docked={!bare || undefined}
-            data-viewer-chrome={quiet ? chrome : undefined}
-            onPointerMove={(event) => {
-              if (
-                quiet &&
-                chrome === "standard" &&
-                event.pointerType === "mouse" &&
-                window.innerHeight - event.clientY < 12 &&
-                !layerAbove(stage.current)
-              )
-                setChrome("full");
-            }}
+            data-viewer-chrome={quiet ? (cycling ? chrome : "full") : undefined}
           >
             <ViewerChrome
               item={displayed}
@@ -717,7 +705,7 @@ export function MediaViewer({
                         width={source.width}
                         height={source.height}
                         swipe={touchSwipe}
-                        onTap={quiet ? cycleChrome : undefined}
+                        onTap={cycling ? cycleChrome : undefined}
                         hideControls={immersive}
                       />
                     ) : compare && item.upscale?.url ? (
@@ -759,7 +747,8 @@ export function MediaViewer({
                           width={source.width}
                           height={source.height}
                           swipe={strip.gesture}
-                          onTap={quiet ? cycleChrome : undefined}
+                          onTap={cycling ? cycleChrome : undefined}
+                          doubleClickZoom={!phone}
                           hideControls={immersive}
                         />
                       </Suspense>

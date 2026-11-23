@@ -3,10 +3,6 @@
   border-radius: var(--mantine-radius-lg);
 }
 
-.tile:has(.timestamp) {
-  container-type: inline-size;
-}
-
 .tile[data-entering] {
   animation: enter var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
@@ -103,6 +99,10 @@
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
+.tile:has([data-tile-ratings]) .caption {
+  padding-inline-end: calc(var(--mantine-spacing-xs) + 64px);
+}
+
 /* A rated tile's Like or Dislike: a small mark at the right of the caption's last line. */
 .rating {
   position: absolute;
@@ -118,7 +118,7 @@
   pointer-events: none;
 }
 
-.button:hover .caption,
+.tile:hover .caption,
 .button:focus-visible .caption,
 .caption[data-pinned] {
   opacity: 1;
@@ -210,6 +210,12 @@
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (hover: hover) {
+  :where(:root:not([data-phone])) .tile:not(:hover):not(:focus-within) .timestamp {
+    opacity: 0;
+  }
 }
 
 /* Face Check's mark on a result that shows someone else or the character twice. */

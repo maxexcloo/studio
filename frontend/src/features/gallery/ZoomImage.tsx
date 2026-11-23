@@ -19,6 +19,7 @@ export function ZoomImage({
   placeholder,
   swipe,
   onTap,
+  doubleClickZoom = false,
   hideControls,
   fill = false,
 }: {
@@ -35,6 +36,7 @@ export function ZoomImage({
   swipe?: SwipeGesture;
   /** A single click or tap on the picture, once it is plainly not part of a double gesture. */
   onTap?: () => void;
+  doubleClickZoom?: boolean;
   hideControls?: boolean;
   /** Rests filling the viewport, cropped, rather than whole; it doesn't pan there. */
   fill?: boolean;
@@ -261,7 +263,9 @@ export function ZoomImage({
       <VisuallyHidden id={instructions}>
         {onTap
           ? "Click, tap or press C to cycle the viewer controls. Double-click or double-tap to zoom."
-          : "Click to cycle Fit, Fill and Actual Size, or double-tap to zoom."}
+          : doubleClickZoom
+            ? "Double-click or double-tap to zoom."
+            : "Click to cycle Fit, Fill and Actual Size, or double-tap to zoom."}
         {" Drag to pan. Use the mouse wheel or pinch to zoom."}
         {swipe &&
           " At Fit, swipe left or right to move between generations, up for details and down to close."}
@@ -313,12 +317,13 @@ export function ZoomImage({
             }}
             onClick={(event) => {
               event.stopPropagation();
-              if (event.detail === 0 || (!touched.current && !onTap)) zoom.cycle();
+              if (event.detail === 0 || (!touched.current && !onTap && !doubleClickZoom))
+                zoom.cycle();
               else if (!touched.current && onTap && event.detail === 1 && !closingPopup())
                 pendingTap.current = window.setTimeout(onTap, 300);
             }}
             onDoubleClick={(event) => {
-              if (!onTap || touched.current || closingPopup()) return;
+              if ((!onTap && !doubleClickZoom) || touched.current || closingPopup()) return;
               clearTimeout(pendingTap.current);
               zoom.toggleAt(event.clientX, event.clientY);
             }}
