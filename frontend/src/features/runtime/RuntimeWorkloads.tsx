@@ -733,7 +733,7 @@ export function RuntimeHistory() {
   const { history } = status;
   const change = changeLine(workloadNames(status.workloads));
   return (
-    <SettingGroup title="History" description="See who requested each GPU change and how it ended.">
+    <SettingGroup title="History">
       <HistoryTable
         label="Runtime Changes"
         rows={history}

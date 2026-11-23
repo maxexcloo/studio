@@ -11,6 +11,7 @@ import {
   type Suggestions,
   type VariationDirection,
   changeActions,
+  maxSuggestionReferences,
   maxSuggestions,
   variationDirections,
 } from "../../shared/suggestions.ts";
@@ -75,6 +76,7 @@ interface Draft {
   kind: "image" | "video";
   prompt: string;
 }
+type DraftReference = { image?: ModelImage; caption?: string };
 interface Request {
   studioAccount?: { userId: string };
   body?: Record<string, unknown>;
@@ -94,7 +96,6 @@ const suggestionRevision = 2;
 const motionRevision = 3;
 /** Ideas avoid this many of the latest shown in the same menu. */
 const shownIdeas = maxSuggestions;
-const maxIdea = 160;
 const maxRequest = 500;
 const directionRequests: Record<VariationDirection, string> = {
   scene:
@@ -133,9 +134,12 @@ const actionGuides: Record<
     "upscale: enlarge or sharpen it without changing what it shows; keep the prompt as it is.",
 };
 // The composer's draft has no result yet: its edit changes the attached reference image.
-const draftGuides: Record<Exclude<ChangeAction, "upscale">, (kind: "image" | "video") => string> = {
-  edit: () =>
-    "edit: change the attached reference image itself and keep the rest; the prompt describes the whole edited image.",
+const draftGuides: Record<
+  Exclude<ChangeAction, "upscale">,
+  (kind: "image" | "video", edits?: WritingTarget["edits"]) => string
+> = {
+  edit: (_kind, edits) =>
+    `edit: change the attached reference image itself and keep the rest; ${editPrompts[edits || "unknown"]}`,
   recreate: (kind) => `recreate: make a fresh ${kind} from the rewritten prompt.`,
   animate: () => "animate: the prompt describes the video's motion, camera, action and sound.",
 };
@@ -226,6 +230,15 @@ const unlike = (labels: string[]) => {
 };
 const describeIdea = (idea: PromptIdea | NextStep) =>
   `${idea.label}: ${"request" in idea ? idea.request : idea.prompt}`;
+function referenceNotes(references: DraftReference[]) {
+  let attached = 0;
+  return references.flatMap(({ caption, image }, index) => {
+    const note = image ? `Attached image ${++attached}` : clean(caption, 600);
+    return note ? [`Reference ${index + 1}: ${note}`] : [];
+  });
+}
+const referenceImages = (references: DraftReference[]) =>
+  references.flatMap(({ image }) => (image ? [image] : []));
 
 /** What the item was made with and what it shows, for the model's next steps and changes. */
 function describeItem(item: SuggestionItem) {
@@ -269,6 +282,7 @@ export function createSuggestions({
   nextSteps,
   cards = () => null,
   target = async () => null,
+  draftReferences = async () => [],
   promptWriter = () => undefined,
   fixed = () => [],
   now = Date.now,
@@ -293,9 +307,11 @@ export function createSuggestions({
   /** The owner's selected Edit model or the one the result was made with. */
   target?: (
     ownerId: string,
-    item: SuggestionItem,
+    item: SuggestionItem | undefined,
     profileId?: string,
   ) => Promise<WritingTarget | null>;
+  /** The owner's attached reference images in order, with captions when the writer cannot see them. */
+  draftReferences?: (ownerId: string, ids: string[]) => Promise<DraftReference[]>;
   /** The owner's text writer (account-policy.js `promptWriter`). */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
   /** The labels of a Prompt Styles kind's fixed options, which suggestions never repeat. */
@@ -354,12 +370,16 @@ export function createSuggestions({
     context: string,
     {
       signal,
-      image,
+      images = [],
+      writing,
+      hasReferences,
       spicy = false,
       cardDraft,
     }: {
       signal?: AbortSignal;
-      image?: ModelImage | null;
+      images?: ModelImage[];
+      writing?: WritingTarget | null;
+      hasReferences?: boolean;
       spicy?: boolean;
       cardDraft?: string;
     } = {},
@@ -369,14 +389,19 @@ export function createSuggestions({
       composer: [
         ...(cardDraft === undefined
           ? [
-              `You suggest prompt ideas for a person's next ${kind} in a media studio, drawn from their taste profile and the prompts they liked.`,
-              `Write ${maxSuggestions} useful, distinct, standalone ${kind} prompts of at most ${maxIdea} characters each that they would likely enjoy: not copies of the prompts they liked.`,
-              `Take each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}), with subjects and settings unlike one another.`,
+              hasReferences
+                ? `Write up to ${maxSuggestions} distinct ${kind} prompts grounded in the attached references and any typed prompt. Preserve identifying traits. For an opening frame, propose one visible sequence that starts from the current pose and ends in a readable state.`
+                : `Write ${maxSuggestions} useful, distinct, standalone ${kind} prompts for the person, drawing on their taste when available and avoiding copies of liked prompts.`,
+              `Take each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}), varying subjects and settings where the brief leaves them open.`,
             ]
           : [
               `Write ${maxSuggestions} useful, distinct continuations for the draft ${kind} prompt, built around its applied cards.`,
             ]),
         contentRule(spicy),
+        ...targetLines(writing),
+        !writing?.guide &&
+          "Without a model guide, write concise natural-language prompts with concrete subject, setting and action.",
+        standalonePrompt,
         suggestionChoices(kind, spicy),
         variety,
         cardDraft !== undefined &&
@@ -391,6 +416,9 @@ export function createSuggestions({
       draft: [
         `You suggest changes to the draft prompt of ${kind === "video" ? "a video" : "an image"} a person is about to make in a media studio, drawn from the prompt and their taste profile.`,
         `Suggest ${maxSuggestions} useful, distinct changes, each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}).`,
+        ...targetLines(writing),
+        hasReferences &&
+          "Use the attached references to identify visible opportunities that support the draft. Keep the draft's requested outcome and reference identity.",
         fidelity,
         applyChange,
         keepDescriptions,
@@ -406,7 +434,7 @@ export function createSuggestions({
       ],
       // Animate's instruction says what happens; its writer turns the instruction into the prompt.
       animate: [
-        `You suggest what could happen when a person's image becomes a short video. Treat ${image ? "what the attached image shows" : "the source caption, then the source prompt"} as the opening frame. Use taste for tone only.`,
+        `You suggest what could happen when a person's image becomes a short video. Treat ${images.length ? "what the attached image shows" : "the source caption, then the source prompt"} as the opening frame. Use taste for tone only.`,
         `Offer up to ${maxSuggestions} distinct ideas. Each uses a different visible detail or relationship in this frame and gives it one plausible motion with a clear ending. Use fewer ideas if the frame supports fewer.`,
         contentRule(spicy),
         suggestionChoices("video", spicy),
@@ -418,7 +446,7 @@ export function createSuggestions({
         'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<what happens>"}]}.',
       ],
       viewer: [
-        `You suggest changes to a finished ${kind} a person made in a media studio, drawn from ${image ? "what the attached image shows, " : ""}its prompt and settings and their taste profile.`,
+        `You suggest changes to a finished ${kind} a person made in a media studio, drawn from ${images.length ? "what the attached image shows, " : ""}its prompt and settings and their taste profile.`,
         kind === "video"
           ? `Suggest ${maxSuggestions} distinct, concrete changes to the clip (${angles(motionAngles, maxSuggestions)}), such as a slower pan or a different motion for the subject. Each changes one part of the clip and preserves its other details.`
           : `Suggest ${maxSuggestions} useful, distinct changes, each in a distinct area (${stepAreas.join(", ")}). Keep the subject's identity. Include an everyday action or setting and a specific photographic or visual treatment when they fit. Name the actual visible change, including when it concerns framing or style.`,
@@ -447,7 +475,7 @@ export function createSuggestions({
               offered.length
                 ? `${context}\n\nThe menu already offers (suggest different ideas): ${offered.join(", ")}`
                 : context,
-              image ? [image] : [],
+              images,
               true,
             ),
           },
@@ -569,7 +597,8 @@ export function createSuggestions({
         : []),
     ];
     const answer = await write(model, ownerId, "viewer", kind, context.join("\n"), {
-      ...options,
+      images: options.image ? [options.image] : [],
+      signal: options.signal,
       spicy,
     });
     if (!answer.reason && !options.signal?.aborted) rememberShown(menu, answer.suggestions);
@@ -588,19 +617,45 @@ export function createSuggestions({
     source: SuggestionItem | Draft,
     request: string,
     actions: ChangeAction[],
-    profileId?: string,
-    directions?: VariationDirection[],
+    {
+      profileId,
+      directions,
+      referenceIds,
+      signal,
+    }: {
+      profileId?: string;
+      directions?: VariationDirection[];
+      referenceIds: string[];
+      signal?: AbortSignal;
+    },
   ): Promise<Suggestions<Change>> {
     const draft = "draft" in source;
     const kind = draft ? source.kind : source.type === "video" ? "video" : "image";
-    const writing = draft ? null : await target(ownerId, source, profileId).catch(() => null);
-    if (profileId && !writing) return empty("The selected Edit profile is unavailable.");
+    const [writing, references] = await Promise.all([
+      (draft && !profileId
+        ? Promise.resolve(null)
+        : target(ownerId, draft ? undefined : source, profileId)
+      ).catch(() => null),
+      (draft
+        ? draftReferences(ownerId, referenceIds)
+        : image(source).then((picture) => (picture ? [{ image: picture }] : []))
+      ).catch(() => []),
+    ]);
+    if (profileId && !writing)
+      return empty(
+        draft ? "The selected model is unavailable." : "The selected Edit profile is unavailable.",
+      );
+    if (signal?.aborted) return empty("Suggestion writing was interrupted.");
+    const pictures = referenceImages(references);
+    const notes = draft ? referenceNotes(references) : [];
     const instruction =
       actions.length === 1 && actions[0] === "edit" && writing?.edits === "instruction";
     const system = [
       draft
         ? `You carry out one change a person asks for to the draft prompt of a ${kind} they are about to make in a media studio.`
         : `You carry out one change a person asks for to a ${kind} they made in a media studio, from its prompt and settings.`,
+      (pictures.length > 0 || notes.length > 0) &&
+        "Use the visible source to ground the requested change and preserve identity, composition and details outside its scope. The source picture shows what is already there. The typed prompt and request decide what the new result should show.",
       ...(directions
         ? [
             "Write one complete new generation prompt for each requested direction. Each starts from the same original prompt. Preserve any exact subject description and words that identify a character or identity reference.",
@@ -611,14 +666,18 @@ export function createSuggestions({
             "Choose the one action that fits best:",
             ...actions.map(
               (action) =>
-                `- ${draft && action !== "upscale" ? draftGuides[action](kind) : actionGuides[action](kind, writing?.edits)}`,
+                `- ${draft && action !== "upscale" ? draftGuides[action](kind, writing?.edits) : actionGuides[action](kind, writing?.edits)}`,
             ),
             instruction
               ? "Write the edit instruction in the request's language, and a label of at most four words in Title Case naming the change."
               : "Write the prompt with the requested change applied, in the same style and language, and a label of at most four words in Title Case naming the change.",
           ]),
       ...targetLines(writing),
-      ...(!instruction ? [applyChange, subjectFirst] : []),
+      !instruction &&
+        (actions.includes("edit") && writing?.edits === "instruction"
+          ? `Apply the following rule only to a full prompt rewrite: ${applyChange}`
+          : applyChange),
+      !instruction && subjectFirst,
       keepDescriptions,
       standalonePrompt,
       fidelity,
@@ -648,16 +707,18 @@ export function createSuggestions({
               [
                 draft ? "The draft:" : `The ${kind}:`,
                 draft ? `Prompt: ${source.prompt || "(empty)"}` : describeItem(source),
+                ...notes,
                 "",
                 directions ? "Apply the requested directions." : `Request: ${request}`,
               ].join("\n"),
-              [],
+              pictures,
               true,
             ),
           },
         ],
         temperature: 0.3,
         timeout: 45_000,
+        signal,
       }));
     } catch (error) {
       return empty(
@@ -789,6 +850,7 @@ export function createSuggestions({
         jobId?: unknown;
         itemId?: unknown;
         profileId?: unknown;
+        referenceIds?: unknown;
         fresh?: unknown;
         request?: unknown;
         directions?: unknown;
@@ -816,6 +878,19 @@ export function createSuggestions({
         (typeof body.prompt !== "string" || body.prompt.length > maxPromptCharacters)
       )
         throw failure(`Keep the prompt to ${maxPromptCharacters} characters.`, 400);
+      const drafted = surface === "composer" || surface === "draft";
+      const profileId = drafted || surface === "change" ? body.profileId : undefined;
+      if (profileId !== undefined && (typeof profileId !== "string" || !profileId))
+        throw failure("Choose a profile.", 400);
+      const references = drafted ? body.referenceIds : undefined;
+      if (
+        references !== undefined &&
+        (!Array.isArray(references) ||
+          references.length > maxSuggestionReferences ||
+          references.some((id) => typeof id !== "string" || !id || id.length > 120))
+      )
+        throw failure("Choose up to four reference images.", 400);
+      const referenceIds = (references ?? []) as string[];
       if (surface === "change" || (surface === "draft" && body.request !== undefined)) {
         const request = clean(body.request, maxRequest);
         const directions =
@@ -847,12 +922,6 @@ export function createSuggestions({
           throw failure("Choose a result.", 400);
         if (!request && !directions) throw failure("Describe the change.", 400);
         if (!actions.length) throw failure("Choose the actions the change may take.", 400);
-        const profileId =
-          surface === "change" && actions.length === 1 && actions[0] === "edit"
-            ? body.profileId
-            : undefined;
-        if (profileId !== undefined && (typeof profileId !== "string" || !profileId))
-          throw failure("Choose an Edit profile.", 400);
         let source: SuggestionItem | Draft | undefined =
           surface === "draft"
             ? {
@@ -876,7 +945,13 @@ export function createSuggestions({
           return empty("The prompt assistant is not configured.");
         }
         if (!(await online())) return empty("The text model is offline.");
-        return change(model, ownerId, source, request, actions, profileId, directions);
+        return change(model, ownerId, source, request, actions, {
+          profileId:
+            drafted || (actions.length === 1 && actions[0] === "edit") ? profileId : undefined,
+          directions,
+          referenceIds,
+          signal,
+        });
       }
       if (
         (surface === "composer" || surface === "draft") &&
@@ -927,7 +1002,6 @@ export function createSuggestions({
           ),
         };
       const { known, lines, motionLines } = tasteContext(ownerId);
-      const drafted = surface === "composer" || surface === "draft";
       const kind = drafted ? (body.kind as "image" | "video") : "image";
       const prompt = drafted || edited ? promptText(body.prompt) : "";
       if (surface === "draft" && !prompt) return empty("Write a prompt to change first.");
@@ -955,7 +1029,7 @@ export function createSuggestions({
           cardDraft = body.prompt as string;
         }
       }
-      if (surface === "composer" && !known && cardDraft === undefined)
+      if (surface === "composer" && !known && cardDraft === undefined && !referenceIds.length)
         return empty("Like a few results so Studio learns your taste.");
       const key = JSON.stringify([
         ownerId,
@@ -963,6 +1037,8 @@ export function createSuggestions({
         kind,
         cardDraft ?? prompt,
         appliedCards,
+        profileId ?? "",
+        referenceIds,
         source?.jobId ?? body.jobId ?? "",
         source?.id ?? itemId,
         spicy,
@@ -980,10 +1056,14 @@ export function createSuggestions({
         }
         if (!(await online())) return empty("The text model is offline.");
         // Without the picture the steps still come from its prompt and caption.
-        const picture =
+        const [picture, draftContext, writing] = await Promise.all([
           source && source.type !== "video"
-            ? await (readPicture?.() ?? image(source)).catch(() => null)
-            : null;
+            ? (readPicture?.() ?? image(source)).catch(() => null)
+            : null,
+          drafted ? draftReferences(ownerId, referenceIds).catch(() => []) : [],
+          drafted && profileId ? target(ownerId, undefined, profileId).catch(() => null) : null,
+        ]);
+        if (drafted && profileId && !writing) return empty("The selected model is unavailable.");
         if (signal?.aborted) return empty("Suggestion writing was interrupted.");
         if (source && surface === "viewer")
           return stepsFor(model, ownerId, source, { image: picture, save: !edited, signal });
@@ -1000,6 +1080,7 @@ export function createSuggestions({
           : [
               ...lines,
               ...(appliedCards.length ? ["", "Applied cards:", ...appliedCards] : []),
+              ...referenceNotes(draftContext),
               ...(surface === "draft"
                 ? ["", `The draft prompt: ${prompt}`]
                 : prompt
@@ -1015,6 +1096,8 @@ export function createSuggestions({
               ? prompt
               : [source?.jobId, source?.id],
           spicy,
+          profileId ?? "",
+          referenceIds,
         ]);
         const latest = shown.get(menu) ?? saved?.steps.map(describeIdea) ?? [];
         const ideas = await write(
@@ -1025,7 +1108,14 @@ export function createSuggestions({
           latest.length
             ? `${context}\n\nAlready suggested (offer different ones): ${latest.join("; ")}`
             : context,
-          { image: picture, spicy, cardDraft, signal },
+          {
+            images: picture ? [picture] : referenceImages(draftContext),
+            hasReferences: referenceIds.length > 0,
+            writing,
+            spicy,
+            cardDraft,
+            signal,
+          },
         );
         if (ideas.reason || signal?.aborted) return ideas;
         const fresh = ideas.suggestions.filter(

@@ -25,6 +25,7 @@ function fixture(
     edits?: "instruction" | "description";
     cards?: Parameters<typeof createSuggestions>[0]["cards"];
     target?: Parameters<typeof createSuggestions>[0]["target"];
+    draftReferences?: Parameters<typeof createSuggestions>[0]["draftReferences"];
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -79,6 +80,7 @@ function fixture(
       read: (owner) => ({ summary: "", signals: [], ...records[owner] }) as TasteRecord,
     },
     cards: options.cards,
+    draftReferences: options.draftReferences,
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
     explicit: options.explicit || ((owner) => owner === "bob"),
@@ -101,7 +103,7 @@ function fixture(
     target:
       options.target ??
       (async (_owner, item) =>
-        item.type === "image"
+        item?.type === "image"
           ? {
               label: "Flux 2",
               guide: { summary: "Subject first.", sampling: {} },
@@ -271,6 +273,36 @@ test("composer ideas asked again offer different ones from those shown", async (
   // Each ask takes its ideas from a few angles drawn at random, so refreshes range widely.
   const angleList = /Take each from a different angle \(([^)]+)\)/.exec(calls[0][0].content)?.[1];
   assert.equal(new Set(angleList?.split("; ")).size, maxSuggestions);
+});
+
+test("composer ideas use the selected guide and the owner's references without needing taste history", async () => {
+  const { calls, suggestions } = fixture({
+    target: async (owner, item, profileId) =>
+      owner === "carol" && !item && profileId === "video:example"
+        ? { label: "Video Model", guide: { mode: { rules: ["Put the motion in one paragraph."] } } }
+        : null,
+    draftReferences: async (owner, ids) => {
+      assert.equal(owner, "carol");
+      return ids.map((id) =>
+        id === "first" ? { caption: "A scarf on a railing." } : { image: { data: "AAAA" } },
+      );
+    },
+  });
+  const request = {
+    surface: "composer",
+    kind: "video",
+    profileId: "video:example",
+    referenceIds: ["first", "second"],
+  };
+  assert.ok((await suggestions.suggest("carol", request)).suggestions.length);
+  const [system, user] = calls[0];
+  assert.match(system.content, /Video Model.*Put the motion in one paragraph/);
+  assert.match(system.content, /Preserve identifying traits/);
+  assert.match(system.content, /The generation model cannot read the chat or earlier prompts/);
+  assert.match(user.content, /Reference 1: A scarf on a railing\.\nReference 2: Attached image 1/);
+  assert.equal(user.images, 1);
+  await suggestions.suggest("carol", { ...request, referenceIds: ["second", "first"] });
+  assert.equal(calls.length, 2);
 });
 
 test("composer ideas keep applied cards and the full draft, even before Studio learns taste", async () => {
@@ -821,6 +853,7 @@ test("a requested change picks one of the offered actions and rewrites the promp
 
 test("Edit writes for the selected profile while describing the original result", async () => {
   const { calls, suggestions } = fixture({
+    image: true,
     reply: () => JSON.stringify({ action: "edit", label: "Night", prompt: "Make it night" }),
     target: async (owner, _source, profileId) =>
       owner === "alice" && profileId === "image:edit"
@@ -840,6 +873,7 @@ test("Edit writes for the selected profile while describing the original result"
   assert.match(system.content, /short imperative edit instruction/);
   assert.doesNotMatch(system.content, /rewrite the words it concerns in place/);
   assert.match(user.content, /Model: Flux 2/);
+  assert.equal(user.images, 1);
   assert.equal(
     (await suggestions.suggest("alice", { ...request, profileId: "image:unavailable" })).reason,
     "The selected Edit profile is unavailable.",

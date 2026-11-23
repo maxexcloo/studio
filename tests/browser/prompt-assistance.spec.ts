@@ -406,6 +406,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
     {
       surface: "draft",
       kind: "image",
+      profileId: "image:test",
       prompt: "A castle at noon",
       request: "make it night",
       actions: ["recreate"],
@@ -426,10 +427,17 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(dialog).toBeHidden();
   await expect.poll(() => asked.length).toBe(4);
   expect(asked.slice(2)).toEqual([
-    { surface: "draft", kind: "image", prompt: "A castle at noon", fresh: false },
     {
       surface: "draft",
       kind: "image",
+      profileId: "image:test",
+      prompt: "A castle at noon",
+      fresh: false,
+    },
+    {
+      surface: "draft",
+      kind: "image",
+      profileId: "image:test",
       prompt: "A castle at noon",
       request: "add rain",
       actions: ["recreate"],

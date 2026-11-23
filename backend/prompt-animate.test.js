@@ -69,6 +69,8 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("living"), /keeps rolling as if the photo were a candid video/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
   assert.match(theme("atmosphere"), /hold the opening composition.*surroundings move/);
+  assert.match(theme("body-bounce"), /impact first, then a small delayed bounce.*quick settle/);
+  assert.match(theme("hip-sway"), /supporting foot take weight.*hips sway/);
   assert.match(theme("dialogue"), /one brief line and leave time for a visible reaction/);
   assert.match(theme("reaction"), /gaze, ears or posture.*readable final pose/);
   assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it must be 18 or older/);
@@ -161,13 +163,15 @@ const issue = (features, writing) =>
   writingIssue(writingRequest({ kind: "animate", ...writing }), { engine, account: user(features) })
     ?.status;
 
-test("Animate is admitted only for known themes, with Extended Themes behind Uncensored Models", () => {
+test("Animate is admitted only for known themes, with restricted themes behind Uncensored Models", () => {
   assert.equal(issue({}, { theme: "cinematic" }), undefined);
   assert.equal(issue({}, { theme: "dialogue" }), undefined);
   assert.equal(issue({}, { theme: "dance" }), 400);
   assert.equal(issue({}, { theme: "custom" }), 400);
-  assert.equal(issue({}, { theme: "spicy" }), 403);
-  assert.equal(issue({ uncensoredModels: true }, { theme: "spicy" }), undefined);
+  for (const theme of ["spicy", "body-bounce", "hip-sway"]) {
+    assert.equal(issue({}, { theme }), 403);
+    assert.equal(issue({ uncensoredModels: true }, { theme }), undefined);
+  }
   assert.equal(issue({ promptAssistant: false }, { theme: "cinematic" }), 403);
   // Dream's Extended Themes needs it too.
   const dream = (features) =>

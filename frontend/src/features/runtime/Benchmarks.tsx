@@ -199,7 +199,7 @@ export function BenchmarkResults() {
   });
   if (!status?.configured) return null;
   return (
-    <SettingGroup title="Benchmarks" description="Review benchmark results and open their logs.">
+    <SettingGroup title="Benchmarks">
       <DataTable
         label="Benchmarks"
         rows={status.runs}

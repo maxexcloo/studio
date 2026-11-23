@@ -136,6 +136,16 @@ export const seedStyles = Object.freeze([
       "Atmosphere: hold the opening composition and make one established part of the surroundings move. Describe where the movement starts, what path it takes and what changes in the frame as it passes or settles. Choose something this setting can already support, such as a shifting reflection, water running off an edge or a draft moving loose fabric. Keep the subject's movement secondary and make the change readable without sound.",
   },
   {
+    id: "body-bounce",
+    kind: "animate",
+    enabled: true,
+    label: "Body Bounce",
+    description: "Natural body follow-through after a footfall or landing.",
+    uncensored: true,
+    instruction:
+      "Body Bounce: when the opening frame clearly depicts an adult person, use a step, landing, or rhythmic movement that their pose and surroundings support. Describe the weight transfer or impact first, then a small delayed bounce in the chest or buttocks, followed by a quick settle. Describe only motion visible through the existing clothing. Preserve the person's build, outfit, and proportions. Keep the movement at real-time speed and in readable framing. For other subjects, use ordinary secondary motion such as fabric or hair settling.",
+  },
+  {
     id: "cinematic",
     kind: "animate",
     enabled: true,
@@ -162,6 +172,16 @@ export const seedStyles = Object.freeze([
     uncensored: true,
     instruction:
       "Extended Themes: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
+  },
+  {
+    id: "hip-sway",
+    kind: "animate",
+    enabled: true,
+    label: "Hip Sway",
+    description: "An unhurried walk or dance beat led by a natural hip sway.",
+    uncensored: true,
+    instruction:
+      "Hip Sway: when the opening frame clearly depicts an adult person, choose a short walk or dance beat that flows from their opening pose. Show the supporting foot take weight and the hips sway as the weight shifts, then show the shoulders and fabric respond before the person settles into a new stance. Keep the sway natural and the same build, outfit, and proportions throughout. Frame the movement so the weight shift reads. For other subjects, continue their ordinary activity without a sensual treatment.",
   },
   {
     id: "living",
