@@ -1965,6 +1965,13 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
   assert.equal(store.hasOpenOwnWork(), false);
   const own = queue(queuePriority.mcp);
   assert.equal(store.hasOpenOwnWork(true), true);
+  // Waiting work a paused queue holds doesn't hold back Dream or idle work for others.
+  store.setPaused("alice", true);
+  assert.equal(store.hasOpenOwnWork(), false);
+  store.setPaused("alice", false);
+  store.setPaused(everyone, true);
+  assert.equal(store.hasOpenOwnWork(true), false);
+  store.setPaused(everyone, false);
   assert.deepEqual(
     store.openDreamJobs(undefined, true).map((job) => job.id),
     [dream.id],

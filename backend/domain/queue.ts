@@ -263,10 +263,13 @@ export class GenerationQueue {
   }
 
   private updateModelIdle(jobs: Iterable<OwnedJob>) {
+    const held = this.held();
     for (const job of jobs) {
       if (terminalStatuses.has(job.status)) continue;
-      // Dream jobs waiting for this quiet period cannot themselves keep the queue busy.
-      if (tier(job) !== queuePriority.dream || this.acceptedIds.has(job.id) || started(job)) {
+      const accepted = this.acceptedIds.has(job.id) || started(job);
+      // Dream jobs waiting for this quiet period, and work a paused queue holds, keep nothing busy.
+      if (!accepted && held(job)) continue;
+      if (tier(job) !== queuePriority.dream || accepted) {
         this.modelIdleSince = undefined;
         return;
       }
@@ -291,7 +294,7 @@ export class GenerationQueue {
       : (this.adapter.dreamImageSwitchMinutes?.() ??
         dreamTimingSettings.imageSwitchMinutes.defaultValue);
     if (!minutes) return;
-    this.updateModelIdle(this.store.openJobs());
+    // Each tick measures the idle period (updateModelIdle).
     if (this.modelIdleSince === undefined || this.now() - this.modelIdleSince < minutes * 60_000)
       return `Dream waits for the queue to be idle for ${minutes} ${minutes === 1 ? "minute" : "minutes"} before ${video ? "loading another model" : "changing the model or LoRAs"}.`;
   }
@@ -684,6 +687,7 @@ export class GenerationQueue {
             // node run it out of system memory. A two-GPU worker holds the node alone, so it never
             // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
             // A user can submit during an asynchronous readiness check.
+            if (tier(job) === queuePriority.dream) this.updateModelIdle(this.store.openJobs());
             const delayed = dreamDelay(job) || this.dreamModelWait(job);
             if (delayed) this.adapter.releaseAdmission?.(job);
             reason ||= delayed;

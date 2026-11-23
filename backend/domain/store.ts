@@ -418,15 +418,22 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
-  /** Whether any unfinished job is someone's own work, not Dream's, read from the priority index alone. */
+  /**
+   * Whether any unfinished job is someone's own work, not Dream's, read from the priority index;
+   * work a paused queue holds doesn't count.
+   */
   hasOpenOwnWork(waiting = false): boolean {
     const statuses = waiting ? pendingStatuses : openStatuses;
     return Boolean(
       this.db
         .prepare(
-          `SELECT 1 FROM studio_queue INDEXED BY studio_queue_priority WHERE status IN (${placeholders(statuses)}) AND ${jobPriority} IS NOT ${queuePriority.dream} LIMIT 1`,
+          `SELECT 1 FROM studio_queue INDEXED BY studio_queue_priority
+           WHERE status IN (${placeholders(statuses)}) AND ${jobPriority} IS NOT ${queuePriority.dream}
+             AND NOT (status IN (${placeholders(pendingStatuses)}) AND EXISTS (
+               SELECT 1 FROM studio_queue_pauses WHERE studio_queue_pauses.owner_id IN (studio_queue.owner_id, ?)))
+           LIMIT 1`,
         )
-        .get(...statuses),
+        .get(...statuses, ...pendingStatuses, everyone),
     );
   }
 
