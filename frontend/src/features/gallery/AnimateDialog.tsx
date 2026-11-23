@@ -53,10 +53,10 @@ export function AnimateDialog({
   const writing = useRef<AbortController>(null);
   const asking = theme === "custom" && !chosen && writer.isIdle;
   const assistant = useQuery(assistantQuery);
-  const offered = Boolean(assistant.data?.available && item.jobId) && item.type === "image";
+  const offered = Boolean(assistant.data?.available) && item.type === "image";
   const ideas = useChangeSuggestions({
-    query: motionIdeasQuery(item.jobId ?? "", item.id),
-    fresh: () => askMotionIdeas(item.jobId!, true, item.id),
+    query: motionIdeasQuery(item),
+    fresh: () => askMotionIdeas(item, true),
     enabled: asking && offered,
     onPick: setInstruction,
   });

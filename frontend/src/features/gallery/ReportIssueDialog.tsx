@@ -95,7 +95,7 @@ export function ReportIssueDialog({
   const upscaled = mediaSource(item).upscaled;
   const inspect = useItemMutation(item.id, `inspect:${upscaled}`, {
     meta: { inlineError: true },
-    mutationFn: () => inspectImage(item.jobId!, item.id, upscaled),
+    mutationFn: () => inspectImage(item, upscaled),
   });
   const inspectImageIssue = () =>
     inspect.mutate(undefined, {

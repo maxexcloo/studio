@@ -54,14 +54,13 @@ function ItemSuggestions({
     restore: () => {},
   });
   const prompt = typedPrompt(item);
-  const available = change.available && Boolean(prompt.trim());
   const canAskForMore = card.kind === "dream" && item.type === "image" && Boolean(prompt.trim());
   const menuBounds = useActionMenuBounds(opened, false);
   const send = (request: string) => change.send(request, prompt);
   const suggestions = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId!, undefined, item.id),
-    fresh: () => askNextSteps(item.jobId!, true, undefined, item.id),
-    enabled: opened && available,
+    query: nextStepsQuery(item),
+    fresh: () => askNextSteps(item, true),
+    enabled: opened && change.available,
     disabled: change.pending || iteration.isPending,
     onPick: send,
   });
@@ -98,7 +97,8 @@ function ItemSuggestions({
       : []),
   ];
   const loading = change.pending || iteration.isPending || compare.isPending || prepare.isPending;
-  const unavailable = !available && !more.length && "Suggestions are unavailable for this result.";
+  const unavailable =
+    !change.available && !more.length && "Suggestions are unavailable for this result.";
   const trigger = (
     <ActionIcon
       variant="default"
@@ -124,10 +124,11 @@ function ItemSuggestions({
         <Menu.Dropdown>
           <ActionMenuItems
             leading={
-              available && card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>
+              change.available &&
+              card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>
             }
             groups={[
-              ...(available
+              ...(change.available
                 ? [
                     suggestionItems(suggestions.action).map((option) => ({
                       ...option,

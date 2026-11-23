@@ -923,9 +923,9 @@ const suggestions = createSuggestions({
   cards: accountCards,
   item: (ownerId, jobId, itemId) =>
     (itemId ? unseenDreamItem(ownerId, itemId, jobId) : undefined) ??
-    filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
-      (item) => !itemId || item.id === itemId,
-    ),
+    filterVisibleGallery(
+      jobId ? galleryJobItems(jobId, ownerId) : [galleryItem(itemId, ownerId)].filter(Boolean),
+    ).find((item) => !itemId || item.id === itemId),
   image: async (item, upscaled) =>
     (await assistantEngine?.supportsVision(textWriter(item.ownerId)))
       ? smallImage(item, upscaled)
