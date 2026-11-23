@@ -63,6 +63,7 @@ import {
   freshConceptProblem,
   ideaMotifs,
   mentionsMotif,
+  missesSubjects,
   motifWindow,
   namedMotif,
   normalised,
@@ -500,6 +501,8 @@ const seriesOutings = [
 const turns = { floor: 0.5, favoured: 2, read: 1000, keptMs: 5 * 60_000, results: 8 };
 /** A proposed project runs this many samples before it is accepted. */
 const draftSamples = 3;
+/** A project's idea sees this many of the project's latest ones. */
+const projectIdeasShown = 6;
 /** Dream remembers this many of the images it animated and videos it extended. */
 const usedLimit = 500;
 /** Dream remembers this many of its latest ideas to avoid repeating them. */
@@ -1826,10 +1829,25 @@ export function createDream(options: {
     const model = await writer.model("dream", false, text(ownerId));
     const guide = `Prompting guide: ${writerGuide(options.guide(profile)) || "(none)"}`;
     const writingRules = [precedence, keepDescriptions(), standalonePrompt()];
+    // The project's own latest ideas, so the next one moves on within the brief.
+    const projectIdeas = brief.length
+      ? options
+          .gallery(ownerId, {
+            ...(projectId
+              ? { dreamProject: projectId, dreamState: poolStates }
+              : { dreamDraft: draft, dreamState: "draft" as const }),
+            limit: projectIdeasShown,
+          })
+          .map((item) => clean(item.prompt || item.dream?.prompt, writerPrompts.characters))
+          .filter(Boolean)
+      : [];
     const briefLines = brief.length
       ? [
           `Project brief (${project!.name}):`,
           ...brief.map(([label, value]) => `- ${label}: ${value}`),
+          ...(projectIdeas.length
+            ? ["The project's recent ideas:", ...projectIdeas.map((idea) => `- ${idea}`)]
+            : []),
         ]
       : [];
     const collectCards = media === "image" && !reword;
@@ -1944,19 +1962,21 @@ export function createDream(options: {
           !similar.some((item) => similarPrompt(prompt, item.prompt || item.dream?.prompt)),
       );
       const library = options.cards(ownerId);
-      const openCards = library
-        ? (["outfits", "scenes"] as const).flatMap((kind) =>
-            pins?.[kind]
-              ? []
-              : shuffled(suggestedCards(library[kind]))
-                  .filter((card) => card.description)
-                  .slice(0, 2)
-                  .map(
-                    ({ name, description }) =>
-                      `- ${cardKinds[kind].name}: ${name} · ${clean(description, 160)}`,
-                  ),
-          )
-        : [];
+      // A project draws only on the cards it pins.
+      const openCards =
+        library && !project
+          ? (["outfits", "scenes"] as const).flatMap((kind) =>
+              pins?.[kind]
+                ? []
+                : shuffled(suggestedCards(library[kind]))
+                    .filter((card) => card.description)
+                    .slice(0, 2)
+                    .map(
+                      ({ name, description }) =>
+                        `- ${cardKinds[kind].name}: ${name} · ${clean(description, 160)}`,
+                    ),
+            )
+          : [];
       const concept = like
         ? undefined
         : direction(
@@ -1965,6 +1985,7 @@ export function createDream(options: {
             anchors,
             Boolean(likes.length || styles.length || liked.length),
             random,
+            Boolean(brief.length),
           );
       drawnAnchors = concept?.anchors || [];
       noveltyPrompts.push(...liked);
@@ -2087,6 +2108,8 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
+      if (project && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
+        return `Your prompt shows none of the brief's subjects (${project.brief.subjects}).`;
       return freshProblem(prompt, title, motifs, cooling);
     };
     for (let attempt = 0; ; attempt++) {
@@ -2168,7 +2191,7 @@ export function createDream(options: {
         messages[0],
         {
           role: "user",
-          content: `${messages[1].content}\nRejected prompt: ${idea}\n${wrong} ${like || seed || series || reword ? "Keep the required source identity and iteration constraints." : pinnedPrompt ? "Keep the pinned details and find a substantially different action or composition." : "Choose a different concept, changing subject or subject role, scene, action and composition; do not paraphrase the rejected idea."}`,
+          content: `${messages[1].content}\nRejected prompt: ${idea}\n${wrong} ${like || seed || series || reword ? "Keep the required source identity and iteration constraints." : pinnedPrompt ? "Keep the pinned details and find a substantially different action or composition." : brief.length ? "Keep the brief's subjects and styles and choose a different scene, action and composition; do not paraphrase the rejected idea." : "Choose a different concept, changing subject or subject role, scene, action and composition; do not paraphrase the rejected idea."}`,
         },
       ];
     }
@@ -2414,6 +2437,8 @@ export function createDream(options: {
       }
       if (
         Boolean(axis) &&
+        // A project's brief sets its subject, so an import's would pull it elsewhere.
+        !target &&
         kind === "image" &&
         // Imports carry no content rating, so only an account with Uncensored Models draws on them.
         access.uncensored &&
@@ -2478,7 +2503,7 @@ export function createDream(options: {
       const uncensored = uncensoredShare(record, access);
       const explore = Boolean(axis);
       const feature =
-        steer || seed || axis === "prompt"
+        steer || seed || target || axis === "prompt"
           ? undefined
           : featuredTag(taste, seedMotifs(ownerId, record));
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.

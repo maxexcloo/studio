@@ -61,9 +61,10 @@ export function useKeyboardDrop(active: boolean, onDrop: () => void) {
 
 /**
  * While `active`, the visual viewport within the layout viewport: the room a popup has above the
- * keyboard and a browser's toolbars.
+ * keyboard and a browser's toolbars. A surface that takes the whole screen follows only `resize`
+ * (`pans` false): following each pan of the visual viewport lags it by a frame and shakes.
  */
-export function useVisibleRect(active: boolean) {
+export function useVisibleRect(active: boolean, pans = true) {
   const [rect, setRect] = useState<{ x: number; y: number; width: number; height: number }>();
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -77,12 +78,12 @@ export function useVisibleRect(active: boolean) {
       });
     resize();
     viewport.addEventListener("resize", resize);
-    viewport.addEventListener("scroll", resize);
+    if (pans) viewport.addEventListener("scroll", resize);
     return () => {
       viewport.removeEventListener("resize", resize);
       viewport.removeEventListener("scroll", resize);
     };
-  }, [active]);
+  }, [active, pans]);
   return rect;
 }
 

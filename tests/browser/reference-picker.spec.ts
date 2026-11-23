@@ -367,7 +367,7 @@ test("Full-screen references show the selected model and open Details", async ({
     .click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
-  await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
+  await expect(header.getByText(/^Reference Model( · |$)/)).toBeVisible();
   const details = header.getByRole("button", { name: "Generation Details", exact: true });
   await details.click();
   if (test.info().project.use.isMobile) {
@@ -460,7 +460,7 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   await expect(header.getByRole("status", { name: "Current Result", exact: true })).toHaveText(
     "148 / 150",
   );
-  await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
+  await expect(header.getByText(/^Reference Model( · |$)/)).toBeVisible();
   await expect(preview.getByRole("group", { name: "Generation Actions" })).toHaveCount(0);
   if (test.info().project.use.isMobile) {
     await preview.locator('[data-zoom-mode="Fit"]').evaluate((node) => {

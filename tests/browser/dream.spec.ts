@@ -1446,9 +1446,11 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await expect(edit).toBeHidden();
   await expect(harbour).not.toContainText("No LoRAs");
 
-  await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Pause", exact: true }).click();
-  await expect(harbour).toContainText("Paused");
+  const enabled = harbour.getByRole("switch", { name: "Enable Harbour", exact: true });
+  await expect(enabled).toBeChecked();
+  await enabled.click({ force: true });
+  await expect(enabled).not.toBeChecked();
+  await expect(harbour).toContainText("Disabled");
   expect(dream.requests.at(-1)).toMatchObject({
     method: "PUT",
     path: "/api/dream/projects/project-2",
@@ -1505,7 +1507,7 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
   await expect(editor.getByRole("status")).toHaveCount(0);
 });
 
-test("The Inbox accepts, edits then accepts, dismisses with a reason and clears Dream's proposals", async ({
+test("The Inbox accepts, edits then accepts, declines with or without a reason and clears Dream's proposals", async ({
   page,
   isMobile,
 }) => {
@@ -1543,10 +1545,11 @@ test("The Inbox accepts, edits then accepts, dismisses with a reason and clears 
       proposal("mara", "card", "Mara", {
         card: { kind: "characters", name: "Mara", description: "red hair" },
       }),
+      proposal("shoes", "rule", "Add Another Rule", { rule: "flat shoes" }),
     ],
   });
   await page.goto("/dream/projects");
-  await expect(page.getByRole("region", { name: "Inbox (4)", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Inbox (5)", exact: true })).toBeVisible();
 
   // A rule goes to Taste › Rules, with Undo.
   const rule = page.getByRole("article", { name: "Add a Rule", exact: true });
@@ -1576,21 +1579,31 @@ test("The Inbox accepts, edits then accepts, dismisses with a reason and clears 
     "film grain, dusk",
   );
 
-  // Dismiss takes an optional reason that teaches Dream.
+  // Decline acts at once; holding it, or its context menu, asks for a reason that teaches Dream.
   await page
     .getByRole("article", { name: "Pause Coast", exact: true })
-    .getByRole("button", { name: "Dismiss", exact: true })
-    .click();
-  const dismiss = page.getByRole("dialog", { name: "Dismiss", exact: true });
-  await fillBox(dismiss, "Reason", "Coast is new", isMobile);
-  await dismiss.getByRole("button", { name: "Dismiss", exact: true }).click();
-  await expect(dismiss).toBeHidden();
+    .getByRole("button", { name: "Decline", exact: true })
+    .press("Shift+F10");
+  const decline = page.getByRole("dialog", { name: "Decline", exact: true });
+  await fillBox(decline, "Reason", "Coast is new", isMobile);
+  await decline.getByRole("button", { name: "Decline", exact: true }).click();
+  await expect(decline).toBeHidden();
   expect(dream.requests.at(-1)).toEqual({
     method: "POST",
     path: "/api/dream/inbox/pause/dismiss",
     body: { reason: "Coast is new" },
   });
+  const mara = page.getByRole("article", { name: "Mara", exact: true });
+  await mara.getByRole("button", { name: "Decline", exact: true }).click();
+  await expect(mara).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Decline", exact: true })).toHaveCount(0);
+  expect(dream.requests.at(-1)).toEqual({
+    method: "POST",
+    path: "/api/dream/inbox/mara/dismiss",
+    body: {},
+  });
 
+  // Clearing the Inbox still asks first.
   await page
     .getByRole("region", { name: "Inbox (1)", exact: true })
     .getByRole("button", { name: "Clear Inbox", exact: true })
