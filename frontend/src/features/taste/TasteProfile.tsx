@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Modal, MultiSelect, Stack, TagsInput, Text } from "@mantine/core";
+import { Alert, Button, Modal, MultiSelect, Stack, TagsInput, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,6 +20,7 @@ import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -309,15 +310,24 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
     <>
       {toolbar &&
         createPortal(
-          <Button
-            size="compact-sm"
-            variant="default"
-            leftSection={<icons.edit size={16} />}
-            disabled={!data || !fields.ready}
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </Button>,
+          <>
+            <ToolbarAction
+              label="Edit"
+              icon={icons.edit}
+              variant="default"
+              disabled={!data || !fields.ready}
+              onClick={() => setEditing(true)}
+            />
+            {data?.writer && (
+              <ToolbarAction
+                label="Refresh"
+                icon={icons.refresh}
+                iconOnly
+                disabled={refresh.isPending || !data.signals}
+                onClick={() => refresh.mutate()}
+              />
+            )}
+          </>,
           toolbar,
         )}
       <SettingGroup title="Taste Profile">
@@ -343,31 +353,25 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
             </>
           )}
           {error && <Alert color="red">{error.message}</Alert>}
-          <Group gap="xs">
-            {data?.writer && (
-              <Button
-                variant="default"
-                leftSection={<icons.refresh size={16} />}
-                loading={refresh.isPending}
-                disabled={!data.signals}
-                onClick={() => refresh.mutate()}
-              >
-                Refresh
-              </Button>
-            )}
-            <Button
-              variant="subtle"
-              color="red"
-              leftSection={<icons.clear size={16} />}
-              disabled={
-                !data || (!data.summary && !data.signals && !Object.keys(data.preferences).length)
-              }
-              onClick={() => setClearing(true)}
-            >
-              Clear
-            </Button>
-          </Group>
         </Stack>
+      </SettingGroup>
+      <SettingGroup title="Danger Zone" danger>
+        <SettingRow
+          label="Clear Taste Profile"
+          description="Forget what Studio learnt and your own edits."
+        >
+          <Button
+            size="compact-sm"
+            color="red"
+            variant="light"
+            disabled={
+              !data || (!data.summary && !data.signals && !Object.keys(data.preferences).length)
+            }
+            onClick={() => setClearing(true)}
+          >
+            Clear
+          </Button>
+        </SettingRow>
       </SettingGroup>
       <Modal
         id="taste-editor"
