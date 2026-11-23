@@ -1163,7 +1163,13 @@ export function createAssistant(
    * (domain/captions.ts). The caller checks the model reads images. A reply that isn't the asked-for
    * JSON is kept as plain text without tags; the text is cut to `captionCharacters`.
    */
-  async function caption({ image, prompt, signal, writer } = {}) {
+  async function caption({
+    image,
+    instructions = captionInstructions(),
+    prompt,
+    signal,
+    writer,
+  } = {}) {
     const model = await modelFor("caption", false, writer);
     const context = one(prompt, maxPromptCharacters);
     const instruction = context
@@ -1174,7 +1180,7 @@ Prompt: ${context}`
       call: "caption",
       model,
       messages: [
-        { role: "system", content: captionInstructions() },
+        { role: "system", content: instructions },
         { role: "user", content: userContent(instruction, [image], true) },
       ],
       temperature: 0.2,

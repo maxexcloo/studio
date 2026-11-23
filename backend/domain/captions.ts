@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { promptInstruction } from "./../prompt-instructions.js";
+import { promptInstruction, promptInstructionStore } from "../prompt-instructions.js";
 import { type IdleDocument, type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 import type { PromptWriter } from "./taste.ts";
@@ -24,6 +24,7 @@ export interface CaptionWriter {
   supportsVision(writer?: PromptWriter): Promise<boolean>;
   caption(request: {
     image: ModelImage;
+    instructions: string;
     prompt?: string;
     signal?: AbortSignal;
     writer?: PromptWriter;
@@ -31,15 +32,19 @@ export interface CaptionWriter {
 }
 export const captionCharacters = 600;
 export const captionTags = 15;
-// Gallery captions are for search: what is visible, in the words people search with.
-export const captionInstructions = () =>
-  promptInstruction("caption-gallery", {
-    captionCharacters,
-    captionTags,
-  });
-// Changing the rules changes the version, so a Caption Gallery pass redoes older captions.
-export const captionVersion = () =>
-  createHash("sha256").update(captionInstructions()).digest("hex").slice(0, 12);
+let cachedPrompt: { hash: string; instructions: string; version: string } | undefined;
+function captionPrompt() {
+  const { hash } = promptInstructionStore().get("caption-gallery");
+  if (cachedPrompt?.hash === hash) return cachedPrompt;
+  const instructions = promptInstruction("caption-gallery", { captionCharacters, captionTags });
+  const version = createHash("sha256").update(instructions).digest("hex").slice(0, 12);
+  cachedPrompt = { hash, instructions, version };
+  return cachedPrompt;
+}
+
+export const captionInstructions = () => captionPrompt().instructions;
+// The Out of Date pass retakes captions written with different instructions.
+export const captionVersion = () => captionPrompt().version;
 
 /**
  * Captions finished gallery images, Dream's pool included, while Studio is idle
@@ -73,6 +78,7 @@ export function createCaptioner(options: {
     ...options,
     name: "Gallery captions",
     dailyCap: false,
+    revision: captionVersion,
     off: "Gallery Captions is off in Settings › Maintenance.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
@@ -93,9 +99,10 @@ export function createCaptioner(options: {
       const image = await options.image(item);
       if (signal.aborted) return;
       if (!image) throw new Error("no image to read");
-      const version = captionVersion();
+      const { instructions, version } = captionPrompt();
       const reply = await writer!.caption({
         image,
+        instructions,
         prompt: item.prompt,
         signal,
         writer: options.text(item.ownerId || ""),
