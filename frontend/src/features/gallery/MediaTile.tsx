@@ -378,10 +378,7 @@ export function MediaTile({
       {(timestamp || drifted) && (
         <div className={classes.marks}>
           {timestamp && (
-            <time
-              className={classes.timestamp}
-              dateTime={timestamp.value}
-            >
+            <time className={classes.timestamp} dateTime={timestamp.value}>
               {timestamp.time}
               <span className={classes.timestampDate}>, {timestamp.day}</span>
             </time>

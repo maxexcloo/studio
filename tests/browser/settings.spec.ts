@@ -857,7 +857,10 @@ test("Workers select local text models to benchmark and list each run's figures"
   // One benchmark at a time.
   await expect(await menu("Gemma")).toBeDisabled();
   await closeMenu();
-  await results.getByRole("button", { name: /^Actions for Gemma · / }).first().click();
+  await results
+    .getByRole("button", { name: /^Actions for Gemma · / })
+    .first()
+    .click();
   await page.getByRole("menuitem", { name: "Stop", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Stop Benchmark", exact: true });
   await confirm.getByRole("button", { name: "Stop", exact: true }).click();
