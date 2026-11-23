@@ -815,7 +815,7 @@ test("account signed result links survive restart without persisting bearer toke
     outputs: [{ url: "/comfy/view?filename=restart-result.png" }],
   });
   const result = await call(client, "result", { job_id: id });
-  const [link] = links(result);
+  const [link] = files(result);
   assert.ok(link);
 
   let available = true;
@@ -902,6 +902,10 @@ function previews(result) {
   return [...texts(result).matchAll(/\[!\[[^\]]*\]\((https?:\/\/[^)]+)\)\]/g)].map(
     (match) => match[1],
   );
+}
+/** The original files behind a reply's image previews (the images themselves link to Studio's page). */
+function files(result) {
+  return previews(result).map((preview) => preview.replace(/\.jpg$/, ""));
 }
 /** Runs a change once the fixture reaches a state, such as every job of a submission existing. */
 const once = (ready, change) => {
@@ -2274,10 +2278,14 @@ test("image Result returns one short linked preview that opens the unchanged ori
     result.content.map((item) => item.type),
     ["text"],
   );
-  const [link] = links(result);
+  const [link] = files(result);
   const [preview] = previews(result);
   assert.match(link, /^https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}$/);
   assert.equal(preview, `${link}.jpg`);
+  // The image opens its page in Studio, not the bare file.
+  const page = await fetch(localLink(f, links(result)[0]), { redirect: "manual" });
+  assert.notEqual(links(result)[0], link);
+  assert.equal(page.headers.get("content-type")?.startsWith("image/"), false);
   assert.match(
     result.content[0].text,
     /\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
@@ -2495,7 +2503,7 @@ test("hiding a completed output revokes existing signed links and prevents resul
     outputs: [{ url: "/comfy/view?filename=visible.png" }],
   });
   const result = await call(client, "result", { job_id: id });
-  const [link] = links(result);
+  const [link] = files(result);
   assert.ok(link);
   f.jobs.get(id).gallery = [];
   const before = f.downloads.length;
@@ -2727,7 +2735,7 @@ test("background Result collects a later completion without another submission",
     /\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/,
   );
   assert.match(message.text, /Stop here unless the user asked for a review\./);
-  const original = await fetch(localLink(f, links(result)[0]));
+  const original = await fetch(localLink(f, files(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
   assert.equal(data(result).ref, "#1");
@@ -2788,7 +2796,7 @@ test("signed links do not expire, preserve the configured public path and cannot
     status: "done",
     outputs: [{ url: "/comfy/view?filename=original.png" }],
   });
-  const [url] = links(await call(client, "result", { job_id: id }));
+  const [url] = files(await call(client, "result", { job_id: id }));
   assert.match(url, /^https:\/\/studio\.example\.test\/nested\/studio\/mcp\/results\//);
   const local = f.base + new URL(url).pathname.replace("/nested/studio", "");
   assert.equal((await fetch(local)).status, 200);

@@ -2164,12 +2164,12 @@ export class McpMedia {
         outputs,
         markdown: outputs
           .map(
-            ({ label, url, caption }, position) =>
+            ({ jobId, label, output_index, caption }, position) =>
               [
                 header(
                   outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label,
                 ),
-                `[View Video](${url})`,
+                `[View Video](${this.pageUrl(owner, jobId, output_index)})`,
               ].join(" · ") + captions([caption]),
           )
           .join("\n\n"),
@@ -2179,8 +2179,8 @@ export class McpMedia {
         outputs,
         markdown: outputs
           .map(
-            ({ jobId, label, output_index, url, caption }) =>
-              `${header(label)}\n[![${label}](${this.previewUrl(owner, jobId, output_index)})](${url})${captions([caption])}`,
+            ({ jobId, label, output_index, caption }) =>
+              `${header(label)}\n[![${label}](${this.previewUrl(owner, jobId, output_index)})](${this.pageUrl(owner, jobId, output_index)})${captions([caption])}`,
           )
           .join(""),
       };
