@@ -750,7 +750,6 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
-    nextSteps.prioritiseRecent(items);
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
@@ -1281,29 +1280,8 @@ const suggester = createPromptSuggester({
   save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
   explicit: explicitFor,
 });
-// Enrich (domain/enrich.ts): one image read for the caption, title, review and suggested prompt a
-// result still needs; each task's own work above is the backfill.
-const enricher = createEnricher({
-  writer: assistantEngine,
-  captions: captioner,
-  titles: titler,
-  reviews: selfReview,
-  prompts: suggester,
-  titled: sameTitle,
-  explicit: explicitFor,
-  text: textWriter,
-  image: smallImage,
-  save: (item, enriched) => updateGalleryJob(galleryKey(item), enriched),
-  failed: (reason) => logWarning(`Couldn't enrich a new result: ${reason}`),
-});
-/** New results' Background AI: one read each, then titles and captions it left to their own work. */
-async function enrichCompleted(items) {
-  const done = await enricher.completed(items);
-  void titler.completed(items.filter((item) => !done.get(item)?.title));
-  const images = items.filter((item) => item.type === "image" && !done.get(item)?.caption);
-  if (images.length) captioner.prioritiseRecent(images);
-}
-// Completion kicks this bounded worker; it retries recent results without walking the old gallery.
+// Completion kicks this bounded worker for steps enrich left; it retries recent results without
+// walking the old gallery.
 const nextSteps = createNextStepWork({
   enabled: () => Boolean(assistantEngine) && flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
@@ -1325,6 +1303,30 @@ const nextSteps = createNextStepWork({
       ? Boolean(item.url && hasGalleryMedia(item))
       : filterVisibleGallery([item]).length > 0,
 });
+// Enrich (domain/enrich.ts): one image read for the caption, title, review, next steps and
+// suggested prompt a result still needs; each task's own work above is the backfill.
+const enricher = createEnricher({
+  writer: assistantEngine,
+  captions: captioner,
+  titles: titler,
+  reviews: selfReview,
+  prompts: suggester,
+  steps: { take: nextSteps.take, task: suggestions.enrichTask },
+  titled: sameTitle,
+  explicit: explicitFor,
+  text: textWriter,
+  image: smallImage,
+  save: (item, enriched) => updateGalleryJob(galleryKey(item), enriched),
+  failed: (reason) => logWarning(`Couldn't enrich a new result: ${reason}`),
+});
+/** New results' Background AI: one read each, then what it left to each task's own work. */
+async function enrichCompleted(items) {
+  const done = await enricher.completed(items);
+  void titler.completed(items.filter((item) => !done.get(item)?.title));
+  const images = items.filter((item) => item.type === "image" && !done.get(item)?.caption);
+  if (images.length) captioner.prioritiseRecent(images);
+  nextSteps.prioritiseRecent(items.filter((item) => !done.get(item)?.nextSteps));
+}
 
 const backgroundWork = [
   generationQueue,

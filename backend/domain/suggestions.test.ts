@@ -775,6 +775,28 @@ test("background work saves exact result changes, leaving motion ideas to Animat
   assert.equal(calls.length, 3);
 });
 
+test("next steps kept from an image's enrich read open without a model call, and Refresh asks anew", async () => {
+  const { calls, items, suggestions } = fixture({ fixed: { change: ["Closer Crop"] } });
+  const source = { ...items["alice:job-a"], ownerId: "alice", caption: undefined };
+  items["alice:job-a"] = source;
+  const task = suggestions.enrichTask(source);
+  assert.match(task.instructions, /"steps"/);
+  assert.match(task.context, /Taste profile: Loves misty harbours/);
+  assert.match(task.context, /The menu already offers.*Closer Crop/);
+  assert.doesNotMatch(task.context, /Prompt:/, "the read already sends the prompt");
+  const kept = task.keep(JSON.parse(replies('"steps"').replace(/^[^{]*/, "")));
+  Object.assign(source, { nextSteps: kept });
+  const body = { surface: "viewer", jobId: "job-a", itemId: "result-a" };
+  const opened = await suggestions.suggest("alice", body);
+  assert.deepEqual(
+    opened.suggestions.map(({ label }) => label),
+    ["Warmer Light Please Now"],
+  );
+  assert.equal(calls.length, 0);
+  await suggestions.suggest("alice", { ...body, fresh: true });
+  assert.equal(calls.length, 1);
+});
+
 test("switched off, prompt ideas and next steps are never written, while asked-for changes still are", async () => {
   const { calls, suggestions } = fixture({ switches: { ideas: false, nextSteps: false } });
   const items = [
