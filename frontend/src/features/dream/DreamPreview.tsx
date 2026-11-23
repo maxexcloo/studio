@@ -110,7 +110,15 @@ export function CardText({
   );
 }
 
-function PreviewImage({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
+interface FaceProps {
+  item: MediaItem;
+  swipe: SwipeGesture;
+  /** A tap or click on the media, which cycles the chrome. */
+  onTap: () => void;
+  bare: boolean;
+}
+
+function PreviewImage({ item, swipe, onTap, bare }: FaceProps) {
   const source = mediaSource(item);
   const [ZoomImage] = useState(zoomImage);
   return (
@@ -127,13 +135,15 @@ function PreviewImage({ item, swipe }: { item: MediaItem; swipe: SwipeGesture })
           width={source.width}
           height={source.height}
           swipe={swipe}
+          onTap={onTap}
+          hideControls={bare}
         />
       </Suspense>
     </div>
   );
 }
 
-function PreviewFace({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
+function PreviewFace({ item, swipe, onTap, bare }: FaceProps) {
   const videoSwipe = useTouchSwipe(swipe);
   const dragged = useRef(false);
   return (
@@ -150,11 +160,13 @@ function PreviewFace({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) 
         },
         onClick(event: React.MouseEvent) {
           if (dragged.current) event.stopPropagation();
+          else if (!isPreviewBackdrop(event.target as HTMLElement, event.clientX, event.clientY))
+            onTap();
         },
       })}
     >
       {item.type === "image" ? (
-        <PreviewImage item={item} swipe={swipe} />
+        <PreviewImage item={item} swipe={swipe} onTap={onTap} bare={bare} />
       ) : (
         <DeckMedia key={item.id} item={item} playing />
       )}
@@ -227,6 +239,11 @@ export function DreamPreview({
   const closeIfTop = closeWhenTop(id, close);
   const phone = usePhone();
   const [details, setDetails] = useState(false);
+  // Taps cycle the chrome, then the chrome with the card's text, then the media alone.
+  const [chrome, setChrome] = useState<"standard" | "text" | "bare">("standard");
+  const bare = chrome === "bare";
+  const cycleChrome = () =>
+    setChrome((shown) => (shown === "standard" ? "text" : shown === "text" ? "bare" : "standard"));
   const stage = useRef<HTMLDivElement>(null);
   const [playbackRoot, setPlaybackRoot] = useState<HTMLDivElement | null>(null);
   const stageRef = useMergedRef(stage, setPlaybackRoot);
@@ -263,6 +280,7 @@ export function DreamPreview({
     )
       return;
     if (event.key === "u" || event.key === "z") return undo();
+    if (event.key === "c") return cycleChrome();
     const direction = previewKeys[event.key];
     if (!direction) return;
     event.preventDefault();
@@ -312,16 +330,30 @@ export function DreamPreview({
                         : undefined
                   }
                 >
-                  <PreviewFace item={item} swipe={strip.gesture} />
+                  <PreviewFace item={item} swipe={strip.gesture} onTap={cycleChrome} bare={bare} />
                 </section>
                 <Neighbour item={next} side="next" />
               </div>
             </SwipeCard>
+            {chrome === "text" && (
+              <CardText
+                item={item}
+                dreamt={card.kind !== "library"}
+                title={
+                  card.kind === "set"
+                    ? card.title
+                    : card.kind === "pair"
+                      ? card.question
+                      : undefined
+                }
+              />
+            )}
             {play && <VideoPlayButton play={play} />}
           </div>
           <ViewerChrome
             item={item}
             actions={sound}
+            hidden={bare}
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
             closeLabel="Close Preview"
@@ -329,6 +361,7 @@ export function DreamPreview({
           />
           <div
             className={classes.previewButtons}
+            hidden={bare}
             data-actions-hidden={(phone && details) || undefined}
             inert={phone && details}
           >

@@ -1231,7 +1231,7 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   expect(dream.requests[2].body).toEqual({ ids: ["one"], reason: "glitch" });
 });
 
-test("Dream fullscreen closes from the letterbox and leaves the image interactive", async ({
+test("Dream fullscreen closes from the letterbox and taps cycle its chrome, text and media alone", async ({
   page,
   isMobile,
 }) => {
@@ -1264,9 +1264,21 @@ test("Dream fullscreen closes from the letterbox and leaves the image interactiv
   await expect(open).toBeFocused();
 
   await open.click();
-  if (isMobile) await picture.tap();
-  else await picture.click();
-  await expect(preview).toBeVisible();
+  const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
+  const actions = preview.getByRole("group", { name: "Dream Actions", exact: true });
+  const why = preview.getByText("Because you like wide.", { exact: true });
+  await expect(why).toBeHidden();
+  const tap = () => (isMobile ? picture.tap() : picture.click());
+  await tap();
+  await expect(why).toBeVisible();
+  await expect(actions).toBeVisible();
+  await tap();
+  await expect(why).toBeHidden();
+  await expect(header).toBeHidden();
+  await expect(actions).toBeHidden();
+  await page.keyboard.press("c");
+  await expect(header).toBeVisible();
+  await expect(actions).toBeVisible();
   expect(verdicts(dream)).toEqual([]);
 });
 
