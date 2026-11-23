@@ -9,6 +9,7 @@ import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { proposalUndo } from "../generation/AskChange";
 import { changeSummary } from "../generation/changeSummary";
 import { inspectImage } from "../taste/suggestions";
@@ -83,6 +84,7 @@ export function ReportIssueDialog({
 }) {
   const id = useId();
   const phone = usePhone();
+  useReturnFocus();
   const fix = useReportIssue(item, onQueued, true);
   const [picked, setPicked] = useState<string[]>([]);
   const [details, setDetails] = useState("");

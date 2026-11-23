@@ -534,6 +534,7 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
   const creating = page.getByRole("dialog", { name: "New Prompt Style", exact: true });
   await expect(creating.getByRole("radio", { name: "Animate", exact: true })).toBeChecked();
   await creating.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("button", { name: "New Style", exact: true })).toBeFocused();
   // Editing keeps the style's ID and kind and saves in a dialog.
   await table.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
   await page
@@ -542,13 +543,19 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit Prompt Style", exact: true });
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
+  await dialog
+    .getByRole("radiogroup", { name: "Offered To", exact: true })
+    .getByText("Without Uncensored", { exact: true })
+    .click();
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(saves.at(-1).styles[2]).toMatchObject({
     id: "cinematic",
     kind: "animate",
     description: "A moving camera.",
+    censored: true,
   });
+  expect(saves.at(-1).styles[2].uncensored).toBeUndefined();
   await expect(table.getByText("A moving camera.")).toBeVisible();
 });
 

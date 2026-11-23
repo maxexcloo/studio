@@ -25,6 +25,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
 import { InspirationPreset } from "./InspirationPreset";
@@ -179,6 +180,7 @@ export function LibraryImportReview({
 }) {
   const client = useQueryClient();
   const phone = usePhone();
+  useReturnFocus();
   const dialog = useId();
   const key = ["imports", id];
   const query = useQuery({

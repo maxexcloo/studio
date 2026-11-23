@@ -9,6 +9,7 @@ import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { librarySections } from "./LibraryNavigation";
 import { type PromptInstruction, promptInstructionsPath, promptInstructionsQuery } from "./queries";
 
@@ -21,6 +22,7 @@ function InstructionEditor({
 }) {
   const client = useQueryClient();
   const phone = usePhone();
+  useReturnFocus();
   const [text, setText] = useState(instruction.text);
   const path = `${promptInstructionsPath}/${encodeURIComponent(instruction.id)}`;
   const history = useQuery({

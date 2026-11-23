@@ -26,6 +26,7 @@ import {
 } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { type PromptStyle, type PromptStyleList, promptStylesQuery } from "./queries";
 
@@ -93,6 +94,7 @@ function StyleEditor({
   close: () => void;
 }) {
   const phone = usePhone();
+  useReturnFocus();
   const { save, refresh } = useSaveStyles();
   const [draft, setDraft] = useState<PromptStyle>(
     style || { id: "", kind, label: "", description: "", instruction: "", enabled: true },
