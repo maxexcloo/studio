@@ -257,6 +257,90 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   ]);
 });
 
+test("Viewer prompt suggestions use the selected operation and wait for review", async ({
+  page,
+}) => {
+  const state = await openViewer(page);
+  const asked: unknown[] = [];
+  const instruction = "Warm the light on the bird, keeping everything else unchanged.";
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface === "composer") return route.fallback();
+    if (body.surface !== "change") return route.fulfill({ json: { suggestions: steps } });
+    asked.push(body);
+    const [action] = body.actions;
+    return route.fulfill({
+      json: {
+        suggestions: [
+          { ...steps[0], action, prompt: action === "edit" ? instruction : steps[0].prompt },
+        ],
+      },
+    });
+  });
+  const showSource = async () => {
+    await page.goto("/images");
+    await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+  };
+  await showSource();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const openAI = async () => {
+    await viewer.getByRole("button", { name: "AI", exact: true }).click();
+    return page.getByRole("menu").first();
+  };
+  let menu = await openAI();
+  await expect(menu.getByRole("radio", { name: "Recreate", exact: true })).toBeChecked();
+  await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
+  await expect(prompt).toHaveValue(steps[0].prompt);
+  expect(asked).toEqual([
+    expect.objectContaining({
+      actions: ["recreate"],
+      prompt: "An amber bird",
+      request: steps[0].request,
+    }),
+  ]);
+  expect(state.jobs).toHaveLength(1);
+  await viewer.getByRole("button", { name: "Generate", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({
+    operation: "image",
+    parentItemId: "hub",
+    input: {
+      prompt: steps[0].prompt,
+      profileId: "image:test",
+      referenceAssets: [],
+      seed: "",
+    },
+  });
+
+  await showSource();
+  menu = await openAI();
+  await menu.getByText("Edit", { exact: true }).click();
+  await expect(menu.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
+  await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
+  await expect(prompt).toHaveValue(instruction);
+  await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
+  expect(asked.at(-1)).toMatchObject({
+    actions: ["edit"],
+    profileId: "image:test",
+    prompt: "An amber bird",
+    request: steps[0].request,
+  });
+  expect(state.jobs).toHaveLength(2);
+  await viewer.getByRole("button", { name: "Run", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(3);
+  expect(state.referenceRequests).toContainEqual({ galleryItemId: "hub" });
+  expect(state.jobs[2]).toMatchObject({
+    operation: "refine",
+    parentItemId: "hub",
+    input: {
+      prompt: instruction,
+      profileId: "image:test",
+      referenceAssets: [{ assetId: "asset-hub", slot: "image" }],
+    },
+  });
+});
+
 test("Custom Animation suggests what could happen from the image, filling the instruction", async ({
   page,
 }) => {

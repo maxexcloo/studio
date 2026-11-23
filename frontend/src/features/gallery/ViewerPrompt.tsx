@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
+import { useRemembered } from "../auth/useRemembered";
 import {
   ProposalLabel,
   SendButton,
@@ -17,6 +18,7 @@ import {
 import { CustomDialog } from "../generation/CustomDialog";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
+import { useActionProfile } from "./mediaProfiles";
 import { useItemChange } from "./useItemChange";
 import { type Iteration, typedPrompt, useMediaReview } from "./useMediaAction";
 
@@ -113,11 +115,15 @@ export function ViewerPrompt({
   const { item, original, prompt, setPrompt, field, ask, custom, openCustom } = state;
   const assistant = useQuery(assistantQuery).data;
   const change = ask.proposal;
+  const [mode, setMode] = useRemembered<ViewerChange>("viewer-prompt-change", "recreate");
+  const { menu: editProfiles, profileId: selectedEdit } = useActionProfile("image");
+  const editProfileId = mode === "edit" ? selectedEdit : undefined;
+  const generate = ask.previewing && change?.action !== "edit";
   const running = pending?.kind === "prompt";
   const [requested, setRequested] = useState<{ itemId: string; prompt?: string }>();
   const queried = requested?.itemId === item.id && requested;
   const base = queried ? queried.prompt : undefined;
-  const pick = (request: string) => state.pick("recreate", request, undefined, true);
+  const pick = (request: string) => state.pick(mode, request, editProfileId, true);
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item.jobId ?? "", base, item.id),
     fresh: () => askNextSteps(item.jobId!, true, base, item.id),
@@ -135,11 +141,31 @@ export function ViewerPrompt({
           menu: [
             ...proposalUndo(change && ask.undo),
             ...assistMenu({
+              settings:
+                item.type === "image"
+                  ? [
+                      {
+                        id: "viewer-prompt-change",
+                        label: "Apply As",
+                        disabled: ask.pending,
+                        choice: {
+                          showLabel: true,
+                          value: mode,
+                          options: [
+                            { value: "edit", label: "Edit" },
+                            { value: "recreate", label: "Recreate" },
+                          ],
+                          onChange: (value) => setMode(value === "edit" ? "edit" : "recreate"),
+                        },
+                      },
+                      ...(mode === "edit" ? editProfiles : []),
+                    ]
+                  : [],
               suggestions,
               ...changeTemplates(
                 assistant?.changes ?? [],
                 pick,
-                () => openCustom("recreate", undefined, true),
+                () => openCustom(mode, editProfileId, true),
                 ask.pending,
               ),
               last: [],
@@ -154,7 +180,7 @@ export function ViewerPrompt({
     : [];
   const submit = change
     ? {
-        label: ask.previewing ? "Generate" : "Run",
+        label: generate ? "Generate" : "Run",
         disabled: !prompt.trim(),
         onSubmit: () => {
           ask.run(prompt);
@@ -203,7 +229,7 @@ export function ViewerPrompt({
             <ProposalLabel
               proposal={change}
               before={original}
-              labels={ask.previewing ? { recreate: "Generate" } : undefined}
+              labels={generate ? { recreate: "Generate" } : undefined}
             />
           )
         }
