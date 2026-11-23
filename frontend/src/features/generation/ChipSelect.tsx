@@ -15,7 +15,7 @@ import {
   isOptionsGroup,
   useCombobox,
 } from "@mantine/core";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { popupMiddlewares } from "../../theme";
@@ -210,7 +210,7 @@ export function ChipSelect({
   );
 }
 
-/** One ChipSelect option: its name and description, with badges at the trailing edge. */
+/** One ChipSelect option: its name and description, with badges and a check when chosen at the trailing edge. */
 export function ChipOption({
   label,
   description,
@@ -225,7 +225,7 @@ export function ChipOption({
   return (
     <Group justify="space-between" wrap="nowrap" gap="xs" w="100%">
       <Stack gap={0} miw={0}>
-        <Text size="sm" fw={checked ? 600 : 500} truncate title={label}>
+        <Text size="sm" fw={500} truncate title={label}>
           {label}
         </Text>
         {description && (
@@ -236,6 +236,7 @@ export function ChipOption({
       </Stack>
       <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
         {badges}
+        {checked && <Check size={14} />}
       </Group>
     </Group>
   );

@@ -903,7 +903,7 @@ export function SavedName<T extends SavedItem>({
                   >
                     <Group gap="xs" wrap="nowrap" justify="space-between">
                       <Stack gap={0} miw={0}>
-                        <Text size="sm" fw={record === current ? 600 : undefined} truncate>
+                        <Text size="sm" truncate>
                           {record.name}
                         </Text>
                         <Text size="xs" c="dimmed" truncate>
