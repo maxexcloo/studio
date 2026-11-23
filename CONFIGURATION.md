@@ -20,7 +20,7 @@ The environment example points to a ComfyUI server on the same Linux host. Edit 
 
 ## Kubernetes
 
-Start from [kubernetes.yaml](config/kubernetes.yaml): a one-replica Deployment with the `Recreate` strategy, a persistent volume at `/data`, a Service on port 8787 and probes on `/api/ping` (liveness) and `/api/ready` (readiness). Supply credentials through a Secret. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator, then set `STUDIO_ALLOWED_HOSTS` and add your HTTPS ingress.
+Start from [kubernetes.yaml](config/kubernetes.yaml): a one-replica Deployment with the `Recreate` strategy, a persistent volume at `/data`, a Service on port 8787 and probes on `/api/ping` (liveness) and `/api/ready` (readiness: the data folder is writable), which answer without an account. Supply credentials through a Secret. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator, then set `STUDIO_ALLOWED_HOSTS` and add your HTTPS ingress.
 
 ### Runtime Control
 
@@ -74,8 +74,6 @@ This path uses Radiance's own media API. Install the [ComfyUI worker](worker/REA
 For the [Docker quick start](README.md#run-with-docker), set `STUDIO_MULTI_USER=1` in `.env` and create the administrator at <http://127.0.0.1:8787> before adding a TLS proxy. Keep the same data volume when recreating the container. `STUDIO_ALLOWED_HOSTS` lists the public hostnames Studio answers to, separated by commas. See [Security](SECURITY.md) for the trust rules.
 
 Single sign-on (Pocket ID or another OpenID Connect provider) needs `STUDIO_OIDC_ISSUER`, `STUDIO_OIDC_CLIENT_ID` and `STUDIO_OIDC_REDIRECT_URI` (`https://<studio>/api/accounts/oidc/callback`); `STUDIO_OIDC_CLIENT_SECRET` serves confidential clients and `STUDIO_OIDC_LABEL` names the button. Setting only some stops Studio at start. `/?password=1` keeps the password form reachable. The provider decides who may sign in; roles and groups never come from it.
-
-`/api/ping` (liveness) and `/api/ready` (the data folder is writable) answer without an account.
 
 ## MCP & Chat Gateway
 
@@ -240,13 +238,9 @@ A download may have stopped early or saved a web page instead of the model. Repl
 
 Try a smaller size, fewer outputs or a lighter profile. Check other workloads on the same GPU. Do not stop a worker while accepted jobs are running or outputs are being saved.
 
-<a name="comfyui-does-not-have-a-file-this-run-asked-for"></a>
-
 #### ComfyUI can't find a file this run uses
 
 ComfyUI returned "Value not in list". Check that the profile's model, LoRA, text encoder and VAE filenames match the selected worker's files and model paths. Correct the owned configuration or worker mount, then refresh the worker's model list.
-
-<a name="parts-that-do-not-fit-together"></a>
 
 #### A LoRA doesn't fit this model
 
