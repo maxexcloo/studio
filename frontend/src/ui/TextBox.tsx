@@ -36,7 +36,7 @@ import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
-import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
+import { useKeyboardDrop, useVisibleRect } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 
 import classes from "./TextBox.module.css";
@@ -113,7 +113,7 @@ export function TextBox({
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
   const openedFrom = useRef<Element | null>(null);
-  const keyboard = useKeyboard(editing, content);
+  const viewport = useVisibleRect(editing);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => close());
@@ -199,7 +199,7 @@ export function TextBox({
     );
   const [focused, setFocused] = useState(false);
   const resting = oneLine && !focused;
-  const centreTools = oneLine && Boolean(send) && !phone;
+  const centreTools = oneLine && Boolean(send);
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
   // takes the textarea's font, padding and border so the two line up.
   const ref = useMergedRef(field, props.ref);
@@ -586,8 +586,13 @@ export function TextBox({
             aria-label={title}
             style={
               {
-                translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
-                "--keyboard-inset": `${keyboard.inset}px`,
+                translate: viewport?.y ? `0 ${viewport.y}px` : undefined,
+                height: viewport?.height,
+                maxHeight: viewport?.height,
+                "--text-editor-safe-bottom":
+                  viewport && window.innerHeight - viewport.y - viewport.height > 100
+                    ? "0px"
+                    : undefined,
               } as CSSProperties
             }
             onKeyDownCapture={escape}

@@ -350,7 +350,7 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   await page.keyboard.press("Escape");
   await expect(tile(1)).toBeVisible();
   await expect(tile(2)).toHaveCount(0);
-  const chatSets = page.getByRole("button", { name: "Chat Sets", exact: true });
+  const chatSets = page.getByRole("combobox", { name: "Chat Sets", exact: true });
   await chatSets.click();
   await page.getByRole("option").filter({ hasText: "Night Studies · Hard flash" }).click();
   await expect(tile(1)).toBeVisible();

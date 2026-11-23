@@ -506,8 +506,30 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   expect(await summary.evaluate((line) => line.scrollWidth > line.clientWidth)).toBe(true);
   // Phones edit in the full-screen editor; elsewhere focus, by click or keyboard, unfolds it.
   if (testInfo.project.use.isMobile) {
+    const ai = (await viewer
+      .getByRole("button", { name: "AI Prompt Actions", exact: true })
+      .boundingBox())!;
+    const send = (await viewer
+      .getByRole("button", { name: "Generate", exact: true })
+      .boundingBox())!;
+    expect(Math.abs(ai.y + ai.height / 2 - send.y - send.height / 2)).toBeLessThan(4);
     await field.click();
-    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeVisible();
+    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+    await expect(editor).toBeVisible();
+    await editor.getByRole("textbox", { name: "Prompt", exact: true }).focus();
+    const keyboardTop = await page.evaluate(() => {
+      const height = window.innerHeight - 300;
+      Object.defineProperty(window.visualViewport, "height", { configurable: true, value: height });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      return height;
+    });
+    const submit = editor.getByRole("button", { name: "Generate", exact: true });
+    await expect
+      .poll(async () => {
+        const box = (await submit.boundingBox())!;
+        return box.y + box.height;
+      })
+      .toBeLessThanOrEqual(keyboardTop);
     return;
   }
   await field.focus();
@@ -1809,9 +1831,7 @@ test("Details keep the caption, run notes and source ahead of model and prompts"
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
   // The title's line holds when and how big; Output carries no result number.
-  await expect(
-    details.getByText(`${formatDateTime(stamp)} · 1024 × 1024`, { exact: true }),
-  ).toBeVisible();
+  await expect(details.getByText(/^23 Oct(?: 2026)?, \d{2}:\d{2} · 1024 × 1024$/)).toBeVisible();
   await expect(details.getByRole("cell", { name: "#866", exact: true })).toHaveCount(0);
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.

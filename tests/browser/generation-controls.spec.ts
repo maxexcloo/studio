@@ -808,8 +808,9 @@ test("Generation controls preserve the draft and return keyboard focus with redu
   await fixtures(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
+  if (testInfo.project.use.isMobile) await expandComposer(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Keep this direction");
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  if (!testInfo.project.use.isMobile) await expandComposer(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toHaveValue("Keep this direction");
   await prompt.fill("Keep this direction, in soft daylight");

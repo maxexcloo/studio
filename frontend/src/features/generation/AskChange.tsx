@@ -158,7 +158,7 @@ export function suggested(
 ): { options: Action[]; again: Action } {
   return {
     options: loading
-      ? []
+      ? [{ id: "loading-suggestions", label: "Loading…", disabled: true }]
       : list.length
         ? list
         : [{ id: "none", label: failure || "No Suggestions", disabled: true }],

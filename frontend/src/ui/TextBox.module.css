@@ -5,8 +5,8 @@
   display: flex;
   flex-direction: column;
   padding-bottom: max(
-    calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-md)),
-    env(safe-area-inset-bottom)
+    var(--mantine-spacing-md),
+    var(--text-editor-safe-bottom, env(safe-area-inset-bottom))
   );
 }
 
@@ -181,12 +181,16 @@
 }
 
 /* A phone box with several tools puts them under its text; a lone one stays beside it. */
-:global([data-phone]) .columned:has(.tools > :nth-child(2)) {
+:global([data-phone]) .columned:not([data-centre-tools]):has(.tools > :nth-child(2)) {
   flex-direction: column;
 }
 
 :global([data-phone]) .tools {
   flex-wrap: wrap;
+}
+
+.columned[data-centre-tools] > .tools {
+  flex-wrap: nowrap;
 }
 
 /* Inline composer fields and the separate phone editor share the same editing surface. */
