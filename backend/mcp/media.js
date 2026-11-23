@@ -15,6 +15,7 @@ import { selectedResolution, withResolution } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
 import { step } from "../event-loop.js";
+import { families } from "../family-catalogue.js";
 import { topCaptionTags } from "../gallery/filters.js";
 import { profileAspectSize } from "../generation-defaults.js";
 import { compatibleLoras } from "../lora/policy.js";
@@ -784,6 +785,10 @@ export class McpMedia {
       );
       Object.assign(body, fitted);
     }
+    // Plain img2img samples at its staged reference's size (generation-routes.js), which the gallery records.
+    const family = families[profile.family];
+    if (reference_asset_ids.length && family?.img2img && !family.references)
+      changes.push(`Its reference sets the size, so it won't draw ${body.width}×${body.height}.`);
     validate?.(profile, body);
     const ignored = changes.filter(Boolean).join(" ");
     // Large draws decode in tiles, matching the browser's generation path.

@@ -1321,6 +1321,25 @@ test("Models and Generate follow the run's backend: its sizes, reference limit a
   assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [2048, 1152]);
 });
 
+test("Generate says a plain img2img reference sets the size", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([{ ...structuredClone(imageProfile), family: "sdxl" }]);
+  const client = await f.client();
+  const asset = data(await call(client, "upload", { content_base64: png.toString("base64") })).asset
+    .id;
+  const reply = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A fox"],
+    count: 1,
+    reference_asset_ids: [asset],
+  });
+  assert.match(texts(reply), /Its reference sets the size, so it won't draw \d+×\d+\./);
+  assert.doesNotMatch(
+    texts(await call(client, "generate", { profile_id: imageProfile.id, prompts: ["A fox"] })),
+    /reference sets the size/,
+  );
+});
+
 test("Generate attaches a compact guide once per account unless it read the selected profile's whole guide, not its gist, discovery or another profile", async (t) => {
   const f = await fixture(t);
   await f.profiles([
