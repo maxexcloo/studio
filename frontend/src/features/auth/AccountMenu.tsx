@@ -1,20 +1,24 @@
 import { Menu } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { post } from "../../api";
 import { icons } from "../../ui/icons";
-import { ownAccountQuery, useAccount } from "./AccountGate";
 
 /** The account heading and Account, then workspace links and the final Sign Out action. */
-export function AccountMenuContent({ children }: { children?: ReactNode }) {
+export function AccountMenuContent({
+  name,
+  multi,
+  children,
+}: {
+  name: string;
+  multi: boolean;
+  children?: ReactNode;
+}) {
   const location = useLocation(),
     client = useQueryClient();
-  const account = useAccount(),
-    multi = account.data?.mode === "multi-user";
-  const own = useQuery({ ...ownAccountQuery, enabled: multi });
   const signOut = useMutation({
     mutationFn: () => post("/api/accounts/sign-out"),
     onSuccess: () => {
@@ -22,7 +26,6 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
       window.location.assign("/?sign-in=signed-out");
     },
   });
-  const name = multi ? own.data?.account.username || "Your Account" : "Single-User Development";
   return (
     <>
       <Menu.Label>{name}</Menu.Label>

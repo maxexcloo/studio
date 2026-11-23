@@ -2,14 +2,24 @@ import { ActionIcon, Menu } from "@mantine/core";
 import { Library } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
+import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
+import { useAccount } from "../auth/AccountGate";
 import { AccountMenuContent } from "../auth/AccountMenu";
 
 export function HeaderOptions() {
   const location = useLocation();
+  const duration = useMotionDuration();
+  const { data } = useAccount();
+  const multi = data?.mode === "multi-user";
+  const name = multi ? data.account?.username || "Your Account" : "Single-User Development";
   return (
-    <Menu position="bottom-end" shadow="md">
+    <Menu
+      position="bottom-end"
+      shadow="md"
+      transitionProps={{ transition: "pop-top-right", duration }}
+    >
       <PopupTooltip label="More Options">
         <Menu.Target>
           <ActionIcon aria-label="More Options" variant="subtle" color="gray">
@@ -18,7 +28,7 @@ export function HeaderOptions() {
         </Menu.Target>
       </PopupTooltip>
       <Menu.Dropdown>
-        <AccountMenuContent>
+        <AccountMenuContent name={name} multi={multi}>
           <Menu.Item
             component={Link}
             to="/library"

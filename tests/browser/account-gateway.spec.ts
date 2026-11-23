@@ -449,7 +449,7 @@ test("Account menu names the account by its email and opens the account workspac
   page,
 }, testInfo) => {
   await fixtures(page);
-  await signIn(page, { id: "admin", role: "user" });
+  await signIn(page, { id: "admin", role: "user", username: "admin@example.test" });
   await page.goto("/");
   const more = page.getByRole("button", { name: "More Options", exact: true });
   if (!testInfo.project.use.isMobile) {

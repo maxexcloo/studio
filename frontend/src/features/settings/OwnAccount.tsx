@@ -18,7 +18,7 @@ import type { Account } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
+import { accountQuery, ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
 import { accountAdminQuery } from "./AccountAdmin";
 import { PersonalMcpToken } from "./PersonalMcpToken";
 
@@ -55,7 +55,12 @@ function AccountForm({
         }),
       });
     },
-    onSuccess: () => {
+    onSuccess: ({ account }) => {
+      client.setQueryData(accountQuery.queryKey, (current) =>
+        current?.account
+          ? { ...current, account: { ...current.account, username: account.username } }
+          : current,
+      );
       void client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
       void client.invalidateQueries({ queryKey: accountAdminQuery.queryKey });
       saved();
