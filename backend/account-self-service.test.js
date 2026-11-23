@@ -146,6 +146,17 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["POST", "/api/assistant/cards/rate"],
     ["GET", "/api/queue/job-1"],
     ["POST", "/api/queue/sets/set-1/move"],
+    ["GET", "/api/dream/history"],
+    ["POST", "/api/dream/pass"],
+    ["POST", "/api/dream/undo"],
+    ["POST", "/api/dream/item-1/super-like"],
+    ["POST", "/api/dream/sets/set-1/answer"],
+    ["GET", "/api/gallery/chat-sets"],
+    ["GET", "/api/gallery/library-review"],
+    ["POST", "/api/gallery/library-review/item-1"],
+    ["GET", "/api/gallery/results/12"],
+    ["POST", "/api/assistant/project-brief"],
+    ["GET", "/api/taste/reflection"],
   ])
     assert.equal(ordinaryRouteAllowed(method, route), true, `${method} ${route}`);
   assert.equal(ordinaryRouteAllowed("POST", "/api/dream/item-1/delete"), false);
