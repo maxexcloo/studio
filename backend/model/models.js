@@ -360,6 +360,9 @@ export function inferModels(
     );
     // Radiance's Qwen-Image 2.1 family (Noct included) repaints a mask and draws transparency itself.
     const radianceQwen = radianceImage && loraFamilyId(workflow.family) === "qwen_image_21";
+    // FLUX.3 [klein] repaints a mask on Radiance too, where its profile permits.
+    const radianceInpaint =
+      radianceQwen || (radianceImage && loraFamilyId(workflow.family) === "flux3");
     if (radianceImage) {
       // A model whose worker lists its two-GPU `-refs` twin takes the twin's sizes.
       const model = String(defaults.model || "");
@@ -549,7 +552,7 @@ export function inferModels(
             (radianceQwen && workflow.imageModes?.reference?.mediaInputs?.length),
           ) &&
           (radianceImage
-            ? radianceQwen
+            ? radianceInpaint
             : imageSaves(workflow.graph).length > 0 &&
               (configuredOnly || !missingNodes(info, inpaintNodes).length)),
         // Mask strength and edge softness shape ComfyUI's stitch; Radiance repaints the mask exactly.
