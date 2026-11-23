@@ -194,10 +194,12 @@ export const scopeMarkdown = ({ chat, turn, set, gallery }, kind) => {
     .filter(Boolean)
     .join(" · ");
 };
-const feedbackContext = (outputs) =>
-  outputs.length
-    ? `Recorded user feedback: ${JSON.stringify(outputs.map(({ caption, link, ...feedback }) => feedback))}`
+const feedbackContext = (outputs) => {
+  const rated = outputs.filter(({ rating }) => rating !== "unrated");
+  return rated.length
+    ? `Recorded user feedback: ${JSON.stringify(rated.map(({ caption, link, ...feedback }) => feedback))}`
     : "";
+};
 const mcpOwner = (key, user, token) =>
   crypto
     .createHmac("sha256", key)

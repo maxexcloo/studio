@@ -2365,7 +2365,9 @@ test("Result reads current per-output user feedback for single, all and set requ
       ),
       feedback,
     );
-    assert.deepEqual(JSON.parse(/Recorded user feedback: (.+)/.exec(texts(reply))[1]), feedback);
+    const rated = feedback.filter(({ rating }) => rating !== "unrated");
+    const recorded = /Recorded user feedback: (.+)/.exec(texts(reply));
+    assert.deepEqual(recorded && JSON.parse(recorded[1]), rated.length ? rated : null);
     assert.equal(
       f.requests.slice(before).filter((item) => item.path === `/gallery/jobs/${id}`).length,
       1,
@@ -4331,7 +4333,7 @@ test("Result returns recorded feedback and markdown, never a settings record", a
   assert.equal(lean.content.length, 1);
   assert.match(
     lean.content[0].text,
-    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\[Open in Studio\]\([^)]+\) .*\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /^#1 is ready\. .+\n\n\[Open in Studio\]\([^)]+\) .*\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
   const { links, outputs, ...details } = lean.structuredContent;
   assert.deepEqual(details, { job_id: id, ref: "#1", link: queued.link, status: "done" });
