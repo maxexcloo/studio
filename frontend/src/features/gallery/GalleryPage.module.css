@@ -37,24 +37,11 @@
 /* The toolbar and any selection bar under it, sticky on desktop, and on phones while a search,
    filter or selection applies. */
 .toolbar {
-  z-index: 5;
-  /* Flush under the header, as it sticks, so its controls sit centred in its band. */
-  margin: calc(-1 * var(--app-shell-padding)) calc(-1 * var(--app-shell-padding)) 0;
-  padding: var(--mantine-spacing-xs) var(--app-shell-padding);
-  background: var(--studio-glass-chrome);
-  backdrop-filter: var(--studio-glass-filter);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
-  border-bottom: 1px solid var(--studio-glass-border);
+  composes: band from "../../ui/PageToolbar.module.css";
 }
 
 :root:not([data-phone]) .toolbar,
 .toolbar[data-pinned] {
   position: sticky;
   top: var(--app-shell-header-offset, var(--app-shell-header-height));
-}
-
-/* A phone held sideways keeps its controls clear of the notch. */
-:root[data-phone] .toolbar {
-  padding-inline: max(var(--app-shell-padding), env(safe-area-inset-left))
-    max(var(--app-shell-padding), env(safe-area-inset-right));
 }

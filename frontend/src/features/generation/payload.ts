@@ -115,20 +115,51 @@ export function referenceDetails(
   input: GenerationInput,
   profile?: Profile,
 ) {
+  const implicitStart = !profile?.mediaInputs?.length && profile?.capabilities.startImage;
   return references.map((asset, index) => ({
     ...asset,
-    slot:
-      asset.slot ||
-      (input.referenceAssets?.[index]?.assetId === asset.id
-        ? input.referenceAssets[index].slot
-        : undefined) ||
-      profile?.mediaInputs?.[0]?.id ||
-      "image",
+    slot: implicitStart
+      ? implicitReferenceSlot.id
+      : asset.slot ||
+        (input.referenceAssets?.[index]?.assetId === asset.id
+          ? input.referenceAssets[index].slot
+          : undefined) ||
+        profile?.mediaInputs?.[0]?.id ||
+        implicitReferenceSlot.id,
   }));
 }
 type ReferenceSlot = NonNullable<Profile["mediaInputs"]>[number];
 /** The reference slots a profile declares, or a card's images (CardImages). */
 export type SlotLayout = Pick<Profile, "mediaInputs">;
+
+const implicitReferenceSlot = { id: "image", label: "Image", max: 1 };
+
+/** A named layout or the one start image a plain img2img profile accepts. */
+export const runReferenceSlots = (profile?: Profile): ReferenceSlot[] =>
+  profile?.mediaInputs?.length
+    ? profile.mediaInputs
+    : profile?.capabilities.startImage
+      ? [implicitReferenceSlot]
+      : [];
+
+/** Incompatible or excess references stay in the draft, ready to recover before the run. */
+export function splitReferenceSlots<T extends { slot?: string }>(
+  references: T[],
+  slots: ReferenceSlot[],
+) {
+  const remaining = new Map(slots.map(({ id, max }) => [id, max || 1]));
+  const placed: T[] = [];
+  const unused: T[] = [];
+  for (const asset of references) {
+    const slot = asset.slot || implicitReferenceSlot.id;
+    const room = remaining.get(slot) ?? 0;
+    if (room > 0) {
+      remaining.set(slot, room - 1);
+      placed.push(asset);
+    } else unused.push(asset);
+  }
+  return { placed, unused };
+}
 
 /** A placed reference as a run sends it: its asset, slot and any strength set. */
 const referenceAsset = (asset: ReferenceAsset) => ({
@@ -138,9 +169,7 @@ const referenceAsset = (asset: ReferenceAsset) => ({
 });
 
 export const referenceGroups = (profile?: SlotLayout): ReferenceSlot[][] =>
-  slotGroups(
-    profile?.mediaInputs?.length ? profile.mediaInputs : [{ id: "image", label: "Image", max: 1 }],
-  );
+  slotGroups(profile?.mediaInputs?.length ? profile.mediaInputs : [implicitReferenceSlot]);
 
 export function referenceGroup(profile?: SlotLayout, slot?: string) {
   const groups = referenceGroups(profile);

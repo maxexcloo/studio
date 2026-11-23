@@ -1,13 +1,41 @@
 import { notifications } from "@mantine/notifications";
-import { useQuery } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { Change, ChangeAction } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
+import { modelsQuery } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askChange } from "../taste/suggestions";
+import { automaticEditProfile } from "./mediaProfiles";
 import { useItemMutation } from "./useItemMutation";
 import type { Iteration } from "./useMediaAction";
+
+/** Resolve the editor before writing, so the eventual edit runs with the same profile. */
+export async function askItemChange(
+  client: QueryClient,
+  item: MediaItem,
+  request: string,
+  actions: ChangeAction[],
+  prompt?: string,
+  selectedEdit?: string,
+) {
+  const profileId = actions.includes("edit")
+    ? selectedEdit ||
+      automaticEditProfile((await client.ensureQueryData(modelsQuery)).profiles, item)?.id
+    : undefined;
+  const availableActions = profileId ? actions : actions.filter((action) => action !== "edit");
+  if (!availableActions.length) throw new Error("No image model is ready for edits.");
+  const answer = await askChange(
+    item.jobId!,
+    request,
+    availableActions,
+    prompt,
+    item.id,
+    profileId,
+  );
+  return { answer, profileId };
+}
 
 /** Writes a change to a finished result and queues the instructed action now or after review. */
 export function useItemChange<T extends string>(
@@ -25,6 +53,7 @@ export function useItemChange<T extends string>(
   },
 ) {
   const video = item.type === "video";
+  const client = useQueryClient();
   const assistant = useQuery(assistantQuery);
   const [change, setChange] = useState<{
     proposal: Change;
@@ -50,9 +79,9 @@ export function useItemChange<T extends string>(
         : video
           ? ["animate"]
           : ["edit", "recreate", "animate"];
-      return askChange(item.jobId!, request, actions, typed, item.id, profileId);
+      return askItemChange(client, item, request, actions, typed, profileId);
     },
-    onSuccess: (answer, { profileId, preview }) => {
+    onSuccess: ({ answer, profileId }, { preview }) => {
       if (answer.reason) notifications.show({ message: answer.reason });
       else if (!preview) {
         const proposal = answer.suggestions[0];
@@ -73,7 +102,7 @@ export function useItemChange<T extends string>(
         operation:
           action === "edit" ? "refine" : action === "animate" && !video ? "animate" : "image",
         sameSeed: action === "recreate" && !preview,
-        ...(action === "edit" && profileId && { profileId }),
+        ...(action === "edit" && { profileId, profileBackend: proposal.profileBackend }),
       });
     setChange(null);
   }
@@ -92,7 +121,7 @@ export function useItemChange<T extends string>(
       ask.mutate(
         { request: request.trim(), typed, action, profileId, preview: review || preview },
         {
-          onSuccess: (answer) => {
+          onSuccess: ({ answer, profileId }) => {
             if ((!review && !preview) || answer.reason) return;
             const [proposal] = answer.suggestions;
             setChange({ proposal, typed, profileId, preview });

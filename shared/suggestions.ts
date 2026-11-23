@@ -20,6 +20,8 @@ export type ChangeAction = (typeof changeActions)[number];
 export interface Change extends NextStep {
   action: ChangeAction;
   prompt: string;
+  /** The reference backend that supplied an Edit prompt's guide on a combined profile. */
+  profileBackend?: string;
 }
 export const variationDirections = ["scene", "outfit", "style"] as const;
 export type VariationDirection = (typeof variationDirections)[number];

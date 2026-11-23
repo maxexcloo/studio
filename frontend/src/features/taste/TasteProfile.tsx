@@ -1,6 +1,7 @@
 import { Alert, Button, Group, Modal, MultiSelect, Stack, TagsInput, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import { loraName } from "../../../../shared/profiles";
 import {
@@ -49,14 +50,14 @@ const learnt = (taste: Taste) =>
     .filter(Boolean)
     .join(" · ");
 const fieldLabels: Record<keyof TasteFields, string> = {
+  note: "Summary",
   likes: "Likes",
   avoid: "Dislikes",
-  rules: "Rules",
-  styles: "Styles",
-  note: "Summary",
-  models: "Models",
   loras: "LoRAs",
+  models: "Models",
+  rules: "Rules",
   shapes: "Shapes",
+  styles: "Styles",
   tags: "Tags",
 };
 const fieldKeys = Object.keys(fieldLabels) as (keyof TasteFields)[];
@@ -267,7 +268,7 @@ function TasteEditor({
 }
 
 /** The taste profile: each field learnt from feedback until the person sets it. */
-export function TasteProfile() {
+export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
   const phone = usePhone();
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
@@ -306,9 +307,8 @@ export function TasteProfile() {
   };
   return (
     <>
-      <SettingGroup
-        title="Taste Profile"
-        toolbar={
+      {toolbar &&
+        createPortal(
           <Button
             size="compact-sm"
             variant="default"
@@ -317,9 +317,10 @@ export function TasteProfile() {
             onClick={() => setEditing(true)}
           >
             Edit
-          </Button>
-        }
-      >
+          </Button>,
+          toolbar,
+        )}
+      <SettingGroup title="Taste Profile">
         <Stack gap="xs">
           {taste.isPending && <LoadingState label="Loading Taste" />}
           {data && (

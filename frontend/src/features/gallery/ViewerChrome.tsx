@@ -14,7 +14,7 @@ export function ViewerMetadata({ item, compact }: { item: MediaItem; compact?: b
   const { profiles } = useGenerationActions();
   const model = mediaProfileName(item, profiles);
   const { width, height } = mediaSource(item);
-  const timestamp = mediaTimestamp(item);
+  const timestamp = compact ? undefined : mediaTimestamp(item);
   const settings = item.settings || {};
   const steps = Number(settings.steps);
   const stepLabel = steps > 0 && !/\b\d+\s+steps?\b/i.test(model) ? `${steps} Steps` : "";
@@ -98,6 +98,7 @@ export function ViewerChrome({
 }) {
   if (hidden) return null;
   const title = item && mediaTitle(item);
+  const timestamp = item && mediaTimestamp(item);
   return (
     <Group
       className={classes.topBar}
@@ -112,8 +113,21 @@ export function ViewerChrome({
       <Group gap={6} wrap="nowrap" miw={0}>
         {item && (
           <Paper withBorder radius="md" px="sm" py={4} miw={0}>
-            <Text size="sm" fw={500} truncate title={title}>
-              {title}
+            <Text
+              size="sm"
+              fw={500}
+              truncate
+              title={[title, timestamp?.label].filter(Boolean).join(" · ")}
+            >
+              <span>{title}</span>
+              {timestamp && (
+                <>
+                  {" · "}
+                  <Text component="time" dateTime={timestamp.value} size="xs" c="dimmed">
+                    {timestamp.label}
+                  </Text>
+                </>
+              )}
             </Text>
             <ViewerMetadata item={item} compact />
           </Paper>

@@ -6,6 +6,7 @@ import {
   Button,
   type CSSProperties,
   type CSSVariablesResolver,
+  Checkbox,
   CloseButton,
   Collapse,
   Combobox,
@@ -23,9 +24,11 @@ import {
   Paper,
   PasswordInput,
   Popover,
+  Radio,
   ScrollArea,
   SegmentedControl,
   Select,
+  Slider,
   Switch,
   Table,
   Tabs,
@@ -74,6 +77,15 @@ export const easing = {
   exit: "cubic-bezier(0.4, 0, 1, 1)",
 } as const;
 const exitDuration = (duration: number) => Math.round(duration * 0.7);
+export const motionTransition = (duration: number) => ({
+  duration,
+  exitDuration: exitDuration(duration),
+  timingFunction: easing.enter,
+});
+const controlMotion = {
+  transitionDuration: "var(--studio-motion-duration)",
+  transitionTimingFunction: "var(--studio-ease-enter)",
+};
 // Phone overlays rise into place. Desktop overlays grow slightly from their trigger.
 const raise = {
   in: { opacity: 1, transform: "translateY(0) scale(1)" },
@@ -142,11 +154,7 @@ export function studioTheme({
         ? rem(bar)
         : undefined;
   const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
-  const transitionProps = {
-    duration: motionDuration,
-    exitDuration: exitDuration(motionDuration),
-    timingFunction: easing.enter,
-  };
+  const transitionProps = motionTransition(motionDuration);
   const popupTransition = { ...transitionProps, transition: raise };
   return createTheme({
     primaryColor,
@@ -224,6 +232,7 @@ export function studioTheme({
           root: `${classes.actionIcon} ${touch && props.size === bar ? classes.phoneIcons : ""}`,
         }),
         defaultProps: { size: bar, radius: "xl" },
+        styles: { icon: controlMotion },
         vars: (_theme, props) => ({
           root: {
             // Touch screens raise the compact icon sizes to the touch target too.
@@ -258,9 +267,13 @@ export function studioTheme({
         }),
         defaultProps: { size: "md", fw: 500, autoContrast: true },
         // A touch button is at least as wide as it is tall (All, Clear).
-        styles: (_theme, props) => ({ root: touch && height(props.size) ? { minWidth: bar } : {} }),
+        styles: (_theme, props) => ({
+          inner: controlMotion,
+          root: touch && height(props.size) ? { minWidth: bar } : {},
+        }),
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
+      Checkbox: Checkbox.extend({ styles: { input: controlMotion, icon: controlMotion } }),
       // Close buttons of dialogs, drawers and sheets are touch targets on touch screens.
       CloseButton: CloseButton.extend({
         vars: () => ({ root: touch ? { "--cb-size": rem(bar), "--cb-icon-size": rem(20) } : {} }),
@@ -311,6 +324,7 @@ export function studioTheme({
       Input: Input.extend({
         classNames: { input: classes.input },
         defaultProps: { size: "md" },
+        styles: { input: controlMotion },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
       }),
       // Menus scroll within the viewport when their options outgrow it.
@@ -337,7 +351,16 @@ export function studioTheme({
         },
         classNames: (_theme, props) => ({
           content: classes.dialogContent,
-          body: classes.dialogBody,
+          body: [
+            classes.dialogBody,
+            !props.fullScreen &&
+              props.size !== "xs" &&
+              props.size !== "sm" &&
+              props.variant !== "compact" &&
+              classes.roomyDialogBody,
+          ]
+            .filter(Boolean)
+            .join(" "),
           ...(props.fullScreen && { overlay: classes.fullScreenOverlay }),
         }),
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
@@ -356,7 +379,6 @@ export function studioTheme({
           },
           body: {
             flex: "1 1 auto",
-            minHeight: 0,
             overflowY: "auto",
             overscrollBehavior: "contain",
           },
@@ -418,6 +440,7 @@ export function studioTheme({
           renderRoot: (props: ComponentPropsWithRef<"div">) => createElement(PopupRoot, props),
         } as Record<string, unknown>,
       }),
+      Radio: Radio.extend({ styles: { radio: controlMotion, icon: controlMotion } }),
       ScrollArea: ScrollArea.extend({
         defaultProps: { type: "never" },
         styles: (_theme, props) => ({
@@ -472,13 +495,16 @@ export function studioTheme({
               },
         }),
       }),
+      Slider: Slider.extend({ styles: { thumb: controlMotion } }),
       Switch: Switch.extend({
         styles: {
           thumb: {
+            ...controlMotion,
             backgroundColor: "var(--mantine-color-default)",
             borderColor: "var(--mantine-color-default-border)",
           },
-          track: { borderColor: "var(--mantine-color-default-border)" },
+          track: { ...controlMotion, borderColor: "var(--mantine-color-default-border)" },
+          trackLabel: controlMotion,
         },
       }),
       // A sort header is a touch target on touch screens (ui/DataTable.tsx).
@@ -535,6 +561,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
     variables: {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "820px",
+      "--studio-panel-min-height": "min(12rem, 35dvh)",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,

@@ -7,6 +7,7 @@ import {
   backToActionMenu,
   closeLoras,
   closeTextEditor,
+  combinedImageProfile,
   expandAssistantMenu,
   fixtures,
   image,
@@ -277,8 +278,10 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
 
 /** Seeds the viewer with an assistant that answers every requested change with a hands fix. */
 async function seedFix(page: Page, asked: any[]) {
-  return seed(page, {}, (page) =>
-    page.route("**/api/suggestions", (route) => {
+  return seed(page, {}, async (page) => {
+    const [source, video] = profiles;
+    await serveProfiles(page, [{ ...source, mediaInputs: [] }, video, combinedImageProfile()]);
+    await page.route("**/api/suggestions", (route) => {
       const body = route.request().postDataJSON();
       if (body.surface !== "change") return route.fallback();
       asked.push(body);
@@ -290,12 +293,13 @@ async function seedFix(page: Page, asked: any[]) {
               label: "Fix Hands",
               request: body.request,
               prompt: "An amber bird with natural claws",
+              profileBackend: "comfyui",
             },
           ],
         },
       });
-    }),
-  );
+    });
+  });
 }
 
 test("Report's reasons fix the image as a new version and dislike the original", async ({
@@ -355,12 +359,17 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
     request: "Fix what is wrong, keeping everything else: Hands: six toes",
     actions: ["edit", "recreate"],
     itemId: "hub",
+    profileId: "custom:combined",
   });
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "refine",
     parentItemId: "hub",
-    input: { prompt: "An amber bird with natural claws" },
+    input: {
+      profileId: "custom:combined",
+      profileBackend: "comfyui",
+      prompt: "An amber bird with natural claws",
+    },
   });
   await expect.poll(() => state.gallery.find((item) => item.id === "hub")?.rating).toBe("disliked");
 });
@@ -412,6 +421,7 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
       actions: ["edit"],
       prompt: "An amber bird",
       itemId: "hub",
+      profileId: "image:test",
     },
   ]);
   // Undo restores the prompt before the suggestion.

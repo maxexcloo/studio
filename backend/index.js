@@ -914,6 +914,7 @@ const suggestions = createSuggestions({
     assistant.target(
       ownerId ? accountAccessForId(ownerId) : undefined,
       profileId ?? (item?.settings?.profileId || ""),
+      Boolean(item && profileId),
     ),
   promptWriter: textWriter,
   fixed: (kind) =>

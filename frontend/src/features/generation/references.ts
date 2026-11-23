@@ -25,6 +25,7 @@ import {
   referenceGroupAssets,
   referenceGroups,
   referencePatch,
+  splitReferenceSlots,
 } from "./payload";
 
 export const galleryReferenceType = "application/x-studio-gallery-item";
@@ -101,9 +102,10 @@ export function nextReferenceTarget(
   chosen?: ReferenceTarget | null,
 ): ReferenceTarget | null {
   const groups = referenceGroups(profile);
+  const { placed } = splitReferenceSlots(references, groups.flat());
   const room = (group: (typeof groups)[number]) =>
-    referenceGroupAssets(references, group).length < slotCapacity(group);
-  if (chosen?.replace && references.some((asset) => referenceKey(asset) === chosen.replace))
+    referenceGroupAssets(placed, group).length < slotCapacity(group);
+  if (chosen?.replace && placed.some((asset) => referenceKey(asset) === chosen.replace))
     return chosen;
   const group = groups.find((items) => items[0].id === chosen?.slot);
   if (group && (room(group) || slotCapacity(group) === 1)) return { slot: group[0].id };

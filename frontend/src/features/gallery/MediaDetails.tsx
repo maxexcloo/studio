@@ -938,7 +938,18 @@ export function MediaDetails({
   return (
     <Stack gap="lg" fz="sm">
       <Caption item={item} />
-      <Section title="Lineage" rows={lineage} inOrder />
+      {lineage.length > 0 && (
+        <DetailSection title="Lineage">
+          <Stack gap="sm">
+            {lineage.map(([label, content]) => (
+              <Stack key={label} gap={4}>
+                <PartLabel>{label}</PartLabel>
+                {content}
+              </Stack>
+            ))}
+          </Stack>
+        </DetailSection>
+      )}
       {details.profile && (
         <DetailSection title="Model">
           <Text size="sm">{details.profile}</Text>

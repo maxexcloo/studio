@@ -27,6 +27,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
+import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -47,7 +48,6 @@ import { MediaViewer } from "./MediaViewer";
 import { MorePages } from "./MorePages";
 import {
   type GalleryDate,
-  type GalleryListing,
   type GalleryPageParam,
   type GalleryResultsPage,
   galleryArrivalsQuery,
@@ -72,6 +72,8 @@ import {
   type GalleryState,
   galleryKind,
   galleryPath,
+  galleryReviewPath,
+  isGalleryReviewPath,
   viewerItemId,
   viewerPath,
   viewerPathId,
@@ -79,7 +81,14 @@ import {
 
 import classes from "./GalleryPage.module.css";
 
-type PageState = GalleryState & OpenComposerState & { compose?: boolean; viewer?: boolean };
+type PageState = GalleryState &
+  OpenComposerState & {
+    compose?: boolean;
+    reviewFrom?: string;
+    reviewQuery?: string;
+    viewer?: boolean;
+  };
+type GalleryView = "gallery" | "uploads" | "review";
 const GalleryReview = lazy(() =>
   import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
@@ -117,8 +126,12 @@ export function GalleryPage() {
 }
 
 function Gallery() {
-  const [query, setQueryText] = useState("");
-  const [search, setSearch] = useState("");
+  const location = useLocation();
+  const state = location.state as PageState | null;
+  const review = isGalleryReviewPath(location.pathname);
+  const initialQuery = review ? (state?.reviewQuery ?? "") : "";
+  const [query, setQueryText] = useState(initialQuery);
+  const [search, setSearch] = useState(initialQuery);
   const searchAfterTyping = useDebouncedCallback(setSearch, 120);
   const setQuery = useCallback(
     (value: string) => {
@@ -131,12 +144,10 @@ function Gallery() {
     },
     [searchAfterTyping],
   );
-  const location = useLocation();
   const routerNavigate = useNavigate();
   const kind = galleryKind(location.pathname) || "image";
   const { leftAt, acknowledged, acknowledge } = useGalleryDeparture(kind);
   const base = galleryPath(kind);
-  const state = location.state as PageState | null;
   const { changeKind, profiles } = useGenerationActions();
   useEffect(() => {
     changeKind(kind);
@@ -147,8 +158,6 @@ function Gallery() {
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
   const [focusItem, setFocusItem] = useState<string | null>(null);
-  const [review, setReview] = useState<GalleryListing>();
-  if (review && review.kind !== kind) setReview(undefined);
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
   const linkedQuery = state?.q;
   // The viewer's item (`/images/<id>`): opening one adds a history entry, so Back closes it, and
@@ -253,7 +262,8 @@ function Gallery() {
     refetchOnWindowFocus: false,
   });
   // The tiles only need one page. Let it arrive before requesting summaries of the listing.
-  const listingReady = gallery.isSuccess && !gallery.isPlaceholderData && query === search;
+  const listingReady =
+    !review && gallery.isSuccess && !gallery.isPlaceholderData && query === search;
   const arrivals =
     useQuery({
       ...galleryArrivalsQuery(listing, leftAt),
@@ -526,7 +536,7 @@ function Gallery() {
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
-  // Liked or Uploads alone: its pressed toggle in the toolbar already undoes it.
+  // Liked or Uploads alone already has its own control in the toolbar.
   const toggledOnly =
     !search &&
     !similar &&
@@ -636,16 +646,91 @@ function Gallery() {
   );
   const page = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
+  const viewButton = useRef<HTMLButtonElement>(null);
+  const reviewScroll = useRef<{ key: string; top: number } | null>(null);
   useLayoutEffect(() => {
-    const host = page.current!;
-    const controls = toolbar.current!;
+    const host = page.current;
+    const controls = toolbar.current;
+    if (!host || !controls) return;
     const measure = () =>
       host.style.setProperty("--gallery-toolbar-height", `${controls.offsetHeight}px`);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(controls, { box: "border-box" });
     return () => observer.disconnect();
-  }, []);
+  }, [review]);
+  useLayoutEffect(() => {
+    if (review) {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
+    const previous = reviewScroll.current;
+    if (previous?.key !== location.key) return;
+    reviewScroll.current = null;
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: previous.top, behavior: "instant" });
+      viewButton.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [location.key, review]);
+  const closeReview = () => {
+    const entry = window.history.state?.key;
+    // An action that stages work in the composer can navigate while leaving Review.
+    setTimeout(() => {
+      if (window.history.state?.key !== entry) return;
+      if (state?.reviewFrom) void routerNavigate(-1);
+      else void routerNavigate(base, { replace: true });
+    });
+  };
+  function showView(next: GalleryView) {
+    if (next === "review") {
+      if (review) return;
+      reviewScroll.current = { key: location.key, top: window.scrollY };
+      void routerNavigate(galleryReviewPath(kind), {
+        state: {
+          chat,
+          set: setId,
+          show: state?.show,
+          similar,
+          turn: chatTurn,
+          reviewFrom: location.key,
+          reviewQuery: query,
+        } satisfies PageState,
+      });
+      return;
+    }
+    const uploads = next === "uploads";
+    if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
+    if (review) closeReview();
+  }
+  const view = (
+    <ViewMenu<GalleryView>
+      label="Gallery View"
+      ref={viewButton}
+      value={review ? "review" : filters.uploads ? "uploads" : "gallery"}
+      groups={[
+        [
+          { value: "gallery", label: "Gallery" },
+          { value: "uploads", label: "Uploads" },
+        ],
+        [{ value: "review", label: "Review", disabled: selection.selecting }],
+      ]}
+      onChange={showView}
+    />
+  );
+  if (review) {
+    return (
+      <Suspense fallback={<LoadingState fill label="Loading Review" />}>
+        <GalleryReview
+          key={kind}
+          listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
+          leftAt={leftAt}
+          back={closeReview}
+          view={view}
+        />
+      </Suspense>
+    );
+  }
   return (
     <Stack
       ref={page}
@@ -686,6 +771,7 @@ function Gallery() {
         }
       >
         <GalleryToolbar
+          view={view}
           query={query}
           onQueryChange={setQuery}
           kind={kind}
@@ -780,18 +866,6 @@ function Gallery() {
           actions={
             <>
               <GalleryImport upload={upload} />
-              {!filters.uploads && !selection.selecting && !!loaded.length && (
-                <Tooltip label="Review Gallery">
-                  <Button
-                    {...(phone ? iconChipProps : chipProps)}
-                    aria-label="Review Gallery"
-                    leftSection={phone ? undefined : <icons.review size={15} />}
-                    onClick={() => setReview(listing)}
-                  >
-                    {phone ? <icons.review size={16} /> : "Review"}
-                  </Button>
-                </Tooltip>
-              )}
               {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
               <Tooltip label="Select Items" disabled={!phone}>
                 <Button
@@ -961,11 +1035,6 @@ function Gallery() {
           }}
           close={closeViewer}
         />
-      )}
-      {review && (
-        <Suspense fallback={<LoadingState label="Loading Review" />}>
-          <GalleryReview listing={review} leftAt={leftAt} close={() => setReview(undefined)} />
-        </Suspense>
       )}
     </Stack>
   );
