@@ -9,6 +9,7 @@ import {
   defaultProfile,
   initialInput,
   inputForProfile,
+  useDraft,
   useGeneration,
 } from "../generation/GenerationProvider";
 import {
@@ -24,7 +25,8 @@ import { ProfilePicker } from "../generation/ProfilePicker";
 
 export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
   const openComposer = useOpenComposer();
-  const { draft, draftForKind, models, profiles, setDraft } = useGeneration();
+  const { draftForKind, models, profiles, setDraft } = useGeneration();
+  const draft = useDraft();
   const presets = useQuery(presetsQuery).data?.presets;
   const [selection, setSelection] = useState<GenerationInput | null>(null);
   const [replacement, setReplacement] = useState<{ draft: Draft; promptOnly: boolean } | null>(

@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useDraft, useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 import { galleryKey } from "./queries";
@@ -14,7 +14,8 @@ import { galleryKey } from "./queries";
  * (backend/gallery/recreate.js). The notice counts those still without a prompt.
  */
 export function useRecreateMany() {
-  const { input, profile } = useGeneration();
+  const { input } = useDraft();
+  const { profile } = useGeneration();
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (items: MediaItem[]) => {

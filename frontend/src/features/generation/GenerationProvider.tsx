@@ -1,4 +1,3 @@
-import { useForm } from "@mantine/form";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
   type ReactNode,
@@ -8,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { profileStartingSize } from "../../../../shared/resolution";
@@ -158,34 +158,86 @@ function savedDrafts(key: string): Record<MediaKind, Draft> {
   });
   return { image: restore("image"), video: restore("video") };
 }
+/** The draft's text, which typing changes. */
+const textFields = ["prompt", "negative"] as const;
+const differs = <T extends object>(a: T, b: T, skip: readonly string[]) =>
+  [...new Set([...Object.keys(a), ...Object.keys(b)])].some(
+    (key) => !skip.includes(key) && a[key as keyof T] !== b[key as keyof T],
+  );
+/**
+ * The composer's draft. `settled` is the draft as typing leaves it: the same object until
+ * something other than its text changes, with its text read from the latest draft.
+ */
+function draftStore(initial: Draft) {
+  let draft = initial;
+  let settled: Draft | undefined;
+  const settledInputs = new WeakSet<GenerationInput>();
+  // A settled input given back is copied, so the draft never holds text that follows another.
+  const plain = (input: GenerationInput) => (settledInputs.has(input) ? { ...input } : input);
+  const listeners = new Set<() => void>();
+  function settle() {
+    if (
+      settled &&
+      !differs(settled, draft, ["input"]) &&
+      !differs(settled.input, draft.input, textFields)
+    )
+      return;
+    const input = { ...draft.input };
+    for (const field of textFields)
+      Object.defineProperty(input, field, { enumerable: true, get: () => draft.input[field] });
+    settledInputs.add(input);
+    settled = { ...draft, input };
+  }
+  settle();
+  return {
+    get: () => draft,
+    settled: () => settled as Draft,
+    set(next: Draft) {
+      const variants = next.compare?.variants;
+      draft = {
+        ...next,
+        input: plain(next.input),
+        ...(next.compare &&
+          variants?.some((variant) => settledInputs.has(variant.input)) && {
+            compare: {
+              ...next.compare,
+              variants: variants.map((variant) => ({ ...variant, input: plain(variant.input) })),
+            },
+          }),
+      };
+      settle();
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+  };
+}
+type DraftStore = ReturnType<typeof draftStore>;
 function useGenerationState() {
   // The gallery composer's drafts survive a reload, remembered as they change.
   const storageKey = useRememberedKey("composer-draft");
   const [restored] = useState(() => savedDrafts(storageKey));
   const drafts = useRef(restored);
-  const form = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
-  const draft = form.values;
-  const formRef = useRef(form);
-  formRef.current = form;
+  const [store] = useState(() => draftStore(restored.image));
+  const draft = useSyncExternalStore(store.subscribe, store.settled);
   const setDraft = useCallback(
     (value: Draft | ((previous: Draft) => Draft)) => {
-      const previous = formRef.current.getValues();
-      const next = {
-        ...empty,
-        ...(typeof value === "function" ? value(previous) : value),
-      };
+      const previous = store.get();
+      store.set({ ...empty, ...(typeof value === "function" ? value(previous) : value) });
+      const next = store.get();
       drafts.current[previous.input.kind] = previous;
       drafts.current[next.input.kind] = next;
       localStorage.setItem(storageKey, JSON.stringify(drafts.current));
-      formRef.current.setValues(next);
     },
-    [storageKey],
+    [store, storageKey],
   );
   const changeKind = useCallback(
     (kind: MediaKind) => {
-      if (formRef.current.getValues().input.kind !== kind) setDraft(drafts.current[kind]);
+      if (store.get().input.kind !== kind) setDraft(drafts.current[kind]);
     },
-    [setDraft],
+    [store, setDraft],
   );
   const models = useQuery({ ...modelsQuery, refetchInterval: 15000 });
   const profiles = models.data?.profiles ?? emptyProfiles;
@@ -207,40 +259,49 @@ function useGenerationState() {
     [setDraft],
   );
   /** Moves the draft to `profile`: one the person picked, or the account's default (`defaulted`). */
-  function selectProfile(profile: Profile, defaulted = false) {
-    // The output toggle restores that mode's whole draft, including its chosen profile.
-    if (form.getValues().input.kind !== profile.kind) {
-      changeKind(profile.kind);
-      return;
-    }
-    setDraft((previous) => ({
-      ...previous,
-      input: inputForProfile(previous.input, profile),
-      operation: profile.kind === "video" ? "animate" : previous.operation,
-      defaultedProfileId: defaulted ? profile.id : undefined,
-    }));
-  }
-  return {
-    form,
-    draft,
-    draftForKind: (kind: MediaKind) => drafts.current[kind],
-    setDraft,
-    changeKind,
-    input: draft.input,
-    update,
-    profiles,
-    profile,
-    models,
-    selectProfile,
-  };
+  const selectProfile = useCallback(
+    (profile: Profile, defaulted = false) => {
+      // The output toggle restores that mode's whole draft, including its chosen profile.
+      if (store.get().input.kind !== profile.kind) {
+        changeKind(profile.kind);
+        return;
+      }
+      setDraft((previous) => ({
+        ...previous,
+        input: inputForProfile(previous.input, profile),
+        operation: profile.kind === "video" ? "animate" : previous.operation,
+        defaultedProfileId: defaulted ? profile.id : undefined,
+      }));
+    },
+    [store, changeKind, setDraft],
+  );
+  const draftForKind = useCallback((kind: MediaKind) => drafts.current[kind], []);
+  const value = useMemo(
+    () => ({
+      /** The draft as it is now, for actions rather than rendering. */
+      getDraft: store.get,
+      draftForKind,
+      setDraft,
+      changeKind,
+      update,
+      profiles,
+      profile,
+      models,
+      selectProfile,
+    }),
+    [store, draftForKind, setDraft, changeKind, update, profiles, profile, models, selectProfile],
+  );
+  return { store, value };
 }
-const Context = createContext<ReturnType<typeof useGenerationState> | null>(null);
+type Generation = ReturnType<typeof useGenerationState>["value"];
+const DraftContext = createContext<DraftStore | null>(null);
+const Context = createContext<Generation | null>(null);
 const GenerationActionsContext = createContext<Pick<
-  ReturnType<typeof useGenerationState>,
+  Generation,
   "profiles" | "setDraft" | "changeKind"
 > | null>(null);
 export function GenerationProvider({ children }: { children: ReactNode }) {
-  const value = useGenerationState();
+  const { store, value } = useGenerationState();
   const actions = useMemo(
     () => ({
       profiles: value.profiles,
@@ -250,9 +311,11 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     [value.profiles, value.setDraft, value.changeKind],
   );
   return (
-    <GenerationActionsContext.Provider value={actions}>
-      <Context.Provider value={value}>{children}</Context.Provider>
-    </GenerationActionsContext.Provider>
+    <DraftContext.Provider value={store}>
+      <GenerationActionsContext.Provider value={actions}>
+        <Context.Provider value={value}>{children}</Context.Provider>
+      </GenerationActionsContext.Provider>
+    </DraftContext.Provider>
   );
 }
 export function useGenerationActions() {
@@ -264,4 +327,13 @@ export function useGeneration() {
   const context = useContext(Context);
   if (!context) throw new Error("GenerationProvider is required");
   return context;
+}
+/**
+ * The composer's draft. Unless `live`, typing a prompt doesn't render the caller: the draft
+ * changes only when something else does, though its text always reads the latest.
+ */
+export function useDraft(live = false) {
+  const store = useContext(DraftContext);
+  if (!store) throw new Error("GenerationProvider is required");
+  return useSyncExternalStore(store.subscribe, live ? store.get : store.settled);
 }

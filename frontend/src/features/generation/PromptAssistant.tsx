@@ -1,7 +1,7 @@
 import { Button, Group, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { maxLoras } from "../../../../shared/profiles";
 import { api, failure, request } from "../../api";
@@ -485,6 +485,31 @@ export function usePromptAssistant({
         }),
       }
     : undefined;
+  // The LoRA chip keeps still while the prompt is typed, reading it when asked.
+  const loraDisabled = disabled || assisting || change?.pending;
+  const loraSuggestions = useMemo(
+    () =>
+      lorasOffered
+        ? {
+            disabled: loraDisabled,
+            loading: findLoras.isPending,
+            feedback: loraFeedback,
+            onClick: () => {
+              const { input, profile, hasReferences } = latest.current;
+              if (!profile) return;
+              setLoraFeedback(undefined);
+              findLoras.mutate({
+                scope: scope.current,
+                profileId: profile.id,
+                profileBackend: input.profileBackend,
+                hasReferences,
+                prompt: input.prompt,
+              });
+            },
+          }
+        : undefined,
+    [lorasOffered, loraDisabled, findLoras.isPending, findLoras.mutate, loraFeedback],
+  );
   return {
     templates,
     custom: customActions,
@@ -492,23 +517,7 @@ export function usePromptAssistant({
     stop,
     working,
     dialog,
-    loraSuggestions: lorasOffered
-      ? {
-          disabled: disabled || assisting || change?.pending,
-          loading: findLoras.isPending,
-          feedback: loraFeedback,
-          onClick: () => {
-            setLoraFeedback(undefined);
-            findLoras.mutate({
-              scope: scope.current,
-              profileId: profile.id,
-              profileBackend: input.profileBackend,
-              hasReferences,
-              prompt: input.prompt,
-            });
-          },
-        }
-      : undefined,
+    loraSuggestions,
     negativeTool,
   };
 }
