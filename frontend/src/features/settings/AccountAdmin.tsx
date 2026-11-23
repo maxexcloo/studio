@@ -52,7 +52,7 @@ const featureLabels = {
   },
   uncensoredModels: {
     label: "Uncensored Models",
-    description: "Profiles marked uncensored and the Spicy preset",
+    description: "Profiles marked uncensored and the Extended Themes preset",
   },
 };
 /** A group ID from its name, in the form the server takes (backend/account-policy.js validAccountKey). */

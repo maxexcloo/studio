@@ -82,7 +82,7 @@ export function DreamPreferences() {
           </Text>
         )}
         {toggle("enabled", "Enable", "Make new images from your taste in idle time.")}
-        {dream.data.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+        {dream.data.spicyAvailable && toggle("spicy", "Extended Themes", "Allow explicit themes.")}
       </SettingGroup>
       <SettingGroup title="Images">
         {toggle("images", "Enable", "Make new images.")}

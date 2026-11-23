@@ -218,7 +218,7 @@ test("an administrator that turns Cloud Models, LoRAs or Uncensored Models off l
   assert.deepEqual(visibleGenerationProfiles(profiles, narrowed), [drafted, plain]);
   assert.equal(mayUseGenerationProfile(narrowed, grok), false);
   assert.equal(mayUseGenerationProfile(narrowed, spicy), false);
-  assert.equal(mayUseFeature(narrowed, "uncensoredModels"), false, "Dream's Spicy");
+  assert.equal(mayUseFeature(narrowed, "uncensoredModels"), false, "Dream's Extended Themes");
   assert.equal(mayUseFeature(narrowed, "loras"), true);
   const noLoras = effectiveAccountAccess(account, {}, null, { loras: false });
   assert.equal(mayUseFeature(noLoras, "loras"), false, "the picker, admission and Dream");

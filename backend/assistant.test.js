@@ -451,7 +451,7 @@ test("FLUX.3 Enhance runs on BFL's upsampler once the gateway lists it", async (
   assert.equal(seen.calls[1].body.model, "cloud/auto");
 });
 
-test("Spicy runs on the assistant model", async () => {
+test("Extended Themes runs on the assistant model", async () => {
   const seen = fakeGateway(() => json("A sultry scene."));
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
@@ -722,7 +722,7 @@ test("cardIdeas offers distinct names from a card's images, unlike those already
   assert.equal(user.content.filter((part) => part.type === "image_url").length, 2);
 });
 
-test("Spicy card ideas describe the reference without proposing body edits", async () => {
+test("Extended Themes card ideas describe the reference without proposing body edits", async () => {
   const seen = fakeGateway(() =>
     json('{"options":["Broad build, grey hair, scar over left eye"]}'),
   );
