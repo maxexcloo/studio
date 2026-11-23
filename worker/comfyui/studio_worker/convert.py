@@ -35,7 +35,7 @@ BASE_FILES = [
 # A scaled or ComfyUI-quantised file has these; the recipe takes plain weights.
 QUANTISED = (".weight_scale", ".comfy_quant", ".scale_weight", ".input_scale")
 HOSTS = {"civitai.com": "civitai", "huggingface.co": "hf"}
-# Where the Radiance deployment mounts this folder (kubelab apps/base/radiance).
+# Where the Radiance deployment mounts this folder.
 SERVED = "/models/radiance"
 
 # Krea's reference names (krea-ai/krea-2 mmdit.py) to diffusers' Krea2Transformer2DModel names.
