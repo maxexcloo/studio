@@ -415,7 +415,7 @@ export function registerQueueRoutes(
 }
 
 /**
- * Settings › Maintenance › Unfinished Items lists every account's jobs for administrators.
+ * Settings › Workers › Unfinished Items lists every account's jobs for administrators.
  * Working jobs come first, then queued jobs in queue order. Administrators can retry, stop or
  * clear a job, or act on every listed job at once.
  */

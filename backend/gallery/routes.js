@@ -258,6 +258,20 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     res.json(found);
   });
 
+  /** The account's open jobs with no gallery tiles yet, but for Dream's and upscales. */
+  function untiledJobs(ownerId) {
+    const open = store
+      .openJobs(ownerId)
+      .filter(
+        (job) =>
+          job.priority !== queuePriority.dream && !job.cleared && job.operation !== "upscale",
+      );
+    const tiled = new Set(
+      galleryItems({ jobIds: open.map((job) => job.id) }).map((item) => item.jobId),
+    );
+    return open.filter((job) => !tiled.has(job.id));
+  }
+
   async function readGallery(account, { query }, dates = null) {
     const owned = ownedQuery(account);
     if (owned) cleanupGalleryState(store, owned);
@@ -278,8 +292,9 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       };
     const looksLike = await near(one(query.q));
     const search = searchFilter(query, looksLike);
-    // A text search reads only rows holding every word: the filter still decides what matches.
-    const words = search && !looksLike ? searchWords(one(query.q)) : [];
+    // A text search reads only rows holding every word or looking like it: the filter still decides
+    // what matches.
+    const words = search ? searchWords(one(query.q)) : [];
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
     // `before` (an ISO date) keeps items made by then.
@@ -340,7 +355,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...(unrated && { unrated }),
             ...(Number.isFinite(since) && since && { since }),
             ...(Number.isFinite(before) && { before }),
-            ...(words.length && { contains: words }),
+            ...(words.length && { contains: words, ...(looksLike && { orKeys: looksLike.keys }) }),
           },
           // Selection and paging share the same search membership.
           filterKey: JSON.stringify([
@@ -380,15 +395,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       similarTo ||
       query.uploads === "1"
         ? []
-        : store
-            .openJobs(account?.userId || "")
-            .filter(
-              (job) =>
-                job.priority !== queuePriority.dream &&
-                !job.cleared &&
-                job.operation !== "upscale" &&
-                !galleryJobItems(job.id).length,
-            )
+        : untiledJobs(account?.userId || "")
             .reverse()
             .flatMap((job) => {
               if (job.galleryAt) retried.add(job.id);

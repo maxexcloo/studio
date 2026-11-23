@@ -196,11 +196,11 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     await editor.getByRole("button", { name: "Actions for Version 1", exact: true }).click();
     await page.getByRole("menuitem", { name: action, exact: true }).click();
   };
-  await versionActions("View Version");
-  await expect(editor.getByRole("textbox", { name: "Saved Definition", exact: true })).toHaveValue(
-    /Original guidance\./,
+  await versionActions("View");
+  await expect(editor.getByRole("region", { name: "Saved Definition", exact: true })).toContainText(
+    "Original guidance.",
   );
-  await versionActions("Restore Version");
+  await versionActions("Restore");
   await expect(editor).toBeHidden();
   expect(saved).toEqual([original, { ...original, summary: "Updated guidance." }, original]);
   await editDefinition(page, "Guide");
@@ -465,8 +465,8 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
     const menu = page.getByRole("menu", { name: `Actions for ${row}`, exact: true });
     const entries =
       part === "Profiles"
-        ? ["Copy ID", "Download", "Duplicate…", "Edit", "Delete"]
-        : ["Copy ID", "Download", "Edit", "Delete"];
+        ? ["Edit", "Copy ID", "Download", "Duplicate…", "Delete"]
+        : ["Edit", "Copy ID", "Download", "Delete"];
     await expect(menu.getByRole("menuitem")).toHaveText(entries);
     const download = page.waitForEvent("download");
     await page.getByRole("menuitem", { name: item, exact: true }).click();
@@ -474,9 +474,7 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   }
 });
 
-test("Prompt Styles sort by type and then name, and can be filtered and edited", async ({
-  page,
-}) => {
+test("Prompt Styles sort by name, and can be filtered and edited", async ({ page }) => {
   await fixtures(page);
   const style = (id: string, kind: string, label: string, extra = {}) => ({
     id,
@@ -489,7 +487,7 @@ test("Prompt Styles sort by type and then name, and can be filtered and edited",
   });
   let styles = [
     style("candid", "improve", "Candid"),
-    style("spicy", "improve", "Extended Themes", { uncensored: true }),
+    style("spicy", "improve", "Bold", { uncensored: true }),
     style("cinematic", "animate", "Cinematic Camera"),
   ];
   let hash = "h1";
@@ -509,15 +507,15 @@ test("Prompt Styles sort by type and then name, and can be filtered and edited",
   await openNav(page, "Library");
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
-  const names = table.getByRole("row").locator("td:first-child > p:first-child");
-  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Extended Themes Uncensored"]);
+  const names = table.getByRole("button", { name: /^Edit / });
+  await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
   await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
-  await expect(names).toHaveText(["Candid", "Cinematic Camera", "Extended Themes Uncensored"]);
+  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Bold Uncensored"]);
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   const type = page.getByRole("radiogroup", { name: "Type", exact: true });
   await type.getByText("Improve Prompt", { exact: true }).click();
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  await expect(table.getByText("Extended Themes line.")).toBeVisible();
+  await expect(table.getByText("Bold line.")).toBeVisible();
   await expect(table.getByText("Cinematic Camera", { exact: true })).toBeHidden();
   // A switch applies at once, over the list's hash. Its track takes the pointer, as it has no
   // visible label, so the click goes to the switch directly.

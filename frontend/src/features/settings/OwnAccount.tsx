@@ -103,7 +103,7 @@ function AccountForm({
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         <DialogFooter pending={save.isPending} onCancel={onCancel}>
           <Button type="submit" disabled={!changed} loading={save.isPending}>
-            Save {credentialsLabel(account)}
+            Save
           </Button>
         </DialogFooter>
       </Stack>
@@ -123,11 +123,6 @@ export function OwnAccount() {
   return (
     <Stack gap="lg">
       <SettingGroup title="Sign-In">
-        {own.accessProfile && (
-          <SettingRow label="Access Group" description="Set by an administrator.">
-            <Text size="sm">{own.accessProfile.name}</Text>
-          </SettingRow>
-        )}
         <SettingRow
           label="Email & Password"
           description={
@@ -141,14 +136,16 @@ export function OwnAccount() {
           )}
         </SettingRow>
         <SettingRow
-          label="Role"
+          label="Access"
           description={
             admin
-              ? "Administrators manage Studio settings and accounts."
-              : "Your access group controls the models and features you can use."
+              ? "Administrators use everything and manage Studio settings and accounts."
+              : "Your access group, set by an administrator, decides the models and features you can use."
           }
         >
-          <Badge miw="max-content">{admin ? "Administrator" : "User"}</Badge>
+          <Badge miw="max-content" color="gray">
+            {admin ? "Administrator" : own.accessProfile?.name || "No Group"}
+          </Badge>
         </SettingRow>
         <SettingRow label="Sign-In Method">
           <Text size="sm">

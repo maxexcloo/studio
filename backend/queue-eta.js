@@ -1,6 +1,7 @@
 import { pausedReason } from "../shared/queue.ts";
 import { upscaleQualities } from "../shared/upscale.ts";
 import { listSchedule } from "./domain/eta.ts";
+import { mediaRank } from "./domain/queue.ts";
 import { jobs, queueClearsAt } from "./jobs.js";
 import { generationEstimate, upscaleEstimate } from "./timings.js";
 import { upscalePlan } from "./upscale/graph.js";
@@ -47,7 +48,7 @@ export function queueSchedule(queue, { now = Date.now(), ahead = () => true } = 
   const freeAt = new Map(
     listWorkers().map((worker) => [`worker:${worker.id}`, queueClearsAt(now, worker.id)]),
   );
-  const tier = (job) => (job.status === "starting" ? -1 : (job.priority ?? 0));
+  const tier = (job) => (job.status === "starting" ? -1 : mediaRank(job));
   const waiting = queue.store
     .openJobs()
     .filter(

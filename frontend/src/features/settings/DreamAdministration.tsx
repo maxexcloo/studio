@@ -71,7 +71,7 @@ export function DreamAdministration() {
   };
   return (
     <Stack gap="lg">
-      <SettingGroup title="Queue">
+      <SettingGroup title="Delays">
         {delay(
           "imageIdleMinutes",
           "Image Idle Delay",
@@ -92,7 +92,7 @@ export function DreamAdministration() {
         {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
         {row(
           "spicy",
-          "Extended Themes",
+          "Uncensored",
           "Allow explicit themes, only for accounts with Uncensored Models access.",
           onOff,
         )}

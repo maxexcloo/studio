@@ -5,7 +5,6 @@ import { useState } from "react";
 import { post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { compareNames } from "../../ui/DataTable";
-import { icons } from "../../ui/icons";
 import { SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -13,30 +12,30 @@ import { queueQuery } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
 
 /**
- * Delete Failed Items: Preferences deletes the account's own; Settings › Generation (`others`) lets
- * administrators of a multi-user Studio delete another account's, or every account's.
+ * Settings › Studio › Delete Failed Items: removes failed and cancelled items, which the gallery
+ * hides, for one account or every account in a multi-user Studio. An account deletes its own
+ * failed items in the gallery, through its Failed quick select.
  */
-export function DeleteFailedItems({ others = false }: { others?: boolean }) {
+export function DeleteFailedItems() {
   const client = useQueryClient();
-  const own = useAccount().data?.account?.id;
-  const accounts = useQuery({ ...accountAdminQuery, enabled: others });
+  const multiUser = useAccount().data?.mode === "multi-user";
+  const accounts = useQuery({ ...accountAdminQuery, enabled: multiUser });
   const [owner, setOwner] = useState("all");
   const [confirming, setConfirming] = useState(false);
   const owners = [
-    { value: "all", label: "All Users" },
+    { value: "all", label: "All Accounts" },
     ...(accounts.data?.accounts || [])
-      .filter((entry) => entry.id !== own)
       .map((entry) => ({ value: entry.id, label: entry.username }))
       .sort((a, b) => compareNames(a.label, b.label)),
   ];
-  const whose = !others
-    ? "your"
+  const whose = !multiUser
+    ? "all"
     : owner === "all"
       ? "every account's"
       : `${owners.find((entry) => entry.value === owner)?.label}'s`;
   const remove = useMutation({
     mutationFn: () =>
-      post<{ cleared: number }>("/api/gallery/errors/clear", others ? { owner } : undefined),
+      post<{ cleared: number }>("/api/gallery/errors/clear", multiUser ? { owner } : undefined),
     onSuccess: () => {
       for (const queryKey of [galleryKey, ["gallery-filters"], queueQuery.queryKey])
         void client.invalidateQueries({ queryKey });
@@ -45,17 +44,17 @@ export function DeleteFailedItems({ others = false }: { others?: boolean }) {
   });
   return (
     <SettingRow
-      wide={others}
+      wide={multiUser}
       label="Delete Failed Items"
       description={
         remove.data
           ? `${remove.data.cleared.toLocaleString()} deleted.`
-          : others
+          : multiUser
             ? "Remove failed and cancelled items from one account's gallery, or every account's."
-            : "Remove your failed and cancelled items from the gallery."
+            : "Remove failed and cancelled items from the gallery."
       }
     >
-      {others && (
+      {multiUser && (
         <Select
           aria-label="Whose Failed Items"
           data={owners}
@@ -65,13 +64,7 @@ export function DeleteFailedItems({ others = false }: { others?: boolean }) {
           onChange={(value) => value && setOwner(value)}
         />
       )}
-      <Button
-        size="compact-sm"
-        color="red"
-        variant="light"
-        leftSection={<icons.delete size={16} />}
-        onClick={() => setConfirming(true)}
-      >
+      <Button size="compact-sm" color="red" variant="light" onClick={() => setConfirming(true)}>
         Delete
       </Button>
       <ConfirmDialog

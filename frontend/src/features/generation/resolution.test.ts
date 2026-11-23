@@ -112,12 +112,27 @@ test("new image drafts select a supported preset for their profile and account d
     ...portrait,
     imageSizePreference: { imageAspect: "1:1", imageResolution: "1K" },
   });
-  assert.deepEqual(withResolution({ kind: "image", ...square }, portrait), {
+  // The profile's own tier keeps its presets' sizes; another tier scales them to its edge.
+  assert.deepEqual(withResolution({ kind: "image", ...configured }, portrait), {
     kind: "image",
-    width: 1024,
-    height: 1024,
+    width: 864,
+    height: 1152,
     resolutionTier: "1K",
   });
+  assert.deepEqual(withResolution({ kind: "image", ...square }, portrait), {
+    kind: "image",
+    width: 992,
+    height: 992,
+    resolutionTier: "1K",
+  });
+  const larger = withResolution(
+    { kind: "image", ...configured, resolutionTier: "2K" },
+    {
+      ...portrait,
+      native: { "2k": "yes" },
+    },
+  );
+  assert.deepEqual([larger.width, larger.height], [1536, 2048]);
   const unavailable = profileStartingSize({
     ...portrait,
     imageSizePreference: { imageAspect: "16:9", imageResolution: "4K" },

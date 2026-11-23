@@ -6,9 +6,8 @@ import { describeFailure, failureTitles, troubleshootingAnchor } from "./failure
 
 test("configuration documents every generation failure headline", () => {
   const doc = fs.readFileSync(new URL("../CONFIGURATION.md", import.meta.url), "utf8");
-  // Windows checkouts can bring the file with \r\n line ends.
   const headings = doc
-    .split(/\r?\n/)
+    .split("\n")
     .filter((line) => line.startsWith("#"))
     .map((line) => line.replace(/^#+\s*/, ""));
   for (const title of failureTitles)

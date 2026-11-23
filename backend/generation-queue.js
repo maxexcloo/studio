@@ -59,7 +59,7 @@ export function createGenerationQueue({
   const { loadComfyContext, mediaModels, workerWorkloads } = catalogue;
   // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
   const mediaLeases = new Map();
-  const restoringImages = new Set();
+  const restoringRuns = new Set();
   const releaseLease = (id) => {
     mediaLeases.get(id)?.release();
     mediaLeases.delete(id);
@@ -140,11 +140,12 @@ export function createGenerationQueue({
     recover: async (job) => {
       if (isRadianceWorker(workerById(job.backend)) && !jobs.has(job.id)) {
         const recovered = await recoverRadianceJob(job, store);
-        if (recovered?.status === "starting") restoringImages.add(job.id);
-        else restoringImages.delete(job.id);
+        if (recovered?.status === "starting") restoringRuns.add(job.id);
+        else restoringRuns.delete(job.id);
         return recovered;
       }
-      if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
+      // Followed on its own worker, even before its prompt ID was recorded (job-recovery.js).
+      if (!jobs.has(job.id))
         jobs.set(job.id, {
           status: job.cancelRequested ? "cancelling" : "running",
           recovered: true,
@@ -307,8 +308,8 @@ export function createGenerationQueue({
         1,
       async slotWait(job, running) {
         if (!isRadianceWorker(workerById(job.backend))) return;
-        if (running.some((active) => restoringImages.has(active.id)))
-          return "Waiting for the worker to recover its interrupted image.";
+        if (running.some((active) => restoringRuns.has(active.id)))
+          return "Waiting for the worker to recover its interrupted run.";
         const wait = "Waiting for Radiance to finish before loading another model.";
         if (running.some((active) => modelOf(active.input) !== modelOf(job.input))) return wait;
         const models = running.map(
@@ -321,7 +322,7 @@ export function createGenerationQueue({
         if (next !== model) return wait;
       },
       settled: async (job) => {
-        restoringImages.delete(job.id);
+        restoringRuns.delete(job.id);
         if (job.admittedAt !== undefined)
           logEvent("Queue job timing", {
             job: job.id,

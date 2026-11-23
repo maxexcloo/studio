@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import sharp from "sharp";
+
 import { stripMetadata } from "./metadata-strip.js";
-import { loadSharp } from "./sharp-loader.js";
 
 // CRC-32 as PNG uses it (zlib.crc32 is Node 22+ only).
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -48,9 +49,7 @@ test("a ComfyUI PNG loses its prompt and workflow and keeps every pixel", async 
   assert.equal(stripMetadata(onePixel).stripped, false);
 });
 
-test("WebP and JPEG lose EXIF and XMP and still open", async (t) => {
-  const sharp = await loadSharp();
-  if (!sharp) return t.skip("sharp isn't installed here");
+test("WebP and JPEG lose EXIF and XMP and still open", async () => {
   const exif = { IFD0: { Model: `prompt:${prompt}`, ImageDescription: "a secret prompt" } };
   for (const format of ["webp", "jpeg"]) {
     const input = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#f40" } })

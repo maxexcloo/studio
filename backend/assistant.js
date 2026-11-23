@@ -95,8 +95,8 @@ const cardIdeaInstructions = {
       cardKind: cardKinds[kind].name,
       media:
         kind === "characters"
-          ? "a given name or nickname, never a real person's name or identity"
-          : "two to four words naming it",
+          ? "a proper first name that suits them, never a real person's name or identity or a description of their looks"
+          : "two to four words naming it, fitting how it looks",
       maxCardName,
     }),
   description: (kind, count) =>
@@ -116,6 +116,10 @@ const rateInstructions = (kind, count) =>
     count,
     criteria: promptInstruction(cardRatings[kind]),
   });
+// The calls idle work makes on its own, and how many of them run at once.
+const backgroundCalls = new Set(["caption", "review", "title"]);
+const backgroundSlots = 2;
+
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
 export const reasoningEfforts = {
@@ -662,6 +666,23 @@ export function createAssistant(
     return (await listModelDetails()).map((model) => model.id);
   }
 
+  // Idle work's calls share backgroundSlots, leaving the text model room for people's requests.
+  let backgroundActive = 0;
+  const backgroundWaiting = [];
+  async function request(options = {}) {
+    if (!backgroundCalls.has(options.call)) return send(options);
+    if (backgroundActive < backgroundSlots) backgroundActive += 1;
+    else await new Promise((resolve) => backgroundWaiting.push(resolve));
+    try {
+      return await send(options);
+    } finally {
+      // A waiting call takes over the slot.
+      const next = backgroundWaiting.shift();
+      if (next) next();
+      else backgroundActive -= 1;
+    }
+  }
+
   /**
    * One chat completion. With `onDelta` or `onThinking`, it streams: visible text (reasoning
    * stripped) goes to `onDelta` and reasoning (`reasoning_content` deltas and `<think>` blocks) to
@@ -670,7 +691,7 @@ export function createAssistant(
    * model answers it. Resolves to { text, thinking, model, served, ms } with the final, reasoning-free text;
    * throws AssistantError.
    */
-  async function request({
+  async function send({
     model,
     call,
     messages,

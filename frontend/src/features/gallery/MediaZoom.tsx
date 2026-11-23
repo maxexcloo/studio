@@ -1,10 +1,10 @@
 import { ActionIcon, Button, Group, Transition } from "@mantine/core";
 import { useFocusWithin, useHover, useMergedRef } from "@mantine/hooks";
-import { Minus, Plus } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 
 import { useMotionDuration } from "../../ui/Appearance";
+import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 
 import classes from "./MediaZoom.module.css";
@@ -194,7 +194,7 @@ export function MediaZoomControls({ zoom }: { zoom: ReturnType<typeof useMediaZo
             disabled={zoom.disabled}
             onClick={() => zoom.zoom(-1)}
           >
-            <Minus size={14} />
+            <icons.zoomOut size={14} />
           </ActionIcon>
           <Button
             size="compact-xs"
@@ -214,7 +214,7 @@ export function MediaZoomControls({ zoom }: { zoom: ReturnType<typeof useMediaZo
             disabled={zoom.disabled}
             onClick={() => zoom.zoom(1)}
           >
-            <Plus size={14} />
+            <icons.zoomIn size={14} />
           </ActionIcon>
         </Group>
       )}

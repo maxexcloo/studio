@@ -43,11 +43,10 @@ export function useIsAdmin() {
   const { data } = useAccount();
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
-/**
- * A group feature that is on unless the account's group turns it off (Characters, Dream, Prompt
- * Assistant).
- */
-export function useGroupFeature(feature: "characters" | "dream" | "promptAssistant") {
+/** A group feature, on unless the account's features turn it off; single-user mode has them all. */
+export function useGroupFeature(
+  feature: "characters" | "cloudModels" | "dream" | "promptAssistant",
+) {
   return useAccount().data?.account?.features?.[feature] !== false;
 }
 export const ownAccountQuery = queryOptions({

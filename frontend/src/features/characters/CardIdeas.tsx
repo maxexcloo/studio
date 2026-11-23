@@ -1,16 +1,15 @@
-import { Button, Group, Menu, getDefaultZIndex } from "@mantine/core";
+import { ActionIcon, Group, Menu, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import type { CardKind } from "../../../../shared/characters";
 import { post } from "../../api";
+import { menuWidth } from "../../theme";
 import type { ReferenceAsset } from "../../types";
 import { type Action, ActionMenuItems } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { PopupTooltip } from "../../ui/PopupTooltip";
-import { UndoButton, suggested } from "../generation/AskChange";
+import { UndoButton, assistMenu, suggested } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 
 type Field = "name" | "description";
@@ -19,8 +18,8 @@ const zIndex = getDefaultZIndex("overlay") + 1;
 const nouns = { name: "Name", description: "Description" } as const;
 
 /**
- * A card field's ✨ ▾: names or descriptions the prompt assistant writes from the card's images,
- * asked for when it opens, then Refresh for others and Custom… to say what to write.
+ * A card field's AI menu: Suggestions of names or descriptions the prompt assistant writes from the
+ * card's images, asked for when it opens, then Custom… to say what to write and Refresh for others.
  * Picking one fills the field, with Undo beside it until the field next changes.
  */
 export function useCardIdeas({
@@ -61,35 +60,31 @@ export function useCardIdeas({
       if (request) pick(answer.options[0]);
     },
   });
-  const options = [...(ideas.data?.options ?? [])].sort(compareNames);
-  const loading = again.isPending || (ideas.isFetching && !options.length);
+  const options = [...(ideas.data?.options ?? [])]
+    .sort(compareNames)
+    .map((idea): Action => ({ id: `idea:${idea}`, label: idea, onClick: () => pick(idea) }));
   const noun = nouns[field];
-  const suggestions = suggested(
-    loading,
-    options.map((idea): Action => ({
-      id: `idea:${idea}`,
-      label: idea,
-      onClick: () => pick(idea),
-    })),
-    { onClick: () => again.mutate(undefined) },
-  );
   return {
     action: {
       id: "card-ideas",
       label: `Suggest ${noun}`,
       icon: icons.assistant,
-      menu: [
-        [
-          { id: "heading", label: "Suggested", heading: true },
-          ...suggestions.options,
-          suggestions.again,
+      heading: false,
+      menu: assistMenu({
+        suggestions: suggested(options, {
+          loading: again.isPending || ideas.isFetching,
+          answered: Boolean(ideas.data || ideas.error || again.error),
+          failure: again.error?.message || ideas.error?.message,
+          onRefresh: () => again.mutate(undefined),
+        }),
+        templates: [],
+        custom: [
+          { id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) },
         ],
-        [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
-      ],
+        last: [],
+      }),
       onOpen: () => setRequested(true),
     } satisfies Action,
-    loading,
-    pending: again.isPending,
     undo: picked && value === picked.after && (
       <UndoButton
         onClick={() => {
@@ -115,38 +110,19 @@ export function useCardIdeas({
   };
 }
 
-/** The single-line Name field keeps its own suggestion picker. */
+/** The single-line Name field keeps its own suggestion picker, opened from the plain AI icon. */
 export function CardIdeas(props: Parameters<typeof useCardIdeas>[0]) {
-  const { action, loading, pending, undo, dialog } = useCardIdeas(props);
-  const [opened, setOpened] = useState(false);
+  const { action, undo, dialog } = useCardIdeas(props);
   return (
     <Group gap={2} wrap="nowrap" pr={4}>
       {undo}
-      <Menu
-        position="bottom-end"
-        width={320}
-        zIndex={zIndex}
-        opened={opened}
-        onChange={setOpened}
-        onOpen={action.onOpen}
-      >
-        <PopupTooltip label={action.label}>
-          <Menu.Target>
-            <Button
-              variant="subtle"
-              color="gray"
-              size="compact-sm"
-              radius="xl"
-              px={6}
-              aria-label={action.label}
-              loading={pending && !opened}
-              rightSection={<ChevronDown size={12} />}
-            >
-              <icons.assistant size={16} />
-            </Button>
-          </Menu.Target>
-        </PopupTooltip>
-        <Menu.Dropdown aria-busy={loading || undefined}>
+      <Menu position="bottom-end" width={menuWidth} zIndex={zIndex} onOpen={action.onOpen}>
+        <Menu.Target>
+          <ActionIcon variant="subtle" color="gray" aria-label={action.label}>
+            <icons.assistant size={18} />
+          </ActionIcon>
+        </Menu.Target>
+        <Menu.Dropdown>
           <ActionMenuItems groups={action.menu} />
         </Menu.Dropdown>
       </Menu>

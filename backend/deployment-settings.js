@@ -29,7 +29,7 @@ const flag = (key, label, description, defaultOn = true) => ({
   defaultOn,
 });
 
-/** Settings › Maintenance switches for gallery work, prompt assistance and taste. */
+/** Settings › Studio switches for gallery work, prompt assistance and taste. */
 export const catalogueFlags = [
   flag(
     "STUDIO_FACE_CHECK",
@@ -67,6 +67,11 @@ export const catalogueFlags = [
     "The assistant offers ideas in the composer's AI menu for an empty prompt or a draft with applied cards.",
   ),
   flag(
+    "STUDIO_SELF_REVIEW",
+    "Self-Review",
+    "While Studio is idle, the assistant model scores recent images against their owner's rules and their project's brief. Needs a model that reads images.",
+  ),
+  flag(
     "STUDIO_SUGGESTED_PROMPTS",
     "Suggested Prompts",
     "While Studio is idle, the assistant model writes a prompt for uploads and other items without one, which Recreate uses.",
@@ -84,7 +89,7 @@ export const catalogueFlags = [
   ),
 ];
 
-/** The default profiles Settings › Generation saves. */
+/** The default profiles Settings › Studio saves. */
 export const defaultProfileKeys = [
   ...Object.values(mediaDefaultProfileKeys),
   defaultTextProfileKey,

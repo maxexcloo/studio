@@ -114,7 +114,7 @@
   margin-top: auto;
   padding: var(--mantine-spacing-sm) var(--mb-padding, var(--mantine-spacing-md))
     calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--studio-glass-border);
+  border-top: 1px solid var(--mantine-color-default-border);
   background: var(--mantine-color-body);
 }
 
@@ -154,9 +154,10 @@
 /* As tall as the bar's icons and compact buttons beside it: a touch target on touch screens. */
 .segmented {
   --sc-color: var(--mantine-primary-color-light);
+  --sc-label-color: var(--mantine-primary-color-light-color);
   height: 2rem;
   background-color: var(--studio-glass-solid);
-  box-shadow: inset 0 0 0 1px var(--studio-glass-border);
+  box-shadow: inset 0 0 0 1px var(--mantine-color-default-border);
 }
 
 @media (pointer: coarse) {
@@ -245,4 +246,26 @@
   :where(:root[data-phone]) .shellHeader::after {
     content: none;
   }
+}
+
+/* Inputs, dividers, tables and tabs draw the theme's one hairline instead of Mantine's greys; focus
+   and error colours still replace it. */
+[data-mantine-color-scheme] .inputWrapper[data-variant="default"] {
+  --input-bd: var(--mantine-color-default-border);
+}
+
+[data-mantine-color-scheme] .hairline {
+  --divider-color: var(--mantine-color-default-border);
+  --table-border-color: var(--mantine-color-default-border);
+  --tab-border-color: var(--mantine-color-default-border);
+}
+
+.option[data-combobox-selected] {
+  background-color: var(--mantine-primary-color-light);
+  color: inherit;
+}
+
+/* An off switch's track stands out from dark surfaces as it does from light ones. */
+[data-mantine-color-scheme="dark"] .switchTrack {
+  --switch-bg: var(--mantine-color-dark-4);
 }

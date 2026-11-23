@@ -31,7 +31,6 @@ import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
 import { animationInput, retainedAnimationProfile } from "./animateLength";
 import { automaticEditProfile } from "./mediaProfiles";
-import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";
@@ -457,9 +456,8 @@ export function useIterate() {
       client.setQueryData(queueQuery.queryKey, (queue) =>
         queue ? { ...queue, jobs: [...queue.jobs, result.job!] } : queue,
       );
-    void Promise.all(
-      [queueQuery.queryKey, galleryKey].map((queryKey) => client.invalidateQueries({ queryKey })),
-    );
+    // The gallery reads its first page when the queue changes.
+    void client.invalidateQueries({ queryKey: queueQuery.queryKey });
     return result.jobId;
   };
 }

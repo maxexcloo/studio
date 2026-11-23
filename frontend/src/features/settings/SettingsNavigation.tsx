@@ -1,4 +1,4 @@
-import { Boxes, Route, Server, Shield, UsersRound, Wrench } from "lucide-react";
+import { Route, Server, Shield, SlidersVertical, UsersRound } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -18,54 +18,47 @@ const settingSections = {
   },
   dream: {
     label: "Dream",
-    description: "Choose what Dream makes in the background and how much it can make each day.",
+    description: "Choose what Dream makes for you and how much it can make each day.",
     icon: icons.dream,
     group: "Personal",
   },
   preferences: {
     label: "Preferences",
     description:
-      "Set how the gallery looks, which models are offered, and whether Studio keeps recent prompts.",
+      "Choose how the gallery looks, which models are offered and whether to keep prompts.",
     icon: icons.settings,
     group: "Personal",
   },
   "where-work-runs": {
     label: "Where Work Runs",
-    description: "Choose where your work runs and the starting models, aspect and resolution.",
+    description: "Choose where your work runs and the models and image sizes it starts with.",
     icon: Route,
     group: "Personal",
   },
   "dream-policy": {
     label: "Dream",
-    description: "Set when Dream can start jobs and which settings accounts can change.",
+    description: "Set when Dream can start jobs and which of its settings accounts can change.",
     icon: icons.dream,
-    admin: true,
-    group: "Administration",
-  },
-  generation: {
-    label: "Generation",
-    description: "Set Studio-wide model defaults and clear failed items for other accounts.",
-    icon: Boxes,
     admin: true,
     group: "Administration",
   },
   groups: {
     label: "Groups",
-    description: "Choose the models and features each access group can use.",
+    description: "Choose the models and features each access group can use, and the default group.",
     icon: Shield,
     admin: true,
     group: "Administration",
   },
-  maintenance: {
-    label: "Maintenance",
-    description: "Manage automatic gallery tasks, run bulk passes and configure prompt assistance.",
-    icon: Wrench,
+  studio: {
+    label: "Studio",
+    description: "Set Studio-wide defaults, the AI work Studio does on its own, and failed items.",
+    icon: SlidersVertical,
     admin: true,
     group: "Administration",
   },
   users: {
     label: "Users",
-    description: "Manage accounts, access groups and linked chat identities.",
+    description: "Manage accounts and linked chat identities.",
     icon: UsersRound,
     admin: true,
     group: "Administration",
@@ -84,14 +77,13 @@ const settingSections = {
     apart: true,
   },
 };
-const multiUserOnly = new Set(["groups", "users"]);
+const multiUserOnly = new Set(["account", "groups", "users"]);
 export function useSettingsNavigation() {
   const multi = useAccount().data?.mode === "multi-user";
   const admin = useIsAdmin();
   const dream = useGroupFeature("dream");
   return {
     admin,
-    multi,
     options: visibleSections(
       settingSections,
       admin,

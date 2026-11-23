@@ -215,7 +215,12 @@ test("SDK Cancel preserves ownership, stale responses and provider errors with o
   f.requests.length = 0;
   assert.deepEqual(data(await f.call("cancel", { job_id: "pending" })), { ok: true });
   assert.equal(f.store.job(alice.id, "pending").status, "cancelled");
-  assert.deepEqual(data(await f.call("cancel", { job_id: "requested" })), { ok: true });
+  // Accepted work may still finish, and the reply says so.
+  assert.deepEqual(data(await f.call("cancel", { job_id: "requested" })), {
+    ok: true,
+    status: "running",
+    note: "Stop requested, but it was already running: it may still finish and be saved.",
+  });
   assert.equal(f.store.job(alice.id, "requested").status, "running");
   assert.equal(f.store.job(alice.id, "requested").cancelRequested, true);
   const refused = await f.call("cancel", { job_id: "unconfirmed" });
@@ -225,7 +230,7 @@ test("SDK Cancel preserves ownership, stale responses and provider errors with o
   const count = f.requests.length;
   const foreign = await f.call("cancel", { job_id: "foreign" });
   assert.equal(foreign.isError, true);
-  assert.match(foreign.content[0].text, /submitted by this account/);
+  assert.match(foreign.content[0].text, /No job "foreign" was found for this account/);
   assert.equal(f.requests.length, count);
   // Even stale MCP ownership cannot bypass the mutation route's account check.
   f.rows.setJobOwner("foreign", alice.id);

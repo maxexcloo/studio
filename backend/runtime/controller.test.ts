@@ -553,7 +553,8 @@ test("a switch waiting on Radiance's work drops stale leases and stops waiting o
   const { kube, controller } = fixture(["radiance"], { withRadiance: true });
   await placeByHand(controller, ["radiance"]);
   const stale = await controller.acquire("radiance");
-  const { leases, queue } = fakeQueue([stale]);
+  const { leases, queue, tiers } = fakeQueue([stale]);
+  tiers.set("image", 0);
   controller.useQueue(queue);
   leases.push(await controller.acquire("radiance"));
   await assert.rejects(controller.acquire("image"), /Studio is switching the GPUs/);
@@ -571,6 +572,25 @@ test("a switch waiting on Radiance's work drops stale leases and stops waiting o
     "scale comfyui/image 1",
   ]);
   assert.equal(controller.operation(running.id).status, "completed");
+});
+
+test("a swap whose ComfyUI work went away leaves Radiance running", async () => {
+  const { kube, controller } = fixture(["radiance"], { withRadiance: true });
+  await placeByHand(controller, ["radiance"]);
+  const { tiers, queue } = fakeQueue();
+  tiers.set("image", 0);
+  controller.useQueue(queue);
+  const accepted = await controller.acquire("radiance");
+  await assert.rejects(controller.acquire("image"), /Studio is switching the GPUs/);
+  await settle();
+  tiers.delete("image");
+  accepted.release();
+  await controller.settled;
+  assert.deepEqual(kube.log, []);
+  assert.equal((await controller.observe()).operation, undefined);
+  // That isn't a failed swap: new ComfyUI work swaps at once.
+  await assert.rejects(controller.acquire("image"), /Studio is switching the GPUs/);
+  await controller.settled;
 });
 
 test("a swap for ComfyUI work holds while Radiance has work of a higher tier waiting", async () => {

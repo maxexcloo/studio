@@ -296,7 +296,7 @@ export function createSuggestions({
   image: (item: SuggestionItem, upscaled?: boolean) => Promise<ModelImage | null>;
   /** Keeps the suggestions for this exact result and menu. */
   save: (item: SuggestionItem, field: "nextSteps" | "motionIdeas", steps: SavedSteps) => void;
-  /** The Settings › Maintenance switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
+  /** The Settings › Studio switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
   ideas: () => boolean;
   /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
   nextSteps: () => boolean;
@@ -399,6 +399,7 @@ export function createSuggestions({
           contentRule: contentRule(spicy),
           guide: targetLines(writing).join("\n"),
           withoutGuide: !writing?.guide && promptInstruction("ideas-without-model-guide"),
+          keepDescriptions: keepDescriptions(),
           standalonePrompt: standalonePrompt(),
           suggestionChoices: suggestionChoices(kind, spicy),
           variety: variety(),
@@ -451,7 +452,7 @@ export function createSuggestions({
                 })
               : promptInstruction("image-change-directions", {
                   maxSuggestions,
-                  areas: stepAreas.join(", "),
+                  areas: angles(stepAreas, stepAreas.length),
                 }),
           contentRule: contentRule(spicy),
           suggestionChoices: suggestionChoices(kind, spicy),
@@ -542,7 +543,7 @@ export function createSuggestions({
           .map((signal) => signal.prompt!.slice(0, 300)),
       ),
     ];
-    const liked = prompts(["like", "compare", "keep"]);
+    const liked = prompts(["like", "compare"]);
     const disliked = prompts(["dislike", "report"]).slice(0, 3);
     // A different few each time, so ideas don't keep drawing on the same prompts.
     for (let index = liked.length - 1; index > 0; index--) {
@@ -550,15 +551,18 @@ export function createSuggestions({
       [liked[index], liked[other]] = [liked[other], liked[index]];
     }
     liked.length = Math.min(liked.length, 5);
+    const limits = [
+      ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
+      ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
+    ];
     return {
       known: Boolean(record.summary || liked.length),
-      motionLines: [
-        record.summary ? `Taste for tone: ${record.summary}` : "",
-        ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
-        ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
-      ].filter(Boolean),
+      motionLines: [record.summary ? `Taste for tone: ${record.summary}` : "", ...limits].filter(
+        Boolean,
+      ),
       lines: [
         `Taste profile: ${record.summary || "(none yet)"}`,
+        ...limits,
         "Prompts they liked:",
         ...(liked.length ? liked.map((text) => `- ${text}`) : ["(none yet)"]),
         ...(disliked.length
@@ -761,26 +765,17 @@ export function createSuggestions({
 
   const service = {
     /**
-     * Prepares the same menu choices the owner can request when viewing the result.
-     * Throws when none could be written so idle work can back off a failing model.
+     * Prepares the viewer's next steps the owner can request when viewing the result; Animate's
+     * ideas are written when its menu opens. Throws when none could be written so idle work can
+     * back off a failing model.
      */
     async prepare(source: SuggestionItem, signal: AbortSignal): Promise<void> {
-      const surfaces = source.type === "image" ? ["viewer", "animate"] : ["viewer"];
-      let picture: Promise<ModelImage | null> | undefined;
-      const readPicture = () => (picture ??= image(source));
-      for (const surface of surfaces) {
-        if (signal.aborted) return;
-        const answer = await service.suggest(
-          source.ownerId || "",
-          {
-            surface,
-            jobId: source.jobId,
-            itemId: source.id,
-          },
-          { prepared: source, readPicture, signal },
-        );
-        if (answer.reason && !signal.aborted) throw new Error(answer.reason);
-      }
+      const answer = await service.suggest(
+        source.ownerId || "",
+        { surface: "viewer", jobId: source.jobId, itemId: source.id },
+        { prepared: source, readPicture: () => image(source), signal },
+      );
+      if (answer.reason && !signal.aborted) throw new Error(answer.reason);
     },
     /** Looks at one owned still without changing the item, its rating or the queue. */
     async inspect(
@@ -889,7 +884,7 @@ export function createSuggestions({
         references !== undefined &&
         (!Array.isArray(references) ||
           references.length > maxSuggestionReferences ||
-          references.some((id) => typeof id !== "string" || !id || id.length > 120))
+          references.some((id) => typeof id !== "string" || !id))
       )
         throw failure("Choose up to four reference images.", 400);
       const referenceIds = (references ?? []) as string[];
@@ -962,9 +957,9 @@ export function createSuggestions({
         throw failure("Choose image or video ideas.", 400);
       // Switched off, the menu or ideas simply have none; the model is never asked.
       if (surface === "composer" && !ideas())
-        return empty("Prompt Ideas is off in Settings › Maintenance.");
+        return empty("Prompt Ideas is off in Settings › Studio.");
       if ((surface === "viewer" || surface === "animate" || surface === "draft") && !nextSteps())
-        return empty("Suggestions are off in Settings › Maintenance.");
+        return empty("Suggestions are off in Settings › Studio.");
       let source: SuggestionItem | undefined;
       if (surface === "viewer" || surface === "animate") {
         if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
@@ -1149,7 +1144,7 @@ type SuggestionService = ReturnType<typeof createSuggestions>;
  * Prepares finished results' menus on completion and retries missing suggestions as idle work.
  */
 export function createNextStepWork(options: {
-  /** The Settings › Maintenance switch (STUDIO_NEXT_STEPS). */
+  /** The Settings › Studio switch (STUDIO_NEXT_STEPS). */
   enabled(): boolean;
   suggestions: Pick<SuggestionService, "prepare">;
   idle(): boolean;
@@ -1167,8 +1162,7 @@ export function createNextStepWork(options: {
     wanted: (item) =>
       !item.uploaded &&
       Boolean(item.jobId && item.id && (item.prompt || item.suggestedPrompt)) &&
-      ((item.type === "image" && (!item.nextSteps || !item.motionIdeas)) ||
-        (item.type === "video" && !item.nextSteps)),
+      !item.nextSteps,
     run: options.suggestions.prepare,
   });
 }

@@ -46,16 +46,6 @@ export const seedStyles = Object.freeze([
       "Enhance: retain the prompt's medium, subject and intent. Make the details already stated or implied more visible: shape, placement, material, the light falling on them, or a specific sequence of movement for video. Use the detail and structure the guide recommends.",
   },
   {
-    id: "spicy",
-    kind: "improve",
-    enabled: true,
-    label: "Extended Themes",
-    description: "Sensual and explicit, for uncensored models.",
-    uncensored: true,
-    instruction:
-      "Extended Themes: make the scene sensual and explicit, building on the request's own subjects and setting.",
-  },
-  {
     id: "fix",
     kind: "improve",
     enabled: true,
@@ -119,6 +109,16 @@ export const seedStyles = Object.freeze([
       "Portrait: make the person the clear focus when the scene already has one. Use the existing face, expression, eye line and pose, with a light direction and depth of field that separate them from the existing background. Preserve distinctive facial features, age, build and visible marks. For a nonhuman subject, work with the features and pose it has. In video, retain the requested action within a readable portrait framing.",
   },
   {
+    id: "spicy",
+    kind: "improve",
+    enabled: true,
+    label: "Uncensored",
+    description: "Sensual and explicit, for uncensored models.",
+    uncensored: true,
+    instruction:
+      "Uncensored: make the scene sensual and explicit, building on the request's own subjects and setting.",
+  },
+  {
     id: "action",
     kind: "animate",
     enabled: true,
@@ -165,16 +165,6 @@ export const seedStyles = Object.freeze([
       "Dialogue: when someone in the frame can speak, start with one brief line and leave time for a visible reaction. A second line needs an established listener and enough clip time. Frame the speaker so their mouth is readable. For silent models, show the communication in mouth movement, gaze and gesture. Where there is no plausible speaker, use a visible exchange or response supported by the frame.",
   },
   {
-    id: "spicy",
-    kind: "animate",
-    enabled: true,
-    label: "Extended Themes",
-    description: "Slow, sensual and explicit, for uncensored models.",
-    uncensored: true,
-    instruction:
-      "Extended Themes: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
-  },
-  {
     id: "hip-sway",
     kind: "animate",
     enabled: true,
@@ -201,6 +191,16 @@ export const seedStyles = Object.freeze([
     description: "One visible response to something established in the frame.",
     instruction:
       "Reaction: pick a person or animal and something already present that could draw their attention. Show what changes first in their gaze, ears or posture, then the expression or weight shift that follows. Settle on a readable final pose. Hold the framing on the subject and keep the response small. Where there is no living subject, show one visible physical response between elements already present.",
+  },
+  {
+    id: "spicy",
+    kind: "animate",
+    enabled: true,
+    label: "Uncensored",
+    description: "Slow, sensual and explicit, for uncensored models.",
+    uncensored: true,
+    instruction:
+      "Uncensored: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
   },
   {
     id: "closer",

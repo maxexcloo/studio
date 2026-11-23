@@ -1,7 +1,7 @@
 import { Alert, Badge, Button, Group, Menu, Popover, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Zap } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
@@ -138,7 +138,7 @@ interface Deleting {
   name: string;
 }
 
-/** A profile's or guide's row menu, ending with Edit and Delete. */
+/** A profile's or guide's row menu: Edit first, Delete last. */
 function rowMenu({
   kind,
   id,
@@ -155,6 +155,9 @@ function rowMenu({
 }) {
   return (
     <>
+      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
+        Edit
+      </Menu.Item>
       {more}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
@@ -176,9 +179,6 @@ function rowMenu({
         </Menu.Item>
       )}
       <Menu.Divider />
-      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
-        Edit
-      </Menu.Item>
       <Menu.Item
         color="red"
         leftSection={<icons.delete size={16} />}
@@ -365,6 +365,8 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                   <>
                     <TableRecord
                       name={entry.name || entry.id}
+                      openLabel={`Edit ${entry.name || entry.id}`}
+                      onOpen={() => setEditing({ kind: "profile", id: entry.id })}
                       detail={
                         [
                           entry.family && modelFamilyLabel(entry.family),
@@ -422,7 +424,10 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                   duplicate: () => duplicating.mutate(entry.id),
                   // A Krea 2 profile on ComfyUI can take a converted Radiance backend, or a newer one.
                   more: entry.family === "krea2" && entry.kind === "image" && (
-                    <Menu.Item leftSection={<Zap size={16} />} onClick={() => setConverting(entry)}>
+                    <Menu.Item
+                      leftSection={<icons.convert size={16} />}
+                      onClick={() => setConverting(entry)}
+                    >
                       Convert to Radiance…
                     </Menu.Item>
                   ),
@@ -542,7 +547,13 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               header: "Name",
               main: true,
               sortValue: (entry) => entry.name,
-              cell: (entry) => <TableRecord name={entry.name} />,
+              cell: (entry) => (
+                <TableRecord
+                  name={entry.name}
+                  openLabel={`Edit ${entry.name}`}
+                  onOpen={() => setEditing({ kind: "guide", id: entry.packId })}
+                />
+              ),
             },
             {
               key: "profiles",

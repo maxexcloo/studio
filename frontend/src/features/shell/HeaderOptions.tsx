@@ -1,9 +1,7 @@
 import { ActionIcon, Menu } from "@mantine/core";
-import { Library } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
-import { motionTransition } from "../../theme";
-import { useMotionDuration } from "../../ui/Appearance";
+import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useAccount } from "../auth/AccountGate";
@@ -11,16 +9,11 @@ import { AccountMenuContent } from "../auth/AccountMenu";
 
 export function HeaderOptions() {
   const location = useLocation();
-  const duration = useMotionDuration();
   const { data } = useAccount();
   const multi = data?.mode === "multi-user";
   const name = multi ? data.account?.username || "Your Account" : "Single-User Development";
   return (
-    <Menu
-      position="bottom-end"
-      shadow="md"
-      transitionProps={{ ...motionTransition(duration), transition: "pop-top-right" }}
-    >
+    <Menu position="bottom-end" width={menuWidth}>
       <PopupTooltip label="More Options">
         <Menu.Target>
           <ActionIcon aria-label="More Options" variant="subtle" color="gray">
@@ -34,7 +27,7 @@ export function HeaderOptions() {
             component={Link}
             to="/library"
             state={{ backgroundLocation: location }}
-            leftSection={<Library size={16} />}
+            leftSection={<icons.library size={16} />}
           >
             Library
           </Menu.Item>

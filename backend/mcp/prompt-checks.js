@@ -1,4 +1,5 @@
 // Checks generate applies to prompt text: a full-body person gets face detail, and exact prompts must not carry instructions.
+import { similarPrompt } from "../domain/dream-concepts.ts";
 import { maxJobsPerCall } from "./controls.js";
 
 const numberWords = {
@@ -85,4 +86,38 @@ export function promptListProblem(prompts) {
     seen.set(key, index);
   }
   return "";
+}
+
+/**
+ * The refusal for prompts that repeat one of the conversation's earlier sets (`earlier`, each its
+ * number and prompts), or '' when none does: a large batch otherwise circles the same ideas.
+ */
+export function repeatedSetProblem(prompts, earlier) {
+  for (const [index, prompt] of prompts.entries())
+    for (const set of earlier)
+      if (set.prompts.some((other) => similarPrompt(prompt, other)))
+        return `prompt ${index + 1} repeats set ${set.number}. Give each prompt a new idea (subject, setting, outfit, action or framing) that earlier sets haven't used, and call generate again.`;
+  return "";
+}
+
+/** The number of images the user's words ask for ("200 more", "five photos"), or 0 when they name none. */
+export function requestedCount(request) {
+  const match = new RegExp(
+    `\\b${number}\\s+(?:more\\b|(?:[\\w-]+\\s+){0,3}?(?:images?|pictures?|photos?|results?|versions?|variations?)\\b)`,
+    "i",
+  ).exec(String(request || ""));
+  return match ? numberOf(match[1]) : 0;
+}
+
+/**
+ * The refusal when a chat turn would queue more images than its request asked for, or '':
+ * `queued` is what the turn has queued already and `adding` this call's images.
+ */
+export function turnCountProblem(request, queued, adding) {
+  const requested = requestedCount(request);
+  if (!requested || queued + adding <= requested) return "";
+  const left = requested - queued;
+  return left > 0
+    ? `the user asked for ${requested} images and this turn has queued ${queued}; queue at most ${left} more.`
+    : `the user asked for ${requested} images and this turn has queued them all. Share the links and end the turn.`;
 }

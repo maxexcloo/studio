@@ -126,7 +126,10 @@ test("The composer groups ideas and draft suggestions in its compact and expande
       .getByRole("combobox", { name: "Suggestions", exact: true }),
   ).toHaveCount(0);
   await prompt.click();
-  expect(asked).toHaveLength(0);
+  // The AI menu asks for its suggestions as it opens, and the answer serves both menus.
+  expect(asked).toEqual([
+    { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
+  ]);
   let menu = await promptMenu(page, "Prompt");
   await expandAssistantMenu(menu, "Suggestions");
   const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
@@ -276,6 +279,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
     .getByRole("button", { name: "AI Instruction Actions", exact: true })
     .click();
   const menu = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
+  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" }]);
   await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(
@@ -388,20 +392,11 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const reason = "Like a few results so Studio learns your taste.";
   const menu = await viewerChangeMenu(page);
-  await expandAssistantMenu(menu, "Suggestions");
-  await expect(
-    menu.getByRole("menuitem", {
-      name: "Like a few results so Studio learns your taste.",
-      exact: true,
-    }),
-  ).toBeDisabled();
-  await backToActionMenu(menu);
-  const side = menu.getByRole("menu", { name: "Suggestions", exact: true });
-  if (await side.isVisible()) {
-    await page.keyboard.press("Escape");
-    await expect(side).toBeHidden();
-  }
+  const suggestions = menu.getByRole("menuitem", { name: "Suggestions", exact: true });
+  await expect(suggestions).toHaveAccessibleDescription(reason);
+  await expect(suggestions).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
   await closeTextEditor(page, "Prompt");
@@ -411,13 +406,9 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const ideas = await promptMenu(page, "Prompt");
   await expect(ideas.getByRole("menuitem", { name: "Recent Prompts", exact: true })).toBeVisible();
-  await expandAssistantMenu(ideas, "Suggestions");
-  await expect(
-    ideas.getByRole("menuitem", {
-      name: "Like a few results so Studio learns your taste.",
-      exact: true,
-    }),
-  ).toBeDisabled();
+  const ideaSuggestions = ideas.getByRole("menuitem", { name: "Suggestions", exact: true });
+  await expect(ideaSuggestions).toHaveAccessibleDescription(reason);
+  await expect(ideaSuggestions).toBeDisabled();
 });
 
 test("Review stays off after editing and Reset, while an explicit opt-in preserves the current prompt for Undo", async ({

@@ -1,4 +1,13 @@
-import { type RefObject, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type RefObject,
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { dayHeading } from "./mediaLabels";
 import type { GalleryDate } from "./queries";
@@ -110,6 +119,7 @@ export const DateScrubber = memo(function DateScrubber({
     let idle = 0;
     const update = () => {
       frame = 0;
+      setActive(true);
       const grid = host.current;
       if (!grid || !sections.length) return;
       const offset = topInset(grid) - grid.getBoundingClientRect().top + 1;
@@ -123,20 +133,19 @@ export const DateScrubber = memo(function DateScrubber({
       const { day, top } = sections[low];
       const index = indices.get(day);
       const end = sections[low + 1]?.top ?? height;
-      const range = document.documentElement.scrollHeight - window.innerHeight;
       const fraction =
         indexed && index !== undefined
           ? (index + clamp((offset - top) / Math.max(end - top, 1))) / timeline.length
-          : range > 0
-            ? clamp(window.scrollY / range)
-            : 0;
+          : clamp(
+              window.scrollY /
+                Math.max(document.documentElement.scrollHeight - window.innerHeight, 1),
+            );
       setPosition((previous) =>
         previous.fraction === fraction && previous.day === day ? previous : { fraction, day },
       );
     };
     const scroll = () => {
       if (!frame) frame = window.requestAnimationFrame(update);
-      setActive(true);
       window.clearTimeout(idle);
       idle = window.setTimeout(() => setActive(false), 1500);
     };
@@ -274,10 +283,7 @@ export const DateScrubber = memo(function DateScrubber({
       }}
       onLostPointerCapture={endDrag}
     >
-      <div
-        className={classes.thumb}
-        style={{ top: `calc(${fraction} * (100% - var(--scrubber-thumb)))` }}
-      >
+      <div className={classes.thumb} style={{ "--scrubber-fraction": fraction } as CSSProperties}>
         {(drag !== null || focus || pendingIndex !== undefined) && (
           <span className={classes.date}>{label}</span>
         )}

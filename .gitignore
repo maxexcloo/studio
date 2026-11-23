@@ -1,4 +1,8 @@
+/.agents/
+/.aws/
 /.claude/
+/.codex/
+/.orca/
 data/
 dist/
 node_modules/

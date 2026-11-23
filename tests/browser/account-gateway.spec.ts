@@ -301,7 +301,7 @@ test("Users change their email only behind password-protected controls", async (
   await fixtures(page);
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/settings");
-  const own = page.getByRole("region", { name: "Your Account", exact: true });
+  const own = page.getByRole("region", { name: "Settings: Account", exact: true });
   await expect(own.getByText("admin@example.test", { exact: true })).toBeVisible();
   await own.getByRole("button", { name: "Change", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Email & Password", exact: true });
@@ -311,9 +311,7 @@ test("Users change their email only behind password-protected controls", async (
   await expect(
     dialog.getByRole("textbox", { name: "Current Password", exact: true }),
   ).toBeVisible();
-  await expect(
-    dialog.getByRole("button", { name: "Save Email & Password", exact: true }),
-  ).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
 });
 
 test("Administrators change roles, reset passwords and delete galleries, accounts and empty groups", async ({
@@ -365,8 +363,8 @@ test("Administrators change roles, reset passwords and delete galleries, account
   await expect(page.getByRole("menuitem")).toHaveText([
     "Make Administrator",
     "Reset Password",
-    "Disable",
     /^Delete Gallery/,
+    "Disable",
     "Delete User",
   ]);
   await page.keyboard.press("Escape");
@@ -414,6 +412,10 @@ test("Administrators change roles, reset passwords and delete galleries, account
 
   // Only a group nobody belongs to that isn't the default can go.
   await section(page, "Settings", "Groups");
+  await expect(page.getByRole("row", { name: "Users", exact: true })).toContainText("Default");
+  await expect(page.getByRole("combobox", { name: "Default Group", exact: true })).toHaveValue(
+    "Users",
+  );
   const actions = (name: string) =>
     page.getByRole("button", { name: `Actions for ${name}`, exact: true }).click();
   await actions("Users");

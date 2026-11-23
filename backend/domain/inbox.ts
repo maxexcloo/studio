@@ -65,10 +65,15 @@ interface InboxRecord {
   proposals: Stored[];
   /** Newest first. */
   accepted: AcceptedRecord[];
-  /** Dismissed proposals' keys, each proposed again only after `until`. */
-  snoozed: { key: string; until: string }[];
-  /** What the person said when dismissing, newest first, which the text model reads. */
+  /**
+   * Dismissed proposals' keys, each proposed again only after `until`; a card's evidence too, so
+   * the same images under another name wait as well.
+   */
+  snoozed: { key: string; until: string; evidence?: string[] }[];
+  /** What the person turned down, newest first, with any reason they gave, which the text model reads. */
   reasons: { title: string; reason: string }[];
+  /** Keys of the cards Dream saved on its own, which it never proposes again once gone. */
+  autoSaved?: string[];
   /** When the latest batch began, and how many proposals Dream made on its latest day. */
   batchAt?: string;
   made?: { day: string; count: number };
@@ -382,7 +387,7 @@ export function editsFrom(
  * edits from a project's misses and keeps, rules from recurring issues (domain/issues.ts) and
  * pacing from how each project's results fare, in batches under daily and per-project caps.
  * Corroborated named cards are saved with Undo. Other changes wait for the person to accept them.
- * A dismissal snoozes a proposal, its reason teaching the next batch.
+ * A dismissal snoozes a proposal and teaches the next batch, with any reason given.
  */
 export function createInbox(options: {
   dataDir: string;
@@ -488,16 +493,54 @@ export function createInbox(options: {
       })),
     };
   }
-  /** Adds the proposals that aren't snoozed or waiting already, within the caps; answers how many. */
-  function offer(record: InboxRecord, found: Stored[]) {
-    const snoozed = new Set(
-      record.snoozed.filter((entry) => Date.parse(entry.until) > now()).map((entry) => entry.key),
-    );
+  /**
+   * Whether a card proposal's evidence images are already references of the account's cards of
+   * its kind: the same card under another name.
+   */
+  function savedImages(ownerId: string, account: GenerationAccount | undefined) {
+    const cards = options.cards(ownerId);
+    return (proposal: Stored) => {
+      const kind = proposal.change.card?.kind;
+      if (!cards || !kind) return false;
+      const ids = new Set(cards[kind].flatMap((card) => card.referenceIds));
+      return proposal.evidence.some((itemId) => {
+        try {
+          return ids.has(options.reference(account, itemId).id);
+        } catch {
+          return false;
+        }
+      });
+    };
+  }
+  /**
+   * Adds the proposals that aren't snoozed or waiting already, within the caps; answers how many.
+   * A card whose evidence is behind a waiting or snoozed card of its kind, or a saved one
+   * (`saved`), is that card under another name, and one Dream saved on its own once is not offered
+   * again.
+   */
+  function offer(record: InboxRecord, found: Stored[], saved?: (proposal: Stored) => boolean) {
+    const live = record.snoozed.filter((entry) => Date.parse(entry.until) > now());
+    const snoozed = new Set(live.map((entry) => entry.key));
     let added = 0;
     for (const proposal of found) {
       if (record.made?.day !== today()) record.made = { day: today(), count: 0 };
       if (record.made.count >= limits.daily || record.proposals.length >= limits.pending) break;
-      if (snoozed.has(proposal.key) || record.proposals.some((entry) => entry.key === proposal.key))
+      if (
+        snoozed.has(proposal.key) ||
+        record.proposals.some((entry) => entry.key === proposal.key) ||
+        record.autoSaved?.includes(proposal.key)
+      )
+        continue;
+      const kind = proposal.change.card?.kind;
+      if (
+        kind &&
+        ([...record.proposals, ...live].some(
+          (entry) =>
+            entry.key.startsWith(`card:${kind}:`) &&
+            proposal.evidence.some((id) => entry.evidence?.includes(id)),
+        ) ||
+          saved?.(proposal))
+      )
         continue;
       const sameProject = record.proposals.filter(
         (entry) => proposal.projectId && entry.projectId === proposal.projectId,
@@ -638,7 +681,7 @@ export function createInbox(options: {
     record.reasons.length
       ? [
           "They turned these down; propose nothing like them:",
-          ...record.reasons.map(({ title, reason }) => `- ${title}: ${reason}`),
+          ...record.reasons.map(({ title, reason }) => `- ${title}${reason ? `: ${reason}` : ""}`),
         ]
       : [];
   /** New projects and cards from what recurs in the newest liked images. */
@@ -652,11 +695,12 @@ export function createInbox(options: {
     const cards = options.cards(ownerId);
     const owned = cards
       ? (Object.keys(cardKinds) as CardKind[]).flatMap((kind) =>
-          cards[kind].map(({ name, rating }) => ({ kind, name, rating })),
+          cards[kind].map(({ name, description, rating }) => ({ kind, name, description, rating })),
         )
       : [];
-    const cardLine = ({ kind, name, rating }: (typeof owned)[number]) =>
-      `- ${cardKinds[kind].name}: ${name}${rating ? ` (${rating})` : ""}`;
+    // Descriptions let the writer tell a saved card under another name from a new one.
+    const cardLine = ({ kind, name, description, rating }: (typeof owned)[number]) =>
+      `- ${cardKinds[kind].name}: ${name}${rating ? ` (${rating})` : ""}. ${clean(description, 120)}`;
     const list = projects.list(ownerId);
     const taken = new Set([
       ...owned.map(({ kind, name }) => cardKey(kind, name)),
@@ -903,13 +947,16 @@ export function createInbox(options: {
       ...record.snoozed.filter(
         (entry) => Date.parse(entry.until) > now() && !gone.some((g) => g.key === entry.key),
       ),
-      ...gone.map((entry) => ({ key: entry.key, until })),
+      ...gone.map((entry) => ({
+        key: entry.key,
+        until,
+        ...(entry.kind === "card" ? { evidence: entry.evidence } : {}),
+      })),
     ];
-    if (words && gone.length)
-      record.reasons = [
-        { title: gone.length === 1 ? gone[0].title : "Everything in the Inbox", reason: words },
-        ...record.reasons,
-      ].slice(0, limits.reasons);
+    record.reasons = [
+      ...gone.map((entry) => ({ title: entry.title, reason: words })),
+      ...record.reasons,
+    ].slice(0, limits.reasons);
     save(ownerId, record);
     await options.dream.dropDrafts(ownerId, keep(record));
     return read(ownerId);
@@ -939,6 +986,7 @@ export function createInbox(options: {
       offer(record, [...chatsFor(ownerId, liked), ...pacingFor(ownerId), ...rulesFor(ownerId)]);
       save(ownerId, record);
       const cards = options.cards(ownerId);
+      const saved = savedImages(ownerId, account);
       if (cards && (account?.userId || "") === ownerId) {
         const found = namedCards(liked, cards, options.minorAge, stamp()).slice(
           0,
@@ -947,7 +995,7 @@ export function createInbox(options: {
         runtimeTransaction(options.dataDir, () => {
           for (const { proposal, auto } of found) {
             const pending = record.proposals.find((entry) => entry.key === proposal.key);
-            if (!pending && !offer(record, [proposal])) continue;
+            if (!pending && !offer(record, [proposal], saved)) continue;
             if (!auto) continue;
             if (pending) {
               if (
@@ -960,6 +1008,7 @@ export function createInbox(options: {
             try {
               const undo = apply(ownerId, account, proposal, proposal.change, true);
               rememberAccepted(record, proposal, undo, true);
+              record.autoSaved = [proposal.key, ...(record.autoSaved || [])].slice(0, 500);
             } catch (error) {
               const status = (error as Error & { status?: number }).status;
               if (status !== 400 && status !== 409) throw error;
@@ -978,7 +1027,7 @@ export function createInbox(options: {
         const found = room(load(ownerId)) ? await ask(ownerId, load(ownerId), writer) : null;
         if (!found) return false;
         const latest = load(ownerId);
-        offer(latest, found);
+        offer(latest, found, saved);
         save(ownerId, latest);
         return true;
       };

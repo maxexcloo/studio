@@ -1,9 +1,10 @@
-import { Alert, Code, Group, Modal, ScrollArea, Select, Stack, Tabs } from "@mantine/core";
+import { Alert, Button, Code, Group, Modal, ScrollArea, Select, Stack, Tabs } from "@mantine/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { RuntimePodLog } from "../../../../shared/runtime";
 import { api } from "../../api";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { CopyButton } from "../../ui/CopyButton";
 import { dateFormat } from "../../ui/dates";
 import { LoadingState } from "../../ui/LoadingState";
@@ -118,35 +119,35 @@ export function LogDialog({
   const phone = usePhone();
   const [tab, setTab] = useState<string | null>(null);
   const shown = parts.some((part) => part.value === tab) ? tab : (initial ?? parts[0]?.value);
+  const close = () => {
+    setTab(null);
+    onClose();
+  };
   return (
-    <Modal
-      opened={opened}
-      onClose={() => {
-        setTab(null);
-        onClose();
-      }}
-      title={title}
-      size="xl"
-      fullScreen={phone}
-    >
-      {parts.length === 1 ? (
-        parts[0].content
-      ) : (
-        <Tabs value={shown} onChange={setTab} keepMounted={false}>
-          <Tabs.List>
+    <Modal opened={opened} onClose={close} title={title} size="xl" fullScreen={phone}>
+      <Stack>
+        {parts.length === 1 ? (
+          parts[0].content
+        ) : (
+          <Tabs value={shown} onChange={setTab} keepMounted={false}>
+            <Tabs.List>
+              {parts.map((part) => (
+                <Tabs.Tab key={part.value} value={part.value}>
+                  {part.label}
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
             {parts.map((part) => (
-              <Tabs.Tab key={part.value} value={part.value}>
-                {part.label}
-              </Tabs.Tab>
+              <Tabs.Panel key={part.value} value={part.value} pt="sm">
+                {part.content}
+              </Tabs.Panel>
             ))}
-          </Tabs.List>
-          {parts.map((part) => (
-            <Tabs.Panel key={part.value} value={part.value} pt="sm">
-              {part.content}
-            </Tabs.Panel>
-          ))}
-        </Tabs>
-      )}
+          </Tabs>
+        )}
+        <DialogFooter>
+          <Button onClick={close}>Done</Button>
+        </DialogFooter>
+      </Stack>
     </Modal>
   );
 }

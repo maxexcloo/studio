@@ -1,13 +1,13 @@
 # Studio Worker
 
 Build from the Studio checkout with `docker build -f worker/Dockerfile -t studio-worker .`.
-The image contains ComfyUI, Studio custom nodes and Radiance's `rad-convert` with
+The image is for AMD GPUs with ROCm. It contains ComfyUI, Studio custom nodes and Radiance's `rad-convert` with
 its isolated libraries. `source.json` pins ComfyUI; `sources.json` pins custom nodes.
 Studio's custom nodes live in `comfyui/` and are copied directly from this
 checkout into `/root/ComfyUI/custom_nodes/` during the worker build.
 
 The image starts ComfyUI on port 8188 with arguments from `CLI_ARGS`. Supply
-model directories and GPU placement in the deployment, owned by kubelab.
+model directories and GPU placement in the deployment.
 
 For model transfers independent of GPU placement, start the same image with
 `--model-library` and mount the workers' shared ComfyUI model folder read-write at
