@@ -20,6 +20,8 @@ export function useRecreateMany() {
   return useMutation({
     mutationFn: async (items: MediaItem[]) => {
       if (!profile) throw new Error("Choose an available model first.");
+      // The draft's negative prompt is read live; one copy keeps every recreation on the same draft.
+      const base = { ...input };
       const ready = items.filter((item) => item.status === "done" && item.suggestedPrompt);
       let queued = 0;
       const failed: { id: string; reason: string }[] = [];
@@ -32,7 +34,7 @@ export function useRecreateMany() {
           await post(`/api/sessions/${sessionId}/generations`, {
             ...generationInput(
               {
-                ...input,
+                ...base,
                 prompt: item.suggestedPrompt || "",
                 seed: "",
                 referenceAssets: [],

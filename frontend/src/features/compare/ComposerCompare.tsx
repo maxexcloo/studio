@@ -165,7 +165,7 @@ export function CompareMenu({ labels }: { labels: string[] }) {
           : withResolution({ ...input, resolutionTier: size as Resolution }, effective),
       );
     else if (axis === "Seed") inputs = seedInputs(input, Number(seeds));
-    else inputs = promptInputs({ ...input, prompt: text });
+    else inputs = promptInputs({ ...input, prompt: prompts ?? input.prompt });
     setDraft((previous) => compareInputs(previous, inputs));
     close();
   };
