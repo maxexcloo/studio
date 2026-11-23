@@ -375,7 +375,6 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await expect(table.getByRole("row")).toHaveCount(3);
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await updates(page, "Update All");
-  await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
   // With nothing left to apply, Update All waits for the next check.
   await loras.getByRole("button", { name: "Updates", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Update All", exact: true })).toBeDisabled();

@@ -27,12 +27,8 @@ import { PromptInstructions } from "./PromptInstructions";
 import { PromptStyles } from "./PromptStyles";
 import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
-/** A check's or an update's answer; Update All also says how many started and which failed. */
-type UpdateResult = {
-  available: number;
-  started?: number;
-  failed?: { key: string; error: string }[];
-};
+/** Update All reports the updates that failed to start. */
+type UpdateResult = { failed?: { key: string; error: string }[] };
 
 export function LibraryPage() {
   const { admin, options } = useLibraryNavigation();
@@ -94,25 +90,16 @@ export function LibraryPage() {
   const update = useMutation({
     mutationFn: (choice: { key: string; alternative?: boolean } | { all: true } | undefined) =>
       post<UpdateResult>(`/api/library/updates/${choice ? "apply" : "check"}`, choice),
-    onSuccess: () => {
+    onSuccess: ({ failed }) => {
       void client.invalidateQueries({ queryKey: catalogueQuery.queryKey });
       void client.invalidateQueries({ queryKey: downloadsQuery.queryKey });
+      if (failed?.length)
+        notifications.show({
+          color: "red",
+          message: failed.map((failure) => `${failure.key}: ${failure.error}`).join(" "),
+        });
     },
   });
-  // The last check or update's outcome, shown under the catalogue toolbar; a check that finds
-  // nothing shows nothing.
-  const updateNote =
-    update.data &&
-    (update.variables && "all" in update.variables
-      ? [
-          `${update.data.started} ${update.data.started === 1 ? "update" : "updates"} queued.`,
-          ...(update.data.failed || []).map((failure) => `${failure.key}: ${failure.error}`),
-        ].join(" ")
-      : update.variables
-        ? "Update queued. The current file stays until the new one is verified and free."
-        : update.data.available
-          ? `${update.data.available} ${update.data.available === 1 ? "update" : "updates"} available.`
-          : undefined);
   const items = catalogue.data?.items || [];
   const families = [
     ...new Set([
@@ -146,7 +133,6 @@ export function LibraryPage() {
         onUpdateAll={
           admin && items.some(freeUpdate) ? () => update.mutate({ all: true }) : undefined
         }
-        updateNote={updateNote || undefined}
         inventoryError={catalogue.data?.inventoryError}
         onEdit={admin ? setEditing : undefined}
         onDelete={

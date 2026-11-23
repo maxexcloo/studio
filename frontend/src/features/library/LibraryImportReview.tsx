@@ -12,6 +12,7 @@ import {
   Table,
   Text,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId } from "react";
 
@@ -203,6 +204,8 @@ export function LibraryImportReview({
         void client.invalidateQueries({ queryKey: editableProfilesQuery.queryKey });
       }
       if (result.import.id !== id) onOpen(result.import.id);
+      if (result.failures?.length)
+        notifications.show({ color: "yellow", message: result.failures.join(" ") });
     },
   });
   const record = query.data?.import;
@@ -287,9 +290,6 @@ export function LibraryImportReview({
               </Button>
             </Group>
             {record.error && <Alert color="red">{record.error}</Alert>}
-            {!!action.data?.failures?.length && (
-              <Alert color="yellow">{action.data.failures.join(" ")}</Alert>
-            )}
             {canDraft && (
               <Button
                 variant="default"

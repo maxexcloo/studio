@@ -10,6 +10,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
@@ -63,7 +64,9 @@ export function ComparePage() {
     },
     onSuccess: ({ proposal, ...result }) => {
       client.setQueryData(comparisonQuery(id).queryKey, result);
-      if (proposal) void client.invalidateQueries({ queryKey: inboxQuery.queryKey });
+      if (!proposal) return;
+      void client.invalidateQueries({ queryKey: inboxQuery.queryKey });
+      notifications.show({ message: `Proposed for ${proposal.name}'s brief in Dream's Inbox` });
     },
     onSettled: () =>
       Promise.all(
@@ -136,11 +139,6 @@ export function ComparePage() {
           {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
         </Text>
       </Group>
-      {choose.data?.proposal && (
-        <Text role="status" size="sm" c="dimmed">
-          Proposed for {choose.data.proposal.name}'s brief in Dream's Inbox
-        </Text>
-      )}
       {(prompt || negative) && (
         <Stack gap={4}>
           {prompt && (

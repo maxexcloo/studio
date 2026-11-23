@@ -21,7 +21,6 @@ import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
-import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
 import {
   type ImportRecord,
@@ -138,7 +137,6 @@ export function LibraryImports({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState<ImportRecord | null>(null);
-  const [cleared, flashCleared] = useFlash<number>();
   const imports = useQuery({
     ...importsQuery,
     enabled: active,
@@ -237,10 +235,9 @@ export function LibraryImports({
     });
   }
   const clearStale = useMutation({
-    mutationFn: () => post<{ cleared: number }>("/api/library/imports/clear-stale"),
-    onSuccess: (result) => {
+    mutationFn: () => post("/api/library/imports/clear-stale"),
+    onSuccess: () => {
       setConfirming(false);
-      flashCleared(result.cleared);
       refresh();
     },
   });
@@ -431,11 +428,6 @@ export function LibraryImports({
           </Stack>
         </form>
       </Modal>
-      {cleared !== undefined && (
-        <Text c="dimmed" size="xs">
-          {cleared} cleared
-        </Text>
-      )}
       {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
       ) : !records.length ? (

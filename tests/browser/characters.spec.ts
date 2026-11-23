@@ -241,7 +241,7 @@ test("Picking a character on an img2img model moves the composer to a model that
   const references = await openCharacters(page);
   await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
   await expect(
-    references.getByText(
+    page.getByText(
       "Switched to Keeper Fast, which keeps a character's face and build in new scenes.",
     ),
   ).toBeVisible();

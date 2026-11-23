@@ -1,6 +1,6 @@
 import { Alert, ScrollArea, Stack, Text } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 
 import { characterProfiles, keepsIdentity } from "../../../../shared/characters";
 import type { Models, Profile, ReferenceAsset } from "../../types";
@@ -80,7 +80,6 @@ export function CharacterChoices({
 }) {
   const characters = useQuery(charactersQuery);
   const models = useQuery(modelsQuery);
-  const [switched, setSwitched] = useState("");
   const editor = switchable ? characterEditor(profile, models.data) : undefined;
   const dialogs = useCharacterDialogs(onLayer);
   const cards = listedCards(characters.data, query, sort);
@@ -88,11 +87,6 @@ export function CharacterChoices({
   if (characters.error) return <Alert color="red">{characters.error.message}</Alert>;
   return (
     <Stack gap="xs" flex={1} mih={0}>
-      {switched && (
-        <Text size="xs" c="dimmed">
-          {switchedText(switched)}
-        </Text>
-      )}
       {!editor && profile && !keepsIdentity(profile) && cards.length > 0 && (
         <Text size="xs" c="dimmed">
           {`${profileName(profile)} keeps a reference's pose and layout. For new scenes, choose a model that edits with references.`}
@@ -120,7 +114,7 @@ export function CharacterChoices({
                 placeholder={card.references.length ? undefined : icons.character}
                 onToggle={() => {
                   if (applied) return onChange(removeCharacter(card, references, prompt, parts));
-                  if (editor) setSwitched(profileName(editor));
+                  if (editor) notifications.show({ message: switchedText(profileName(editor)) });
                   onChange({
                     ...applyCharacter(card, references, prompt, editor || profile, parts),
                     profile: editor,

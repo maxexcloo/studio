@@ -1,4 +1,5 @@
-import { Alert, Checkbox, getDefaultZIndex } from "@mantine/core";
+import { Checkbox, getDefaultZIndex } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -27,7 +28,6 @@ export function useCardSelection(
   const { queryKey } = kind === "characters" ? charactersQuery : promptCardsQuery(kind);
   const [selection, setSelection] = useState<Set<string> | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const [failure, setFailure] = useState("");
   const selected = cards?.filter(({ id }) => selection?.has(id)) ?? [];
   const all = matches.length > 0 && matches.every(({ id }) => selection?.has(id));
   const batch = useMutation({
@@ -58,7 +58,6 @@ export function useCardSelection(
       }
       return { saved, failed };
     },
-    onMutate: () => setFailure(""),
     onSuccess: ({ saved, failed }, { changes, undo }) => {
       client.setQueryData<Card[]>(queryKey, (entries) =>
         entries?.flatMap((card) => {
@@ -89,7 +88,7 @@ export function useCardSelection(
           : changes[0]?.rating === "delete"
             ? "delete"
             : "rate";
-        setFailure(`Couldn't ${action} ${names}${more}.`);
+        notifications.show({ color: "red", message: `Couldn't ${action} ${names}${more}.` });
       }
       void client.invalidateQueries({ queryKey });
     },
@@ -119,10 +118,7 @@ export function useCardSelection(
         variant="default"
         aria-pressed={selection !== null}
         disabled={(!selection && !cards?.length) || batch.isPending}
-        onClick={() => {
-          setFailure("");
-          setSelection(selection ? null : new Set());
-        }}
+        onClick={() => setSelection(selection ? null : new Set())}
       />
     ),
     control: ({ id, name }: ListedCard) =>
@@ -175,11 +171,6 @@ export function useCardSelection(
               onClick={() => setConfirm(true)}
             />
           </SelectionBar>
-        )}
-        {failure && (
-          <Alert color="red" role="alert">
-            {failure}
-          </Alert>
         )}
         <ConfirmDialog
           opened={confirm}

@@ -62,7 +62,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   const confirm = page.getByRole("dialog", { name: "Delete Failed Items", exact: true });
   await expect(confirm).toContainText("Remove member@example.test's failed and cancelled items");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(danger.getByText("2 deleted.", { exact: true })).toBeVisible();
+  await expect(confirm).toBeHidden();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   // Each worker's status comes first, under the page's own title, one line each: what it runs, its
