@@ -1,6 +1,5 @@
 import { Menu } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -42,7 +41,7 @@ export function AccountMenuContent({
         <>
           <Menu.Divider />
           <Menu.Item
-            leftSection={<LogOut size={16} />}
+            leftSection={<icons.signOut size={16} />}
             disabled={signOut.isPending}
             onClick={() => signOut.mutate()}
           >

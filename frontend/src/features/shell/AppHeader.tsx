@@ -7,7 +7,6 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Image, Video } from "lucide-react";
 import { useId, useState } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -26,8 +25,8 @@ import classes from "./AppHeader.module.css";
 
 const modes = [
   { to: "/dream", label: "Dream", icon: icons.dream },
-  { to: "/images", label: "Images", icon: Image },
-  { to: "/videos", label: "Videos", icon: Video },
+  { to: "/images", label: "Images", icon: icons.image },
+  { to: "/videos", label: "Videos", icon: icons.video },
 ];
 function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();

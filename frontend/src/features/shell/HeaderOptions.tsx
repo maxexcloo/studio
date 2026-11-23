@@ -1,5 +1,4 @@
 import { ActionIcon, Menu } from "@mantine/core";
-import { Library } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 import { menuWidth } from "../../theme";
@@ -28,7 +27,7 @@ export function HeaderOptions() {
             component={Link}
             to="/library"
             state={{ backgroundLocation: location }}
-            leftSection={<Library size={16} />}
+            leftSection={<icons.library size={16} />}
           >
             Library
           </Menu.Item>

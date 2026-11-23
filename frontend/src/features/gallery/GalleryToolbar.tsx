@@ -1,6 +1,6 @@
 import { ActionIcon, Button, Group, Slider, Text, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
-import { Search, SquareMinus, SquarePlus } from "lucide-react";
+import { Search } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type GallerySort, gallerySortGroups } from "../../../../shared/gallery-sort";
@@ -234,7 +234,7 @@ function ZoomSlider() {
         disabled={columns >= max}
         onClick={() => zoomTo(columns + 1)}
       >
-        <SquareMinus size={15} />
+        <icons.zoomOut size={15} />
       </ActionIcon>
       <Slider
         className={classes.slider}
@@ -260,7 +260,7 @@ function ZoomSlider() {
         disabled={columns <= min}
         onClick={() => zoomTo(columns - 1)}
       >
-        <SquarePlus size={15} />
+        <icons.zoomIn size={15} />
       </ActionIcon>
     </Group>
   );

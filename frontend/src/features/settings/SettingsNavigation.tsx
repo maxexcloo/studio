@@ -1,4 +1,4 @@
-import { Boxes, Route, Server, Shield, UsersRound, Wrench } from "lucide-react";
+import { Route, Server, Shield, SlidersVertical, UsersRound, Wrench } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -45,7 +45,7 @@ const settingSections = {
   generation: {
     label: "Generation",
     description: "Set Studio-wide model defaults and clear failed items for other accounts.",
-    icon: Boxes,
+    icon: SlidersVertical,
     admin: true,
     group: "Administration",
   },
