@@ -526,7 +526,7 @@ export function registerGenerateTools({
       count: jobCount
         .optional()
         .describe(
-          `Repeats each prompt with new seeds (default ${mcpGenerationCount}, or the account's default for one prompt on one image model). For distinct results provide separate prompts.`,
+          `Repeats each prompt with new seeds (default ${mcpGenerationCount}, or the account's default for one prompt). For distinct results provide separate prompts.`,
         ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),
