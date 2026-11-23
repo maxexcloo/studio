@@ -97,7 +97,9 @@ test("A tile can be liked and read back without opening the viewer", async ({ pa
   await expect(liked).toBeVisible();
 });
 
-test("Dislike hides a tile, Disliked shows it and Restore brings it back", async ({ page }) => {
+test("Dislike hides a tile, Disliked shows it and Undo Dislike brings it back", async ({
+  page,
+}) => {
   const state = await galleryFixture(page);
   const select = async () => {
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
@@ -116,7 +118,7 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
-  await selectionAction(page, "Restore").click();
+  await selectionAction(page, "Undo Dislike").click();
   await expect(tile).toBeHidden();
   await expect.poll(() => state.gallery[0].rating).toBeUndefined();
   await page.getByRole("button", { name: "Remove Disliked Filter", exact: true }).click();
