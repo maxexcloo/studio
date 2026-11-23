@@ -239,7 +239,7 @@ test("a rewrite streams as server-sent events: deltas, then the final result", a
   );
 });
 
-test("Spicy needs Uncensored Models, whatever the profile, and runs on the uncensored alias", async () => {
+test("Extended Themes needs Uncensored Models, whatever the profile, and runs on the uncensored alias", async () => {
   assert.equal(
     (
       await post(

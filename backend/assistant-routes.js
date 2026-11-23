@@ -5,7 +5,7 @@ import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { accountPreferences, defaultTextSide } from "./account-preferences.js";
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
- * access-profile feature, works only with profiles the account may use, and an uncensored style (Spicy) needs Uncensored Models.
+ * access-profile feature, works only with profiles the account may use, and an uncensored style (Extended Themes) needs Uncensored Models.
  * LoRA suggestions need the LoRAs feature.
  *
  *   GET  /api/assistant                 what this account may use: presets (Improve Prompt's styles),

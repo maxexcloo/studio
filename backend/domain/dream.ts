@@ -536,7 +536,7 @@ const steerCount = 2;
 /** Dream page views this close together are one visit. */
 const visitGapMs = 30 * 60_000;
 const roundTo = (value: number, step: number) => Math.round(value / step) * step;
-const spicyTheme = "Spicy: sensual, explicit content where it suits the scene.";
+const spicyTheme = "Extended Themes: sensual, explicit content where it suits the scene.";
 /** Image and video models overdo expressions; Dream asks for natural ones unless taste says otherwise. */
 const naturalFaces =
   "Give people natural, relaxed, believable expressions that suit the moment (a soft smile, a calm, thoughtful or focused look). Avoid exaggerated or contorted expressions, grimaces, gaping mouths and tongues unless the taste profile, brief or source prompt explicitly asks for one.";
@@ -2359,7 +2359,7 @@ export function createDream(options: {
             source: "character",
           },
         ];
-      // Spicy goes to a share of ideas, so the rest stay plain.
+      // Extended Themes goes to a share of ideas, so the rest stay plain.
       const spicy = spicyShare(record, access);
       const explore = Boolean(axis);
       const feature =
@@ -2731,7 +2731,7 @@ export function createDream(options: {
     return false;
   }
 
-  /** Whether a job is Spicy: a share of them, where the setting and Uncensored Models allow. */
+  /** Whether a job is Extended Themes: a share of them, where the setting and Uncensored Models allow. */
   function spicyShare(record: DreamRecord, access: DreamAccess) {
     return record.settings.spicy && access.uncensored && chance(shares.spicy);
   }
