@@ -358,8 +358,20 @@ export function createCloudQueueAdapter({
           "The synchronous provider response is not confirmed. This request will not be submitted again automatically.",
       };
     },
-    // This provider has no cancellation API; accepted work stays recorded until it finishes.
-    async cancel() {},
+    // This provider has no cancellation API: a stopped video is no longer followed or saved.
+    async cancel(job) {
+      const state = record(job);
+      if (state?.state !== "running" || !state.providerId) return;
+      polls.delete(job.id);
+      return result(
+        save(job, {
+          ...state,
+          state: "cancelled",
+          reason:
+            "Stopped. The provider can't cancel a video it accepted, so it may still finish it unseen.",
+        }),
+      );
+    },
     async saveOutputs(job) {
       const state = record(job);
       if (!state?.outputs.length) throw new Error("Provider outputs are not yet safely saved.");

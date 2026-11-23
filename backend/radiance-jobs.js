@@ -188,7 +188,8 @@ async function withModelTiming(id, client, model, marks, request, estimate) {
 }
 
 /**
- * A DELETE forgets an active video before its GPU stops; retain it until its terminal status.
+ * Follows a video to its MP4; nothing when it was stopped. Stop deletes the video: Radiance drops
+ * it while queued, but one already generating runs on unwatched until its GPU finishes it.
  * `marks` takes when Radiance accepted the video (its model loaded) and when it completed.
  */
 async function runVideo(id, client, record, save, body, pollMs, marks) {
@@ -206,6 +207,10 @@ async function runVideo(id, client, record, save, body, pollMs, marks) {
   let endsAt;
   while (video.status !== "completed") {
     if (ended(id)) throw new Error("Ended outside the run.");
+    if (stopping(id)) {
+      await client.deleteVideo(record.videoId).catch(() => null);
+      return cancelledRun(id);
+    }
     const failure = videoFailure(video);
     if (failure) throw Object.assign(new Error(failure), { terminal: true });
     const percent = Number(video.progress) || 0;
@@ -324,9 +329,8 @@ async function runRadiance(
     let outputs = record.outputs;
     if (!outputs.length) {
       let made;
-      if (record.videoId) {
-        made = await runVideo(id, client, record, save, undefined, pollMs);
-      } else {
+      if (record.videoId) made = await runVideo(id, client, record, save, undefined, pollMs);
+      else {
         const references = await referenceImages(record.body);
         const request = record.video
           ? videoRequest(record.values, references)
@@ -363,8 +367,8 @@ async function runRadiance(
           );
         }
         if (marks) marks.received = Date.now();
-        if (ended(id)) return;
       }
+      if (ended(id)) return;
       showProgress(id, "Saving");
       // Keep accepted bytes in this process while local storage is unavailable.
       for (const [index, bytes] of made.entries()) {

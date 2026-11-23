@@ -251,7 +251,6 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
         now += 1000;
         calls.push(["read", videoId]);
         if (jobs.get(id).progress) phases.push(jobs.get(id).progress);
-        if (calls.length === 4) jobs.set(id, { ...jobs.get(id), status: "cancelling" });
         const sample = [
           { status: "queued" },
           { status: "in_progress", steps_done: 2, steps_total: 10, progress: 18 },
@@ -263,7 +262,6 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
       },
       videoContent: async (videoId) => {
         phases.push(jobs.get(id).progress);
-        assert.match(jobs.get(id).error, /Radiance is finishing accepted work/);
         calls.push(["content", videoId]);
         return new Uint8Array([1, 2, 3]);
       },
@@ -287,12 +285,49 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
       ["Waiting for Execution", 0, 0, false],
       ["Generating", 2, 10, true],
       ["Generating", 4, 10, true],
-      ["Finishing accepted work", 92, 100, false],
+      ["Decoding", 92, 100, false],
       ["Saving", 0, 0, false],
     ],
   );
   assert.equal(typeof phases[2].endsAt, "number");
   assert.equal(jobs.get(id).status, "done");
+});
+
+test("Stop deletes a running video and records it cancelled without saving", async () => {
+  const id = "stop-video";
+  const body = { ...bodyFor(id), kind: "video" };
+  pending(id, body);
+  records.set(id, {
+    body,
+    video: true,
+    videoId: "stopped-video",
+    values: { model: "minimax-h3-i8", prompt: "Waves", frames: 192, seed: 1 },
+    outputs: [],
+  });
+  const calls = [];
+  await runRadianceJob(id, body, worker, {
+    store,
+    recovered: true,
+    pollMs: 1,
+    client: {
+      video: async (videoId) => {
+        calls.push(["read", videoId]);
+        if (calls.length === 2) jobs.set(id, { ...jobs.get(id), status: "cancelling" });
+        return { id: videoId, status: "in_progress", steps_done: 2, steps_total: 10 };
+      },
+      videoContent: () => {
+        throw new Error("must not download");
+      },
+      deleteVideo: async (videoId) => calls.push(["delete", videoId]),
+    },
+  });
+  assert.deepEqual(calls, [
+    ["read", "stopped-video"],
+    ["read", "stopped-video"],
+    ["delete", "stopped-video"],
+  ]);
+  assert.equal(jobs.get(id).status, "cancelled");
+  assert.equal(galleryItems({ jobId: id })[0].status, "cancelled");
 });
 
 test("a missing remote video fails explicitly without a replacement generation", async () => {

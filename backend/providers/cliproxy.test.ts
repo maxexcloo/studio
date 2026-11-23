@@ -414,7 +414,7 @@ test("lost synchronous response is recovered without resubmit and only its owner
   }
 });
 
-test("Stop keeps an accepted cloud video visible until its result is saved", async () => {
+test("Stop ends an accepted cloud video at once and saves nothing it finishes", async () => {
   const store = new Store(openDatabase(":memory:"));
   const remote = fixture();
   const saved: string[] = [];
@@ -447,12 +447,12 @@ test("Stop keeps an accepted cloud video visible until its result is saved", asy
     );
     await queue.tick();
     await queue.cancel("alice", job.id);
-    assert.equal(store.job("alice", job.id)?.status, "running");
+    assert.equal(store.job("alice", job.id)?.status, "cancelled");
     remote.complete();
     await queue.tick();
-    assert.equal(store.job("alice", job.id)?.status, "completed");
-    assert.deepEqual(saved, [job.id]);
-    assert.deepEqual(published, ["/fixture-video"]);
+    assert.equal(store.job("alice", job.id)?.status, "cancelled");
+    assert.deepEqual(saved, []);
+    assert.deepEqual(published, []);
     assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/generations").length, 1);
   } finally {
     store.close();
