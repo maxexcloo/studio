@@ -568,7 +568,7 @@ export function createInbox(options: {
         found.push({
           ...base,
           key: `pacing:${project.id}:pause`,
-          title: `Pause ${project.name}`,
+          title: `Disable ${project.name}`,
           why: `You kept ${kept} of its last ${judged} results${reviewed}`,
           change: { paused: true },
           evidence: options.dream

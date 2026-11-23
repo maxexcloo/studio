@@ -19,7 +19,7 @@ import {
   useDraft,
   useGeneration,
 } from "./GenerationProvider";
-import { generationInput, isProfile, referencePatch } from "./payload";
+import { generationInput, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
 import { CompactPromptFields, useDraftChange } from "./PromptFields";
 import { queueQuery } from "./Queue";
@@ -246,17 +246,15 @@ export function GenerationForm({
       onClear={() => {
         clearing.current = true;
         setCleared(draft);
-        const resetProfile = input.profileId
-          ? models.data?.profiles.find((candidate) => isProfile(candidate, input.profileId))
-          : preferred;
+        // Clear returns to the account's default profile, which the draft then follows.
         setDraft((previous) => ({
           sessionId: previous.sessionId,
           operation: previous.input.kind === "video" ? "animate" : "image",
           references: [],
-          defaultedProfileId: previous.defaultedProfileId,
+          defaultedProfileId: preferred?.id,
           input: {
-            ...(resetProfile
-              ? inputForProfile(initialInput, resetProfile)
+            ...(preferred
+              ? inputForProfile(initialInput, preferred)
               : { ...initialInput, kind: previous.input.kind }),
             seed: "",
           },

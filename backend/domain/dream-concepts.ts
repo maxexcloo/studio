@@ -172,6 +172,12 @@ function overlap(a: Set<string>, b: Set<string>) {
   const union = a.size + b.size - shared;
   return union ? shared / union : 0;
 }
+const stem = (word: string) => word.replace(/men$/, "man").replace(/([^s])s$/, "$1");
+/** Whether a prompt shares no word with a brief's subjects, so it can't be showing them. */
+export function missesSubjects(prompt: string, subjects: string) {
+  const wanted = new Set([...contentWords(subjects)].map(stem));
+  return wanted.size > 0 && ![...contentWords(prompt)].some((word) => wanted.has(stem(word)));
+}
 /** A short subject for an idea: its title, else its opening words. */
 export const subjectOf = (title: unknown, prompt: unknown) =>
   clean(title, 80) || clean(prompt, 400).split(" ").slice(0, 6).join(" ");
@@ -307,17 +313,22 @@ export function repeatedMotif(prompt: string, cooling: string[], motifs: string[
   );
 }
 
-/** Draw away from recently used anchors as well as asking for a different concept. */
+/**
+ * Draw away from recently used anchors as well as asking for a different concept. A project's
+ * idea (`briefed`) keeps the brief's subjects and styles, so it varies only what the brief leaves
+ * open.
+ */
 export function direction(
   { explore, feature }: { explore?: boolean; feature?: string },
   recent: string[],
   used: string[],
   hasTaste: boolean,
   random: (size: number) => number,
+  briefed = false,
 ) {
   const words = recent.slice(0, diversity.results).map(contentWords);
   const available = Object.entries(axes).filter(
-    ([axis]) => !hasTaste || (axis !== "subject" && axis !== "medium or style"),
+    ([axis]) => !(hasTaste || briefed) || (axis !== "subject" && axis !== "medium or style"),
   );
   const drawn = available.map(([axis, values]) => {
     const unused = values.filter((value) => !used.includes(`${axis}: ${value}`));
@@ -335,11 +346,13 @@ export function direction(
   });
   return {
     anchors: drawn,
-    text: promptInstruction("dream-diversity", {
-      tasteDirection: promptInstruction(explore ? "explore-dream-taste" : "follow-dream-taste"),
-      featuredTaste: feature ? promptInstruction("feature-dream-taste", { feature }) : "",
-      startingPoints: drawn.join("; "),
-    }),
+    text: briefed
+      ? promptInstruction("project-diversity", { startingPoints: drawn.join("; ") })
+      : promptInstruction("dream-diversity", {
+          tasteDirection: promptInstruction(explore ? "explore-dream-taste" : "follow-dream-taste"),
+          featuredTaste: feature ? promptInstruction("feature-dream-taste", { feature }) : "",
+          startingPoints: drawn.join("; "),
+        }),
   };
 }
 
