@@ -58,6 +58,12 @@ function briefText(
     .join("\n");
 }
 const briefHash = (brief: string) => createHash("sha256").update(brief).digest("hex").slice(0, 12);
+/** A review as the result saves it: the reply, when, and which brief it judged. */
+export const reviewRecord = (
+  reply: { score: number; miss: string; model: string },
+  brief: string,
+  at: number,
+): Review => ({ ...reply, at: new Date(at).toISOString(), brief: briefHash(brief) });
 
 /**
  * A model's reply as a review: a whole score from 1 to 10, and a miss only at `missAt` or below,
@@ -126,7 +132,7 @@ export function createReview(options: {
   };
   // Checked before each pick, so an owner's images wait while their text model can't read them.
   const vision = { cloud: true, local: false };
-  return createIdleWork<ReviewItem>({
+  const work = createIdleWork<ReviewItem>({
     ...options,
     name: "Self-review",
     off: "Self-Review is off in Settings › Maintenance.",
@@ -158,7 +164,9 @@ export function createReview(options: {
         writer: options.text(item.ownerId || ""),
       });
       if (signal.aborted) return;
-      options.save(item, { ...reply, at: new Date(now()).toISOString(), brief: briefHash(text) });
+      options.save(item, reviewRecord(reply, text, now()));
     },
   });
+  /** The brief `item` is judged by, which enrich (domain/enrich.ts) reviews it against too. */
+  return { ...work, brief };
 }

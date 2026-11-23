@@ -112,7 +112,7 @@ Use an ordinary Studio account for this shared connection. Every authorised Open
 
 The optional prompt assistant accepts an OpenAI-compatible Chat Completions endpoint directly or through Bifrost. Set `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` to the endpoint's URL, key and model ID. Leave all three unset to run Studio without the assistant. With managed local text workloads, `STUDIO_LOCAL_TEXT_MODEL` supplies their model ID.
 
-**Background AI** (**Settings › Studio**) has a switch for each call Studio makes on its own; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
+**Background AI** (**Settings › Studio**) has a switch for each task Studio does on its own, and a finished image is read once for the caption, title, review and suggested prompt it needs; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
 
 ## Downloads & Imports
 

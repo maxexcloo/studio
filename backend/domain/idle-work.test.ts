@@ -63,6 +63,38 @@ test("overlapping wakes select from the gallery once", async () => {
   assert.deepEqual(started, ["a"]);
 });
 
+test("items another run takes are passed by until it releases them", async () => {
+  let clock = 0;
+  const started: string[] = [];
+  const work = createIdleWork<IdleItem>({
+    name: "Test work",
+    enabled: () => true,
+    unavailable: async () => "",
+    idle: () => true,
+    allowed: () => true,
+    items: () => [{ id: "a", status: "done" }],
+    visible: () => true,
+    wanted: (item) => !started.includes(item.id!),
+    run: async (item) => {
+      started.push(item.id!);
+    },
+    now: () => clock,
+  });
+  const claim = await work.take([
+    { id: "a", status: "done" },
+    { id: "pending", status: "pending" },
+  ]);
+  assert.deepEqual(
+    claim.items.map((item) => item.id),
+    ["a"],
+  );
+  assert.equal(await work.tick(), "none");
+  claim.release();
+  clock += 10_000;
+  assert.equal(await work.tick(), "done");
+  assert.deepEqual(started, ["a"]);
+});
+
 test("an interrupted completion keeps its turn ahead of the gallery walk", async () => {
   let clock = 0;
   const completed = { id: "completed", status: "done" };
