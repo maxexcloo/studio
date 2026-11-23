@@ -132,7 +132,7 @@ const list = (values) => JSON.stringify([...values].map(String));
  * one or several; `dreamArm` keeps Dream results whose arm starts with one of its prefixes,
  * `notDreamArm` leaves out one arm and `dreamPair` keeps (or leaves out) comparison sides; `liked` keeps
  * the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
- * items and `turnId` one turn of a chat; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
+ * items and `turnId` one turn of a chat; `ids` match items' ids, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
  * pending one, `before` those made by then; `limit` (galleryItems) reads only that many; `prompt` matches the prompt exactly and `titled` keeps
  * items with a title.
@@ -225,8 +225,6 @@ function where(query = {}) {
   if (query.idPrefix)
     add("item_id >= ? AND item_id < ?", query.idPrefix, `${query.idPrefix}\uffff`);
   if (query.ids) add("item_id IN (SELECT value FROM json_each(?))", list(query.ids));
-  if (query.notIds?.length)
-    add("item_id NOT IN (SELECT value FROM json_each(?))", list(query.notIds));
   if (query.named)
     add(
       "(item_id IN (SELECT value FROM json_each(?)) OR key IN (SELECT value FROM json_each(?)))",

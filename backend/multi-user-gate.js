@@ -70,11 +70,11 @@ const ordinaryRoutes = [
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   [
     "GET",
-    /^\/api\/(comparisons(\/[\w-]+)?|taste(\/reflection)?|dream(\/calibration|\/count|\/discarded|\/history|\/inbox)?)$/,
+    /^\/api\/(comparisons(\/[\w-]+)?|taste(\/reflection)?|dream(\/count|\/discarded|\/history|\/inbox)?)$/,
   ],
   [
     "POST",
-    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions(\/inspect)?|dream\/(calibration|pass|reset-limit|undo|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more|super-like)|dream\/(pairs|sets)\/[^/]+\/answer)$/,
+    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions(\/inspect)?|dream\/(pass|reset-limit|undo|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more|super-like)|dream\/(pairs|sets)\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],

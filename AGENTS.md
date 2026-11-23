@@ -192,7 +192,8 @@ recur across features.
 - Outside click and Escape close only the topmost layer; nothing beneath
   reacts. On phones the first outside tap consumes the pointer and click,
   leaving the control beneath for the next tap. A closing layer no longer
-  counts while it fades out.
+  counts while it fades out. In the viewer, Escape first leaves a text box,
+  keeping its edit, then closes the docked Details, then the viewer.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
   and dialogs that can have another dialog above use `closeWhenTop`.
 - A trigger's tooltip is a `PopupTooltip` wrapping `Popover.Target` or
@@ -223,7 +224,9 @@ recur across features.
   Clear are left to the browser, and a box starting from its own text shows
   Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
-  marks prompt assistance. The viewer keeps its prompt send beside the text.
+  marks prompt assistance. An AI tool with a single option runs it on
+  click, named by that option, and is a menu only while a proposal adds
+  Undo. The viewer keeps its prompt send beside the text.
   Composer fields edit in place: at rest the phone Generate sheet's prompt,
   and its Negative Prompt when shown, share the room between its heading and
   the chips, which wrap onto as many rows as they need; each box shows only

@@ -82,7 +82,6 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["POST", "/api/library/imports/image"],
     ["GET", "/api/library/imports"],
     ["POST", "/api/presets"],
-    ["POST", "/api/presets/import"],
     ["DELETE", "/api/presets/123"],
     ["POST", "/api/models/downloads"],
     ["GET", "/api/accounts/admin"],

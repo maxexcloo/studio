@@ -5,7 +5,6 @@ import {
   type RefObject,
   memo,
   useCallback,
-  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -14,8 +13,6 @@ import {
 } from "react";
 
 import type { MediaItem } from "../../types";
-import { layerAbove } from "../../ui/popupClicks";
-import { usePhone } from "../../ui/usePhone";
 import { DateScrubber, type GallerySection } from "./DateScrubber";
 import { dayHeading, mediaDay } from "./mediaLabels";
 import { mediaIdentity } from "./mediaSource";
@@ -23,7 +20,6 @@ import { MediaTile } from "./MediaTile";
 import type { GalleryDate } from "./queries";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
 import type { GallerySelection, SelectionActions } from "./useGallerySelection";
-import { useRatings } from "./useMediaRating";
 
 import classes from "./MediaGrid.module.css";
 
@@ -74,7 +70,6 @@ interface GridLayout {
 // A day heading's height, and the space above each day after the first.
 const headingHeight = 36;
 const sectionSpace = 12;
-const doubleTapMs = 260;
 
 /** A layout being built, with each lane's next free top. */
 type Building = GridLayout & { lanes: number[] };
@@ -205,41 +200,8 @@ export function MediaGrid({
   leadingPage,
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
-  const phone = usePhone();
-  const { mutate: rate } = useRatings();
   const gridId = useId();
   const pendingFocus = useRef<string | null>(null);
-  const pendingTap = useRef<{ id: string; clear: () => void } | null>(null);
-  const cancelTap = useCallback(() => {
-    pendingTap.current?.clear();
-    pendingTap.current = null;
-  }, []);
-  useEffect(() => cancelTap, [cancelTap, results, selection.selecting]);
-  const onTap = useCallback(
-    (item: MediaItem, target: HTMLButtonElement) => {
-      const twice = pendingTap.current?.id === item.id;
-      cancelTap();
-      if (twice) {
-        if (item.rating !== "liked") rate({ ids: [item.id], rating: "liked" });
-        return;
-      }
-      const timer = window.setTimeout(() => {
-        cancelTap();
-        if (!target.isConnected || layerAbove(target)) return;
-        target.focus({ preventScroll: true });
-        open(item);
-      }, doubleTapMs);
-      window.addEventListener("scroll", cancelTap, { capture: true, passive: true });
-      pendingTap.current = {
-        id: item.id,
-        clear: () => {
-          window.clearTimeout(timer);
-          window.removeEventListener("scroll", cancelTap, true);
-        },
-      };
-    },
-    [cancelTap, open, rate],
-  );
   const [menuItem, setMenuItem] = useState<string | null>(null);
   const hold = useHoldToSelect(items, selection, setMenuItem);
   const layout = useMemo(
@@ -364,7 +326,6 @@ export function MediaGrid({
               setMenuItem={setMenuItem}
               onArrow={onArrow}
               open={open}
-              onTap={phone && item.status === "done" && !selection.selecting ? onTap : undefined}
               selecting={selection.selecting}
               selected={selection.selected.has(item.id)}
               select={selection.actions}
@@ -410,7 +371,6 @@ const GridCell = memo(function GridCell({
   setMenuItem,
   onArrow,
   open,
-  onTap,
   detail,
   renderActions,
   ...tile
@@ -427,7 +387,6 @@ const GridCell = memo(function GridCell({
   menuOpen: boolean;
   setMenuItem: (id: string | null) => void;
   onArrow: (index: number, event: KeyboardEvent<HTMLButtonElement>) => void;
-  onTap?: (item: MediaItem, target: HTMLButtonElement) => void;
   hold: ReturnType<typeof useHoldToSelect>;
   eager: boolean;
   selecting: boolean;
@@ -449,7 +408,6 @@ const GridCell = memo(function GridCell({
         transform: `translateY(${top}px)`,
       }}
       onOpen={() => open(item)}
-      onTap={onTap && ((target) => onTap(item, target))}
       onMenu={() => setMenuItem(item.id)}
       actions={renderActions(item, menuOpen, (opened) => setMenuItem(opened ? item.id : null))}
       onKeyDown={(event) => onArrow(index, event)}

@@ -15,7 +15,7 @@ const result = (id: string, title: string, createdAt = stamp) => ({
   createdAt,
 });
 
-test("A phone double tap likes the tile and a single tap opens it", async ({ page, isMobile }) => {
+test("A phone tap opens the tile at once", async ({ page, isMobile }) => {
   test.skip(!isMobile, "Phone touch gesture");
   const state = await fixtures(page);
   state.gallery.push(result("bird", "Amber Bird"));
@@ -23,14 +23,9 @@ test("A phone double tap likes the tile and a single tap opens it", async ({ pag
   const tile = page.getByRole("button", { name: "Open image: Amber Bird", exact: true });
   await expect(tile).toBeVisible();
   const box = (await tile.boundingBox())!;
-  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  await page.touchscreen.tap(point.x, point.y);
-  await page.touchscreen.tap(point.x, point.y);
-  await expect.poll(() => state.gallery[0].rating).toBe("liked");
-  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(viewer).toBeHidden();
-  await page.touchscreen.tap(point.x, point.y);
-  await expect(viewer).toBeVisible();
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+  expect(state.gallery[0].rating).toBeUndefined();
 });
 
 test("Returning to Gallery offers a jump only after an image arrives while away", async ({

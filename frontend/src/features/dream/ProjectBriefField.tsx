@@ -41,7 +41,8 @@ export function ProjectBriefField({
     mutationFn: ({ name, brief }: Context) =>
       post<{ text: string }>("/api/assistant/project-brief", { name, brief, field }),
   });
-  const label = value.trim() ? "Improve" : "Suggest";
+  // Each brief box offers its own, so the action names its field.
+  const label = `${value.trim() ? "Improve" : "Suggest"} ${props.label}`;
   const writeAction = {
     id: "write",
     icon: icons.assistant,

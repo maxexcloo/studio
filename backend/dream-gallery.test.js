@@ -121,15 +121,10 @@ test("Dream reads its results, an owner's liked items and a chat's items by quer
   assert.deepEqual(ids({ dreamProject: "coast", dreamState: "kept", status: "done" }), ["kept"]);
   assert.deepEqual(ids({ liked: true }), ["kept", "liked"]);
   assert.deepEqual(ids({ conversationIds: ["chat-1"] }), ["asked"]);
-  // Calibration's random pick of older records.
-  assert.deepEqual(
-    ids({
-      before: Date.now() + 1000,
-      notIds: ["plain", "liked"],
-      jobIds: ["job-plain", "job-liked", "job-asked"],
-    }),
-    ["asked"],
-  );
+  assert.deepEqual(ids({ before: Date.now() + 1000, jobIds: ["job-plain", "job-asked"] }), [
+    "asked",
+    "plain",
+  ]);
   assert.deepEqual(ids({ before: 0 }), []);
   assert.equal(ids({ sample: 2 }).length, 2);
 });

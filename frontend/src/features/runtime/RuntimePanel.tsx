@@ -4,6 +4,7 @@ import { Circle, CircleDot } from "lucide-react";
 
 import type {
   ServiceHealth,
+  ServiceKind,
   ServiceStatus,
   ServicesStatus,
   WorkerStatus,
@@ -39,6 +40,16 @@ const capabilityLabels: Record<string, string> = {
   video: "Videos",
 };
 
+/**
+ * What a worker, or the workers serving a kind, are doing: its failing or stopped state, else Busy
+ * or Idle, then how much waits for it. Settings › Workers and Status both read it this way.
+ */
+const activity = (state: ServiceHealth, running: boolean, queued: number) =>
+  [
+    state !== "healthy" ? healthLabel(state) : running ? "Busy" : "Idle",
+    queued > 0 && `${queued} Queued`,
+  ].filter((part) => part !== false);
+
 /** "11.2 GiB Free" from a worker's free memory in bytes. */
 const gibFree = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB Free`;
 
@@ -72,12 +83,7 @@ function WorkerList({ workers }: { workers: WorkerStatus[] }) {
               {[
                 "",
                 worker.capabilities.map((id) => capabilityLabels[id] || id).join(", "),
-                worker.state !== "healthy"
-                  ? healthLabel(worker.state)
-                  : worker.currentJob
-                    ? "Busy"
-                    : "Idle",
-                `${worker.queued} Queued`,
+                ...activity(worker.state, Boolean(worker.currentJob), worker.queued),
                 worker.memoryFree !== undefined && gibFree(worker.memoryFree),
               ]
                 .filter((part) => part !== false)
@@ -117,16 +123,27 @@ export function serviceSummary({ data, error }: UseQueryResult<ServicesStatus>) 
     return { colour: "red", label: "Services Unavailable" };
   return { colour: "yellow", label: "Services Partly Available" };
 }
-/** A media service's state: Stopped or another failing state, else how many workers run its jobs. */
-const mediaState = (service: ServiceStatus) => {
-  if (service.state !== "healthy") return healthLabel(service.state);
-  const running = service.endpoints.filter((endpoint) => endpoint.running).length;
-  return running ? `${running} running` : "Idle";
+/**
+ * A kind's workers that can run (a parked one is Stopped, not available) and what they are doing,
+ * or Stopped when every one is parked.
+ */
+const serviceDetail = (kind: ServiceKind, service: ServiceStatus) => {
+  if (service.state === "parked") return healthLabel(service.state);
+  const live = service.endpoints.filter((endpoint) => endpoint.state !== "parked");
+  const state =
+    kind === "text"
+      ? [healthLabel(service.state)]
+      : activity(
+          service.state,
+          live.some((endpoint) => endpoint.running),
+          live.reduce((sum, endpoint) => sum + (endpoint.queued ?? 0), 0),
+        );
+  return [plural(live.length, "worker"), ...state].join(" · ");
 };
 /**
- * The status panel's quiet summary, one line per kind: its health dot, then how many workers or
- * workers serve it and their state. Text without a local worker runs in the cloud. Read-only
- * and the same for everyone; Settings › Workers holds the controls.
+ * The status panel's quiet summary, one line per kind: its health dot, then how many workers
+ * can serve it and their state. Text without a local worker runs in the cloud. Read-only and the
+ * same for everyone; Settings › Workers holds the controls.
  */
 export function ServiceHealthSummary() {
   const status = useQuery(servicesStatusQuery);
@@ -146,13 +163,8 @@ export function ServiceHealthSummary() {
       )}
       {available.map(({ kind, label }) => {
         const service = status.data!.services[kind]!;
-        const count = service.endpoints.length;
-        const cloud = kind === "text" && !count;
-        const detail = cloud
-          ? "Cloud only"
-          : kind === "text"
-            ? `${plural(count, "worker")} · ${healthLabel(service.state)}`
-            : `${plural(count, "worker")} · ${mediaState(service)}`;
+        const cloud = kind === "text" && !service.endpoints.length;
+        const detail = cloud ? "Cloud only" : serviceDetail(kind, service);
         return (
           <Group key={kind} gap="xs" wrap="nowrap" aria-label={`${label}: ${detail}`}>
             <Circle

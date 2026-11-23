@@ -458,8 +458,15 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   ]);
   expect(state.jobs.every((job: any) => job.parentItemId === "source")).toBe(true);
   await page.getByRole("button", { name: "Open Prompt B", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer).toBeVisible();
+  if (!test.info().project.use.isMobile) {
+    // The first Escape closes the docked Details, the next the viewer.
+    await page.keyboard.press("Escape");
+    await expect(viewer).toBeVisible();
+  }
   await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   await page.keyboard.press("2");
   await expect(
     page.getByRole("button", { name: "Clear Winner Prompt B", exact: true }),

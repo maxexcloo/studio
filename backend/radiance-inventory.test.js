@@ -257,6 +257,48 @@ test("a Radiance profile that loads reference images is offered", async () => {
   assert.equal(offered.capabilities.transparent, true);
 });
 
+test("FLUX.3 [klein] paints a mask on Radiance unless its profile turns inpainting off", async () => {
+  const { inferModels } = await import("./model/models.js");
+  const model = "flux3-klein-bf16";
+  const flux3 = (id, capabilities) =>
+    saveImportedWorkflow({
+      studio: {
+        id,
+        kind: "image",
+        family: "flux3",
+        defaults: { model, width: 1024, height: 1024 },
+        controls: Object.fromEntries(
+          ["model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
+        ),
+        mediaInputs: [
+          {
+            id: "reference",
+            kind: "image",
+            label: "Reference Image",
+            control: { input: "image", node: "3" },
+            max: 1,
+          },
+        ],
+        ...(capabilities && { capabilities }),
+      },
+      graph: {
+        1: { class_type: "RadianceImageGenerate", inputs: { model, "images.image_1": ["3", 0] } },
+        2: { class_type: "SaveImage", inputs: { images: ["1", 0] } },
+        3: { class_type: "LoadImage", inputs: { image: "reference.png" } },
+      },
+    });
+  flux3("flux3-paints");
+  flux3("flux3-no-paint", { inpaint: false });
+  const stats = { radiance: [{ id: model, state: "cold" }] };
+  const { profiles } = inferModels(radianceInfo(stats.radiance), stats);
+  const paints = profiles.find((item) => item.id === "custom:flux3-paints");
+  assert.equal(paints.capabilities.inpaint, true);
+  assert.equal(paints.capabilities.inpaintStitch, false);
+  assert.equal(paints.capabilities.transparent, false);
+  const off = profiles.find((item) => item.id === "custom:flux3-no-paint");
+  assert.equal(off.capabilities.inpaint, false);
+});
+
 test("a masked Qwen edit on Radiance keeps its mask and stages nothing in ComfyUI", async () => {
   const { inferModels } = await import("./model/models.js");
   const { createGenerationSubmission } = await import("./generation-routes.js");

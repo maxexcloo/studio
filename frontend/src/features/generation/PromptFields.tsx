@@ -238,7 +238,6 @@ export function PromptFields({
         <TextBox
           ref={textareaRef}
           tools={[assistantTool, history.action].filter((tool) => !!tool)}
-          copyBefore={history.action.id}
           busy={assistant.working}
           popups={history.popup}
           data-composer-prompt={compact || undefined}

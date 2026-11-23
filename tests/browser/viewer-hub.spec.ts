@@ -332,8 +332,7 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   await expect(fix).toBeDisabled();
   await report.getByText("Hands", { exact: true }).click();
   await expect(report.getByRole("checkbox", { name: "Hands", exact: true })).toBeChecked();
-  await promptMenu(report, "Details");
-  await page.getByRole("menuitem", { name: "Inspect Image", exact: true }).click();
+  await report.getByRole("button", { name: "Inspect Image", exact: true }).click();
   // The finding fills the details in place, with Undo.
   const details = report.getByRole("textbox", { name: "Details", exact: true });
   await expect(details).toHaveValue("six toes");
@@ -1908,6 +1907,27 @@ test("The gallery viewer opens without desktop Details", async ({ page }, testIn
     viewer.getByRole("button", { name: "Generation Details", exact: true }),
   ).toHaveAttribute("aria-expanded", "false");
   await expect(details).toBeHidden();
+});
+
+test("Escape leaves the prompt, then closes Details, then the viewer", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones edit and show Details in sheets.");
+  const { viewer } = await seed(page);
+  const details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(details).toBeVisible();
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await field.fill("An amber bird at dusk");
+  await page.keyboard.press("Escape");
+  await expect(field).not.toBeFocused();
+  await expect(field).toHaveValue("An amber bird at dusk");
+  await expect(details).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(details).toBeHidden();
+  await expect(viewer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
 });
 
 test("Phone Details hides the viewer actions and swipes closed", async ({
