@@ -41,6 +41,7 @@ test.before(async () => {
         { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
       ]),
       STUDIO_DATA_DIR: dataDir,
+      STUDIO_RELEASE_VERSION: "v2026.1.1.1",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
@@ -83,6 +84,7 @@ const api = async (pathname, options = {}) => {
 test("the server says who it is, and an unknown API route fails as JSON", async () => {
   const ping = await api("/api/ping");
   assert.equal(ping.body.app, "studio");
+  assert.equal((await api("/api/stats")).body.releaseVersion, "v2026.1.1.1");
   const unknown = await api("/api/no-such-thing");
   assert.equal(unknown.status, 404);
   assert.match(unknown.body.error, /Unknown API route/);

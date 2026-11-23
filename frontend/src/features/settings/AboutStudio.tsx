@@ -123,14 +123,16 @@ function Help() {
   );
 }
 
-/** Settings › About: the running commit, releases, licences, help and credits. */
+/** Settings › About: the running release and commit, licences, help and credits. */
 export function AboutStudio() {
   const stats = useQuery({
     queryKey: ["stats"],
-    queryFn: () => api<{ stats?: { outputs?: number }; version: string }>("/api/stats"),
+    queryFn: () =>
+      api<{ stats?: { outputs?: number }; version: string; releaseVersion?: string }>("/api/stats"),
   });
   const outputs = stats.data?.stats?.outputs;
   const commit = stats.data?.version;
+  const release = stats.data?.releaseVersion;
   return (
     <Stack gap="lg">
       <Stack align="center" gap={6} py="md">
@@ -142,6 +144,11 @@ export function AboutStudio() {
       </Stack>
       {/* What is running leads; the other groups follow A–Z. */}
       <SettingGroup title="Release">
+        {release && (
+          <SettingRow label="Version" description="The release running here.">
+            {link(`${repository}/releases/tag/${release}`, release)}
+          </SettingRow>
+        )}
         <SettingRow label="Commit" description="The commit running here.">
           {commit ? (
             link(`${repository}/commit/${commit}`, commit)
