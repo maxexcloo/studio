@@ -204,12 +204,16 @@ export function DreamPage() {
       data={(["image", "video"] as const).map((kind) => ({
         value: kind,
         label: (
-          <>
-            {mediaLabels[kind]}{" "}
-            <span className={classes.count} data-hidden={pending[kind] === undefined || undefined}>
-              ({pending[kind] ?? 0})
+          <span
+            className={classes.count}
+            data-label={deck ? `${mediaLabels[kind]} (00)` : mediaLabels[kind]}
+          >
+            <span>
+              {pending[kind] === undefined
+                ? mediaLabels[kind]
+                : `${mediaLabels[kind]} (${pending[kind]})`}
             </span>
-          </>
+          </span>
         ),
       }))}
     />
