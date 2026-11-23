@@ -174,7 +174,8 @@ const loadCost = (job: OwnedJob, warm: OwnedJob[]) => {
 };
 const reuseBypassLimit = 3;
 const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
-const mediaRank = (job: OwnedJob) => tier(job) + (job.input.kind === "video" ? 0.5 : 0);
+/** A job's place among waiting work: its tier, photos before videos. */
+export const mediaRank = (job: OwnedJob) => tier(job) + (job.input.kind === "video" ? 0.5 : 0);
 /** A local video job: on a worker, not a cloud provider. */
 const localVideo = (job: OwnedJob) =>
   job.resource.startsWith("worker:") && job.input.kind === "video";
