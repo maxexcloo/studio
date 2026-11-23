@@ -54,7 +54,6 @@ import {
   networkListening,
   optionsFor,
   port,
-  root,
   setListeningPort,
 } from "./comfy/comfy.js";
 import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
@@ -62,7 +61,7 @@ import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
-import { appVersion, dataDir } from "./data-dir.js";
+import { appVersion, dataDir, projectRoot } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
@@ -1332,7 +1331,7 @@ registerGalleryDeleteRoute(app, {
 
 registerComfyMediaRoutes(app);
 
-const dist = path.join(root, "dist");
+const dist = path.join(projectRoot, "dist");
 // An unknown API route must fail as JSON, never fall through to the app page.
 app.all("/api/*splat", (_req, res) =>
   res
