@@ -1,4 +1,4 @@
-import { Button, Group, Stack, Text } from "@mantine/core";
+import { Button, Group, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { assistMenu, suggested } from "./AskChange";
 import { CustomDialog } from "./CustomDialog";
 import { profileForLoras } from "./payload";
 
@@ -37,10 +38,7 @@ interface AssistantStatus {
 }
 interface Suggestion {
   name: string;
-  title: string;
   strength: number;
-  triggers: string[];
-  reason: string;
 }
 interface Result {
   prompt?: string;
@@ -83,7 +81,7 @@ async function referenceImage(asset: ReferenceAsset, signal: AbortSignal) {
 
 /**
  * The prompt box's assistance tool (Improve Prompt, Stop Assistance while it works), what it is
- * doing, its Custom… dialog and any LoRA suggestions it produced.
+ * doing, its Custom… dialog and Suggest LoRAs, which adds the LoRAs that fit the prompt.
  */
 export function usePromptAssistant({
   input,
@@ -121,7 +119,6 @@ export function usePromptAssistant({
   const editAfter = useRef(false);
   // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loraFeedback, setLoraFeedback] = useState<{ message: string; error?: boolean }>();
   const [negativeIdea, setNegativeIdea] = useState<{ key: string; value: string }>();
   const controller = useRef<AbortController | null>(null);
@@ -144,7 +141,6 @@ export function usePromptAssistant({
   useEffect(() => {
     mounted.current = true;
     scope.current++;
-    setSuggestions([]);
     setLoraFeedback(undefined);
     return () => {
       mounted.current = false;
@@ -348,13 +344,33 @@ export function usePromptAssistant({
       }
       const offered = new Set(current.loraProfile?.options?.loras || []);
       const usable = (result.loras || []).filter((item) => offered.has(item.name));
-      setSuggestions(usable);
       if (!usable.length)
-        setLoraFeedback({
+        return setLoraFeedback({
           message: result.loras?.length
             ? "The suggested LoRAs are no longer available for the selected model."
             : result.reason || "No LoRAs fit this prompt.",
         });
+      const loras = current.input.loras;
+      const room =
+        (current.loraProfile?.maxLoras || maxLoras) -
+        loras.filter((item) => item.enabled !== false).length;
+      const added = usable
+        .filter((item) => !loras.some((lora) => lora.name === item.name))
+        .slice(0, Math.max(0, room));
+      if (!added.length)
+        return setLoraFeedback({
+          message:
+            room > 0
+              ? "The suggested LoRAs are already in the stack."
+              : "Disable or remove a LoRA before adding another.",
+        });
+      // Studio adds enabled LoRAs' trigger words when it runs the prompt.
+      applyChange(added.length === 1 ? "LoRA added" : "LoRAs added", {
+        loras: [
+          ...loras,
+          ...added.map((item) => ({ name: item.name, strength: item.strength, enabled: true })),
+        ],
+      });
     },
     onError: (error, source) => {
       if (mounted.current && source.scope === scope.current && error.name !== "AbortError")
@@ -365,26 +381,6 @@ export function usePromptAssistant({
     },
   });
   const assisting = assistance.isPending || findLoras.isPending;
-  function apply(suggestion: Suggestion) {
-    if (input.loras.some((item) => item.name === suggestion.name)) return;
-    if (
-      input.loras.filter((item) => item.enabled !== false).length >=
-      (loraProfile?.maxLoras || maxLoras)
-    ) {
-      setLoraFeedback({
-        message: "Disable or remove a LoRA before adding another.",
-      });
-      return;
-    }
-    setLoraFeedback(undefined);
-    // Studio adds enabled LoRAs' trigger words when it runs the prompt.
-    applyChange("LoRA applied", {
-      loras: [
-        ...input.loras,
-        { name: suggestion.name, strength: suggestion.strength, enabled: true },
-      ],
-    });
-  }
   if (!info?.available || !profile || !info.presets.length)
     return { working: undefined, dialog: null };
   const disabled = !input.prompt.trim();
@@ -452,42 +448,10 @@ export function usePromptAssistant({
       suggestions={change?.suggestions}
     />
   );
-  const list = suggestions.length ? (
-    <Stack gap="xs">
-      {suggestions.map((item) => {
-        const added = input.loras.some((lora) => lora.name === item.name);
-        return (
-          <Group key={item.name} justify="space-between" wrap="nowrap" align="start">
-            <Stack gap={2} style={{ minWidth: 0 }}>
-              <Text size="sm">{item.title || item.name}</Text>
-              <Text size="xs" c="dimmed">
-                {item.reason}
-              </Text>
-              {!!item.triggers?.length && (
-                <Text size="xs" c="dimmed">
-                  Trigger words: {item.triggers.join(", ")}
-                </Text>
-              )}
-            </Stack>
-            <Button
-              size="compact-sm"
-              variant="default"
-              disabled={added || assisting}
-              aria-label={`Apply ${item.title || item.name}`}
-              onClick={() => apply(item)}
-            >
-              {added ? "Added" : "Apply"}
-            </Button>
-          </Group>
-        );
-      })}
-    </Stack>
-  ) : null;
   const preview = negativeIdea?.key === negativeKey ? negativeIdea.value : undefined;
   const loadNegative = () => {
     if (!assisting) assistance.mutate({ action: "negative", preview: true });
   };
-  const negativeLoading = assistance.isPending && assistance.variables.action === "negative";
   const negativeFailed = assistance.isError && assistance.variables?.action === "negative";
   const negativeTool: ToolAction | undefined = negativeOffered
     ? {
@@ -497,39 +461,28 @@ export function usePromptAssistant({
         onOpen: () => {
           if (!disabled && preview === undefined) loadNegative();
         },
-        menu: [
-          [
+        menu: assistMenu({
+          suggestions: suggested(
+            preview
+              ? [
+                  {
+                    id: "negative-idea",
+                    label: preview,
+                    onClick: () => applyChange("Negative prompt written", { negative: preview }),
+                  },
+                ]
+              : [],
             {
-              id: "negative-suggestions",
-              label: "Suggestions",
-              icon: icons.assistant,
-              disabled: disabled || negativeLoading,
-              loading: negativeLoading,
-              menu: [
-                [
-                  negativeLoading || (preview === undefined && !negativeFailed)
-                    ? { id: "loading-negative", label: "Loading…", disabled: true }
-                    : preview
-                      ? {
-                          id: "negative-idea",
-                          label: preview,
-                          onClick: () =>
-                            applyChange("Negative prompt written", { negative: preview }),
-                        }
-                      : { id: "no-negative", label: "No Suggestions", disabled: true },
-                ],
-              ],
+              loading: assisting,
+              answered: preview !== undefined || negativeFailed,
+              failure: negativeFailed ? assistance.error.message : undefined,
+              disabled,
+              onRefresh: loadNegative,
             },
-            {
-              id: "refresh-negative",
-              label: "Refresh",
-              icon: icons.refresh,
-              disabled: disabled || assisting,
-              keepOpen: true,
-              onClick: loadNegative,
-            },
-          ],
-        ],
+          ),
+          templates: [],
+          last: [],
+        }),
       }
     : undefined;
   return {
@@ -545,7 +498,6 @@ export function usePromptAssistant({
           loading: findLoras.isPending,
           feedback: loraFeedback,
           onClick: () => {
-            setSuggestions([]);
             setLoraFeedback(undefined);
             findLoras.mutate({
               scope: scope.current,
@@ -555,7 +507,6 @@ export function usePromptAssistant({
               prompt: input.prompt,
             });
           },
-          list,
         }
       : undefined,
     negativeTool,

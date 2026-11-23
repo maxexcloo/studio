@@ -146,26 +146,44 @@ export function SendButton({
   );
 }
 
-/** Suggestions show a status row until choices are ready. */
+/**
+ * Suggestions as a submenu and Refresh beside it. Neither spins: Suggestions greys until it has
+ * options, saying why once an answer brings none, and keeps them while Refresh asks for others.
+ */
 export function suggested(
-  loading: boolean,
   list: Action[],
-  refresh: Pick<Action, "disabled" | "onClick">,
-  failure?: string,
-): { options: Action[]; again: Action } {
+  {
+    loading,
+    answered,
+    failure,
+    disabled,
+    onRefresh,
+  }: {
+    loading: boolean;
+    /** An answer or failure arrived, so an empty list has a reason to show. */
+    answered: boolean;
+    failure?: string;
+    disabled?: boolean;
+    onRefresh: () => void;
+  },
+): { action: Action; refresh: Action } {
+  const empty = !list.length;
   return {
-    options: loading
-      ? [{ id: "loading-suggestions", label: "Loading…", disabled: true }]
-      : list.length
-        ? list
-        : [{ id: "none", label: failure || "No Suggestions", disabled: true }],
-    again: {
+    action: {
+      id: "suggestions",
+      label: "Suggestions",
+      icon: icons.assistant,
+      disabled: disabled || empty,
+      description: empty && answered && !loading ? failure || "No suggestions." : undefined,
+      menu: [list],
+    },
+    refresh: {
       id: "refresh",
       label: "Refresh",
       icon: icons.refresh,
       keepOpen: true,
-      ...refresh,
-      disabled: loading || refresh.disabled,
+      disabled: disabled || loading,
+      onClick: onRefresh,
     },
   };
 }
@@ -192,30 +210,21 @@ export function useChangeSuggestions<K extends QueryKey>({
     mutationFn: fresh,
     onSuccess: (answer) => client.setQueryData<Suggestions<NextStep>>(query.queryKey, answer),
   });
-  const list = [...(steps.data?.suggestions ?? [])]
+  const options = [...(steps.data?.suggestions ?? [])]
     .slice(0, maxSuggestions)
-    .sort((a, b) => compareNames(a.label, b.label));
-  const loading =
-    refresh.isPending || (!list.length && (steps.isFetching || (enabled && steps.isPending)));
-  const { options, again } = suggested(
-    loading,
-    list.map((step) => ({
+    .sort((a, b) => compareNames(a.label, b.label))
+    .map((step): Action => ({
       id: `step:${step.label}`,
       label: step.label,
       onClick: () => onPick(step.request),
-    })),
-    { disabled, onClick: () => refresh.mutate() },
-    steps.error?.message || steps.data?.reason,
-  );
-  const preparing = loading && (enabled || refresh.isPending);
-  const action = {
-    id: "suggestions",
-    label: "Suggestions",
-    icon: icons.assistant,
-    disabled: disabled || preparing,
-    loading: preparing,
-    menu: [options],
-  } satisfies Action;
+    }));
+  const { action, refresh: again } = suggested(options, {
+    loading: refresh.isPending || steps.isFetching,
+    answered: Boolean(steps.data || steps.error || refresh.error),
+    failure: refresh.error?.message || steps.error?.message || steps.data?.reason,
+    disabled,
+    onRefresh: () => refresh.mutate(),
+  });
   return { action, options, refresh: again };
 }
 
@@ -280,7 +289,20 @@ export function changeTemplates(
   };
 }
 
-/** Supplies a text box's suggestions, loading once its More menu opens. */
+/** A text box's AI menu holding only Suggestions and Refresh. */
+export const suggestionsTool = (
+  suggestions: { action: Action; refresh: Action },
+  onOpen?: () => void,
+): Action => ({
+  id: "assistant",
+  label: "Suggestions",
+  icon: icons.assistant,
+  heading: false,
+  menu: assistMenu({ suggestions, templates: [], last: [] }),
+  onOpen,
+});
+
+/** Supplies a text box's suggestions, loading once its AI menu opens. */
 export function ChangeSuggestions<K extends QueryKey>({
   children,
   ...props
@@ -288,12 +310,8 @@ export function ChangeSuggestions<K extends QueryKey>({
   children: (action: Action) => ReactNode;
 }) {
   const [requested, setRequested] = useState(false);
-  const { action, refresh } = useChangeSuggestions({ ...props, enabled: requested });
-  return children({
-    ...action,
-    menu: [...action.menu, [refresh]],
-    onOpen: () => setRequested(true),
-  });
+  const suggestions = useChangeSuggestions({ ...props, enabled: requested });
+  return children(suggestionsTool(suggestions, () => setRequested(true)));
 }
 
 /**
