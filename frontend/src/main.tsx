@@ -41,9 +41,9 @@ function AppNotifications() {
   const { notifications: shown, queue } = useNotifications();
   useEffect(() => {
     if (!queue.length) return;
-    for (const { id, position = "top-center", priority = 0 } of shown) {
+    for (const { id, position = "top-right", priority = 0 } of shown) {
       const replaces = queue.some(
-        (next) => (next.position ?? "top-center") === position && (next.priority ?? 0) >= priority,
+        (next) => (next.position ?? "top-right") === position && (next.priority ?? 0) >= priority,
       );
       if (!replaces) continue;
       const banner = document.getElementById(id!);
@@ -54,9 +54,9 @@ function AppNotifications() {
   }, [shown, queue]);
   return (
     <Notifications
-      position="top-center"
+      position="top-right"
       limit={1}
-      containerWidth={400}
+      containerWidth={320}
       transitionDuration={theme.other.motionDuration}
       allowDragDismiss={!phone}
       onTouchStart={(event) => {

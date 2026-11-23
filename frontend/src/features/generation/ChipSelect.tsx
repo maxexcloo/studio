@@ -42,6 +42,7 @@ export type ChipSelectProps = Pick<
   title?: string;
   target?: Record<string, unknown>;
   field?: boolean;
+  clearable?: boolean;
   disabled?: boolean;
   withinPortal?: boolean;
 };
@@ -60,6 +61,7 @@ export function ChipSelect({
   title,
   target,
   field = false,
+  clearable = false,
   disabled,
   searchable,
   data,
@@ -117,6 +119,7 @@ export function ChipSelect({
       aria-hidden
     />
   );
+  const canClear = clearable && Boolean(value) && !disabled;
   return (
     <Combobox
       store={combobox}
@@ -142,11 +145,33 @@ export function ChipSelect({
             disabled={disabled}
             {...target}
             leftSection={swatchDot}
-            rightSection={<ChevronDown size={16} />}
-            rightSectionPointerEvents="none"
+            rightSection={
+              canClear ? (
+                <Combobox.ClearButton
+                  aria-label={`Clear ${name}`}
+                  aria-hidden={false}
+                  tabIndex={0}
+                  onClear={() => {
+                    onChange?.(null);
+                    combobox.closeDropdown();
+                    combobox.focusTarget();
+                  }}
+                />
+              ) : (
+                <ChevronDown size={16} />
+              )
+            }
+            rightSectionPointerEvents={canClear ? "all" : "none"}
             title={title}
           >
-            <span className={classes.fieldLabel}>{label}</span>
+            <Text
+              span
+              inherit
+              c={clearable && !value ? "dimmed" : undefined}
+              className={classes.fieldLabel}
+            >
+              {label}
+            </Text>
           </InputBase>
         ) : (
           <Button

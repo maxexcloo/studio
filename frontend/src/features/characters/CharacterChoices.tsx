@@ -103,7 +103,6 @@ export function CharacterChoices({
           <PickerTile
             label="New Character"
             title="New Character"
-            selected={false}
             placeholder={icons.add}
             onToggle={() => dialogs.edit()}
           />

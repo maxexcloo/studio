@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expandAssistantMenu, fixtures, image, stamp, toolbarSearch } from "./fixtures";
+import { fixtures, image, stamp, toolbarSearch } from "./fixtures";
 
 const result = (id: string, title: string, createdAt = stamp) => ({
   id,
@@ -104,7 +104,10 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   state.gallery.push({ ...result("bird", "Amber Bird"), jobId: "bird-job" });
   const asked: string[] = [];
   await page.route("**/api/suggestions", (route) => {
-    asked.push(route.request().postDataJSON().itemId);
+    const body = route.request().postDataJSON();
+    if (body.surface === "change")
+      return route.fulfill({ json: { suggestions: [], reason: "No matching change" } });
+    asked.push(body.itemId);
     return route.fulfill({
       json: {
         suggestions: [
@@ -118,7 +121,14 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   const deck = page.getByRole("dialog", { name: "Review Gallery", exact: true });
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
-  await expandAssistantMenu(menu, "Suggestions");
-  await expect(menu.getByRole("menuitem", { name: "Later Light", exact: true })).toBeVisible();
+  const chosen = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/suggestions") && request.postDataJSON().surface === "change",
+  );
+  await menu.getByRole("menuitem", { name: "Later Light", exact: true }).click();
+  expect((await chosen).postDataJSON()).toMatchObject({
+    itemId: "bird",
+    request: "change the light",
+  });
   expect(asked).toEqual(["bird"]);
 });

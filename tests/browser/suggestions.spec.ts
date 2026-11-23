@@ -188,10 +188,8 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await page.keyboard.press("Escape");
   await expect(viewerChangeButton(page)).toBeFocused();
   await viewerChangeMenu(page);
-  // The top-level Refresh reads Loading… while the suggestions load.
-  const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
-  await expect(thinking).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toHaveCount(0);
+  const refresh = menu.getByRole("menuitem", { name: "Refresh", exact: true });
+  await expect(refresh).toBeDisabled();
   await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
   release[0]();
   await expandAssistantMenu(menu, "Suggestions");
@@ -202,8 +200,8 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   expect(asked).toEqual([
     { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
   ]);
-  await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
-  await expect(thinking).toBeVisible();
+  await refresh.click();
+  await expect(refresh).toBeDisabled();
   release[1]();
   await expandAssistantMenu(menu, "Suggestions");
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
@@ -236,7 +234,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
     "An amber bird",
   );
   expect(asked.filter((body) => body.surface === "change")).toEqual([]);
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Viewer Actions");
   await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText([
     "Keep & Vary",
     "More Like This",
@@ -265,7 +263,10 @@ test("Custom Animation suggests what could happen from the image, filling the in
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu", { name: "Animate", exact: true })).toBeHidden();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
-  await dialog.getByRole("button", { name: "AI Instruction Actions", exact: true }).click();
+  await dialog
+    .locator('[data-position="right"]')
+    .getByRole("button", { name: "AI Instruction Actions", exact: true })
+    .click();
   const menu = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" }]);

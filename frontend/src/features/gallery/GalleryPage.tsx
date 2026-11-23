@@ -1,5 +1,5 @@
 import { Alert, Button, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
-import { useDebouncedValue } from "@mantine/hooks";
+import { useDebouncedCallback } from "@mantine/hooks";
 import {
   type InfiniteData,
   focusManager,
@@ -117,8 +117,20 @@ export function GalleryPage() {
 }
 
 function Gallery() {
-  const [query, setQuery] = useState("");
-  const [search] = useDebouncedValue(query, 250);
+  const [query, setQueryText] = useState("");
+  const [search, setSearch] = useState("");
+  const searchAfterTyping = useDebouncedCallback(setSearch, 120);
+  const setQuery = useCallback(
+    (value: string) => {
+      setQueryText(value);
+      if (value) searchAfterTyping(value);
+      else {
+        searchAfterTyping.cancel();
+        setSearch("");
+      }
+    },
+    [searchAfterTyping],
+  );
   const location = useLocation();
   const routerNavigate = useNavigate();
   const kind = galleryKind(location.pathname) || "image";
@@ -178,7 +190,7 @@ function Gallery() {
     if (linkedQuery === undefined) return;
     setQuery(linkedQuery);
     dropState("q");
-  }, [linkedQuery, dropState]);
+  }, [linkedQuery, dropState, setQuery]);
   // `useOpenComposer`'s request to open the composer and focus its prompt is taken once, so a
   // reload doesn't repeat it; `compose` keeps the composer open through a reload until it closes.
   const [opening, setOpening] = useState("");
@@ -217,17 +229,11 @@ function Gallery() {
     [search, kind, filters, similar, strictness, setId, chat, turn, sort],
   );
   const scope = useMemo(() => JSON.stringify(galleryListingKey(listing)), [listing]);
-  const arrivals =
-    useQuery({
-      ...galleryArrivalsQuery(listing, leftAt),
-      enabled: !!leftAt && !acknowledged && !itemId && !similar,
-    }).data && !acknowledged;
   const byDay = !similar && sort !== "liked" && sort !== "disliked";
   const [jump, setJump] = useState<{ scope: string; date: GalleryDate }>();
   if (jump && jump.scope !== scope) setJump(undefined);
   const jumpDate = jump?.scope === scope && byDay ? jump.date : undefined;
   const date = jumpDate?.cursor ? jumpDate : undefined;
-  const timeline = useQuery({ ...galleryTimelineQuery(listing), enabled: byDay });
   const jumpToDate = useCallback(
     (date: GalleryDate) => {
       setFocusItem(null);
@@ -246,6 +252,14 @@ function Gallery() {
     // Returning to the tab reads only the first page (below), not every loaded page.
     refetchOnWindowFocus: false,
   });
+  // The tiles only need one page. Let it arrive before requesting summaries of the listing.
+  const listingReady = gallery.isSuccess && !gallery.isPlaceholderData && query === search;
+  const arrivals =
+    useQuery({
+      ...galleryArrivalsQuery(listing, leftAt),
+      enabled: listingReady && !!leftAt && !acknowledged && !itemId && !similar,
+    }).data && !acknowledged;
+  const timeline = useQuery({ ...galleryTimelineQuery(listing), enabled: listingReady && byDay });
   const historical = Boolean(
     date && (gallery.isPlaceholderData || gallery.data?.pages[0]?.previousCursor !== ""),
   );

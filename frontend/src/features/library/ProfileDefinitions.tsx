@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { DataTable, compareNames } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import {
@@ -361,20 +361,19 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 header: "Name",
                 main: true,
                 sortValue: (entry) => entry.name || entry.id,
-                // The name and its family wrap rather than cut off; Copy ID has the exact ID.
                 cell: (entry) => (
                   <>
-                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                      {entry.name || entry.id}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                      {[
-                        entry.family && modelFamilyLabel(entry.family),
-                        entry.kind && kindLabels[entry.kind],
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || entry.id}
-                    </Text>
+                    <TableRecord
+                      name={entry.name || entry.id}
+                      detail={
+                        [
+                          entry.family && modelFamilyLabel(entry.family),
+                          entry.kind && kindLabels[entry.kind],
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || (entry.name ? entry.id : undefined)
+                      }
+                    />
                     {phone && (
                       <Group gap="xs" wrap="nowrap">
                         <Text size="xs" c="dimmed">
@@ -543,12 +542,7 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               header: "Name",
               main: true,
               sortValue: (entry) => entry.name,
-              // Copy ID has the exact ID.
-              cell: (entry) => (
-                <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                  {entry.name}
-                </Text>
-              ),
+              cell: (entry) => <TableRecord name={entry.name} />,
             },
             {
               key: "profiles",

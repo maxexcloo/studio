@@ -318,6 +318,7 @@ export function MediaGrid({
         ref={host}
         id={gridId}
         data-gallery-view
+        data-by-day={byDay || undefined}
         className={classes.grid}
         {...hold.handlers}
         style={{ height: layout?.height, position: "relative", touchAction: "pan-x pan-y" }}

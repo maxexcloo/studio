@@ -41,9 +41,9 @@
   min-width: 0;
 }
 
-/* Even padding all round; with its 1 px border the one-line prompt is as tall as the 44 px Generate. */
 .compactPrompt textarea {
   min-height: 0;
   line-height: 1.5rem;
-  padding: calc(var(--mantine-spacing-xs) - 1px);
+  padding-block: calc(var(--mantine-spacing-xs) - 1px);
+  padding-inline-start: calc(var(--mantine-spacing-xs) - 1px);
 }

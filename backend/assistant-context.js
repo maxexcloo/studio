@@ -31,10 +31,10 @@ export function createAssistantContext({ catalogueModels, installedLoras }) {
       return [];
     }
   };
-  const loras = async (req) => {
+  const loras = async (req, available) => {
     if (!accountMayUseLoras(req)) return [];
     try {
-      const names = installedLoras().filter(loraAllowed(req.studioAccount));
+      const names = (available ?? installedLoras()).filter(loraAllowed(req.studioAccount));
       const infos = await loraInfos(defaultWorkerId(), names);
       return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
     } catch {

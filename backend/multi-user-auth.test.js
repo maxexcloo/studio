@@ -92,6 +92,7 @@ test("only the local machine can bootstrap the first recovery administrator, onc
   assert.equal(accountForRequest(signedIn).role, "administrator");
   const status = await call(routes["GET /api/accounts/status"], signedIn);
   assert.equal(status.body.account.id, accountForRequest(signedIn).userId);
+  assert.equal(status.body.account.username, "recovery");
 
   const repeated = await call(
     routes["POST /api/accounts/bootstrap"],

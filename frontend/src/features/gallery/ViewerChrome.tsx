@@ -25,25 +25,52 @@ export function ViewerMetadata({ item, compact }: { item: MediaItem; compact?: b
   ]
     .filter(Boolean)
     .join(" · ");
-  return (
+  const hasModel = Boolean(model || stepLabel);
+  const hasFacts = Boolean(timestamp || sizeAndDuration);
+  const summary = (
     <>
-      {(model || stepLabel) && (
+      {model && <span>{model}</span>}
+      {model && stepLabel && " · "}
+      {stepLabel}
+    </>
+  );
+  const facts = (
+    <>
+      {timestamp && <time dateTime={timestamp.value}>{timestamp.label}</time>}
+      {timestamp && sizeAndDuration && " · "}
+      {sizeAndDuration}
+    </>
+  );
+  if (compact)
+    return (
+      (hasModel || hasFacts) && (
         <Text
           size="xs"
           lh={1.25}
-          lineClamp={compact ? 1 : 2}
+          truncate
+          title={[model, stepLabel, timestamp?.label, sizeAndDuration].filter(Boolean).join(" · ")}
+        >
+          {summary}
+          {hasModel && hasFacts && " · "}
+          {facts}
+        </Text>
+      )
+    );
+  return (
+    <>
+      {hasModel && (
+        <Text
+          size="xs"
+          lh={1.25}
+          lineClamp={2}
           title={[model, stepLabel].filter(Boolean).join(" · ")}
         >
-          {model && <span>{model}</span>}
-          {model && stepLabel && " · "}
-          {stepLabel}
+          {summary}
         </Text>
       )}
-      {(timestamp || sizeAndDuration) && (
+      {hasFacts && (
         <Text size="xs" c="dimmed" lh={1.25}>
-          {timestamp && <time dateTime={timestamp.value}>{timestamp.label}</time>}
-          {timestamp && sizeAndDuration && " · "}
-          {sizeAndDuration}
+          {facts}
         </Text>
       )}
     </>

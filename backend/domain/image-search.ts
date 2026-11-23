@@ -113,7 +113,7 @@ export function createImageSearch(options: {
       vectors.set(item, await encoder.embedImage(await options.image(item)));
     },
   });
-  const queries = new Map<string, Float32Array>();
+  const queries = new Map<string, Promise<Float32Array>>();
   let failed = "";
   return {
     ...work,
@@ -136,21 +136,23 @@ export function createImageSearch(options: {
     async near(text: string) {
       const query = text.trim().toLowerCase();
       if (!query || !options.enabled() || !vectors.size || !encoder.downloaded()) return null;
-      let target = queries.get(query);
-      if (!target) {
-        try {
-          target = await encoder.embedText(query);
-        } catch (error) {
-          const reason = (error as Error).message;
-          if (reason !== failed) log.info(`Image search skip: ${reason}`);
-          failed = reason;
-          return null;
+      let embedding = queries.get(query);
+      let wanted: Float32Array;
+      try {
+        if (!embedding) {
+          // Gallery listings and their date index can ask for the same text concurrently.
+          embedding = encoder.embedText(query);
+          if (queries.size >= 50) queries.delete(queries.keys().next().value!);
+          queries.set(query, embedding);
         }
-        // Paging repeats a search, so the last few are kept.
-        if (queries.size >= 50) queries.delete(queries.keys().next().value!);
-        queries.set(query, target);
+        wanted = await embedding;
+      } catch (error) {
+        if (queries.get(query) === embedding) queries.delete(query);
+        const reason = (error as Error).message;
+        if (reason !== failed) log.info(`Image search skip: ${reason}`);
+        failed = reason;
+        return null;
       }
-      const wanted = target;
       return (item: IdleItem) => {
         const vector = vectors.get(item);
         return vector ? likeness(vector, wanted) >= nearThreshold : false;

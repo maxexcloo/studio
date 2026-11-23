@@ -1,25 +1,19 @@
 import { titleCase } from "../../../../shared/titles";
+import { compareNames } from "../../ui/DataTable";
 import { ChipOption, ChipSelect } from "./ChipSelect";
 
 const brands: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", mimo: "MiMo" };
 const titled = (word: string) => brands[word] ?? titleCase(word);
-/** A gateway alias by its readable name. */
-export const textModelName = (id: string) => {
-  const [side, name = ""] = id.split("/");
-  const words = name.split("-");
-  if (words.at(-1) === "uncensored") {
-    words.pop();
-    const location = `${titled(side)} - Uncensored`;
-    return words.length ? `${words.map(titled).join(" ")} · ${location}` : location;
-  }
-  return `${words.map(titled).join(" ")} · ${titled(side)}`;
-};
+const modelTitle = (id: string) => id.split("/")[1]?.split("-").map(titled).join(" ") || id;
+/** A gateway alias by its side and readable model name. */
+export const textModelName = (id: string) => `${titled(id.split("/")[0])} · ${modelTitle(id)}`;
 
 export function TextModelSelect({
   name,
   models,
   value,
   unset,
+  clearable,
   onChange,
   disabled,
 }: {
@@ -27,20 +21,26 @@ export function TextModelSelect({
   models: string[];
   value: string | null;
   unset: string;
+  clearable?: boolean;
   onChange: (value: string | null) => void;
   disabled?: boolean;
 }) {
+  const groups = ["cloud", "local"].flatMap((side) => {
+    const items = models
+      .filter((model) => model.startsWith(`${side}/`))
+      .map((model) => ({ value: model, label: modelTitle(model) }))
+      .sort((a, b) => compareNames(a.label, b.label));
+    return items.length ? [{ group: titled(side), items }] : [];
+  });
   return (
     <ChipSelect
       field
       name={name}
       searchable
+      clearable={clearable}
       nothingFoundMessage="No Matches"
-      data={[
-        { value: "", label: unset },
-        ...models.map((model) => ({ value: model, label: textModelName(model) })),
-      ]}
-      value={value ?? ""}
+      data={[...(clearable ? [] : [{ value: "", label: unset }]), ...groups]}
+      value={value ?? (clearable ? null : "")}
       renderOption={({ option, checked }) => <ChipOption label={option.label} checked={checked} />}
       onChange={onChange}
       label={value ? textModelName(value) : unset}

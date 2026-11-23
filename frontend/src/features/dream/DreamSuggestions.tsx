@@ -5,14 +5,14 @@ import { useState } from "react";
 import type { VariationDirection } from "../../../../shared/suggestions";
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
-import { type Action, ActionMenuItems } from "../../ui/ActionBar";
+import { type Action, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
 import { useItemChange } from "../gallery/useItemChange";
 import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
 import { VariationDialog, keepAndVaryAction } from "../gallery/VariationDialog";
-import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
+import { useChangeSuggestions } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
@@ -60,6 +60,7 @@ function ItemSuggestions({
   const available = change.available && Boolean(prompt.trim());
   const canAskForMore = card.kind === "dream" && item.type === "image" && Boolean(prompt.trim());
   const canVary = available && item.type === "image" && !item.uploaded;
+  const menuBounds = useActionMenuBounds(opened, canVary);
   const send = (request: string) => change.send(request, prompt);
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item.jobId!, undefined, item.id),
@@ -121,7 +122,7 @@ function ItemSuggestions({
   if (unavailable) return <Tooltip label={unavailable}>{trigger}</Tooltip>;
   return (
     <>
-      <Menu position="top-end" width={menuWidth} onChange={setOpened}>
+      <Menu {...menuBounds} position="top-end" width={menuWidth} onChange={setOpened}>
         <PopupTooltip label="Suggestions">
           <Menu.Target>{trigger}</Menu.Target>
         </PopupTooltip>
@@ -130,22 +131,27 @@ function ItemSuggestions({
             leading={
               available && card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>
             }
-            groups={assistMenu({
-              separateSections: true,
-              suggestions: available ? suggestions : undefined,
-              templates: [],
-              custom: available
+            groups={[
+              ...(available
                 ? [
-                    {
-                      id: "custom",
-                      label: "Custom…",
-                      icon: icons.custom,
-                      onClick: () => setCustom(true),
-                    },
+                    suggestions.options.map((option) => ({
+                      ...option,
+                      disabled: option.disabled || loading,
+                    })),
+                    [
+                      {
+                        id: "custom",
+                        label: "Custom…",
+                        icon: icons.custom,
+                        disabled: loading,
+                        onClick: () => setCustom(true),
+                      },
+                      suggestions.refresh,
+                    ],
                   ]
-                : [],
-              last: more,
-            })}
+                : []),
+              more,
+            ]}
           />
         </Menu.Dropdown>
       </Menu>

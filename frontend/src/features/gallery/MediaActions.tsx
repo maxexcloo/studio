@@ -246,7 +246,7 @@ interface MediaActionOptions {
     onApplied: () => void,
   ) => void;
   onDelete: () => void;
-  /** Opens Report's Custom… dialog. */
+  /** Opens Report's Other Issue… dialog. */
   onReport: () => void;
   onReportQueued?: (jobId: string) => void;
   onRetried?: (jobId: string) => void;
@@ -725,7 +725,7 @@ export function useMediaActions(
             disabled: report.isPending,
             onClick: () => report.mutate(issue),
           })),
-          [{ id: "report-custom", label: "Custom…", icon: icons.custom, onClick: onReport }],
+          [{ id: "report-custom", label: "Other Issue…", icon: icons.custom, onClick: onReport }],
         ],
       }),
     itemAction("share", {

@@ -256,7 +256,7 @@ test("Each reference takes one Strength: a guiding one its own, an img2img start
   await showReferenceStack(page);
   const picker = page.getByRole("region", { name: "Reference Stack", exact: true });
   // The test profile doesn't edit with its references, so the first one is where the result starts.
-  await expect(picker.getByText("Reference 1 is the start image", { exact: false })).toBeVisible();
+  await expect(picker.getByText("Start Image", { exact: true })).toBeVisible();
   await picker
     .getByRole("textbox", { name: "Reference 1 · Image Strength", exact: true })
     .fill("0.4");

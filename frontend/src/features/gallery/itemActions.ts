@@ -27,8 +27,11 @@ const sections: ItemActionId[][] = [["retry", "stop", ...menus], assist, rating,
 /** Bars name Retry, Stop and the four menus; the rest are icons. */
 export const namedItemActions: string[] = ["retry", "stop", ...menus];
 
-/** A pressed Like reads Unlike; a pressed Dislike reads Restore. */
-const pressedLabels: Partial<Record<ItemActionId, string>> = { dislike: "Restore", like: "Unlike" };
+/** A pressed Like reads Unlike; a pressed Dislike reads Undo Dislike. */
+const pressedLabels: Partial<Record<ItemActionId, string>> = {
+  dislike: "Undo Dislike",
+  like: "Unlike",
+};
 /** The label of a rating action, pressed or not. */
 export const ratingLabel = (id: "dislike" | "like", pressed: boolean) =>
   (pressed && pressedLabels[id]) || definitions[id].label;

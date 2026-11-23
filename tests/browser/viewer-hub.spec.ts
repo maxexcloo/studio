@@ -319,7 +319,7 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
     inspected.push(route.request().postDataJSON());
     return route.fulfill({ json: { status: "issue", issue: "six toes" } });
   });
-  await viewerAction(page, "Report", "Custom…");
+  await viewerAction(page, "Report", "Other Issue…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
   await expect(fix).toBeDisabled();
@@ -504,11 +504,11 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   const summary = viewer.locator("[aria-hidden]", { hasText: prompt });
   await expect(summary).toBeVisible();
   expect(await summary.evaluate((line) => line.scrollWidth > line.clientWidth)).toBe(true);
-  // Phones edit in the full-screen editor; elsewhere focus, by click or keyboard, unfolds it.
+  // Phones keep the dock to one line, including focus before the full-screen editor opens.
   if (testInfo.project.use.isMobile) {
-    const ai = (await viewer
-      .getByRole("button", { name: "AI Prompt Actions", exact: true })
-      .boundingBox())!;
+    await field.focus();
+    await expect.poll(height).toBeLessThan(line * 1.5);
+    const ai = (await viewer.getByRole("button", { name: "AI", exact: true }).boundingBox())!;
     const send = (await viewer
       .getByRole("button", { name: "Generate", exact: true })
       .boundingBox())!;
@@ -516,7 +516,9 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
     await field.click();
     const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
     await expect(editor).toBeVisible();
-    await editor.getByRole("textbox", { name: "Prompt", exact: true }).focus();
+    const editorField = editor.getByRole("textbox", { name: "Prompt", exact: true });
+    await expect(editorField).toHaveValue(prompt);
+    await editorField.focus();
     const keyboardTop = await page.evaluate(() => {
       const height = window.innerHeight - 300;
       Object.defineProperty(window.visualViewport, "height", { configurable: true, value: height });
@@ -657,7 +659,7 @@ test("The viewer prompt offers suggestions for review beside the field and in th
     }),
   );
   const suggest = async (surface: typeof viewer) => {
-    await surface.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
+    await surface.getByRole("button", { name: "AI", exact: true }).click();
     await expandAssistantMenu(page, "Suggestions");
     await page.getByRole("menuitem", { name: "At Dusk", exact: true }).click();
     await expect(surface.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -739,7 +741,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
       });
     }),
   );
-  await viewerAction(page, "AI", "Keep & Vary", "Explore Three Directions");
+  await viewerAction(page, "Viewer Actions", "Keep & Vary", "Explore Three Directions");
   const review = page.getByRole("dialog", { name: "Explore Three Directions", exact: true });
   await review.getByRole("button", { name: "Open Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
@@ -986,7 +988,7 @@ test("AI › More Like This Set asks for new variations of a result's set", asyn
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "AI", "More Like This Set");
+  await viewerAction(page, "Viewer Actions", "More Like This Set");
   await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "set" }]);
 });
 
@@ -998,7 +1000,7 @@ test("AI › More Like This explicitly selects only the current image", async ({
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Viewer Actions");
   await expect(
     page.getByRole("menuitem", { name: "More Like This Set", exact: true }),
   ).toBeVisible();
@@ -1008,7 +1010,7 @@ test("AI › More Like This explicitly selects only the current image", async ({
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Viewer Actions");
   await expect(page.getByRole("menuitem", { name: "More Like This", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -2360,7 +2362,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Edit",
       "Recreate",
       "Upscale",
-      "AI",
+      "Viewer Actions",
       "Share",
       "Like",
       "Dislike",
@@ -2658,16 +2660,18 @@ test("The desktop viewer bar keeps its actions on one row in a narrow window", a
   await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
 });
 
-test("Phone viewer shows Report beside Delete and Similar under AI", async ({ page }, testInfo) => {
+test("Phone viewer shows Report beside Delete and Similar under Viewer Actions", async ({
+  page,
+}, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   await expect(bar.getByRole("button", { name: "Report", exact: true })).toBeVisible();
-  await viewerAction(page, "Report", "Custom…");
+  await viewerAction(page, "Report", "Other Issue…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
-  await viewerAction(page, "AI", "Similar");
+  await viewerAction(page, "Viewer Actions", "Similar");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
 });

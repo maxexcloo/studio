@@ -48,16 +48,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--mantine-spacing-sm);
-  /* Span the sheet's padding so the bar reaches both edges. */
-  margin-inline: calc(-1 * var(--mantine-spacing-md));
-  padding-inline: var(--mantine-spacing-md);
-  padding-block: var(--mantine-spacing-sm)
-    max(
-      var(--mantine-spacing-md),
-      env(safe-area-inset-bottom),
-      calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-xs))
-    );
-  border-top: 1px solid var(--studio-glass-border);
 }
 
 /*

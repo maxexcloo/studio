@@ -635,8 +635,7 @@ export function ActionBarGroups({
   const row = useRef<HTMLDivElement>(null);
   const actions = shown(groups).flat();
   const named = actions.filter((action) => (!phone || equal) && labelled.includes(action.id));
-  // How many labels, from the last, drop to fit the room (the bar's width, which doesn't follow
-  // them); it starts again for other actions or another room.
+  // Removing a label can shrink the bar. Try the full labels again when the room grows.
   const key = `${phone}:${actions.map((action) => `${action.id}:${action.label}`).join()}`;
   const [fitted, setFitted] = useState({ key, room: 0, dropped: 0 });
   const dropped = fitted.key === key ? fitted.dropped : 0;
@@ -649,9 +648,10 @@ export function ActionBarGroups({
     if (!fit) return;
     const bar = row.current!;
     const room = bar.parentElement!.clientWidth;
-    if (fitted.key !== key || fitted.room !== room) setFitted({ key, room, dropped: 0 });
+    if (fitted.key !== key || fitted.room < room) setFitted({ key, room, dropped: 0 });
     else if (!wrap && bar.scrollWidth > bar.clientWidth)
       setFitted({ key, room, dropped: dropped + 1 });
+    else if (fitted.room !== room) setFitted({ key, room, dropped });
   });
   useEffect(() => {
     if (!fit) return;

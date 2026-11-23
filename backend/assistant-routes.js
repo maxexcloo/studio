@@ -1,4 +1,5 @@
 import { cardKinds } from "../shared/characters.ts";
+import { runBackend } from "../shared/profiles.ts";
 import { maxProjectBrief, projectBriefTextFields } from "../shared/projects.ts";
 import { ownerIdForRequest } from "./account-ownership.js";
 import { mayUseFeature, promptWriter } from "./account-policy.js";
@@ -19,7 +20,7 @@ import { accountPreferences, defaultTextSide } from "./account-preferences.js";
  *                                       duration?, frames?, fps? } → { prompt, model, thinking }:
  *                                       Animate's motion prompt for Review Prompt
  *   POST /api/assistant/negative        { profileId, prompt, cfg?, loras? } → { negative | null, unused }
- *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
+ *   POST /api/assistant/loras           { profileId, prompt, profileBackend?, hasReferences? } → { loras }
  */
 import { AssistantError, createAssistant, gatewaySettings, uncensoredText } from "./assistant.js";
 import { directRoute } from "./domain/direct-route.ts";
@@ -28,6 +29,7 @@ import { americanEnglish, contentRule } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { promptStyleStore } from "./prompt-styles.js";
 import { loadSharp } from "./sharp-loader.js";
+import { runProfile } from "./workflow-modes.js";
 
 const maxReferences = 4;
 const maxImageBytes = 12 * 1024 * 1024;
@@ -430,17 +432,34 @@ export function registerAssistantRoutes(
   writer("/api/assistant/loras", async (account, body, context, signal) => {
     if (!allowed(account, "loras"))
       return { status: 403, payload: { ok: false, error: "LoRAs are off for this account." } };
-    const likes = await liked({ studioAccount: account }, context.profile);
+    const listed = context.profile;
+    const hasReferences = body?.hasReferences === true;
+    const backend = runBackend(
+      listed.backendOptions || [],
+      listed.backend,
+      body?.profileBackend,
+      hasReferences,
+      true,
+    );
+    const selected = runProfile(listed, backend);
+    const mode = hasReferences ? selected.imageModes?.reference : undefined;
+    const profile = mode
+      ? { ...selected, ...mode, defaults: { ...selected.defaults, ...mode.defaults } }
+      : selected;
+    const names = profile.options?.loras;
+    const req = { studioAccount: account };
+    const likes = await liked(req, profile);
     return {
       status: 200,
       payload: {
         ok: true,
         ...(await engine.matchLoras({
           signal,
-          profile: context.profile,
+          profile,
           prompt: body?.prompt,
-          loras: await loras({ studioAccount: account }),
+          loras: await loras(req, names),
           liked: likes.loras || [],
+          writer: writerOf(account),
         })),
       },
     };

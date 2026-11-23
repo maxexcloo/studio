@@ -179,8 +179,8 @@ export function FilterChoices({
 
 /**
  * Library and Settings lists share one toolbar, on one line: segmented views (on phones a menu
- * named by the current view), then search (a field, or on phones an icon that expands into one
- * across the header), one filter popover, then behind a divider the section's own actions: `more`
+ * named by the current view), then search (a field, or an icon when space is tight),
+ * one filter popover, then behind a divider the section's own actions: `more`
  * by name under ⋯, then `actions`, ending with the create action (`ToolbarAction`). Escape leaves search, keeping the query, or closes the filters;
  * `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
  */
@@ -240,7 +240,7 @@ export function SectionToolbar({
         }}
         size="sm"
         radius="xl"
-        w={expanded ? "100%" : "13rem"}
+        className={expanded ? classes.expandedSearch : classes.inlineSearch}
       />
     );
   const segments =
@@ -264,25 +264,31 @@ export function SectionToolbar({
       </Group>
     );
   return (
-    <Group className={classes.enter} gap="xs" mih={44} wrap="nowrap" justify="flex-end">
+    <Group
+      className={classes.enter}
+      data-adaptive-search={phone && !views && onQueryChange ? "" : undefined}
+      gap="xs"
+      mih={44}
+      wrap="nowrap"
+      justify="flex-end"
+    >
       {segments}
-      <Group gap={4} wrap="nowrap">
-        {onQueryChange &&
-          (phone ? (
-            <Tooltip label={`Search ${label}`}>
-              <ActionIcon
-                ref={trigger}
-                aria-label={`Search ${label}`}
-                variant={query ? "light" : "subtle"}
-                color={query ? undefined : "gray"}
-                onClick={() => setSearching(true)}
-              >
-                <Search size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            search(false)
-          ))}
+      <Group className={classes.controls} gap={4} wrap="nowrap">
+        {(!phone || !views) && search(false)}
+        {phone && onQueryChange && (
+          <Tooltip label={`Search ${label}`}>
+            <ActionIcon
+              className={classes.searchTrigger}
+              ref={trigger}
+              aria-label={`Search ${label}`}
+              variant={query ? "light" : "subtle"}
+              color={query ? undefined : "gray"}
+              onClick={() => setSearching(true)}
+            >
+              <Search size={18} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         {filters && (
           <Popover
             position="bottom-end"

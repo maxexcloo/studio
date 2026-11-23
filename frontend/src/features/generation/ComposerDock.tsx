@@ -241,10 +241,9 @@ export const ComposerDock = memo(function ComposerDock({
       >
         {(!opened || !expanded) && (
           <Paper
-            withBorder
             radius="xl"
             shadow="xl"
-            className={`${classes.surface} ${classes.compactSurface}`}
+            className={classes.compactSurface}
             // While handing over, it leaves the accessibility tree once focus has moved on.
             aria-hidden={(opened && !compactFocused) || undefined}
             onFocus={() => setCompactFocused(true)}
