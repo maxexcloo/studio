@@ -136,10 +136,13 @@ export function DreamPage() {
   const save = useDreamSettings();
   const params = useParams();
   const param = params.projectId ? "projects" : params.view;
-  const view = views.flat().find(({ value }) => value === param)?.value ?? "dream";
+  const { value: view, label: viewLabel } =
+    views.flat().find(({ value }) => value === param) ?? views[0][0];
   if (view !== "projects" && creatingProject) setCreatingProject(false);
   const navigate = useNavigate();
   const reviewing = view === "library";
+  // Counts, pausing and allocation concern the decks, not the views around them.
+  const deck = reviewing || view === "dream";
   const imageReview = useLibraryReview(seed, "image", libraryDecided, reviewing);
   const videoReview = useLibraryReview(seed, "video", libraryDecided, reviewing);
   const reviews = { image: imageReview, video: videoReview };
@@ -161,8 +164,8 @@ export function DreamPage() {
     : [];
   const count = data && dreamCardCounts(deckUnseen, data.settings);
   const pending = {
-    image: reviewing ? imageReview.remaining : count?.images,
-    video: reviewing ? videoReview.remaining : count?.videos,
+    image: !deck ? undefined : reviewing ? imageReview.remaining : count?.images,
+    video: !deck ? undefined : reviewing ? videoReview.remaining : count?.videos,
   };
 
   useEffect(() => {
@@ -213,6 +216,7 @@ export function DreamPage() {
   );
   return (
     <div className={classes.page}>
+      <VisuallyHidden component="h1">{viewLabel}</VisuallyHidden>
       <div className={toolbarClasses.band}>
         <Group
           role="group"
@@ -243,22 +247,28 @@ export function DreamPage() {
           ) : view === "taste" ? (
             <Group ml="auto" ref={setTasteActions} />
           ) : (
-            <Group gap={4} wrap="nowrap" ml="auto">
-              {data?.settings.enabled && (
-                <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
-                    loading={save.isPending}
-                    onClick={() => save.mutate({ paused: !data.settings.paused })}
-                  >
-                    {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              {data && <DreamAllocation dream={data} />}
-            </Group>
+            deck && (
+              <Group gap={4} wrap="nowrap" ml="auto">
+                {data?.settings.enabled && (
+                  <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
+                      loading={save.isPending}
+                      onClick={() => save.mutate({ paused: !data.settings.paused })}
+                    >
+                      {data.settings.paused ? (
+                        <icons.resume size={18} />
+                      ) : (
+                        <icons.pause size={18} />
+                      )}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+                {data && <DreamAllocation dream={data} />}
+              </Group>
+            )
           )}
         </Group>
       </div>

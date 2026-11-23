@@ -1070,6 +1070,12 @@ test("Discarded Dream results can be viewed and accepted after all, or deleted a
   });
   await page.goto("/dream");
   await showView(page, "Discards");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Discards", exact: true }),
+  ).toBeAttached();
+  // The deck's counts and Pause stay with the deck.
+  await expect(page.getByRole("radio", { name: "Images", exact: true })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Pause Dream", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Accept Dream prompt gone", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Accept Dream prompt gone", exact: true }),
