@@ -1839,7 +1839,8 @@ export function createDream(options: {
       : [];
     const collectCards = media === "image" && !reword;
     const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"`;
-    const reply = `Reply with JSON only: {${replyShape}}.`;
+    const language = `Write "why" and "title" in Australian English (colour, centre); only "prompt" uses American English.`;
+    const reply = `Reply with JSON only: {${replyShape}}. ${language}`;
     let messages: { role: "system" | "user"; content: string }[];
     const noveltyPrompts = [...recent];
     const newConcept = media === "image" && !like && !seed && !series && !reword;
@@ -1851,7 +1852,7 @@ export function createDream(options: {
     const similar = like ? [] : similarPasses(ownerId);
     const paused = pausedMotifs(similar);
     const cooling = newConcept ? cooledMotifs(record, fixed, forbidden, paused) : [];
-    const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}.`;
+    const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}. ${language}`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
     const shots = series
