@@ -11,6 +11,7 @@ import {
   Collapse,
   Combobox,
   ComboboxPopover,
+  Divider,
   Drawer,
   DrawerRoot,
   type DrawerRootProps,
@@ -104,13 +105,13 @@ export const glass = {
   background: "var(--studio-glass-raised)",
   backdropFilter: "var(--studio-glass-filter)",
   WebkitBackdropFilter: "var(--studio-glass-filter)",
-  borderColor: "var(--studio-glass-border)",
+  borderColor: "var(--mantine-color-default-border)",
 } satisfies CSSProperties;
 // Header and navigation bars sit directly on the page background.
 const chrome = { ...glass, background: "var(--studio-glass-chrome)" } satisfies CSSProperties;
 const dropdown = {
   ...glass,
-  "--popover-border-color": "var(--studio-glass-border)",
+  "--popover-border-color": "var(--mantine-color-default-border)",
   boxShadow: "var(--mantine-shadow-lg)",
 } as CSSProperties;
 // Title rows sit on their surface; dialogs scroll only their body beneath them.
@@ -240,7 +241,7 @@ export function studioTheme({
             ...(props.variant === "default" && {
               "--ai-bg": "var(--studio-glass-raised)",
               "--ai-hover": "var(--studio-glass-raised-hover)",
-              "--ai-bd": "1px solid var(--studio-glass-border)",
+              "--ai-bd": "1px solid var(--mantine-color-default-border)",
             }),
           },
         }),
@@ -248,7 +249,9 @@ export function studioTheme({
       AppShell: AppShell.extend({
         classNames: { header: classes.shellHeader },
         styles: {
-          root: { "--app-shell-border-color": "var(--studio-glass-border)" } as CSSProperties,
+          root: {
+            "--app-shell-border-color": "var(--mantine-color-default-border)",
+          } as CSSProperties,
           aside: chrome,
           footer: chrome,
           navbar: chrome,
@@ -290,6 +293,7 @@ export function studioTheme({
       Combobox: Combobox.extend({ styles: { option: target } }),
       ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
       // A drawer's content is its scroller; a full-height one is a full-screen surface.
+      Divider: Divider.extend({ classNames: { root: classes.hairline } }),
       Drawer: Drawer.extend({
         classNames: (_theme, props) => ({
           ...(props.size === "100%" && {
@@ -322,7 +326,7 @@ export function studioTheme({
         styles: { root: { transitionTimingFunction: easing.enter } },
       }),
       Input: Input.extend({
-        classNames: { input: classes.input },
+        classNames: { input: classes.input, wrapper: classes.inputWrapper },
         defaultProps: { size: "md" },
         styles: { input: controlMotion },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
@@ -412,7 +416,9 @@ export function studioTheme({
       }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({
-        styles: { root: { ...glass, "--paper-border-color": "var(--studio-glass-border)" } },
+        styles: {
+          root: { ...glass, "--paper-border-color": "var(--mantine-color-default-border)" },
+        },
       }),
       // Popover also renders Menu and Combobox dropdowns (Select, Autocomplete and similar).
       // Fixed positioning keeps a popup anchored to fixed chrome (header, composer) still while the
@@ -497,20 +503,20 @@ export function studioTheme({
       }),
       Slider: Slider.extend({ styles: { thumb: controlMotion } }),
       Switch: Switch.extend({
+        classNames: { track: classes.switchTrack },
         styles: {
-          thumb: {
-            ...controlMotion,
-            backgroundColor: "var(--mantine-color-default)",
-            borderColor: "var(--mantine-color-default-border)",
-          },
+          thumb: { ...controlMotion, borderColor: "var(--mantine-color-default-border)" },
           track: { ...controlMotion, borderColor: "var(--mantine-color-default-border)" },
           trackLabel: controlMotion,
         },
       }),
       // A sort header is a touch target on touch screens (ui/DataTable.tsx).
-      Table: Table.extend({ classNames: touch ? { th: classes.touchHeader } : {} }),
+      Table: Table.extend({
+        classNames: { table: classes.hairline, ...(touch && { th: classes.touchHeader }) },
+      }),
       // Tabs stay on one row, scrolling sideways where they outgrow it.
       Tabs: Tabs.extend({
+        classNames: { root: classes.hairline },
         styles: {
           list: { flexWrap: "nowrap", overflowX: "auto", overscrollBehaviorX: "contain" },
           tab: { flexShrink: 0 },
@@ -526,7 +532,7 @@ export function studioTheme({
             ...glass,
             "--tooltip-bg": "var(--studio-glass-raised)",
             "--tooltip-color": "var(--mantine-color-text)",
-            border: "1px solid var(--studio-glass-border)",
+            border: "1px solid var(--mantine-color-default-border)",
             boxShadow: "var(--mantine-shadow-md)",
           } as CSSProperties,
         },
@@ -550,7 +556,10 @@ const glassTokens = (scheme: "light" | "dark", transparency: boolean) => {
     "--studio-glass-raised-hover": translucent(
       `color-mix(in srgb, var(--mantine-color-body), ${hover})`,
     ),
-    "--studio-glass-border": scheme === "dark" ? "rgb(255 255 255 / .1)" : "rgb(0 0 0 / .09)",
+    // The one hairline for every edge and divider: translucent, so it takes the tint of the
+    // background and surface beneath it.
+    "--mantine-color-default-border":
+      scheme === "dark" ? "rgb(255 255 255 / .1)" : "rgb(0 0 0 / .09)",
   };
 };
 
@@ -575,7 +584,6 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-body": background.dark,
       "--mantine-color-default": "#18181b",
       "--mantine-color-default-hover": "#27272a",
-      "--mantine-color-default-border": "#27272a",
       "--mantine-color-dimmed":
         "color-mix(in srgb, var(--mantine-color-dark-1), var(--mantine-color-dark-0) 45%)",
       // Mantine's dark light-variant red is near white, so a subtle Delete lost its colour.
@@ -586,7 +594,6 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-body": background.light,
       "--mantine-color-default": "#ffffff",
       "--mantine-color-default-hover": "#f4f4f5",
-      "--mantine-color-default-border": "#e4e4e7",
       "--mantine-color-dimmed": "var(--mantine-color-gray-7)",
       // Links take the primary's text shade, as its light buttons do; the filled shade is too pale.
       "--mantine-color-anchor": "var(--mantine-primary-color-light-color)",

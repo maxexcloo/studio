@@ -215,7 +215,7 @@
   width: var(--answer-size);
   height: var(--answer-size);
   min-width: var(--answer-size);
-  border-color: var(--studio-glass-border);
+  border-color: var(--mantine-color-default-border);
   box-shadow: var(--mantine-shadow-sm);
   transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
 }
@@ -380,7 +380,7 @@
   padding-inline: max(var(--mantine-spacing-sm), env(safe-area-inset-left))
     max(var(--mantine-spacing-sm), env(safe-area-inset-right));
   background: var(--studio-glass-chrome);
-  border-top: 1px solid var(--studio-glass-border);
+  border-top: 1px solid var(--mantine-color-default-border);
 }
 .choice[data-selected] .side {
   outline: 1px solid var(--mantine-primary-color-filled);
