@@ -14,7 +14,6 @@ import {
   type KeyboardEvent,
   type RefObject,
   Suspense,
-  lazy,
   useId,
   useLayoutEffect,
   useRef,
@@ -32,6 +31,7 @@ import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
+import { zoomImage } from "../gallery/zoomImage";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
 import type { DeckCard } from "./deck";
@@ -44,10 +44,6 @@ import { type Fly, SwipeCard } from "./SwipeCard";
 
 import viewerClasses from "../gallery/MediaViewer.module.css";
 import classes from "./DreamPage.module.css";
-
-const ZoomImage = lazy(() =>
-  import("../gallery/ZoomImage").then((module) => ({ default: module.ZoomImage })),
-);
 
 /** Why Dream made a result and the LoRAs it tried, each rated here. */
 function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?: string }) {
@@ -116,9 +112,11 @@ export function CardText({
 
 function PreviewImage({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
   const source = mediaSource(item);
+  const [ZoomImage] = useState(zoomImage);
   return (
     <div className={classes.fit}>
-      <MediaBackdrop src={source.thumbnailUrl || source.displayUrl} />
+      {/* The deck card's own picture, already loaded, so the fill is there from the first frame. */}
+      <MediaBackdrop src={source.displayUrl} />
       <Suspense fallback={<DeckMedia item={item} />}>
         <ZoomImage
           mediaId={item.id}
