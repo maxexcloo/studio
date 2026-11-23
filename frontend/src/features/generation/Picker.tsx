@@ -953,15 +953,16 @@ export function SavedName<T extends SavedItem>({
               disabled={!current}
               onClick={() => naming.name("rename")}
             >
-              Rename {noun}
+              Rename
             </Menu.Item>
+            <Menu.Divider />
             <Menu.Item
               color="red"
               leftSection={<icons.delete size={16} />}
               disabled={!current}
               onClick={() => current && onDelete(current)}
             >
-              Delete {noun}
+              Delete
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
