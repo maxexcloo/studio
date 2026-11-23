@@ -107,11 +107,13 @@ export function selectedResolution(input: SizedInput, profile?: SizedProfile) {
 export function resolutionSize(
   size: { width: number; height: number },
   resolution: Resolution,
-  profile?: DefaultSizedProfile,
+  profile?: SizedProfile & { aspectPresets?: readonly object[] },
 ) {
-  const presets = profile?.aspectPresets?.filter(({ w, h }) => w > 0 && h > 0);
+  const presets = (profile?.aspectPresets as { w?: number; h?: number }[] | undefined)?.filter(
+    (preset): preset is { w: number; h: number } => Number(preset.w) > 0 && Number(preset.h) > 0,
+  );
   if (presets?.length) {
-    const canvas = profileImageSize(profile);
+    const canvas = profileImageSize(profile as DefaultSizedProfile);
     const edge = Math.max(canvas.width, canvas.height);
     const away = (tier: Resolution) => Math.abs(Math.log(longEdges[tier] / edge));
     const own = resolutions.reduce((closest, tier) =>
