@@ -319,8 +319,8 @@ export function LibraryCatalogueTable({
                 )}
                 {canUpdate(item) && (
                   <Text size="xs">
-                    Update Available: {item.update?.latest?.name}
-                    {item.update?.note ? ` · ${item.update.note}` : ""}
+                    {/* The note names the update, as "v2 is newer than v1." */}
+                    Update Available: {item.update?.note || item.update?.latest?.name}
                   </Text>
                 )}
                 {item.update?.state === "error" && item.update.note && (

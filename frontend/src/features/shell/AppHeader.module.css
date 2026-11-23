@@ -38,7 +38,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.home :is(h2, h3) {
+.home h2 {
   line-height: 1;
 }
 
@@ -56,7 +56,7 @@
   min-height: 44px;
 }
 
-:where(:root[data-phone]) .home h3 {
+:where(:root[data-phone]) .home h2 {
   font-size: var(--mantine-font-size-lg);
 }
 

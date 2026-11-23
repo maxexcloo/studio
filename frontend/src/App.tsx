@@ -114,7 +114,6 @@ function Workspace() {
             ? navigate(-1)
             : navigate("/images", { replace: true }),
         )}
-        aria-label={panel === "library" ? "Library" : "Settings"}
         title={
           phone ? (
             <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>

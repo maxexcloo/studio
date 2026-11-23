@@ -407,8 +407,10 @@ function Gallery() {
     },
     [listingKey],
   );
-  // Cached results show at once, then their first page is read again.
-  useEffect(() => refreshFirst(), [listingKey]);
+  // Cached results show at once, then their first page is read again; a first load reads it once.
+  useEffect(() => {
+    if (client.getQueryData(listingKey)) refreshFirst();
+  }, [listingKey]);
   // A return or final completion during a read still needs a fresh head once that read settles.
   useEffect(() => {
     if (!gallery.isFetching && !refresh.isFetching && pendingFirst.current === listingKey)

@@ -149,7 +149,7 @@ export function WhereWorkRuns() {
             {cloud && (
               <SettingRow wide label="Run On" description={description}>
                 <SegmentedControl
-                  aria-label="Run On"
+                  aria-label={`${label} Run On`}
                   fullWidth
                   data={sides}
                   value={
