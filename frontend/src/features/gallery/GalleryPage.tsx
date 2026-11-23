@@ -780,7 +780,9 @@ function Gallery() {
         void droppedFiles(event.dataTransfer).then(upload.upload);
       }}
     >
-      <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
+      <VisuallyHidden component="h1">
+        {filters.uploads ? "Uploads" : kind === "video" ? "Videos" : "Images"}
+      </VisuallyHidden>
       {/* The search and filters stay in place while selecting; the selection bar follows them.
           Phones keep them in sight only while a search, filter or selection applies. */}
       <div
