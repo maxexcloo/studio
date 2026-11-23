@@ -258,6 +258,20 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     res.json(found);
   });
 
+  /** The account's open jobs with no gallery tiles yet, but for Dream's and upscales. */
+  function untiledJobs(ownerId) {
+    const open = store
+      .openJobs(ownerId)
+      .filter(
+        (job) =>
+          job.priority !== queuePriority.dream && !job.cleared && job.operation !== "upscale",
+      );
+    const tiled = new Set(
+      galleryItems({ jobIds: open.map((job) => job.id) }).map((item) => item.jobId),
+    );
+    return open.filter((job) => !tiled.has(job.id));
+  }
+
   async function readGallery(account, { query }, dates = null) {
     const owned = ownedQuery(account);
     if (owned) cleanupGalleryState(store, owned);
@@ -381,15 +395,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       similarTo ||
       query.uploads === "1"
         ? []
-        : store
-            .openJobs(account?.userId || "")
-            .filter(
-              (job) =>
-                job.priority !== queuePriority.dream &&
-                !job.cleared &&
-                job.operation !== "upscale" &&
-                !galleryJobItems(job.id).length,
-            )
+        : untiledJobs(account?.userId || "")
             .reverse()
             .flatMap((job) => {
               if (job.galleryAt) retried.add(job.id);
