@@ -10,7 +10,7 @@ import { ratingLabel } from "./itemActions";
 import { MediaActionMenu, useMediaDialogs } from "./MediaActions";
 import { mediaTitle } from "./mediaLabels";
 import { useMediaTransfer } from "./mediaShare";
-import { useMediaRating } from "./useMediaRating";
+import type { useRate } from "./useMediaRating";
 
 import classes from "./MediaTileActions.module.css";
 
@@ -20,19 +20,24 @@ export function MediaTileActions({
   opened,
   onOpenedChange,
   onSelect,
+  rate,
   hideMore,
 }: {
   item: MediaItem;
   opened: boolean;
   onOpenedChange: (value: boolean) => void;
   onSelect?: () => void;
+  /** The gallery's one rating mutation, shared by its tiles. */
+  rate: ReturnType<typeof useRate>;
   /** Hides More for a tile whose menu opens by holding; the hidden button still anchors it. */
   hideMore?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
+  // Delete's dialog mounts once the menu offering it opens, so tiles carry no closed dialogs.
+  const [menuUsed, setMenuUsed] = useState(opened);
+  if (opened && !menuUsed) setMenuUsed(true);
   const menuBounds = useActionMenuBounds(opened);
   const { handlers, dialogs } = useMediaDialogs(item);
-  const rating = useMediaRating(item);
   const transfer = useMediaTransfer(item, opened);
   const name = mediaTitle(item);
   return (
@@ -50,7 +55,8 @@ export function MediaTileActions({
         {item.status === "done" && (
           <Group className={classes.ratings} data-tile-ratings gap={4} wrap="nowrap">
             {(["like", "dislike"] as const).map((id) => {
-              const pressed = item.rating === (id === "like" ? "liked" : "disliked");
+              const rating = id === "like" ? "liked" : "disliked";
+              const pressed = item.rating === rating;
               const Icon = icons[id];
               const label = ratingLabel(id);
               return (
@@ -62,7 +68,7 @@ export function MediaTileActions({
                     variant="default"
                     size={28}
                     data-touch-target
-                    onClick={rating[id]}
+                    onClick={() => rate(item, rating)}
                   >
                     <Icon size={16} fill={pressed ? "currentColor" : "none"} />
                   </ActionIcon>
@@ -103,12 +109,14 @@ export function MediaTileActions({
           </Menu.Dropdown>
         </Menu>
       </Group>
-      <DeleteMediaDialog
-        opened={deleting}
-        ids={[item.id]}
-        close={() => setDeleting(false)}
-        onDeleted={() => {}}
-      />
+      {menuUsed && (
+        <DeleteMediaDialog
+          opened={deleting}
+          ids={[item.id]}
+          close={() => setDeleting(false)}
+          onDeleted={() => {}}
+        />
+      )}
       {dialogs}
     </>
   );

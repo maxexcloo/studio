@@ -18,7 +18,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { type Location, Navigate, useLocation, useNavigate } from "react-router";
+import {
+  type Location,
+  Navigate,
+  type NavigateFunction,
+  type NavigateOptions,
+  type To,
+  useLocation,
+  useNavigate,
+} from "react-router";
 
 import type { GallerySort } from "../../../../shared/gallery-sort";
 import { terminalStatuses } from "../../../../shared/queue";
@@ -66,7 +74,7 @@ import {
 } from "./similarStrictness";
 import { useGalleryDeparture } from "./useGalleryDeparture";
 import { useGallerySelection } from "./useGallerySelection";
-import { usePendingRating } from "./useMediaRating";
+import { usePendingRating, useRate } from "./useMediaRating";
 import { useTryAgain } from "./useTryAgain";
 import {
   type GalleryState,
@@ -158,7 +166,15 @@ function Gallery() {
     },
     [searchAfterTyping],
   );
-  const routerNavigate = useNavigate();
+  // useNavigate changes with the path, so with every viewer step; every target here is absolute.
+  const navigate = useNavigate();
+  const latestNavigate = useRef(navigate);
+  latestNavigate.current = navigate;
+  const routerNavigate = useCallback<NavigateFunction>(
+    (to: To | number, options?: NavigateOptions) =>
+      typeof to === "number" ? latestNavigate.current(to) : latestNavigate.current(to, options),
+    [],
+  );
   const kind = galleryKind(location.pathname) || "image";
   const { leftAt, acknowledged, acknowledge } = useGalleryDeparture(kind);
   const base = galleryPath(kind);
@@ -623,6 +639,7 @@ function Gallery() {
   // Phones without captions hold a tile for its menu instead of showing More.
   const hideMore = phone && !captions;
   const { toggle } = selection;
+  const rate = useRate();
   const renderTileActions = useCallback(
     (item: MediaItem, opened: boolean, onOpenedChange: (opened: boolean) => void) => (
       <MediaTileActions
@@ -630,10 +647,11 @@ function Gallery() {
         opened={opened}
         onOpenedChange={onOpenedChange}
         onSelect={() => toggle([item])}
+        rate={rate}
         hideMore={hideMore}
       />
     ),
-    [hideMore, toggle],
+    [hideMore, toggle, rate],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(

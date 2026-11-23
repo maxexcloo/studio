@@ -7,6 +7,7 @@ import {
   useMutationState,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { post } from "../../api";
 import type { MediaItem, Rating } from "../../types";
@@ -201,24 +202,32 @@ export function usePendingRating(id?: string) {
   }).at(-1);
 }
 
+/** Toggles an item's Like or Dislike, offering Undo after a dislike; stable, so one serves a gallery. */
+export function useRate() {
+  const cache = useQueryClient();
+  const { mutate, mutateAsync } = useRatings();
+  return useCallback(
+    (item: MediaItem, rating: Rating) => {
+      if (cache.isMutating(changing(item.id))) return;
+      const was = item.rating ?? null;
+      const next = was === rating ? null : rating;
+      const change = { ids: [item.id], rating: next };
+      if (next !== "disliked") return mutate(change);
+      const owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]');
+      void mutateAsync(change).then(
+        () => showDisliked(1, () => mutate({ ids: change.ids, rating: was }), owner),
+        () => {},
+      );
+    },
+    [cache, mutate, mutateAsync],
+  );
+}
+
 /** One item's Like and Dislike toggles. */
 export function useMediaRating(item: MediaItem) {
-  const cache = useQueryClient();
-  const ratings = useRatings();
-  const rate = (rating: Rating) => {
-    if (cache.isMutating(changing(item.id))) return;
-    const was = item.rating ?? null;
-    const next = was === rating ? null : rating;
-    const change = { ids: [item.id], rating: next };
-    if (next !== "disliked") return ratings.mutate(change);
-    const owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]');
-    void ratings.mutateAsync(change).then(
-      () => showDisliked(1, () => ratings.mutate({ ids: change.ids, rating: was }), owner),
-      () => {},
-    );
-  };
+  const rate = useRate();
   return {
-    like: () => rate("liked"),
-    dislike: () => rate("disliked"),
+    like: () => rate(item, "liked"),
+    dislike: () => rate(item, "disliked"),
   };
 }
