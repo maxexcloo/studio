@@ -140,9 +140,10 @@ document.addEventListener(
 // of the opening position would land afterwards and override it.
 history.scrollRestoration = "manual";
 const routerHistory = UNSAFE_createBrowserHistory({ v5Compat: true });
+// Only iOS's installed app lacks a system Back that closes viewers and dialogs through history.
 if (
-  matchMedia("(display-mode: standalone)").matches ||
-  (navigator as Navigator & { standalone?: boolean }).standalone === true
+  (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) && matchMedia("(display-mode: standalone)").matches)
 )
   singleEntry(routerHistory, sessionStorage);
 // The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.
