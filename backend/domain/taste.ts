@@ -130,7 +130,8 @@ interface StoredTaste extends TasteWords {
 /** An attribute's decayed score and how many signals moved it, for how sure Studio is of it. */
 interface TasteScore {
   score: number;
-  count: number;
+  /** How many likes and comparison wins raised it. */
+  liked: number;
 }
 interface Weighted {
   score: number;
@@ -295,9 +296,9 @@ function tasteScores(signals: TasteSignal[], at: number) {
   for (const signal of signals) {
     const decay = 0.5 ** (Math.max(0, at - Date.parse(signal.at)) / halfLifeMs) || 0;
     const add = (attribute: string, amount: number) => {
-      const entry = scores.get(attribute) || { score: 0, count: 0 };
+      const entry = scores.get(attribute) || { score: 0, liked: 0 };
       entry.score += amount * decay;
-      entry.count += 1;
+      if (amount > 0 && ["like", "compare", "preferred"].includes(signal.kind)) entry.liked += 1;
       scores.set(attribute, entry);
     };
     const other = signal.over || signal.also;
