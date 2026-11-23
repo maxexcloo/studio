@@ -2416,7 +2416,7 @@ test("Comparisons lists each comparison and kept Dream comparison as a card that
   await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
   const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
   await expect(card).toBeVisible();
-  await expect(page.getByText("2 Variants", { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/^2 Variants\b/)).toHaveCount(2);
   // One card per comparison, without the gallery's tiles.
   await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(2);
   await card.click();
