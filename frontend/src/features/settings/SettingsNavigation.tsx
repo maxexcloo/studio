@@ -36,7 +36,7 @@ const settingSections = {
     group: "Personal",
   },
   "dream-policy": {
-    label: "Dream",
+    label: "Dream Defaults",
     description: "Set when Dream can start jobs and which of its settings accounts can change.",
     icon: icons.dream,
     admin: true,

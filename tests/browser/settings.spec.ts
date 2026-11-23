@@ -967,7 +967,7 @@ test("Settings › Studio switches follow at once and settle back after a failed
   await expect(toggle).toBeChecked();
 });
 
-test("Administration Dream saves shared queue delays and hands an override back to each account", async ({
+test("Dream Defaults saves shared queue delays and hands an override back to each account", async ({
   page,
 }) => {
   await fixtures(page);
