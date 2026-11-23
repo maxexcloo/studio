@@ -424,8 +424,8 @@ const seriesShare = 2;
 const extendShare = 35;
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
-/** One video in this many runs on another video model than the account's default, so videos vary. */
-const videoExploreDraw = 2;
+/** The weight left to the video model Dream used last, so consecutive videos change model. */
+const lastVideoModelWeight = 0.25;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
@@ -775,11 +775,12 @@ export function createDream(options: {
       backend: "local" | "cloud";
       allowUncensored: boolean;
       unavailable: ReadonlySet<string>;
-      alternate?: (profiles: DreamProfile[], chosen: DreamProfile) => DreamProfile | undefined;
+      choose?: (profiles: DreamProfile[]) => DreamProfile | undefined;
     },
   ): Promise<{
     profile: DreamProfile;
     size?: { width: number; height: number };
+    frames?: number;
   }>;
   /** The account's character, outfit and scene cards, or null where it may not use Characters. */
   cards(ownerId: string): Record<CardKind, Character[]> | null;
@@ -2256,8 +2257,7 @@ export function createDream(options: {
           continue;
         }
         videoMisses.delete(ownerId);
-        const alternate = random(videoExploreDraw) === 1;
-        const refused = await video(ownerId, record, access, key, alternate);
+        const refused = await video(ownerId, record, access, key);
         if (!refused) return { status: "generating" };
         reason = refused;
         continue;
@@ -2889,13 +2889,7 @@ export function createDream(options: {
    * Queues a video that animates the account's best still or extends one of its videos
    * (videoSources), on its selected backend; answers why it couldn't, or "".
    */
-  async function video(
-    ownerId: string,
-    record: DreamRecord,
-    access: DreamAccess,
-    key: string,
-    alternate: boolean,
-  ) {
+  async function video(ownerId: string, record: DreamRecord, access: DreamAccess, key: string) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
       try {
         return options.reference(access.account, String(item.id), extend ? "last" : undefined);
@@ -2911,7 +2905,7 @@ export function createDream(options: {
         markUsed(ownerId, source);
         continue;
       }
-      const refused = await animate(ownerId, record, access, source, reference, key, alternate);
+      const refused = await animate(ownerId, record, access, source, reference, key);
       if (refused && referenceOf(source)) {
         if (!source.extend) return refused;
         extensionRefusal = refused;
@@ -2926,6 +2920,33 @@ export function createDream(options: {
     return (
       extensionRefusal || "Dream videos animate a kept or liked image. Keep or like one first."
     );
+  }
+  /**
+   * How much each video profile weighs for the account's next Dream video: its keep rate among
+   * Dream's latest judged videos (Laplace's rule, so an untried one starts at one half), with
+   * `lastVideoModelWeight` left to the one its last video used.
+   */
+  function videoWeights(ownerId: string) {
+    const judged = new Map<string, { kept: number; total: number }>();
+    for (const item of options.gallery(ownerId, {
+      dreamState: ["kept", "discarded"],
+      type: "video",
+      limit: judgedRates,
+    })) {
+      const id = String(item.settings?.profileId || "");
+      const entry = judged.get(id) ?? { kept: 0, total: 0 };
+      entry.total++;
+      if (item.dream?.state === "kept") entry.kept++;
+      judged.set(id, entry);
+    }
+    const last = store
+      .dreamJobsSince(ownerId, new Date(now() - 7 * 86_400_000).toISOString())
+      .filter((job) => kindOf(job) === "video")
+      .at(-1)?.profileId;
+    return (profile: DreamProfile) => {
+      const { kept, total } = judged.get(profile.id) ?? { kept: 0, total: 0 };
+      return ((kept + 1) / (total + 2)) * (profile.id === last ? lastVideoModelWeight : 1);
+    };
   }
   /** Each account's last Dream video that found no model, and the video profiles it saw then. */
   const videoMisses = new Map<string, { reason: string; key: string; until: number }>();
@@ -2943,7 +2964,6 @@ export function createDream(options: {
     { item, extend }: DreamVideoSource,
     reference: { id: string; source?: string },
     key: string,
-    alternate: boolean,
   ) {
     const miss = (reason: string) => {
       if (!extend) videoMisses.set(ownerId, { reason, key, until: now() + videoRecheckMs });
@@ -2958,11 +2978,10 @@ export function createDream(options: {
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
         unavailable: failingProfiles(ownerId, 1),
-        ...(alternate &&
-          !extend && {
-            alternate: (profiles, chosen) =>
-              exploreProfile(ownerId, "video", profiles, chosen)?.profile,
-          }),
+        choose: (profiles) => {
+          const weigh = videoWeights(ownerId);
+          return drawn(profiles.map((profile) => [profile, weigh(profile)]));
+        },
       });
     } catch (error) {
       return miss((error as Error).message);
@@ -2988,6 +3007,7 @@ export function createDream(options: {
       {
         ...profile.defaults,
         ...choice.size,
+        ...(choice.frames ? { frames: choice.frames } : {}),
         autoUpscale: null,
         kind: "video",
         profileId: profile.id,

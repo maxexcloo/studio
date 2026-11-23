@@ -291,7 +291,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       return dreamVideoProfile(catalogue, {
         ...choice,
         localRunning: true,
-        preferred: { local: state.video, cloud: state.video },
+        defaultId: state.video,
       });
     },
     cards: () => state.cards,
@@ -3304,6 +3304,8 @@ test("Dream's content setting limits image and video model choices and waiting w
       rating: "liked",
       prompt: `still ${id}`,
     });
+  // Dream draws its video model by keep rate; this roll lands on the last of the even candidates.
+  state.draws[1_000_000] = [999_999];
   const video = (await dreamOnce())!;
   assert.equal(video.input.profileId, unrestrictedVideo.id);
   assert.equal(await dream.queuedProfileIssue(video), undefined);
@@ -3454,7 +3456,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     status: "done",
     rating: "liked",
   });
-  fx.state.draws[2] = [1];
+  // The model its last video used weighs less, so the next one turns to the other.
   const varied = await fx.dreamOnce();
   assert.equal(varied?.input.profileId, alternate.id);
   assert.equal(varied.parentItemId, "other-still");
