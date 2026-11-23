@@ -147,7 +147,8 @@ export async function fixtures(page: Page) {
       item:
         gallery.find(
           (item) =>
-            item.jobId === jobId && (!comparison.itemIds || item.id === comparison.itemIds[index]),
+            item.jobId === jobId &&
+            (!comparison.itemIds?.[index] || item.id === comparison.itemIds[index]),
         ) || null,
     })),
   });
@@ -559,17 +560,22 @@ export async function fixtures(page: Page) {
       const job = recordGeneration(body, sessionId);
       return respond({ jobId: job.id, sessionId, status: "queued" });
     }
-    // Compare Selected records chosen gallery images.
+    // Compare Selected and Recreate On record chosen gallery images; an empty one is its job's first.
     if (path === "/api/comparisons" && method === "POST") {
       const comparison = {
         id: `compare-${comparisons.length + 1}`,
         seed: "",
-        requests: body.itemIds.map((id: string) => ({
-          input: { prompt: gallery.find((item) => item.id === id)?.prompt },
+        requests: body.itemIds.map((id: string, index: number) => ({
+          input: {
+            prompt: gallery.find((item) =>
+              id ? item.id === id : item.jobId === body.jobIds[index],
+            )?.prompt,
+          },
         })),
         jobIds: body.jobIds,
         itemIds: body.itemIds,
-        labels: body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
+        labels:
+          body.labels ?? body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
         vote: null,
       };
       comparisons.push(comparison);

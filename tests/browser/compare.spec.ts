@@ -562,6 +562,75 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
   );
 });
 
+test("Recreate On runs each selected image again on another model beside its original", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  for (const [id, prompt] of [
+    ["tin", "A tin owl"],
+    ["felt", "A felt owl"],
+  ]) {
+    const settings = { profileId: "image:test", profileName: "Image Quality", seed: 7, count: 2 };
+    const item = {
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      url: image,
+      thumbnailUrl: image,
+      prompt,
+      width: 832,
+      height: 1216,
+      createdAt: stamp,
+      settings,
+    };
+    state.jobs.push({
+      id: item.jobId,
+      jobId: item.jobId,
+      sessionId: "session-owls",
+      status: "completed",
+      operation: "image",
+      input: { kind: "image", prompt, ...settings },
+      items: [item],
+      outputs: [item],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+    state.gallery.push(item);
+  }
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  for (const title of ["Tin Owl", "Felt Owl"])
+    await page.getByRole("button", { name: `Select image: ${title}`, exact: true }).click();
+  await (await selectionMenuItem(page, "Recreate", "Recreate On…")).click();
+  const dialog = page.getByRole("dialog", { name: "Recreate On", exact: true });
+  await expect(dialog.getByRole("button", { name: "Recreate", exact: true })).toBeDisabled();
+  await dialog.getByRole("combobox", { name: "Model", exact: true }).click();
+  await page.getByRole("option", { name: /^Image Fast/ }).click();
+  await dialog.getByRole("button", { name: "Recreate", exact: true }).click();
+  // Several comparisons wait in Comparisons, each the original beside its new run.
+  await expect(page).toHaveURL(/\/images\/comparisons$/);
+  expect(state.jobs.slice(2)).toMatchObject(
+    ["tin", "felt"].map((id) => ({
+      sessionId: "session-owls",
+      parentItemId: id,
+      input: {
+        profileId: "image:fast",
+        prompt: id === "tin" ? "A tin owl" : "A felt owl",
+        seed: 7,
+        count: 1,
+      },
+    })),
+  );
+  expect(state.comparisons.map(({ jobIds, itemIds, labels }) => [jobIds, itemIds, labels])).toEqual(
+    ["tin", "felt"].map((id, index) => [
+      [`job-${id}`, state.jobs[index + 2].id],
+      [id, ""],
+      ["Image Quality", "Image Fast"],
+    ]),
+  );
+});
+
 test("Variants of a result show their numbers, the axis they vary and propose a pick for the brief", async ({
   page,
 }, testInfo) => {

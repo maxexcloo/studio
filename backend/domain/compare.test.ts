@@ -309,6 +309,16 @@ test("compare runs queue one seeded set, read back per owner and record the star
     (await request("", { jobIds: [winner.jobId, winner.jobId], itemIds: ["w-0", "w-0"] })).status,
     400,
   );
+  // An empty chosen image is its job's first, as for Recreate On's run while it is queued.
+  const recreated = await request("", {
+    jobIds: [winner.jobId, other.jobId],
+    itemIds: ["w-1", ""],
+  });
+  assert.equal(recreated.status, 201);
+  assert.deepEqual(
+    recreated.body.variants.map((entry: { item: { id: string } }) => entry.item.id),
+    ["w-1", "o-0"],
+  );
 
   // Variants with seeds of their own keep them, and no shared seed is recorded.
   const seeded = await request("/run", {
