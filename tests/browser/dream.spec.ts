@@ -119,13 +119,22 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
 }) => {
   await fixtures(page);
   const dream = await serveDream(page, {
-    unseen: ["one", "two", "three", "four", "five"].map((id) => dreamItem(id)),
+    unseen: [
+      dreamItem("one", {
+        dream: { ...dreamItem("one").dream, why: "Exploring new ground · The harbour at dusk" },
+      }),
+      ...["two", "three", "four", "five"].map((id) => dreamItem(id)),
+    ],
   });
   await page.goto("/images");
   await page.getByRole("link", { name: "Dream", exact: true }).click();
   await expect(page).toHaveURL(/\/dream$/);
-  await expect(current(page)).toContainText("Because you like one.");
-  await expect(current(page)).toContainText("Dream prompt one");
+  await expect(current(page).getByText("Exploring new ground", { exact: true })).toBeVisible();
+  await expect(current(page).getByText("The harbour at dusk", { exact: true })).toBeVisible();
+  await expect(current(page).getByText("Dream prompt one", { exact: true })).toHaveCount(0);
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
+  ).toBeVisible();
 
   // Undo stands before the card’s round verdict buttons.
   const bar = page.getByRole("group", { name: "Dream Actions" });
@@ -135,21 +144,35 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeDisabled();
   await page.keyboard.press("ArrowRight");
-  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt two", exact: true }),
+  ).toBeVisible();
   await undo.click();
-  await expect(current(page)).toContainText("Dream prompt one");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
+  ).toBeVisible();
   await expect(undo).toBeDisabled();
   await page.keyboard.press("ArrowRight");
-  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt two", exact: true }),
+  ).toBeVisible();
   // U undoes from the keyboard too.
   await page.keyboard.press("u");
-  await expect(current(page)).toContainText("Dream prompt one");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt two", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect(current(page)).toContainText("Dream prompt three");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt three", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("ArrowUp");
-  await expect(current(page)).toContainText("Dream prompt four");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt four", exact: true }),
+  ).toBeVisible();
 
   // A full drag passes the card; a short one springs back.
   const box = (await current(page).boundingBox())!;
@@ -158,12 +181,16 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.down();
   await page.mouse.move(centre.x - 20, centre.y, { steps: 4 });
   await page.mouse.up();
-  await expect(current(page)).toContainText("Dream prompt four");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt four", exact: true }),
+  ).toBeVisible();
   await page.mouse.move(centre.x, centre.y);
   await page.mouse.down();
   await page.mouse.move(centre.x - box.width / 2, centre.y + 10, { steps: 8 });
   await page.mouse.up();
-  await expect(current(page)).toContainText("Dream prompt five");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt five", exact: true }),
+  ).toBeVisible();
 
   // The preview shows the card's full text in Details and judges with the deck's buttons.
   await current(page).getByRole("button", { name: "View", exact: true }).click();
@@ -786,7 +813,7 @@ test("Liking an expanded Dream Set rates the shown member and keeps the set", as
   });
   await page.goto("/dream");
   const set = page.getByRole("group", { name: "Night Out", exact: true });
-  await expect(set).toContainText("Dream prompt cover");
+  await expect(set.getByRole("img", { name: "Dream prompt cover", exact: true })).toBeVisible();
   await set.getByRole("button", { name: "View Set (3)", exact: true }).click();
   const preview = page.getByRole("dialog");
   await expect(
@@ -882,7 +909,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
   const answers = viewer.getByRole("group", { name: "Dream Actions" });
-  for (const name of ["Pass", "Super Like", "Accept", "Suggestions"])
+  for (const name of ["Pass", "Super Like", "Accept", "Both", "Suggestions"])
     await expect(answers.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
   await expect(viewer.getByRole("button", { name: "Close Preview" })).toBeFocused();
   await page.keyboard.press("Escape");
@@ -913,7 +940,8 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   ).toBeEnabled();
   await undo.click();
   await expect(third).toContainText("Guidance 3");
-  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await third.getByRole("button", { name: "View A · Guidance 3", exact: true }).click();
+  await viewer.getByRole("button", { name: "Both", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`))
@@ -964,7 +992,7 @@ test("A three-way comparison fits a small phone and can accept the selected side
   await card.getByRole("button", { name: "View C · Bold", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const previewActions = preview.getByRole("group", { name: "Dream Actions" });
-  for (const name of ["Undo", "Pass", "Super Like", "Accept", "Suggestions"])
+  for (const name of ["Undo", "Pass", "Super Like", "Accept", "All", "Suggestions"])
     await expect(previewActions.getByRole("button", { name, exact: true })).toBeInViewport({
       ratio: 1,
     });
@@ -1172,7 +1200,9 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   await expect(card.getByRole("img", { name: "Dream prompt two", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
-  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt two", exact: true }),
+  ).toBeVisible();
   await expect(current(page).getByRole("button", { name: "View", exact: true })).toBeFocused();
   await expect
     .poll(() => verdicts(dream))
@@ -1286,7 +1316,9 @@ test("The Dream tab counts the results waiting for a verdict, a comparison as on
     .getByRole("link", { name: "Dream", exact: true });
   await expect(tab).toHaveAccessibleDescription("4 Unseen");
   await tab.click();
-  await expect(current(page)).toContainText("Dream prompt one");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(tab).toHaveAccessibleDescription("3 Unseen");
 });
@@ -1788,7 +1820,9 @@ test("new Dream generations follow the active comparison and survive Undo", asyn
   await refreshed;
   await expect(original).toBeVisible();
   await page.getByRole("button", { name: "A", exact: true }).click();
-  await expect(current(page)).toContainText("Dream prompt latest");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt latest", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(original).toBeVisible();
   await expect
@@ -1799,13 +1833,19 @@ test("new Dream generations follow the active comparison and survive Undo", asyn
     )
     .toEqual(["/api/dream/pairs/original/answer", "/api/dream/undo"]);
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(current(page)).toContainText("Dream prompt latest");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt latest", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(page.getByRole("group", { name: "Which arrived?", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(current(page)).toContainText("Dream prompt middle");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt middle", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(current(page)).toContainText("Dream prompt old");
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt old", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
 });
