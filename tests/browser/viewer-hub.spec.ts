@@ -1134,7 +1134,7 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
   const { state, viewer } = await seed(page);
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "Spicy", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Extended Themes", exact: true })).toHaveCount(0);
   await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);

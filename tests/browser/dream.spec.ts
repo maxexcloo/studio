@@ -483,7 +483,9 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await images.fill("200");
   await images.press("Enter");
   await expect.poll(() => dream.settings.dailyImages).toBe(200);
-  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeVisible();
+  await expect(
+    settings.getByRole("switch", { name: "Extended Themes", exact: true }),
+  ).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
     .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
@@ -537,7 +539,9 @@ test("Dream settings an administrator forces stay locked for the account", async
       .getByRole("region", { name: "Dream", exact: true })
       .getByRole("switch", { name: "Enable", exact: true }),
   ).toBeDisabled();
-  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
+  await expect(
+    settings.getByRole("switch", { name: "Extended Themes", exact: true }),
+  ).toBeEnabled();
   await section(page, "Settings", "Where Work Runs");
   await expect(
     page
