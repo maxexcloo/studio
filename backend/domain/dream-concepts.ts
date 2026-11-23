@@ -66,6 +66,34 @@ const axes: Record<string, string[]> = {
     "a ruin",
     "a snowfield",
   ],
+  outfit: [
+    "everyday casualwear",
+    "tailored formalwear",
+    "sportswear",
+    "a work uniform",
+    "traditional dress",
+    "vintage clothing",
+    "streetwear",
+    "evening wear",
+    "swimwear",
+    "outdoor gear",
+    "layered winter clothing",
+    "loungewear",
+  ],
+  look: [
+    "short cropped hair",
+    "long loose hair",
+    "braided hair",
+    "curly hair",
+    "an unusual hair color",
+    "freckles",
+    "glasses",
+    "tattoos",
+    "bold makeup",
+    "a bare, natural face",
+    "a different build",
+    "striking jewelry",
+  ],
   "medium or style": [
     "35mm film photograph",
     "oil painting",
@@ -153,6 +181,7 @@ const motifAliases = [
     "laundry",
     /\b(?:laundry|laundromats?|launderettes?|washing machines?|clotheslines?|wash(?:ing|es) clothes)\b/i,
   ],
+  ["wet", /\b(?:wet|damp|soaked|soaking|drenched|dripping)\b/i],
   [
     "smoking",
     /\b(?:smoking|cigarettes?|cigars?|ashtrays?|tobacco pipes?|smok(?:e[sd]?|ing) (?:an? |the )?(?:joint|hookah))\b/i,
@@ -189,8 +218,15 @@ export function mentionsMotif(text: string, motif: string) {
   return alias?.test(text) || ` ${phraseWords(text)} `.includes(` ${motif} `);
 }
 
-/** Explicit avoids and negative rules. For unrecognised concepts use only short, literal phrases. */
-export function forbiddenMotifs(avoids: string[], rules: string[]) {
+/** The first excluded motif a prompt names at all: an image model draws what it names, even after "no". */
+export const namedMotif = (prompt: string, forbidden: string[]) =>
+  forbidden.find((motif) => mentionsMotif(prompt, motif));
+
+/**
+ * Explicit avoids and negative rules. For unrecognised concepts use only short, literal phrases.
+ * `unasked` (Dream, which takes no requests) keeps a rule's exclusion before "unless".
+ */
+export function forbiddenMotifs(avoids: string[], rules: string[], unasked = false) {
   const exclusions = [
     ...avoids,
     ...rules.flatMap((rule) => motifClauses(rule).map(({ excluded }) => excluded)),
@@ -198,9 +234,11 @@ export function forbiddenMotifs(avoids: string[], rules: string[]) {
   return [
     ...new Set(
       exclusions
+        .map((text) => (unasked ? text.split(/\bunless\b/i)[0] : text))
         .filter((text) => !conditionalMotif.test(text))
         .flatMap((text) =>
-          text.split(/[,;\n]+|\b(?:and|or)\b/gi).flatMap((part) => {
+          // "black and white photos" is one phrase, so "and" never separates items; "or" does.
+          text.split(/[,;\n]+|\bor\b/gi).flatMap((part) => {
             const aliases = aliasMotifs(part);
             if (aliases.length) return aliases;
             const phrase = phraseWords(part.replace(motifNegation, "")).replace(
@@ -239,16 +277,22 @@ function recurringMotifs(history: string[][]) {
   return [...counts].filter(([, count]) => count >= motifFrequency).map(([motif]) => motif);
 }
 
+/**
+ * Optional motifs to leave out of a new idea: those recurring in recent ideas and those of ideas
+ * passed as too similar (`paused`), unless the fixed brief or rules show them.
+ */
 export function cooledMotifs(
   { motifs = [], recent }: { motifs?: string[][]; recent: string[] },
   fixed = "",
   forbidden: string[] = [],
+  paused: string[] = [],
 ) {
   const shown = motifClauses(fixed).map((clause) => clause.shown);
   return [
     ...new Set([
       ...recurringMotifs(motifs.slice(0, motifWindow)),
       ...recurringMotifs(recent.map(promptMotifs)),
+      ...paused,
     ]),
   ].filter(
     (motif) => forbidden.includes(motif) || !shown.some((part) => mentionsMotif(part, motif)),
@@ -308,19 +352,27 @@ export function similarPrompt(a: unknown, b: unknown) {
   );
 }
 
+/**
+ * Why a new idea repeats a recent one, or "". Words of the fixed brief and rules (`fixed`), which
+ * every prompt may repeat, don't count towards likeness.
+ */
 export function freshConceptProblem(
   recent: string[],
   noveltyPrompts: string[],
   subjects: string[],
+  fixed = "",
 ) {
-  const recentWords = noveltyPrompts.map(contentWords);
+  const shared = contentWords(fixed);
+  const varying = (text: string) =>
+    new Set([...contentWords(text)].filter((word) => !shared.has(word)));
+  const recentWords = noveltyPrompts.map(varying);
   const recentSubjects = new Set(subjects.map(normalised));
   return (prompt: string, title: string, motifs: string[], cooling: string[]) => {
     const repeat = repeatedMotif(prompt, cooling, motifs);
     if (repeat) return `The optional motif "${repeat}" has appeared in several recent ideas.`;
     // Compared as remembered: shortened, as each recent prompt is.
     const head = clean(prompt, recentPromptCharacters);
-    const words = contentWords(head);
+    const words = varying(head);
     if (
       recent.some((item) => normalised(item) === normalised(head)) ||
       recentWords.some((item) => overlap(words, item) > repeatOverlap)

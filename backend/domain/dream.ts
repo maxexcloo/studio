@@ -62,7 +62,9 @@ import {
   forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
+  mentionsMotif,
   motifWindow,
+  namedMotif,
   normalised,
   phraseWords,
   recentPromptCharacters,
@@ -101,6 +103,8 @@ export interface DreamOrigin {
   spicy?: true;
   /** Named card details quoted from the written prompt. */
   cardContext?: ResultContext;
+  /** A new idea's optional motifs, paused for later ideas once it is passed as too similar. */
+  motifs?: string[];
   pair?: DreamPair;
   /**
    * How the idea came about: "exploit", "explore:<axis>" for the first thing it tried,
@@ -480,6 +484,11 @@ const usedLimit = 500;
 const recentIdeas = 100;
 /** The writer avoids this many of the latest disliked subjects. */
 const avoidDislikes = 8;
+/** The writer sees this many recent subjects, and this many recent prompts cut to this length. */
+const writerSubjects = 30;
+const writerPrompts = { count: 10, characters: 200 };
+/** Dream revisits a concept only once it is liked more than twice. */
+const featuredLikes = 3;
 /**
  * Calibration seeds and the writer's liked prompts draw from the account's likes. Calibration
  * sometimes includes Dream's own results and keeps.
@@ -1031,10 +1040,26 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
-  /** One of the person's own shapes or tags where they set them, else one drawn by its score. */
-  const favourite = (taste: TasteRecord, field: "shapes" | "tags", prefix: string) => {
-    const own = taste.preferences[field];
-    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, prefix);
+  /** One of the person's own shapes where they set them, else one drawn by its score. */
+  const favouriteShape = (taste: TasteRecord) => {
+    const own = taste.preferences.shapes;
+    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, "aspect:");
+  };
+  /**
+   * A tag to feature: one of the person's own where they set them, else one drawn by its score
+   * among those liked at least `featuredLikes` times; never one their rules leave out or that is
+   * cooling down (`motifs`).
+   */
+  const featuredTag = (taste: TasteRecord, motifs: string[]) => {
+    const open = (tag: string) => !motifs.some((motif) => mentionsMotif(tag, motif));
+    const own = taste.preferences.tags;
+    if (own) return drawn(own.filter(open).map((value) => [value, 1]));
+    return drawn(
+      [...taste.scores]
+        .filter(([attribute, { liked }]) => attribute.startsWith("tag:") && liked >= featuredLikes)
+        .map(([attribute, { score }]): [string, number] => [attribute.slice(4), score])
+        .filter(([tag]) => open(tag)),
+    );
   };
   /**
    * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (evenly
@@ -1415,10 +1440,14 @@ export function createDream(options: {
   const repeats = (item: DreamItem, recent: DreamItem[]) =>
     recent.some((prior) => related(item, prior) || sameConcept(item, prior));
 
+  /** The optional motifs of ideas passed as too similar lately, paused for new ideas. */
+  const pausedMotifs = (similar: DreamItem[]) =>
+    similar.flatMap((item) => item.dream?.motifs ?? []);
   const seedMotifs = (ownerId: string, record: DreamRecord) => {
     const { preferences, rules } = options.taste.read(ownerId);
-    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules);
-    return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden)];
+    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules, true);
+    const paused = pausedMotifs(similarPasses(ownerId));
+    return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden, paused)];
   };
 
   /** Three independent Super Likes on the same concept can seed an automatic variant. */
@@ -1580,7 +1609,7 @@ export function createDream(options: {
       ? drawnValue(taste, `steps:${profile.id}:`)
       : undefined;
     const cfg = drawnValue(taste, `cfg:${profile.id}:`);
-    const aspect = Number(kind === "image" && favourite(taste, "shapes", "aspect:"));
+    const aspect = Number(kind === "image" && favouriteShape(taste));
     const area = Number(profile.defaults?.width) * Number(profile.defaults?.height);
     // Sizes keep to multiples of 64, as the models' trained buckets do.
     const side = (length: number) => Math.max(64, Math.round(length / 64) * 64);
@@ -1719,10 +1748,13 @@ export function createDream(options: {
     const spicy =
       (job.input.writing as DreamWriting).spicy && record.settings.spicy && access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
-    const { summary, rules, likes, styles, avoid, preferences } = options.taste.read(ownerId);
+    const { summary, rules, likes, styles, preferences, learnt } = options.taste.read(ownerId);
+    // Their own avoids and those Studio learnt both steer the idea; only their own are enforced.
+    const avoid = [...new Set([...(preferences.avoid ?? []), ...learnt.avoid])];
     const forbidden = forbiddenMotifs(
       [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
       [...rules, project?.brief.rules ?? ""],
+      true,
     );
     const contentTaste = [
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
@@ -1755,7 +1787,10 @@ export function createDream(options: {
       ...brief.filter(([label]) => label !== "Avoid").map(([, value]) => value),
       ...rules,
     ].join("\n");
-    const cooling = newConcept ? cooledMotifs(record, fixed, forbidden) : [];
+    // More Like This follows its source; other ideas move away from what was passed as too similar.
+    const similar = like ? [] : similarPasses(ownerId);
+    const paused = pausedMotifs(similar);
+    const cooling = newConcept ? cooledMotifs(record, fixed, forbidden, paused) : [];
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}.`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
@@ -1845,8 +1880,14 @@ export function createDream(options: {
         { role: "user", content: `Prompt: ${reword}` },
       ];
     else {
-      const liked = await tastePrompts(ownerId);
-      const library = project ? options.cards(ownerId) : null;
+      // Liked prompts that name what is excluded, cooling or passed as too similar would lead back to it.
+      const liked = (await tastePrompts(ownerId)).filter(
+        (prompt) =>
+          !namedMotif(prompt, forbidden) &&
+          !repeatedMotif(prompt, cooling) &&
+          !similar.some((item) => similarPrompt(prompt, item.prompt || item.dream?.prompt)),
+      );
+      const library = options.cards(ownerId);
       const openCards = library
         ? (["outfits", "scenes"] as const).flatMap((kind) =>
             pins?.[kind]
@@ -1873,7 +1914,6 @@ export function createDream(options: {
       noveltyPrompts.push(...liked);
       // More Like This follows its source; other ideas move away from what repeats.
       const repeats = like ? [] : lookalikes(ownerId);
-      const similar = like ? [] : similarPasses(ownerId);
       noveltyPrompts.push(...similar.map((item) => clean(item.prompt || item.dream?.prompt, 300)));
       const passed = options
         .gallery(ownerId, { rating: "disliked", limit: avoidDislikes })
@@ -1930,13 +1970,17 @@ export function createDream(options: {
             ...(!like
               ? [
                   "Recent Dream ideas to avoid:",
-                  ...(subjects.length ? subjects.map((subject) => `- ${subject}`) : ["(none yet)"]),
+                  ...(subjects.length
+                    ? subjects.slice(0, writerSubjects).map((subject) => `- ${subject}`)
+                    : ["(none yet)"]),
                 ]
               : []),
             ...(!like && recent.length
               ? [
                   "Recent prompts: avoid their underlying concepts, even with different wording:",
-                  ...recent.slice(0, diversity.results).map((prompt) => `- ${prompt}`),
+                  ...recent
+                    .slice(0, writerPrompts.count)
+                    .map((prompt) => `- ${clean(prompt, writerPrompts.characters)}`),
                 ]
               : []),
             ...(cooling.length
@@ -1966,7 +2010,7 @@ export function createDream(options: {
         },
       ];
     }
-    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects);
+    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed);
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
@@ -1976,7 +2020,7 @@ export function createDream(options: {
       const minor = options.minorAge(prompt);
       if (minor)
         return `"${minor}" reads as someone under 18; drop it, without adding "adult" or an age.`;
-      const excluded = repeatedMotif(prompt, forbidden);
+      const excluded = namedMotif(prompt, forbidden);
       if (excluded)
         return `Your prompt includes "${excluded}", which their rules or brief say to avoid.`;
       if (series)
@@ -2025,7 +2069,7 @@ export function createDream(options: {
               idea,
               title,
               chosenMotifs,
-              newConcept && latest ? cooledMotifs(latest, fixed, forbidden) : [],
+              newConcept && latest ? cooledMotifs(latest, fixed, forbidden, paused) : [],
             );
       if (!wrong) {
         if (latest) {
@@ -2057,10 +2101,11 @@ export function createDream(options: {
           thinking,
           model,
           ...(title ? { title } : {}),
+          ...(chosenMotifs.length ? { motifs: chosenMotifs } : {}),
           ...(cardContext && Object.keys(cardContext).length ? { cardContext } : {}),
         };
       }
-      if (attempt) throw new Error("The text model's idea was unusable.");
+      if (attempt) throw new Error(`The text model's idea was unusable: ${wrong}`);
       onThinking("\n");
       onDelta("\n");
       messages = [
@@ -2378,7 +2423,9 @@ export function createDream(options: {
       const spicy = spicyShare(record, access);
       const explore = Boolean(axis);
       const feature =
-        steer || seed || axis === "prompt" ? undefined : favourite(taste, "tags", "tag:");
+        steer || seed || axis === "prompt"
+          ? undefined
+          : featuredTag(taste, seedMotifs(ownerId, record));
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
       const writing: DreamWriting = {
         kind: "dream",
@@ -2625,8 +2672,12 @@ export function createDream(options: {
       sample: seedSample,
     });
     const candidates = [];
+    // As comparisons do (pairBase), skip what is cooling, excluded or passed as too similar.
+    const recent = cooled(ownerId, record);
+    const motifs = seedMotifs(ownerId, record);
+    const hidden = allowsUncensored(ownerId) ? new Set<string>() : options.uncensoredLoras();
     for (const item of liked) {
-      if (!item.id || item.dream?.arm === "recreate") continue;
+      if (!item.id || item.dream?.arm === "recreate" || repeats(item, recent)) continue;
       const idBase = `dream-recreate-${createHash("sha256")
         .update(JSON.stringify([ownerId, item.id]))
         .digest("hex")}`;
@@ -2666,6 +2717,7 @@ export function createDream(options: {
       } = sizing;
       const prompt =
         typeof saved.typedPrompt === "string" ? saved.typedPrompt : String(source.input.prompt);
+      if (repeatedMotif(prompt, motifs)) continue;
       const base = {
         ...input,
         ...settingsOf(saved),
@@ -2681,6 +2733,8 @@ export function createDream(options: {
         { ...sizing, ...saved, referenceAssets, referenceRole },
         size,
       );
+      const stack = requestedLoras(base);
+      if (stack.some((lora) => hidden.has(lora.name))) continue;
       candidates.push({
         idBase,
         itemId: item.id,
@@ -2690,7 +2744,7 @@ export function createDream(options: {
         seed: hasSeed ? seed : undefined,
         size,
         target,
-        stack: requestedLoras(base),
+        stack,
         resolutionTier: saved.resolutionTier ?? sourceTier,
       });
     }

@@ -692,7 +692,7 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.deepEqual([writing.kind, writing.theme, writing.source], ["animate", "custom", "dream 2"]);
   assert.match(writing.instruction, /One continuous shot of one simple, coherent action/);
   assert.match(writing.instruction, /no cuts, scene changes/);
-  assert.match(writing.instruction, /natural, relaxed, believable expressions/);
+  assert.match(writing.instruction, /believable expressions that suit the moment/);
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").status, "capped");
   assert.equal(live().length, 0);
@@ -714,6 +714,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   };
   liked("a", "qwen");
   liked("b", "qwen");
+  liked("d", "qwen");
   taste.record("alice", [tasteSignal("discard", "c", { profileId: "flux" })]);
   await dream.save("alice", { enabled: true, spicy: true });
   const job = await dreamOnce();
@@ -743,7 +744,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
   assert.equal(explored?.dream?.arm, "explore:profile");
-  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.match(state.calls.at(-1)!.system, /change at least three/);
   assert.equal((explored?.input.writing as { explore?: boolean })?.explore, true);
   assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You like foxes.");
   // The next explores a concept from a Library import, on its profile with its LoRAs, for
@@ -812,7 +813,7 @@ test("Dream draws from the models and tags a person set over those it learnt", a
     /Avoids: surreal props\nLikes: quiet candid portraits\nPreferred Styles: documentary photography/,
   );
   assert.match(system, /Treat recurring props and settings as incidental/);
-  assert.match(system, /Use at most one/);
+  assert.match(system, /Build the idea around one of these starting points/);
   assert.doesNotMatch(system, /Possible starting points:.*(?:\bsubject:|medium or style:)/);
 });
 
@@ -833,8 +834,8 @@ test("Fresh concepts rotate anchors and inspirations without overriding a model 
     assert.ok(job);
     assert.equal((job.input.writing as { explore?: boolean }).explore, true);
     seen.push((job.input.writing as { inspiration: string }).inspiration);
-    anchors.push(dream.read("alice").anchors!.slice(0, 8));
-    assert.match(state.calls.at(-1)!.system, /Change at least three/);
+    anchors.push(dream.read("alice").anchors!.slice(0, 10));
+    assert.match(state.calls.at(-1)!.system, /change at least three/);
     assert.match(
       state.calls.at(-1)!.system,
       /Do not copy its complete concept or merely paraphrase it/,
@@ -962,7 +963,7 @@ test("Motif cooldowns recognise unlabelled laundry and smoking across different 
   assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
-test("Dream retries explicit avoids without cooling required or explicitly absent motifs", async (t) => {
+test("Dream retries explicit avoids, even negated ones, without cooling required motifs", async (t) => {
   const { dataDir, dream, projects, state, taste, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   taste.edit("alice", { avoid: ["smoking"] });
@@ -980,17 +981,14 @@ test("Dream retries explicit avoids without cooling required or explicitly absen
   });
 
   const kept = [
-    {
-      prompt: "A poet reads by a paper lantern, no smoking, cigarettes or laundry.",
-      motifs: ["paper lantern", "cigarette", "laundry"],
-    },
+    { prompt: "A poet reads by a paper lantern in a quiet study.", motifs: ["paper lantern"] },
     { prompt: "A paper lantern lights an astronomer under a sandstone arch as lightning strikes." },
     { prompt: "A paper lantern leads a night parade across a castle's drawbridge." },
   ];
   state.replies = [
     { prompt: "A washing machine hums in the corner of a spaceship." },
     kept[0],
-    { prompt: "There is no smoking indoors, but she lights a cigarette on the balcony." },
+    { prompt: "A quiet balcony at night, with no smoking allowed." },
     kept[1],
     { prompt: "Neon signs light a flooded road in the distance." },
     kept[2],
@@ -1199,7 +1197,7 @@ test("More Like This permits close iterations while keeping species and source i
   const next = await dreamOnce();
   assert.equal(next?.input.prompt, iteration);
   assert.match(state.calls.at(-1)!.system, /including species and breed/);
-  assert.doesNotMatch(state.calls.at(-1)!.system, /Change at least three/);
+  assert.doesNotMatch(state.calls.at(-1)!.system, /change at least three/);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Recent Dream ideas to avoid/);
 });
 
@@ -2214,7 +2212,7 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   const tried = (await dreamOnce())!;
   assert.deepEqual(loras(tried), [["ink.safetensors", 1]]);
   assert.equal(tried.dream?.arm, "explore:lora");
-  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.match(state.calls.at(-1)!.system, /change at least three/);
   assert.equal((tried.input.writing as { explore?: boolean }).explore, true);
   assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
