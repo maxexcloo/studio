@@ -61,6 +61,7 @@ import {
   fullBodyPerson,
   promptListProblem,
   repeatedSetProblem,
+  requestedCount,
   turnCountProblem,
 } from "./prompt-checks.js";
 import { compactGuide } from "./prompting.js";
@@ -113,10 +114,10 @@ const theme = z
  */
 function runSize(profile, aspect, resolution) {
   const { width, height } =
-    aspect || !profile.imageSizePreference?.imageAspect
+    aspect || !profile.imagePreference?.imageAspect
       ? profileAspectSize(profile, aspect ? { aspect } : {})
       : profileStartingSize(profile);
-  const preferred = profile.imageSizePreference?.imageResolution;
+  const preferred = profile.imagePreference?.imageResolution;
   const native = profile.options?.resolutions;
   const takes =
     preferred &&
@@ -525,7 +526,7 @@ export function registerGenerateTools({
       count: jobCount
         .optional()
         .describe(
-          `Repeats each prompt with new seeds (default ${mcpGenerationCount}). For distinct results provide separate prompts.`,
+          `Repeats each prompt with new seeds (default ${mcpGenerationCount}, or the account's default for one prompt on one image model). For distinct results provide separate prompts.`,
         ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),
@@ -1061,7 +1062,12 @@ export function registerGenerateTools({
       throw new Error(
         `${unable.map(({ profile }) => profile.label || profile.id).join(", ")} can't hold ${card.name}'s face: it takes no reference to edit with, so each image would show someone else. Leave the model out (Studio picks ${keeper ? keeper.label || keeper.id : "one that edits with references"}), or pass any_model: true only if the user insists on it.`,
       );
-    const count = (args.count ??= mcpGenerationCount);
+    // A lone prompt on one image model, for a request that names no number, takes the account's Default Count.
+    const preferredCount =
+      targets.length === 1 && args.prompts.length === 1 && !requestedCount(request)
+        ? targets[0].profile.imagePreference?.imageCount
+        : undefined;
+    const count = (args.count ??= preferredCount ?? mcpGenerationCount);
     const jobs = targets.length * (args.prompts?.length || 1) * count;
     if (jobs > maxSplitJobs)
       throw new Error(

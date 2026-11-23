@@ -15,7 +15,7 @@ import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { useRememberedKey } from "../auth/useRemembered";
 import { setFamilyLabels } from "./modelFamily";
-import { isProfile, profileForBackend, referencePatch } from "./payload";
+import { generationCountLimit, isProfile, profileForBackend, referencePatch } from "./payload";
 
 export async function fetchModels(cached: boolean) {
   const models = await api<Models>(cached ? "/api/models?cached=1" : "/api/models");
@@ -44,10 +44,12 @@ export const initialInput: GenerationInput = {
   referenceAssets: [],
 };
 export function inputForProfile(previous: GenerationInput, profile: Profile): GenerationInput {
+  const count = profile.imagePreference?.imageCount;
   return {
     ...initialInput,
     ...profile.defaults,
     ...profileStartingSize(profile),
+    ...(count && { count: Math.min(count, generationCountLimit(profile, profile.kind)) }),
     prompt: previous.prompt,
     cardParts: previous.cardParts,
     negative: previous.negative,

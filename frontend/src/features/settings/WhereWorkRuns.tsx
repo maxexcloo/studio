@@ -2,7 +2,7 @@ import { Alert, SegmentedControl, Select, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
-import { imageAspects, resolutions } from "../../../../shared/resolution";
+import { imageAspects, maxImageCount, resolutions } from "../../../../shared/resolution";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useGroupFeature } from "../auth/AccountGate";
@@ -179,6 +179,22 @@ export function WhereWorkRuns() {
                         imageAspect: imageAspects.find((value) => value === choice) ?? null,
                       })
                     }
+                  />
+                </SettingRow>
+                <SettingRow
+                  wide
+                  label="Default Count"
+                  description="How many images new image drafts make when the model can make several."
+                >
+                  <Select
+                    aria-label="Default Count"
+                    data={Array.from({ length: maxImageCount }, (_, index) => ({
+                      value: String(index + 1),
+                      label: `${index + 1} Image${index ? "s" : ""}`,
+                    }))}
+                    value={String(preferences.imageCount ?? 1)}
+                    allowDeselect={false}
+                    onChange={(choice) => save.mutate({ imageCount: Number(choice) })}
                   />
                 </SettingRow>
                 <SettingRow

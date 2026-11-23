@@ -9,6 +9,7 @@ import {
 import {
   grokPinnedResolutions,
   grokVideoDefaultResolution,
+  maxImageCount,
   profileStartingSize,
   selectedResolution,
   withResolution,
@@ -21,7 +22,7 @@ export const isProfile = (profile: Profile, id: unknown) => profile.id === id;
 /** The shared Count limit for a run that can produce variations. */
 export function generationCountLimit(profile: Profile | undefined, kind: GenerationInput["kind"]) {
   return (profile?.capabilities.variations ?? kind === "image")
-    ? Math.min(profile?.constraints?.count?.max ?? 8, 8)
+    ? Math.min(profile?.constraints?.count?.max ?? maxImageCount, maxImageCount)
     : 1;
 }
 
@@ -49,7 +50,7 @@ export function profileForBackend(
   return profile && option?.profile
     ? {
         ...option.profile,
-        imageSizePreference: profile.imageSizePreference,
+        imagePreference: profile.imagePreference,
         backendOptions: profile.backendOptions,
         failing: profile.failing,
         workerIds: profile.workerIds,

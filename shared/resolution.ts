@@ -28,7 +28,7 @@ interface DefaultSizedProfile extends SizedProfile {
   aspectDefault?: string;
   aspectPresets?: { label: string; w: number; h: number }[];
   defaults?: { width?: unknown; height?: unknown; resolution?: unknown; resolutionTier?: unknown };
-  imageSizePreference?: ImageSizePreference;
+  imagePreference?: ImagePreference;
 }
 
 /** The workflow's configured canvas or its family's starting preset. */
@@ -132,8 +132,12 @@ export function resolutionSize(
 }
 
 export const imageAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"] as const;
-export type ImageSizePreference = {
+/** Most images one composer run makes, and so the most an account's Default Image Count may be. */
+export const maxImageCount = 8;
+/** The account's starting values for new image drafts (backend/account-preferences.js). */
+export type ImagePreference = {
   imageAspect?: (typeof imageAspects)[number] | null;
+  imageCount?: number | null;
   imageResolution?: Resolution | null;
 };
 export const grokVideoAspects = [...imageAspects, "21:9", "5:2"];
@@ -170,7 +174,7 @@ export function profileStartingSize(profile: DefaultSizedProfile): {
   resolutionTier?: Resolution;
 } {
   const canvas = profileImageSize(profile);
-  const { aspectPresets: presets, imageSizePreference: preference } = profile;
+  const { aspectPresets: presets, imagePreference: preference } = profile;
   if (profile.kind !== "image" || !presets?.length || profile.aspectPolicy === "fixed")
     return canvas;
   const native = profile.options?.resolutions;

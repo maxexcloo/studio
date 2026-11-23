@@ -5481,7 +5481,10 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
   assert.match(generate.description, /at most 30 images per call\./);
-  assert.match(generate.inputSchema.properties.count.description, /default 1\)/);
+  assert.match(
+    generate.inputSchema.properties.count.description,
+    /default 1, or the account's default/,
+  );
   assert.equal(f.submitted.length, 7);
 });
 
@@ -5837,7 +5840,7 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
   // The account's Settings size starts a run the chat sized no further, as in the composer.
   await f.profiles(
-    [{ ...native, imageSizePreference: { imageAspect: "16:9", imageResolution: "2K" } }],
+    [{ ...native, imagePreference: { imageAspect: "16:9", imageResolution: "2K" } }],
     { defaults: { image: "native", video: videoProfile.id } },
   );
   assert.deepEqual(await size({}), [2048, 1152]);

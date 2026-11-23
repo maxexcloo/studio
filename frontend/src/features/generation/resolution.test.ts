@@ -110,7 +110,7 @@ test("new image drafts select a supported preset for their profile and account d
   assert.deepEqual(configured, { width: 864, height: 1152, resolutionTier: "1K" });
   const square = profileStartingSize({
     ...portrait,
-    imageSizePreference: { imageAspect: "1:1", imageResolution: "1K" },
+    imagePreference: { imageAspect: "1:1", imageResolution: "1K" },
   });
   // The profile's own tier keeps its presets' sizes; another tier scales them to its edge.
   assert.deepEqual(withResolution({ kind: "image", ...configured }, portrait), {
@@ -135,13 +135,13 @@ test("new image drafts select a supported preset for their profile and account d
   assert.deepEqual([larger.width, larger.height], [1536, 2048]);
   const unavailable = profileStartingSize({
     ...portrait,
-    imageSizePreference: { imageAspect: "16:9", imageResolution: "4K" },
+    imagePreference: { imageAspect: "16:9", imageResolution: "4K" },
   });
   assert.deepEqual(unavailable, configured);
   const native = profileStartingSize({
     ...portrait,
     options: { resolutions: ["1k", "2k"] },
-    imageSizePreference: { imageAspect: "1:1", imageResolution: "2K" },
+    imagePreference: { imageAspect: "1:1", imageResolution: "2K" },
   });
   assert.deepEqual(native, { width: 992, height: 992, resolution: "2k" });
   assert.deepEqual(profileStartingSize({ ...portrait, kind: "video" }), {
