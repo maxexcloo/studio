@@ -2236,6 +2236,17 @@ test("Work still generating and videos take the same swipes as a picture", async
     !testInfo.project.use.isMobile || testInfo.project.use.browserName === "webkit",
     "Touch input is dispatched through Chromium's protocol.",
   );
+  await page.addInitScript(() => {
+    const played: string[] = [];
+    Object.assign(window, { played });
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      const source = this.getAttribute("src");
+      if (source === "/test-media/clip-2.mp4" && !this.muted)
+        return Promise.reject(new DOMException("Audio needs a tap", "NotAllowedError"));
+      if (source) played.push(source);
+      return Promise.resolve();
+    };
+  });
   const state = await fixtures(page);
   state.gallery.push(
     {
@@ -2292,6 +2303,10 @@ test("Work still generating and videos take the same swipes as a picture", async
   await expect(video).toHaveAttribute("src", "/test-media/clip.mp4");
   await swipeLeft(video);
   await expect(video).toHaveAttribute("src", "/test-media/clip-2.mp4");
+  await expect
+    .poll(() => page.evaluate(() => (window as any).played))
+    .toEqual(["/test-media/clip.mp4", "/test-media/clip-2.mp4"]);
+  await expect(video).toHaveJSProperty("muted", true);
 });
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({

@@ -112,10 +112,19 @@ function ViewerVideo({
   const player = useRef<HTMLVideoElement>(null);
   const [controls, setControls] = useState(false);
   const [refused, setRefused] = useState(false);
+  const [silent, setSilent] = useState(false);
+  const silentFallback = useRef(false);
   const play = useCallback((media: HTMLVideoElement | null) => {
     if (!media) return;
     player.current = media;
-    const release = playVideo(media, () => setRefused(true));
+    const release = playVideo(
+      media,
+      () => setRefused(true),
+      (value) => {
+        silentFallback.current = value;
+        setSilent(value);
+      },
+    );
     return () => {
       player.current = null;
       release();
@@ -137,8 +146,15 @@ function ViewerVideo({
     <>
       <video
         ref={play}
-        muted={muted}
-        onVolumeChange={onVolumeChange}
+        muted={muted || silent}
+        onVolumeChange={(event) => {
+          if (silentFallback.current) {
+            if (event.currentTarget.muted) return;
+            silentFallback.current = false;
+            setSilent(false);
+          }
+          onVolumeChange(event);
+        }}
         onPlaying={() => setRefused(false)}
         data-media-id={id}
         src={src}

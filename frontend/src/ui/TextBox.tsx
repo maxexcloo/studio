@@ -5,13 +5,11 @@ import {
   Loader,
   Menu,
   Modal,
-  type ModalProps,
   Textarea,
   type TextareaProps,
   Tooltip,
   VisuallyHidden,
   getDefaultZIndex,
-  useProps,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
 import { ArrowUp, Check, type LucideIcon } from "lucide-react";
@@ -114,7 +112,9 @@ export function TextBox({
   const [menuOpened, setMenuOpened] = useState(false);
   const openedFrom = useRef<Element | null>(null);
   const viewport = useVisibleRect(editing);
-  const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
+  const [closingViewport, setClosingViewport] = useState<typeof viewport>();
+  const closing = useRef(false);
+  const editorViewport = editing ? viewport : closingViewport;
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => close());
   // The text an in-place box had when it took focus: changed since, Reset returns to it.
@@ -381,9 +381,13 @@ export function TextBox({
     </div>
   );
   const close = () => {
+    if (!editing || closing.current) return;
+    closing.current = true;
+    setClosingViewport(viewport);
     setMenuOpened(false);
     setEditing(false);
-    setTimeout(() => field.current?.focus({ preventScroll: true }));
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && content.current?.contains(focused)) focused.blur();
   };
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -571,8 +575,12 @@ export function TextBox({
           fullScreen
           closeOnEscape={false}
           returnFocus={false}
-          // The page returns at once, rather than showing through a fade while the keyboard drops.
-          transitionProps={{ ...modal.transitionProps, exitDuration: 0 }}
+          onExitTransitionEnd={() => {
+            closing.current = false;
+            setClosingViewport(undefined);
+            if (field.current && !layerAbove(field.current))
+              field.current.focus({ preventScroll: true });
+          }}
           // A column of header and body. Inline, since Paper's `display: block` has a module
           // class's specificity.
           styles={{ content: { display: "flex", flexDirection: "column", overflow: "clip" } }}
@@ -584,13 +592,16 @@ export function TextBox({
             ref={content}
             data-composer-layer
             aria-label={title}
+            aria-hidden={!editing || undefined}
+            inert={!editing}
             style={
               {
-                translate: viewport?.y ? `0 ${viewport.y}px` : undefined,
-                height: viewport?.height,
-                maxHeight: viewport?.height,
+                translate: editorViewport?.y ? `0 ${editorViewport.y}px` : undefined,
+                height: editorViewport?.height,
+                maxHeight: editorViewport?.height,
                 "--text-editor-safe-bottom":
-                  viewport && window.innerHeight - viewport.y - viewport.height > 100
+                  editorViewport &&
+                  window.innerHeight - editorViewport.y - editorViewport.height > 100
                     ? "0px"
                     : undefined,
               } as CSSProperties
