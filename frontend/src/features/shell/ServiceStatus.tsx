@@ -136,7 +136,7 @@ export function StatusAction() {
       variant="transparent"
       color={generating || held ? "gray" : summary.colour}
       className={progress ? classes.counted : undefined}
-      data-queue-count={Boolean(progress) || undefined}
+      data-queue-count
       onClick={() => setOpened(!opened)}
     >
       <icons.queue size={19} />
