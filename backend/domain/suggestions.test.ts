@@ -225,7 +225,8 @@ test("older saved suggestions refresh on access, and a new short answer stays ca
   items["alice:job-a"].nextSteps = {
     steps: [{ label: "Old", request: "old", prompt: "old" }],
     at: "2026-01-01",
-    count: 6,
+    count: maxSuggestions,
+    revision: 2,
   };
   const body = { surface: "viewer", jobId: "job-a" };
   const answer = await suggestions.suggest("alice", body);
@@ -392,6 +393,7 @@ test("video next steps suggest concrete variations using the clip's saved prompt
   const result = await suggestions.suggest("alice", { surface: "viewer", jobId: "job-video" });
   assert.equal(result.suggestions.length, 2);
   assert.match(calls[0][0].content, /concrete changes to the clip/);
+  assert.doesNotMatch(calls[0][0].content, /distinct medium/);
   assert.match(calls[0][1].content, /The video:\nModel: unknown\nPrompt: Waves/);
   assert.equal(calls[0][1].images, 0);
 });
@@ -401,6 +403,42 @@ test("viewer next steps read the image itself where the text model can", async (
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls[0][1].images, 1);
   assert.match(calls[0][0].content, /what the attached image shows/);
+});
+
+test("image suggestions use the existing medium to offer a distinct style", async () => {
+  const { calls, items, suggestions } = fixture({ image: true });
+  const source = items["alice:job-a"];
+  source.caption = { text: "A photograph of fishing boats in pale fog." };
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
+  await suggestions.suggest("alice", {
+    surface: "draft",
+    kind: "image",
+    prompt: "A linocut of fishing boats in pale fog",
+  });
+  const prepared = suggestions.enrichTask(source);
+  for (const system of [calls[0][0].content, calls[1][0].content, prepared.instructions]) {
+    assert.match(system, /rendering medium from the visible result/);
+    assert.match(system, /for an illustration or render, consider a photograph/i);
+    assert.match(
+      system,
+      /for a photograph, consider a gouache painting, ink illustration or animation cel/i,
+    );
+    assert.match(system, /Keep the subject, outfit, action, setting and framing/);
+  }
+  assert.match(calls[0][1].content, /What it shows: A photograph of fishing boats/);
+  assert.equal(calls[0][1].images, 1);
+  assert.match(calls[1][1].content, /A linocut of fishing boats/);
+  await suggestions.suggest("alice", {
+    surface: "change",
+    jobId: "job-a",
+    request: "Render the scene as a gouache painting",
+    actions: ["edit"],
+  });
+  assert.match(calls[2][0].content, /replace conflicting style cues/);
+  assert.match(
+    calls[2][0].content,
+    /instruction-based edit, name the new style for the whole image/,
+  );
 });
 
 test("Animate saves its own image-grounded motion instructions", async () => {
