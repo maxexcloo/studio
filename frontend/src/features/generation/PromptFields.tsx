@@ -171,16 +171,7 @@ export function PromptFields({
     onChange: (prompt) => onChange({ prompt }),
   });
   const suggestions =
-    ideas.suggestions ??
-    (ask?.available && base.trim()
-      ? {
-          ...draftSuggestions,
-          action: {
-            ...draftSuggestions.action,
-            onOpen: () => void client.fetchQuery(steps).catch(() => {}),
-          },
-        }
-      : undefined);
+    ideas.suggestions ?? (ask?.available && base.trim() ? draftSuggestions : undefined);
   const assistantTool =
     assistant.stop ??
     (assistant.templates || suggestions
@@ -190,6 +181,12 @@ export function PromptFields({
           heading: false,
           icon: icons.assistant,
           disabled: ask?.pending,
+          onOpen: suggestions
+            ? () => {
+                if (ideas.suggestions) ideas.load();
+                else void client.fetchQuery(steps).catch(() => {});
+              }
+            : undefined,
           menu: assistMenu({
             suggestions,
             templates: assistant.templates ?? [],

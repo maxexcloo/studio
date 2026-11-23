@@ -75,11 +75,11 @@ export function usePromptIdeas({
                 ? [{ id: "loading-suggestions", label: "Loading…", disabled: true }]
                 : options,
             ],
-            onOpen: () => load(),
           } satisfies Action,
           refresh: again,
         }
       : undefined,
+    load,
     label: current?.label,
     undo: current && (
       <UndoButton

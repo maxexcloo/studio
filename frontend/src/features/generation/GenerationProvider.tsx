@@ -5,7 +5,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -164,26 +163,22 @@ function useGenerationState() {
   const drafts = useRef(restored);
   const form = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
   const draft = form.values;
-  const saveDrafts = useCallback(() => {
-    localStorage.setItem(storageKey, JSON.stringify(drafts.current));
-  }, [storageKey]);
-  useEffect(() => saveDrafts(), [draft, saveDrafts]);
-  useEffect(() => {
-    window.addEventListener("pagehide", saveDrafts);
-    return () => window.removeEventListener("pagehide", saveDrafts);
-  }, [saveDrafts]);
   const formRef = useRef(form);
   formRef.current = form;
-  const setDraft = useCallback((value: Draft | ((previous: Draft) => Draft)) => {
-    const previous = formRef.current.getValues();
-    const next = {
-      ...empty,
-      ...(typeof value === "function" ? value(previous) : value),
-    };
-    drafts.current[previous.input.kind] = previous;
-    drafts.current[next.input.kind] = next;
-    formRef.current.setValues(next);
-  }, []);
+  const setDraft = useCallback(
+    (value: Draft | ((previous: Draft) => Draft)) => {
+      const previous = formRef.current.getValues();
+      const next = {
+        ...empty,
+        ...(typeof value === "function" ? value(previous) : value),
+      };
+      drafts.current[previous.input.kind] = previous;
+      drafts.current[next.input.kind] = next;
+      localStorage.setItem(storageKey, JSON.stringify(drafts.current));
+      formRef.current.setValues(next);
+    },
+    [storageKey],
+  );
   const changeKind = useCallback(
     (kind: MediaKind) => {
       if (formRef.current.getValues().input.kind !== kind) setDraft(drafts.current[kind]);

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
+import { dreamItem, expandAssistantMenu, fixtures, section, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string | RegExp) {
@@ -326,6 +326,7 @@ test("Suggest can queue a library item variation at its source", async ({ page }
   const suggest = actions.getByRole("button").last();
   await expect(suggest).toHaveAccessibleName("Suggestions");
   await suggest.click();
+  await expandAssistantMenu(page, "Suggestions");
   const submitted = page.waitForRequest(
     (request) =>
       request.method() === "POST" &&
