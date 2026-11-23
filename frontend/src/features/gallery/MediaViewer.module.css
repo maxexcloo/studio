@@ -19,7 +19,7 @@
 .overlay.overlay {
   inset: 0 !important;
   background: var(--overlay-bg) !important;
-  backdrop-filter: var(--overlay-filter) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
 /* The header only names the dialog; the viewer draws its own close action. */

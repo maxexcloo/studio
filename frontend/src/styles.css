@@ -56,6 +56,7 @@ select {
    media behind it, so it takes the solid raised colour to stay readable. */
 :not([data-portal]) > [data-popup] {
   background: var(--studio-glass-solid) !important;
+  backdrop-filter: none !important;
 }
 /* The installed app draws under the status bar and, held sideways, beside the notch; full-screen
    dialogs and sheets keep their content clear of both (their footers clear the home indicator). */

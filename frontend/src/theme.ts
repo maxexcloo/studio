@@ -318,7 +318,7 @@ export function studioTheme({
         }),
       }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
-      DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
+      DrawerOverlay: { defaultProps: { backgroundOpacity: 0.4 } },
       DrawerRoot: DrawerRoot.extend({
         defaultProps: { transitionProps },
         styles: (_theme, props) => ({
@@ -347,13 +347,14 @@ export function studioTheme({
           item: { minHeight: touch ? bar : 36 },
         },
       }),
-      // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
-      // deep shadow. Full-screen dialogs (the viewer, phone panels) fill the viewport instead.
+      // Dialogs sit centred on a raised plane: a dimmed backdrop (a blur there halves the frame
+      // rate), a clear border and a deep shadow. Full-screen dialogs (the viewer, phone panels) fill
+      // the viewport instead.
       Modal: Modal.extend({
         defaultProps: {
           centered: true,
           closeButtonProps: { "aria-label": "Close" },
-          overlayProps: { blur: 8, backgroundOpacity: 0.55 },
+          overlayProps: { backgroundOpacity: 0.55 },
           transitionProps: popupTransition,
           radius: "lg",
           size: "lg",
@@ -413,8 +414,8 @@ export function studioTheme({
         },
         styles: {
           root: {
-            ...glass,
             background: "var(--studio-glass-solid)",
+            borderColor: "var(--mantine-color-default-border)",
             boxShadow: "var(--mantine-shadow-md)",
           },
         },
