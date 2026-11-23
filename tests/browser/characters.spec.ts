@@ -397,6 +397,63 @@ test("New Character saves a name, description and gallery images from the Refere
   ).toBeVisible();
 });
 
+test("A character written from a name and description is improved in place, then Generate References compares its candidates and the winner becomes its image", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const improved: unknown[] = [];
+  await page.route("**/api/assistant/cards/improve", (route) => {
+    improved.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: { ok: true, description: "red-haired woman in her thirties, freckles, slim build" },
+    });
+  });
+  await page.goto("/library#characters");
+  await page.getByRole("button", { name: "New Character", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "New Character", exact: true });
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Mara");
+  const description = editor.getByRole("textbox", { name: "Description", exact: true });
+  await description.click();
+  // Phones edit the description full screen, its tools beside the text; desktops type in place.
+  const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
+  const box = phone ? page.getByRole("dialog", { name: "Description", exact: true }) : editor;
+  const text = box.getByRole("textbox", { name: "Description", exact: true });
+  await text.fill("red hair, freckles");
+  // Improve alone runs on click, replacing the text in place; Undo leads the AI menu after.
+  await box.getByRole("button", { name: "Improve", exact: true }).click();
+  await expect(text).toHaveValue("red-haired woman in her thirties, freckles, slim build");
+  expect(improved).toEqual([
+    { kind: "characters", name: "Mara", description: "red hair, freckles" },
+  ]);
+  const menu = await promptMenu(box, "Description");
+  await menu.getByRole("menuitem", { name: "Undo", exact: true }).click();
+  await expect(text).toHaveValue("red hair, freckles");
+  await box.getByRole("button", { name: "Improve", exact: true }).click();
+  await expect(text).toHaveValue("red-haired woman in her thirties, freckles, slim build");
+  await closeTextEditor(page, "Description");
+  // A character needs an image to save on its own; Generate References saves it waiting on them.
+  await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await editor.getByRole("button", { name: "Generate References", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  expect(
+    state.characters.map(({ name, description, referenceIds, candidates }) => [
+      name,
+      description,
+      referenceIds,
+      candidates,
+    ]),
+  ).toEqual([["Mara", "red-haired woman in her thirties, freckles, slim build", [], "compare-1"]]);
+  expect(state.comparisons[0].requests[0].input.prompt).toContain("red-haired woman");
+  await expect(
+    page.getByText("The winner joins Mara's images in Library.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Pick Seed 2 as Winner", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Clear Winner Seed 2", exact: true }),
+  ).toBeVisible();
+  expect(state.characters[0].referenceIds).toEqual([state.comparisons[0].winnerItemId]);
+});
+
 test("Use as Character starts a card from a gallery image in Library › Characters, named and described by the assistant", async ({
   page,
 }) => {
