@@ -45,7 +45,7 @@ interface GuideBindings {
   families: Record<string, Record<string, string>>;
   profiles: Record<string, { pack?: string }>;
 }
-const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
+const kindLabels = { image: "Image", video: "Video" };
 
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
 
@@ -116,7 +116,7 @@ function useDefinitions() {
   // Guide bindings record the runtime id, `custom:` plus the definition's id.
   const guideIdOf = (entry: ProfileRow) =>
     bindings?.profiles[`custom:${entry.id}`]?.pack ??
-    (entry.family ? bindings?.families[entry.family]?.[entry.kind || "image"] : undefined);
+    (entry.family ? bindings?.families[entry.family]?.[entry.kind] : undefined);
   const guideNames = new Map(guides.map((entry) => [entry.packId, entry.name]));
   const guideOf = (entry: ProfileRow) => {
     const id = guideIdOf(entry);
@@ -341,7 +341,13 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
         ) : (
           <DataTable
             label="Editable Profiles"
-            rows={profileRows}
+            // Sorted by type, family and name first, so the stable Type sort keeps that order within it.
+            rows={[...profileRows].sort(
+              (a, b) =>
+                compareNames(kindLabels[a.kind], kindLabels[b.kind]) ||
+                compareNames(modelFamilyLabel(a.family), modelFamilyLabel(b.family)) ||
+                compareNames(a.name || a.id, b.name || b.id),
+            )}
             rowKey={(entry) => entry.id}
             rowName={(entry) => entry.name || entry.id}
             loading={profileList.isPending && "Loading Profiles"}
@@ -349,12 +355,33 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             searchText={(entry) => [
               entry.name,
               entry.id,
+              kindLabels[entry.kind],
               entry.family && modelFamilyLabel(entry.family),
               guideOf(entry),
             ]}
-            initialSort={{ key: "name", descending: false }}
+            initialSort={{ key: "kind", descending: false }}
             empty={profiles.length ? "No Matches" : "No Profiles"}
             columns={[
+              {
+                key: "kind",
+                header: "Type",
+                sortValue: (entry) => kindLabels[entry.kind],
+                cell: (entry) => (
+                  <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                    {kindLabels[entry.kind]}
+                  </Text>
+                ),
+              },
+              {
+                key: "family",
+                header: "Family",
+                sortValue: (entry) => modelFamilyLabel(entry.family),
+                cell: (entry) => (
+                  <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                    {modelFamilyLabel(entry.family)}
+                  </Text>
+                ),
+              },
               {
                 key: "name",
                 header: "Name",
@@ -366,14 +393,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                       name={entry.name || entry.id}
                       openLabel={`Edit ${entry.name || entry.id}`}
                       onOpen={() => setEditing({ kind: "profile", id: entry.id })}
-                      detail={
-                        [
-                          entry.family && modelFamilyLabel(entry.family),
-                          entry.kind && kindLabels[entry.kind],
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || (entry.name ? entry.id : undefined)
-                      }
+                      detail={entry.name ? entry.id : undefined}
                     />
                     {phone && (
                       <Group gap="xs" wrap="nowrap">
