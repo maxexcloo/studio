@@ -32,7 +32,6 @@ export function NumberSetting({
       value={draft}
       min={min}
       max={max}
-      size="xs"
       w={80}
       allowDecimal={false}
       clampBehavior="strict"
