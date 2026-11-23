@@ -269,8 +269,17 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
   // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.
   assert.match(body.messages[0].content, /Translate figurative visual shorthand/);
   assert.match(body.messages[0].content, /generation model cannot read the chat/);
-  assert.match(body.messages[0].content, /real flaws means subtle texture/);
-  assert.match(body.messages[0].content, /age and ethnicity in the prompt's first words/);
+  assert.match(
+    body.messages[0].content,
+    /Use section labels when the guide requires them, preserve any literal quotations/,
+  );
+  assert.match(body.messages[0].content, /Keep words that describe the scene or its motion/);
+  assert.match(
+    body.messages[0].content,
+    /If the person asks for realistic imperfections, use the requested traits/,
+  );
+  assert.match(body.messages[0].content, /including any supplied age and ethnicity/);
+  assert.match(body.messages[0].content, /Do not infer age or ethnicity from appearance/);
   assert.equal(body.messages[1].content, "secret cabin");
   assert.match(lines[0], /^Prompt assistant rewrite with cloud\/auto in \d+ ms$/);
   assert.doesNotMatch(lines.join("\n"), /secret/);
@@ -744,7 +753,7 @@ test("cardIdeas offers distinct names from a card's images, unlike those already
     { options: ["Mara", "Wren", "Ash", "Ivy", "Rook", "Sloane"], model: "cloud/auto" },
   );
   const [system, user] = seen.calls[0].body.messages;
-  assert.match(system.content, /6 useful, distinct names.*never a real person's name/s);
+  assert.match(system.content, /10 useful, distinct names.*never a real person's name/s);
   assert.match(system.content, /same reference, not alternative appearances/);
   assert.match(system.content, /not synonyms or near-duplicates/);
   assert.match(user.content[0].text, /Juno/s);
@@ -768,22 +777,35 @@ test("Extended Themes card ideas describe the reference without proposing body e
   assert.doesNotMatch(system, /include a non-graphic body-shape/);
 });
 
-test("card ideas offer six descriptions, while a custom request returns one result", async () => {
+test("card ideas offer up to ten suggestions, while a custom request returns one result", async () => {
   for (const field of ["name", "description"]) {
     for (const request of ["", "make it shorter"]) {
       const seen = fakeGateway(() =>
         json(
           JSON.stringify({
-            options: ["Wind", "Wind", "Rain", "Fog", "Snow", "Cloud", "Sun", "Moon"],
+            options: [
+              "Wind",
+              "Wind",
+              "Rain",
+              "Fog",
+              "Snow",
+              "Cloud",
+              "Sun",
+              "Moon",
+              "Stars",
+              "Dawn",
+              "Dusk",
+              "Hail",
+            ],
           }),
         ),
       );
       const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
       const result = await engine.cardIdeas({ kind: "scenes", field, images: [], request });
-      assert.equal(result.options.length, request ? 1 : 6);
+      assert.equal(result.options.length, request ? 1 : 10);
       assert.match(
         seen.calls[0].body.messages[0].content,
-        request ? /1 useful, distinct/ : /6 useful, distinct/,
+        request ? /1 useful, distinct/ : /10 useful, distinct/,
       );
     }
   }

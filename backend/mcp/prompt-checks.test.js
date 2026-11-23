@@ -31,6 +31,10 @@ test("an exact prompt with generation instructions is refused with the count to 
   assert.match(refusal, /^prompts run verbatim, and this one holds instructions/);
   assert.match(refusal, /count: 5 \(1–10 per call\)/);
   assert.match(refusal, /"five distinct amateur-snapshot variations"/);
+  assert.match(
+    refusal,
+    /send one finished prompt per image. Include the user's original words as request/,
+  );
   assert.match(exactPromptInstructions("Make 3 images of a red fox in snow"), /count: 3 /);
   assert.match(
     exactPromptInstructions("A red fox in snow. Please create two versions"),
@@ -54,6 +58,7 @@ test("an exact prompt with generation instructions is refused with the count to 
     ["Generate me three images of a cat", 3],
     ["Eight variations, a red fox in snow", 8],
     ["A red fox in snow, a few variations please", 0],
+    ["Generate a few variations of the red fox", 0],
     ["A red fox in snow, of this scene", 0],
   ])
     assert.match(
@@ -77,6 +82,8 @@ test("finished prompts pass as exact prompts", () => {
     "Two variants of tulips in a vase",
     "A woman holding two photos of her family",
     "Variation in light across a mountain ridge",
+    "Alternating variations in the wood grain",
+    "Three color variations in a single stained-glass panel",
   ])
     assert.equal(exactPromptInstructions(prompt), "", prompt);
 });

@@ -1035,13 +1035,14 @@ test("media and administrator credentials discover only their own friendly tools
   // A chat keeps the user's own description, and LoRAs run only when asked.
   assert.match(media.getInstructions(), /Translate figurative visual shorthand/);
   assert.match(media.getInstructions(), /a LoRA only when the user names one or clearly wants one/);
-  // A rule such as real flaws lands as texture on the asked-for face, never a plainer or older one.
   assert.match(
     media.getInstructions(),
-    /real flaws means subtle texture .* never a plainer, older/,
+    /If the person asks for realistic imperfections, use the requested traits/,
   );
-  // A person's age and ethnicity lead, since one named late is often lost in the image.
-  assert.match(media.getInstructions(), /age and ethnicity in the prompt's first words/);
+  assert.match(
+    media.getInstructions(),
+    /including any supplied age and ethnicity.*Do not infer age or ethnicity from appearance/,
+  );
   assert.match(
     media.getInstructions(),
     /call reuse with its ref and your revised prompt, not a new generate/,

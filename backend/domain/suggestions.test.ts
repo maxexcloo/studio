@@ -512,7 +512,7 @@ test("viewer ideas and chosen changes use current wording without changing saved
   source.parentItemId = "original-reference";
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   const saved = structuredClone(source);
-  const prompt = "A brindle greyhound with a white chest, lying on a blue boat";
+  const prompt = "A brindle greyhound with a white chest.\n\nIt lies on a blue boat.";
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", prompt });
   assert.match(calls[1][1].content, /Prompt: A brindle greyhound with a white chest/);
   assert.equal(calls[1][1].images, 1);
@@ -528,17 +528,21 @@ test("viewer ideas and chosen changes use current wording without changing saved
       JSON.stringify({
         action: "recreate",
         label: "Standing",
-        prompt: "A brindle greyhound with a white chest, standing on a blue boat",
+        prompt: "A brindle greyhound with a white chest.\n\nIt stands on a blue boat.",
       }),
   });
-  await changes.suggestions.suggest("alice", {
+  const result = await changes.suggestions.suggest("alice", {
     surface: "change",
     jobId: "job-a",
     prompt,
     request: "standing",
     actions: ["recreate"],
   });
-  assert.match(changes.calls[0][1].content, /Prompt: A brindle greyhound with a white chest/);
+  assert.ok(changes.calls[0][1].content.includes(prompt));
+  assert.equal(
+    result.suggestions[0]?.prompt,
+    "A brindle greyhound with a white chest.\n\nIt stands on a blue boat.",
+  );
   assert.equal(changes.items["alice:job-a"].prompt, "A harbour at dawn");
 });
 
