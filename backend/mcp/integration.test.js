@@ -1330,6 +1330,8 @@ test("Generate attaches a compact guide once per account unless it read the sele
         id: "fixture-guide",
         summary: "Subject first",
         rules: ["Describe the subject first"],
+        pitfalls: ["Stacked adjectives blur"],
+        example: "A lighthouse at dusk",
         sources: ["https://example.test/guide"],
       },
     },
@@ -5572,7 +5574,7 @@ test("a Generate count is one batched job where the profile batches, else a job 
   assert.equal(f.submitted.length, 19);
 });
 
-test("each conversation gets a profile guide once, whole, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
+test("each conversation gets a profile guide once, every rule of it, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
   const f = await fixture(t);
   const long = {
     id: "long-guide",
@@ -5596,7 +5598,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   );
   const guided = replies.filter((reply) => guideOf(reply));
   assert.equal(guided.length, 1, "concurrent calls attach the guide once");
-  assert.match(guideOf(guided[0]), /Rule 40 explains/, "the whole guide, not a gist");
+  assert.match(guideOf(guided[0]), /Rule 40 explains/, "every rule, not a gist");
   assert.equal(texts(guided[0]).includes("example.test/guide"), false);
   for (const reply of replies.filter((reply) => !guideOf(reply)))
     assert.ok(texts(reply).length < 570, `${texts(reply).length} characters`);

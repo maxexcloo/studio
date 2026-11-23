@@ -272,7 +272,7 @@ export function registerGenerateTools({
       ? [
           {
             type: "text",
-            text: `Prompting guide for ${label}; apply it to later prompts: ${guide}`,
+            text: `Prompting guide for ${label} (its essentials; models with full_guide has pitfalls and examples); apply it to later prompts: ${guide}`,
           },
         ]
       : [];
@@ -456,7 +456,10 @@ export function registerGenerateTools({
       }
       if (prompts.length > size && !queued.error)
         queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${outputCount(queued.jobs)} images in batches of up to ${size * count}.`;
-      return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
+      return {
+        queued,
+        guide: fresh ? compactGuide(profile.prompting, Infinity, { essentials: true }) : "",
+      };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.
       if (fresh) reviewedGuides.forget(guideKey(profile.id));
