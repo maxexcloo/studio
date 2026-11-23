@@ -78,8 +78,15 @@ function bumpRevision() {
 
 // Bumped by changes that can move items into, out of or across a list. Idle work's enrichment
 // (titles, captions, suggestions, reviews, face checks) leaves it be: a kept list picks those up
-// when it next expires.
+// when it next expires. An account's lists wait only for its own changes and those of no known
+// owner (delete markers).
 let listVersion = 0;
+let everyoneChanged = 0;
+const ownerChanged = new Map();
+const listVersionFor = (query) =>
+  typeof query.ownerId === "string"
+    ? Math.max(everyoneChanged, ownerChanged.get(query.ownerId) ?? 0)
+    : listVersion;
 const enrichment = new Set([
   "caption",
   "identity",
@@ -90,9 +97,13 @@ const enrichment = new Set([
   "title",
 ]);
 
-function changed({ enriched = false } = {}) {
+function changed({ enriched = false, items } = {}) {
   dataVersion += 1;
-  if (!enriched) listVersion += 1;
+  if (!enriched) {
+    listVersion += 1;
+    if (items) for (const item of items) ownerChanged.set(item.ownerId ?? "", listVersion);
+    else everyoneChanged = listVersion;
+  }
   bumpRevision();
 }
 
@@ -453,7 +464,7 @@ export function putGalleryItems(items, { enriched = false } = {}) {
       else live.delete(key);
     }
   });
-  changed({ enriched });
+  changed({ enriched, items });
 }
 
 /** Deletes items' records only: no files and no delete markers (removeGalleryItems does those). */
@@ -464,7 +475,7 @@ export function forgetGalleryItems(items) {
     list(keys),
   );
   for (const key of keys) live.delete(key);
-  changed();
+  changed({ items });
 }
 
 /** Each account's result numbers (domain/result-numbers.ts), shown on its gallery items. */
@@ -886,7 +897,8 @@ const listLifeMs = 60_000;
 function keptList(query, filter, filterKey, rank, sort) {
   const name = filterKey && JSON.stringify([query, filterKey, Boolean(rank), sort]);
   const kept = name && lists.get(name);
-  if (kept && kept.version === listVersion && Date.now() - kept.at <= listLifeMs) return kept;
+  const version = listVersionFor(query);
+  if (kept && kept.version === version && Date.now() - kept.at <= listLifeMs) return kept;
   let entries = [];
   const candidates = filter || rank ? visibleRows(query, filter) : sortableRows(query);
   for (const { row, item } of candidates) {
@@ -906,7 +918,7 @@ function keptList(query, filter, filterKey, rank, sort) {
   else if (sort !== "newest")
     entries.sort((a, b) => compareGalleryKeys(a.position, b.position, sort));
   const list = {
-    version: listVersion,
+    version,
     at: Date.now(),
     entries,
     positions: new Map(entries.map((entry, index) => [entry.key, index])),
