@@ -223,8 +223,8 @@ export function PromptFields({
             ...proposalUndo(undo),
             ...assistMenu({
               suggestions,
-              ideasFirst: Boolean(ideas.suggestions),
-              templates: assistant.templates ?? [],
+              // An empty prompt has nothing to rewrite: its ideas stand alone.
+              templates: ideas.suggestions ? [] : (assistant.templates ?? []),
               custom: assistant.custom,
               others: [assistant.more ?? []],
               last: [],
