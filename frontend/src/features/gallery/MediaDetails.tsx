@@ -722,7 +722,7 @@ function RelatedLinks({ items, open }: { items: MediaItem[]; open?: (item: Media
 const isFrameReference = (id: string) => /:(?:last-frame|frame-\d+)$/.test(id);
 
 /**
- * A reference's thumbnail, linking to the page of the result it was taken from: `source` when it
+ * A reference's thumbnail, named by its role for assistive technology, linking to the page of the result it was taken from: `source` when it
  * is loaded, otherwise the result its asset names; a reference no longer in the gallery opens its
  * picture in a new tab.
  */
@@ -745,39 +745,32 @@ function ReferenceLink({
         type: isFrameReference(reference.id) ? "video" : "image",
       });
   const presentation = (
-    <Group gap="xs" wrap="nowrap">
-      <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
-      <Stack gap={0} miw={0}>
-        <Text size="sm">{reference.role}</Text>
-        {reference.name && (
-          <Text size="xs" c="dimmed" truncate title={reference.name}>
-            {reference.name}
-          </Text>
-        )}
-        {reference.strength && <PartLabel>{reference.strength}</PartLabel>}
-      </Stack>
-    </Group>
+    <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
   );
-  return target ? (
-    <UnstyledButton
-      component={Link}
-      to={target}
-      state={followed}
-      aria-label={`Open ${reference.role}`}
-      onClick={source && openHere(source, open)}
-    >
-      {presentation}
-    </UnstyledButton>
-  ) : (
-    <UnstyledButton
-      component="a"
-      href={`${address}/media`}
-      target="_blank"
-      rel="noreferrer"
-      aria-label={`Open ${reference.role}`}
-    >
-      {presentation}
-    </UnstyledButton>
+  return (
+    <Tooltip label={reference.role}>
+      {target ? (
+        <UnstyledButton
+          component={Link}
+          to={target}
+          state={followed}
+          aria-label={`Open ${reference.role}`}
+          onClick={source && openHere(source, open)}
+        >
+          {presentation}
+        </UnstyledButton>
+      ) : (
+        <UnstyledButton
+          component="a"
+          href={`${address}/media`}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open ${reference.role}`}
+        >
+          {presentation}
+        </UnstyledButton>
+      )}
+    </Tooltip>
   );
 }
 
@@ -943,7 +936,7 @@ export function MediaDetails({
           <Stack gap="sm">
             {lineage.map(([label, content]) => (
               <Stack key={label} gap={4}>
-                <PartLabel>{label}</PartLabel>
+                {lineage.length > 1 && <PartLabel>{label}</PartLabel>}
                 {content}
               </Stack>
             ))}
@@ -977,7 +970,7 @@ export function MediaDetails({
       ) && (
         <DetailSection title="References">
           {details.references.length > 0 && (
-            <Stack align="stretch" gap="xs">
+            <Group gap="xs">
               {details.references.map((reference) => (
                 <ReferenceLink
                   key={`${reference.role}:${reference.id}`}
@@ -989,7 +982,7 @@ export function MediaDetails({
                   open={open}
                 />
               ))}
-            </Stack>
+            </Group>
           )}
           {details.unused.map((note) => (
             <Text key={note} size="sm" c="yellow">

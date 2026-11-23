@@ -898,9 +898,9 @@ test("Details shows the source, exact set, original chat and applied reference",
   await expect(
     page.getByRole("link", { name: "Results From This Chat", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Identity", { exact: true })).toBeVisible();
-  await expect(page.getByText("Heron Upload", { exact: true })).toBeVisible();
-  await expect(page.getByText("Strength 0.7", { exact: true })).toBeVisible();
+  // References show their thumbnails alone, named by their role.
+  await expect(page.getByRole("link", { name: "Open Identity", exact: true })).toBeVisible();
+  await expect(page.getByText("Strength 0.7", { exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Bird Studies", exact: true }).click();
   await expect(page.getByRole("button", { name: "Remove Set: Bird Studies Filter" })).toBeVisible();
   await expect(
