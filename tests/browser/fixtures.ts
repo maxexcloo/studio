@@ -1210,7 +1210,7 @@ export async function chooseView(page: Page, list: string, view: string) {
 }
 
 /** Closes a chip's popup with Escape, leaving the composer open. */
-export async function closePopup(page: Page, title: string) {
+async function closePopup(page: Page, title: string) {
   const popup = page.getByRole("dialog", { name: title, exact: true });
   await popup.press("Escape");
   await expect(popup).toBeHidden();
@@ -1444,8 +1444,6 @@ export async function serveDream(
     uncensoredAvailable?: boolean;
     /** The settings an administrator forces, which the account can't change. */
     locked?: (keyof typeof dreamDefaults)[];
-    /** Older gallery images offered for calibration until judged. */
-    calibration?: any[];
     library?: any[];
     /** Why Dream can't run, which makes it unavailable. */
     reason?: string;
@@ -1469,12 +1467,10 @@ export async function serveDream(
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],
     uncensoredAvailable: options.uncensoredAvailable ?? false,
-    calibration: options.calibration ?? [],
     library: options.library ?? [],
     today: { images: 12, videos: 1 },
     usage: undefined as import("../../shared/dream").DreamCounts | undefined,
     reviewed: new Set<string>(),
-    judged: new Set<string>(),
     /** Every Dream result served, so Undo can bring one back. */
     known: new Map<string, any>(),
     projects: options.projects ?? [],
@@ -1582,15 +1578,9 @@ export async function serveDream(
       return route.fulfill({ json: { since: options.since ?? null } });
     if (method !== "GET") state.requests.push({ method, path, body });
     for (const item of [...state.unseen, ...state.discarded]) state.known.set(item.id, item);
-    // As the backend: Undo returns results to unseen and gallery images to unjudged.
+    // As the backend: Undo returns results to unseen.
     if (path === "/api/dream/undo") {
       for (const id of body.ids) {
-        state.judged.delete(id);
-        if (body.calibration) {
-          const item = state.calibration.find((entry) => entry.id === id);
-          if (item && body.rating !== undefined) item.rating = body.rating ?? undefined;
-          continue;
-        }
         const item = state.known.get(id);
         if (!item) continue;
         state.discarded = state.discarded.filter((entry) => entry !== item);
@@ -1624,24 +1614,6 @@ export async function serveDream(
         [body.kind === "image" ? "images" : "videos"]: 0,
       };
       return route.fulfill({ json: show() });
-    }
-    if (path === "/api/dream/calibration") {
-      if (method === "GET")
-        return route.fulfill({
-          json: {
-            items: state.calibration.filter(
-              (item) =>
-                !state.judged.has(item.id) &&
-                item.type === (url.searchParams.get("media") || "image"),
-            ),
-          },
-        });
-      for (const id of [...(body.liked || []), ...(body.passed || [])]) {
-        state.judged.add(id);
-        const item = state.calibration.find((entry) => entry.id === id);
-        if (item && body.rating !== undefined) item.rating = body.rating;
-      }
-      return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {
       if (method === "DELETE") {
