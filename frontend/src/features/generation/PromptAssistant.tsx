@@ -381,6 +381,31 @@ export function usePromptAssistant({
     },
   });
   const assisting = assistance.isPending || findLoras.isPending;
+  // The LoRA chip keeps still while the prompt is typed, reading it when asked.
+  const loraDisabled = !input.prompt.trim() || assisting || change?.pending;
+  const loraSuggestions = useMemo(
+    () =>
+      lorasOffered
+        ? {
+            disabled: loraDisabled,
+            loading: findLoras.isPending,
+            feedback: loraFeedback,
+            onClick: () => {
+              const { input, profile, hasReferences } = latest.current;
+              if (!profile) return;
+              setLoraFeedback(undefined);
+              findLoras.mutate({
+                scope: scope.current,
+                profileId: profile.id,
+                profileBackend: input.profileBackend,
+                hasReferences,
+                prompt: input.prompt,
+              });
+            },
+          }
+        : undefined,
+    [lorasOffered, loraDisabled, findLoras.isPending, findLoras.mutate, loraFeedback],
+  );
   if (!info?.available || !profile || !info.presets.length)
     return { working: undefined, dialog: null };
   const disabled = !input.prompt.trim();
@@ -485,31 +510,6 @@ export function usePromptAssistant({
         }),
       }
     : undefined;
-  // The LoRA chip keeps still while the prompt is typed, reading it when asked.
-  const loraDisabled = disabled || assisting || change?.pending;
-  const loraSuggestions = useMemo(
-    () =>
-      lorasOffered
-        ? {
-            disabled: loraDisabled,
-            loading: findLoras.isPending,
-            feedback: loraFeedback,
-            onClick: () => {
-              const { input, profile, hasReferences } = latest.current;
-              if (!profile) return;
-              setLoraFeedback(undefined);
-              findLoras.mutate({
-                scope: scope.current,
-                profileId: profile.id,
-                profileBackend: input.profileBackend,
-                hasReferences,
-                prompt: input.prompt,
-              });
-            },
-          }
-        : undefined,
-    [lorasOffered, loraDisabled, findLoras.isPending, findLoras.mutate, loraFeedback],
-  );
   return {
     templates,
     custom: customActions,
