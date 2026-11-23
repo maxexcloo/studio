@@ -161,7 +161,7 @@
   padding-inline: var(--mantine-spacing-md) 4px;
 }
 
-.notification::before {
+.notification:global(.mantine-Notification-root)::before {
   display: none;
 }
 
@@ -175,7 +175,7 @@
   padding-inline-start: calc(var(--mantine-spacing-md) + 12px);
 }
 
-.alert::before {
+.alert:global(.mantine-Notification-root)::before {
   display: block;
   top: 50%;
   bottom: auto;

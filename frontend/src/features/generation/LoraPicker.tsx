@@ -147,6 +147,7 @@ interface LoraPickerProps {
 export interface LoraSuggestions {
   disabled?: boolean;
   loading: boolean;
+  feedback?: { message: string; error?: boolean };
   onClick: () => void;
   list: ReactNode;
 }
@@ -197,16 +198,26 @@ export function LoraPicker({
   );
   const choices = <LoraChoices value={value} onChange={onChange} picker={picker} />;
   const stack = <LoraStack value={value} onChange={onChange} picker={picker} />;
-  const suggestLabel = "Suggest LoRAs";
-  const suggestProps = suggestions && {
-    disabled: suggestions.disabled,
-    loading: suggestions.loading,
-    onClick: suggestions.onClick,
-  };
-  const suggest = suggestProps && (
-    <Button variant="default" {...suggestProps}>
-      {suggestLabel}
-    </Button>
+  const suggest = suggestions && (
+    <ActionIcon
+      variant="default"
+      aria-label="Suggest LoRAs"
+      disabled={suggestions.disabled}
+      loading={suggestions.loading}
+      onClick={suggestions.onClick}
+    >
+      <icons.assistant size={18} />
+    </ActionIcon>
+  );
+  const feedback = suggestions && (suggestions.loading || suggestions.feedback) && (
+    <Text
+      role={suggestions.feedback?.error ? "alert" : "status"}
+      size="sm"
+      c={suggestions.feedback?.error ? "red" : "dimmed"}
+      mb={phone ? "xs" : undefined}
+    >
+      {suggestions.loading ? "Finding LoRAs…" : suggestions.feedback?.message}
+    </Text>
   );
   if (phone)
     return (
@@ -221,13 +232,7 @@ export function LoraPicker({
         {...clear}
         leading={
           <Group gap="xs" wrap="nowrap">
-            {!adding && suggestProps && (
-              <Tooltip label={suggestLabel}>
-                <ActionIcon variant="default" aria-label={suggestLabel} {...suggestProps}>
-                  <icons.assistant size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )}
+            {!adding && suggest}
             <ChipPopup
               title="Add LoRAs"
               width="100%"
@@ -245,12 +250,14 @@ export function LoraPicker({
               }
               leading={suggest}
             >
+              {feedback}
               {suggestions?.list}
               {choices}
             </ChipPopup>
           </Group>
         }
       >
+        {!adding && feedback}
         {!adding && suggestions?.list}
         {stack}
       </ChipPopup>
@@ -267,6 +274,7 @@ export function LoraPicker({
       leading={suggest}
       {...clear}
     >
+      {feedback}
       {suggestions?.list}
       {choices}
     </ChipPopup>

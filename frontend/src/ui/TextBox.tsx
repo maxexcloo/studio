@@ -201,7 +201,7 @@ export function TextBox({
       props.description
     );
   const [focused, setFocused] = useState(false);
-  const resting = oneLine && !focused;
+  const resting = oneLine && (phone || !focused);
   const centreTools = props.maxRows === 1 || (oneLine && Boolean(send));
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
   // takes the textarea's font, padding and border so the two line up.
@@ -340,6 +340,20 @@ export function TextBox({
       <Menu.Dropdown>{menuOpened && <ActionMenuItems groups={groups} />}</Menu.Dropdown>
     </Menu>
   );
+  const barEdit = (action: Action) => (
+    <Tooltip key={action.id} label={action.label}>
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        aria-label={action.label}
+        data-edit={action.id}
+        disabled={action.disabled}
+        onClick={action.onClick}
+      >
+        {action.icon && <action.icon size={18} />}
+      </ActionIcon>
+    </Tooltip>
+  );
   // At rest the tools stand over the text's end; while it has focus, the bar leads with the menu
   // and Copy, and Clear/Reset/Undo sits at its far end beside the form's primary, all as icons of one size.
   const toolGroup = (
@@ -353,20 +367,7 @@ export function TextBox({
       {inBar ? (
         <>
           {menu}
-          {edits.map((action) => (
-            <Tooltip key={action.id} label={action.label}>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label={action.label}
-                data-edit={action.id}
-                disabled={action.disabled}
-                onClick={action.onClick}
-              >
-                {action.icon && <action.icon size={18} />}
-              </ActionIcon>
-            </Tooltip>
-          ))}
+          {edits.map(barEdit)}
         </>
       ) : (
         <>
@@ -474,14 +475,14 @@ export function TextBox({
       {below && <div className={classes.below}>{below}</div>}
       {/* Tools and form sends share the pinned row above the keyboard. */}
       {(tools || send || submit || rightSection) && (
-        <div className={classes.toolbar} onMouseDown={keepFocus}>
+        <div className={`${classes.toolbar} ${classes.footerSurface}`} onMouseDown={keepFocus}>
           <div className={classes.editActions} role="group" aria-label={`${title} Tools`}>
             {!inside && menu}
-            {edits.filter((action) => action.id !== "clear").map(editButton)}
+            {edits.filter((action) => action.id !== "clear").map(barEdit)}
             {!tools && !send && rightSection}
           </div>
           <div className={classes.sends}>
-            {edits.filter((action) => action.id === "clear").map(editButton)}
+            {edits.filter((action) => action.id === "clear").map(barEdit)}
             {!submit && send}
             {submit?.map((each, index) => {
               const primary = index === submit.length - 1;

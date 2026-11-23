@@ -504,8 +504,10 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   const summary = viewer.locator("[aria-hidden]", { hasText: prompt });
   await expect(summary).toBeVisible();
   expect(await summary.evaluate((line) => line.scrollWidth > line.clientWidth)).toBe(true);
-  // Phones edit in the full-screen editor; elsewhere focus, by click or keyboard, unfolds it.
+  // Phones keep the dock to one line, including focus before the full-screen editor opens.
   if (testInfo.project.use.isMobile) {
+    await field.focus();
+    await expect.poll(height).toBeLessThan(line * 1.5);
     const ai = (await viewer.getByRole("button", { name: "AI", exact: true }).boundingBox())!;
     const send = (await viewer
       .getByRole("button", { name: "Generate", exact: true })
@@ -514,7 +516,9 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
     await field.click();
     const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
     await expect(editor).toBeVisible();
-    await editor.getByRole("textbox", { name: "Prompt", exact: true }).focus();
+    const editorField = editor.getByRole("textbox", { name: "Prompt", exact: true });
+    await expect(editorField).toHaveValue(prompt);
+    await editorField.focus();
     const keyboardTop = await page.evaluate(() => {
       const height = window.innerHeight - 300;
       Object.defineProperty(window.visualViewport, "height", { configurable: true, value: height });

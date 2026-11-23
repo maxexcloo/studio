@@ -406,6 +406,12 @@
   padding-bottom: max(4px, calc(env(safe-area-inset-bottom) - var(--mantine-spacing-xs)));
 }
 
+:where(:root[data-phone]) .promptRow {
+  min-height: 44px;
+  align-content: center;
+  padding-inline: var(--mantine-spacing-xs);
+}
+
 .topActions {
   flex-shrink: 0;
 }

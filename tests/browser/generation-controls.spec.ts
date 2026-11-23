@@ -1056,9 +1056,10 @@ test("Images and Videos retain independent prompts and settings", async ({ page 
   );
 });
 
-test("The composer's draft survives a reload", async ({ page }) => {
+test("The composer's draft survives a reload", async ({ page }, testInfo) => {
   await fixtures(page);
   await page.goto("/images");
+  if (testInfo.project.use.isMobile) await expandComposer(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A copper bird at dusk");
   await page.reload();
