@@ -1899,6 +1899,71 @@ test("cards updates a card named by name, keeping the fields and images left out
   assert.notEqual(created[0].referenceIds[0], "#1");
 });
 
+test("cards improves a typed description, then saves a new card with lettered reference candidates the chat picks from", async (t) => {
+  const f = await fixture(t);
+  const client = await chat(t, f, "alice", "mara-chat", "mara-turn");
+  const improved = [];
+  f.app.post("/api/assistant/cards/improve", (req, res) => {
+    improved.push(req.body);
+    res.json({ ok: true, description: "red-haired woman in her thirties, freckles" });
+  });
+  const draft = { kind: "characters", name: "Mara", description: "red hair, freckles" };
+  assert.deepEqual(data(await call(client, "cards", { action: "improve", ...draft })), {
+    description: "red-haired woman in her thirties, freckles",
+  });
+  assert.deepEqual(improved, [
+    { kind: "characters", name: "Mara", description: "red hair, freckles" },
+  ]);
+  // Like Studio's: the card saved waiting on a comparison of candidates, each numbered as it queues.
+  const made = [];
+  const votes = [];
+  f.app.post("/api/characters/references", (req, res) => {
+    made.push(req.body);
+    const variants = [0, 1, 2, 3].map((index) => {
+      const id = `candidate-${index}`;
+      const job = { id, owner: f.owner(req), status: "running", kind: "image", outputs: [] };
+      job.settings = { prompt: "Full-body reference photo", profileId: req.body.profileId };
+      f.jobs.set(id, job);
+      return {
+        jobId: id,
+        label: `Seed ${index}`,
+        item: { jobId: id, index: 0, number: f.numbered(job) },
+      };
+    });
+    res.status(201).json({
+      ok: true,
+      character: { id: "chr-mara", ...req.body, references: [], candidates: "mara-candidates" },
+      comparison: { id: "mara-candidates", variants },
+    });
+  });
+  f.app.put("/api/comparisons/:id/vote", (req, res) => {
+    votes.push([req.params.id, req.body]);
+    res.json({ vote: req.body.jobId, variants: [{ jobId: req.body.jobId, label: "Seed 2" }] });
+  });
+  const reply = await call(client, "cards", {
+    action: "references",
+    kind: "characters",
+    name: "Mara",
+    description: "red-haired woman in her thirties",
+  });
+  assert.notEqual(reply.isError, true, texts(reply));
+  assert.deepEqual(made, [
+    {
+      name: "Mara",
+      description: "red-haired woman in her thirties",
+      referenceIds: [],
+      profileId: imageProfile.id,
+      chat: { conversationId: "mara-chat" },
+    },
+  ]);
+  assert.match(texts(reply), /\[Compare Side by Side\]\([^)]+\/compare\/mara-candidates\)/);
+  assert.match(texts(reply), /\[A\]\([^)]+\) #1\n\[B\]\([^)]+\) #2/);
+  assert.match(data(reply).character.candidates, /\/compare\/mara-candidates$/);
+  // The user's letter picks a candidate, which Studio adds to the card's images.
+  data(await call(client, "variants", { pick: "C" }));
+  assert.deepEqual(votes, [["mara-candidates", { jobId: "candidate-2", by: "chat" }]]);
+});
+
 test("create_characters saves each card with its story and queues its portrait, refusing a name in use before queueing", async (t) => {
   const f = await fixture(t);
   const client = await f.client("alice");

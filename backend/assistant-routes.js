@@ -557,6 +557,30 @@ export function registerAssistantRoutes(
       }),
     );
   });
+  // Improve: a card's typed description rewritten to its kind's rules, no image needed.
+  directRoute(app, "POST", "/api/assistant/cards/improve", async (account, { body, stop }) => {
+    const kind = cardKind(body?.kind);
+    if (!kind) return refuse(400, "Name a card kind: characters, outfits or scenes.").refusal;
+    const description = String(body?.description || "").trim();
+    if (!description) return refuse(400, "Write a description to improve.").refusal;
+    if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff).refusal;
+    if (!allowed(account, "characters"))
+      return refuse(403, "Characters are off for this account.").refusal;
+    if (!engine) return refuse(503, "The prompt assistant is not configured.").refusal;
+    try {
+      const result = await engine.improveCard({
+        kind,
+        name: String(body?.name || "").trim(),
+        description,
+        request: String(body?.request || ""),
+        explicit: allowed(account, "uncensoredModels"),
+        signal: stop,
+      });
+      return { status: 200, payload: { ok: true, ...result } };
+    } catch (error) {
+      return failure(error);
+    }
+  });
   directRoute(app, "POST", "/api/assistant/cards/rate", (account, { body, stop }) => {
     const kind = cardKind(body?.kind);
     if (!kind) return refuse(400, "Name a card kind: characters, outfits or scenes.").refusal;

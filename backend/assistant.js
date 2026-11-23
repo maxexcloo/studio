@@ -1382,6 +1382,44 @@ Prompt: ${context}`
   }
 
   /**
+   * A card's draft description, written without an image, rewritten to its kind's rules (Improve
+   * in the card editors and the MCP `cards` tool), keeping what it says.
+   */
+  async function improveCard({ kind, name, description, request = "", explicit = false, signal }) {
+    const model = await modelFor("character", explicit);
+    const reply = await chat({
+      call: "character",
+      model,
+      messages: [
+        {
+          role: "system",
+          content: promptInstruction("improve-card", {
+            cardKind: cardKinds[kind].name,
+            description: cardInstructions[kind](),
+            americanEnglish,
+            contentRule: contentRule(explicit),
+          }),
+        },
+        {
+          role: "user",
+          content: [
+            name && `Name: ${one(name, maxCardName)}`,
+            `Draft: ${one(description, maxCardDescription)}`,
+            request && `What the person wants: ${one(request, 300)}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        },
+      ],
+      temperature: 0.4,
+      signal,
+    });
+    const improved = one(reply.text, maxCardDescription).replace(/^["'“]+|["'”.\s]+$/g, "");
+    if (!improved) throw new AssistantError("unusable reply");
+    return { description: improved, model };
+  }
+
+  /**
    * Names or descriptions (`field`) for a card from its images, or one for a custom `request`,
    * unlike those already shown (`avoid`); the caller checks the model reads images.
    */
@@ -1587,6 +1625,7 @@ Prompt: ${context}`
     review,
     character,
     cardIdeas,
+    improveCard,
     rateCardImages,
     title,
     draftGuide,

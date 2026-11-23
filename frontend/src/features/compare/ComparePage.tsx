@@ -75,6 +75,8 @@ export function ComparePage() {
           comparisonsQuery.queryKey,
           galleryKey,
           ["gallery-filters"],
+          // A card's Generate References: the winner joined its images.
+          ...(comparison.data?.card ? [[comparison.data.card.kind]] : []),
         ].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
@@ -107,7 +109,7 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, seed, prompt, negative, set, axis, dream } = comparison.data;
+  const { variants, seed, prompt, negative, set, axis, dream, card } = comparison.data;
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   // Compare Again brings back every finished variant, the winner first.
   const again = items
@@ -142,6 +144,11 @@ export function ComparePage() {
           {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
         </Text>
       </Group>
+      {card && (
+        <Text size="sm" c="dimmed">
+          {`The winner joins ${card.name}'s images in Library.`}
+        </Text>
+      )}
       {(prompt || negative) && (
         <Stack gap={4}>
           {prompt && (
