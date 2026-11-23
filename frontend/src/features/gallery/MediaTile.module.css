@@ -81,6 +81,16 @@
   visibility: hidden;
 }
 
+.videoPreview {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.tile:hover .videoPreview[data-previewing] {
+  opacity: 1;
+}
+
 .caption {
   position: absolute;
   inset: auto 0 0;

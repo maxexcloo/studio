@@ -1733,14 +1733,24 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     type: "video",
     status: "done",
     url: "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
-    thumbnailUrl: image,
     prompt: "A rolling wave",
     width: 1280,
     height: 720,
     createdAt: stamp,
   });
+  let posterAttempts = 0;
+  await page.route("**/comfy/thumb?filename=clip.mp4&**", (route) =>
+    ++posterAttempts === 1
+      ? route.fulfill({ status: 503 })
+      : route.fulfill({
+          contentType: "image/svg+xml",
+          body: decodeURIComponent(image.slice("data:image/svg+xml,".length)),
+        }),
+  );
   await page.goto("/videos");
-  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).hover();
+  const tile = page.getByRole("button", { name: "Open video: Rolling Wave", exact: true });
+  await expect(tile.locator("img")).toHaveJSProperty("naturalWidth", 1024);
+  await tile.hover();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");

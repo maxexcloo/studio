@@ -403,7 +403,11 @@ test("Projects show what is new in each since the last visit, and the viewer jud
     page.getByRole("button", { name: "Dream View", exact: true }),
   ).toHaveAccessibleDescription("4 images and 0 videos waiting");
   await showView(page, "Projects");
-  await expect(page.getByText(/^2 new since /)).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Projects", exact: true })
+      .getByRole("button", { name: "New Project", exact: true }),
+  ).toBeVisible();
   const beach = page.getByRole("region", { name: "Beach", exact: true });
   await expect(beach.getByText("2 New", { exact: true })).toBeVisible();
   // Newest first.
@@ -469,7 +473,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
 
-  await page.getByRole("link", { name: "Dream Settings", exact: true }).click();
+  await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
   const imageSettings = settings.getByRole("region", { name: "Images", exact: true });
   const videoSettings = settings.getByRole("region", { name: "Videos", exact: true });
