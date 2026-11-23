@@ -13,6 +13,7 @@
 /* The date scrubber's track: the right edge between the header and the composer. */
 .scrubber {
   --scrubber-thumb: 44px;
+  container-type: size;
   position: fixed;
   z-index: 6;
   right: 2px;
@@ -51,7 +52,9 @@
 
 .thumb {
   position: absolute;
+  top: 0;
   right: 0;
+  translate: 0 calc(var(--scrubber-fraction) * (100cqh - var(--scrubber-thumb)));
   width: 100%;
   height: var(--scrubber-thumb);
   cursor: grab;

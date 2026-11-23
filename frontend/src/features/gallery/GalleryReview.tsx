@@ -1,6 +1,5 @@
-import { ActionIcon, Alert, Button, Group, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
+import { Alert, Button, Group, Stack, VisuallyHidden } from "@mantine/core";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 
 import type { MediaItem } from "../../types";
@@ -12,6 +11,7 @@ import { type GalleryListing, type GalleryReviewRating, galleryReviewQuery } fro
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "../dream/DreamPage.module.css";
+import filterClasses from "./GalleryFilters.module.css";
 
 const day = 24 * 60 * 60 * 1000;
 const ratings = [
@@ -23,12 +23,13 @@ const ratings = [
 export function GalleryReview({
   listing,
   leftAt,
-  back,
+  close,
   view,
 }: {
   listing: GalleryListing;
   leftAt: number;
-  back: () => void;
+  /** Leaves Review for the gallery it opened from. */
+  close: () => void;
   view: ReactNode;
 }) {
   const id = useId();
@@ -48,51 +49,44 @@ export function GalleryReview({
         Review
       </VisuallyHidden>
       <div className={toolbarClasses.band}>
-        <Group gap="xs" mih={44} wrap="nowrap">
-          <Tooltip label="Back">
-            <ActionIcon variant="subtle" color="gray" aria-label="Back" onClick={back}>
-              <ArrowLeft size={18} />
-            </ActionIcon>
-          </Tooltip>
+        <Group gap="xs" mih={44} wrap="nowrap" className={filterClasses.mode}>
           {view}
-          <div style={{ marginInlineStart: "auto" }}>
-            <ChipPopup
-              title="Filters"
-              spacious={false}
-              opened={filtering}
-              onOpenedChange={setFiltering}
-              width={340}
-              position="bottom-end"
-              clearDisabled={!filterCount}
-              onClear={() => {
-                setCutoff("0");
-                setRating("unrated");
-              }}
-              target={
-                <FilterButton
-                  label="Review Filters"
-                  count={filterCount}
-                  opened={filtering}
-                  onClick={() => setFiltering(!filtering)}
-                />
-              }
-            >
-              <Stack gap="sm">
-                <FilterChoices
-                  label="Time"
-                  data={times}
-                  value={cutoff === "0" ? null : cutoff}
-                  onChange={(value) => setCutoff(value ?? "0")}
-                />
-                <FilterChoices
-                  label="Rating"
-                  data={ratings}
-                  value={rating === "all" ? null : rating}
-                  onChange={(value) => setRating((value ?? "all") as GalleryReviewRating)}
-                />
-              </Stack>
-            </ChipPopup>
-          </div>
+          <ChipPopup
+            title="Filters"
+            spacious={false}
+            opened={filtering}
+            onOpenedChange={setFiltering}
+            width={340}
+            position="bottom-start"
+            clearDisabled={!filterCount}
+            onClear={() => {
+              setCutoff("0");
+              setRating("unrated");
+            }}
+            target={
+              <FilterButton
+                label="Review Filters"
+                count={filterCount}
+                opened={filtering}
+                onClick={() => setFiltering(!filtering)}
+              />
+            }
+          >
+            <Stack gap="sm">
+              <FilterChoices
+                label="Time"
+                data={times}
+                value={cutoff === "0" ? null : cutoff}
+                onChange={(value) => setCutoff(value ?? "0")}
+              />
+              <FilterChoices
+                label="Rating"
+                data={ratings}
+                value={rating === "all" ? null : rating}
+                onChange={(value) => setRating((value ?? "all") as GalleryReviewRating)}
+              />
+            </Stack>
+          </ChipPopup>
         </Group>
       </div>
       <GalleryReviewDeck
@@ -100,7 +94,7 @@ export function GalleryReview({
         listing={listing}
         rating={rating}
         since={Number(cutoff)}
-        close={back}
+        close={close}
       />
     </section>
   );

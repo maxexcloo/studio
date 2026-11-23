@@ -9,11 +9,20 @@ import {
   getDefaultZIndex,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 
 import { glass } from "../../theme";
-import type { MediaItem } from "../../types";
+import type { MediaItem, QueueJob } from "../../types";
 import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -49,6 +58,11 @@ const loadZoomImage = () =>
   import("./ZoomImage").then((module) => ({ default: (zoomImage = module.ZoomImage) }));
 const LazyZoomImage = lazy(loadZoomImage);
 (window.requestIdleCallback || setTimeout)(() => void loadZoomImage());
+
+// Versions don't depend on progress, so the viewer skips the queue's progress polls; the strips
+// read progress themselves.
+const versionJobs = (queue: { jobs: QueueJob[] }) =>
+  queue.jobs.map((job) => ({ ...job, progress: undefined, updatedAt: "" }));
 
 // Clicks this close to a visible control are near-misses, not a request to close. The zoomable
 // picture is not a control: a click just outside the image still closes.
@@ -342,9 +356,9 @@ export function MediaViewer({
   const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join their source's strip.
   const [queued, setQueued] = useState<QueuedRun[]>([]);
-  const jobs = useQuery(queueQuery).data?.jobs;
+  const jobs = useQuery({ ...queueQuery, select: versionJobs }).data;
   const family = useRunFamily(item, queued, related, jobs);
-  const members = setMembers(related, item);
+  const members = useMemo(() => setMembers(related, item), [related, item]);
   const hasRelatedThumbnails = family.length > 1 || members.length > 1;
   const nearby =
     quiet && thumbnailsOpen && !hasRelatedThumbnails
@@ -769,7 +783,6 @@ export function MediaViewer({
                 <MediaViewerDock
                   item={displayed}
                   family={family}
-                  jobs={jobs}
                   set={members}
                   nearby={nearby}
                   showThumbnails={thumbnailsOpen}

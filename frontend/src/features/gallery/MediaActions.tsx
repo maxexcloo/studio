@@ -379,7 +379,8 @@ export function useMediaActions(
   const [review, setReview] = useAnimateReview();
   const { menu: animateProfiles, profileId: animationProfileId } = useActionProfile("video");
   const { menu: editProfiles, profileId: selectedEdit, profiles } = useActionProfile("image");
-  const [savedCount, setRecreateCount] = useRemembered("recreate-count", 1);
+  // Recreate makes as many as the original did until a count is chosen.
+  const [savedCount, setRecreateCount] = useRemembered<number | null>("recreate-count", null);
   const original = profiles?.find((profile) =>
     item.settings?.profileId
       ? isProfile(profile, item.settings.profileId)
@@ -392,7 +393,7 @@ export function useMediaActions(
     Array.isArray(item.settings?.loras) && item.settings.loras.length > 0,
   );
   const countLimit = generationCountLimit(recreateProfile, item.type);
-  const recreateCount = Math.min(savedCount, countLimit);
+  const recreateCount = Math.min(savedCount ?? (Number(item.settings?.count) || 1), countLimit);
   const automaticEdit = image && automaticEditProfile(profiles || [], item);
   const editProfileId =
     selectedEdit ||

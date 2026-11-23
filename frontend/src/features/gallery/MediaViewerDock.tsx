@@ -1,4 +1,5 @@
 import { Group, Image, Loader, ScrollArea, UnstyledButton } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -6,6 +7,7 @@ import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, QueueJob } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
+import { queueQuery } from "../generation/Queue";
 import { mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
@@ -103,7 +105,6 @@ export function useRunFamily(
 export function MediaViewerDock({
   item,
   family,
-  jobs,
   set,
   nearby,
   showThumbnails,
@@ -112,7 +113,6 @@ export function MediaViewerDock({
 }: {
   item: MediaItem;
   family: Entry[];
-  jobs?: QueueJob[];
   /** The MCP result set's loaded results, in order (`setMembers`). */
   set: MediaItem[];
   nearby?: MediaItem[];
@@ -157,7 +157,6 @@ export function MediaViewerDock({
             item: result,
             label: `Show ${mediaTitle(result)}`,
           }))}
-          jobs={jobs}
           current={item}
           choose={choose}
         />
@@ -166,7 +165,6 @@ export function MediaViewerDock({
         <ResultStrip
           label={`Set: ${item.resultSet?.title}`}
           entries={setEntries}
-          jobs={jobs}
           current={item}
           choose={choose}
         />
@@ -175,7 +173,6 @@ export function MediaViewerDock({
         <ResultStrip
           label="Versions"
           entries={versions}
-          jobs={jobs}
           current={item}
           depths={branched}
           entering={(key) => shown.root === root && !shown.keys.has(key)}
@@ -191,7 +188,6 @@ export function MediaViewerDock({
 function ResultStrip({
   label,
   entries,
-  jobs,
   current,
   entering,
   depths,
@@ -199,7 +195,6 @@ function ResultStrip({
 }: {
   label: string;
   entries: StripEntry[];
-  jobs?: QueueJob[];
   current: MediaItem;
   entering?: (key: string) => boolean;
   /** Marks each version's generations from the original. */
@@ -211,6 +206,7 @@ function ResultStrip({
   const motion = useMotionDuration();
   const viewport = useRef<HTMLDivElement>(null);
   const placed = useRef(false);
+  const jobs = useQuery(queueQuery).data?.jobs;
   const active = useMemo(
     () =>
       new Map(
