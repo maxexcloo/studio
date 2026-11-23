@@ -44,6 +44,7 @@ import {
   fidelity,
   keepDescriptions,
   matchEffort,
+  plainWords,
   precedence,
   proportionate,
   standalonePrompt,
@@ -67,6 +68,7 @@ const gatewayKeys = [
 // A gallery item's title, from its prompt.
 const titleInstructions = () =>
   promptInstruction("gallery-title", {
+    plainWords,
     titleRule,
   });
 // A character card's description (Make Character), which leads a prompt with the card's images.

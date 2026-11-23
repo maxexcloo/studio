@@ -1078,7 +1078,7 @@ test("media and administrator credentials discover only their own friendly tools
   assert.equal(generateSchema.count.maximum, 10);
   assert.equal(generateSchema.prompts.anyOf[0].maxItems, 30);
   assert.match(generateSchema.title.description, /Title Case/);
-  assert.match(media.getInstructions(), /Retain any set name the user explicitly supplied/);
+  assert.match(media.getInstructions(), /Keep any set name the user gives/);
   assert.match(
     media.getInstructions(),
     /search with uploads: true, kind: image, and the exact filename if known\. Omit query.*reference_asset_ids.*upload_link.*wait for their upload/,
