@@ -232,7 +232,9 @@ export function ZoomImage({
       Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 32
     ) {
       lastTap.current = null;
-      zoom.toggleAt(event.clientX, event.clientY);
+      const { clientX, clientY } = event;
+      // Let the zoom library finish its native touchend pan before starting the tap zoom.
+      pendingTap.current = window.setTimeout(() => zoom.toggleAt(clientX, clientY), 0);
     } else if (onTap && event.timeStamp - start.at < 500 && !closingPopup())
       // A long press is not a tap, and a press that closes a popup only closes it.
       pendingTap.current = window.setTimeout(onTap, 300);
