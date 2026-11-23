@@ -31,6 +31,9 @@ import { directRoute } from "../domain/direct-route.ts";
  *   GET  /api/profiles/prompt-styles/versions/:n    one version with its styles
  *   POST /api/profiles/prompt-styles/revert         {version, baseHash}
  *   POST /api/profiles/prompt-styles/approve        clears AI-Drafted on the styles
+ *   GET  /api/profiles/prompt-instructions          current writer templates and their defaults
+ *   GET  /api/profiles/prompt-instructions/:id/history  the saved versions, newest first
+ *   PUT  /api/profiles/prompt-instructions/:id      {text, baseHash}: saves one instruction as a new version
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
  *   POST /api/profiles/duplicates/merge             {hash}: merges that preview (profile/merge.js)
@@ -44,6 +47,7 @@ import { directRoute } from "../domain/direct-route.ts";
  * same routes in process: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
 import { families as familyCatalogue } from "../family-catalogue.js";
+import { promptInstructionStore } from "../prompt-instructions.js";
 import { adminRefusal, fromChat, requireAdmin } from "../route-access.js";
 import { backendCandidates, combineBackends } from "./backends.js";
 import {
@@ -315,6 +319,18 @@ export function registerProfileRoutes(
   );
   route("POST", "/api/profiles/prompt-styles/approve", (account) =>
     promptStyles().approve({ by: accountName(account) }),
+  );
+  route("GET", "/api/profiles/prompt-instructions", () => ({
+    instructions: promptInstructionStore().list(),
+  }));
+  route("GET", "/api/profiles/prompt-instructions/:id/history", (_account, { params }) => ({
+    versions: promptInstructionStore().history(params.id),
+  }));
+  route("PUT", "/api/profiles/prompt-instructions/:id", (account, { body, params }) =>
+    promptInstructionStore().save(params.id, body?.text, {
+      by: accountName(account),
+      baseHash: body?.baseHash,
+    }),
   );
 
   route("GET", "/api/profiles/duplicates", () => duplicateProfiles());

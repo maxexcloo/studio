@@ -1,3 +1,5 @@
+import { promptInstruction } from "../prompt-instructions.js";
+
 /**
  * Dream's latest this many image results set its diversity budget: a profile or LoRA weighs less by
  * the share of them it took (to no less than `floor`), and results at least `alike` like another
@@ -289,14 +291,11 @@ export function direction(
   });
   return {
     anchors: drawn,
-    text: [
-      explore
-        ? "Explore a fresh idea within their taste, using a familiar kind of subject or visual treatment in a new situation."
-        : "Stay within their taste, while inventing a distinct concept.",
-      ...(feature ? [`Keep this taste they like: ${feature}.`] : []),
-      `Possible starting points: ${drawn.join("; ")}. Use at most one, and skip them all if none fits their taste or brief.`,
-      "Choose a different subject or subject role, scene, action and composition from recent ideas. Change at least three of those dimensions; a new model, LoRA, outfit, lighting or wording alone is not a new concept.",
-    ].join("\n"),
+    text: promptInstruction("dream-diversity", {
+      tasteDirection: promptInstruction(explore ? "explore-dream-taste" : "follow-dream-taste"),
+      featuredTaste: feature ? promptInstruction("feature-dream-taste", { feature }) : "",
+      startingPoints: drawn.join("; "),
+    }),
   };
 }
 

@@ -10,6 +10,7 @@ import {
   standalonePrompt,
   writerGuide,
 } from "./domain/writing-standard.ts";
+import { promptInstruction } from "./prompt-instructions.js";
 
 // The newest prompts are enough to steer away from; older ones only lengthen the request.
 const shownPrompts = 12;
@@ -44,26 +45,24 @@ export async function writeSetPrompt({
     messages: [
       {
         role: "system",
-        content: [
-          scope === "image"
-            ? `You write one new prompt for ${profile.label || profile.id}, a variation of the selected image. Keep that image's subject and its source prompt's intent; do not broaden it to the surrounding set.`
-            : `You write one new prompt for ${profile.label || profile.id}, a variation in the set "${title}".`,
-          scope === "image" && (image || shown)
-            ? "The selected image defines the subject and visible appearance. Preserve its species, breed, identity, markings and defining appearance. Its source prompt supplies the intended theme, style and requested details, not permission to substitute another subject. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject."
-            : "The source prompt defines the subject and intended set theme. Preserve its species, breed, identity and defining appearance, and keep its theme and style. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject.",
-          scope === "image" && intent
-            ? "The typed source prompt records the user's intent before trigger words. Where it differs from the recorded source prompt or image, keep the selected image's identity and species authoritative; do not substitute the typed prompt's subject."
-            : "",
+        content: promptInstruction("vary-set", {
+          sourceContext:
+            scope === "image"
+              ? promptInstruction("vary-selected-image", { model: profile.label || profile.id })
+              : promptInstruction("vary-result-set", { model: profile.label || profile.id, title }),
+          sourceSubject:
+            scope === "image" && (image || shown)
+              ? promptInstruction("keep-image-subject")
+              : promptInstruction("keep-prompt-subject"),
+          typedIntent:
+            scope === "image" && intent ? promptInstruction("typed-variation-intent") : "",
           precedence,
-          keepDescriptions,
-          standalonePrompt,
+          keepDescriptions: keepDescriptions(),
+          standalonePrompt: standalonePrompt(),
           americanEnglish,
-          "The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.",
-          `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
-          `Reply with JSON only: {"title": "${titleRule}", "prompt": "the finished prompt"}.`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
+          guide: writerGuide(guide) || "(none; write a clear, specific natural-language prompt)",
+          titleRule,
+        }),
       },
       {
         role: "user",

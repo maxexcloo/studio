@@ -50,6 +50,13 @@ export const librarySections = {
     admin: true,
     group: "Generation",
   },
+  promptInstructions: {
+    label: "Prompt Instructions",
+    description: "Read and edit the instructions Studio sends to its writers.",
+    icon: icons.prompt,
+    admin: true,
+    group: "Generation",
+  },
   promptStyles: {
     label: "Prompt Styles",
     description: "Shared assistant styles and templates for Improve Prompt, Animate and Edit.",

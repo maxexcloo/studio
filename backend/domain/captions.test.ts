@@ -97,7 +97,7 @@ test("captions the newest uncaptioned image, one at a time and at most one every
     tags: ["picture"],
     model: "vision-model",
     at: "2026-10-26T09:00:00.000Z",
-    version: captionVersion,
+    version: captionVersion(),
   });
   assert.deepEqual(
     Object.keys(state.items[0]).sort(),
@@ -207,7 +207,7 @@ test("a pass captions everything flat out, two at a time, including older captio
     image("a"),
     image("b"),
     image("current", "alice", {
-      caption: { ...old, tags: [], version: captionVersion },
+      caption: { ...old, tags: [], version: captionVersion() },
     }),
     image("outdated", "alice", { caption: old }),
     image("bob-1", "bob"),
@@ -237,12 +237,12 @@ test("a pass captions everything flat out, two at a time, including older captio
     ["finished", 4, 4, 0, 0],
   );
   assert.equal(state.saved?.pass?.state, "finished");
-  assert.equal(state.items[3].caption?.version, captionVersion);
+  assert.equal(state.items[3].caption?.version, captionVersion());
   assert.equal(state.saved?.trickle?.count || 0, 0, "a pass doesn't use the trickle's day");
 });
 
 test("a pass takes only missing captions, or redoes every caption once", async () => {
-  const current = { ...old, tags: [], version: captionVersion };
+  const current = { ...old, tags: [], version: captionVersion() };
   const items = () => [
     image("new"),
     image("current", "alice", { caption: current }),
