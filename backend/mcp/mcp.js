@@ -349,6 +349,11 @@ export function registerMcpRoutes(
     const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
     // A reference asset id, or a result's number or option letter ("#12", "B") as its image's.
     const referenceAsset = async (value, signal) => {
+      // A bare "2" could be an attachment's place as well as a result, so a result takes its #.
+      if (/^\s*\d+\s*$/.test(value))
+        throw new Error(
+          `Reference "${value.trim()}" is ambiguous: pass #${value.trim()} for that result, or an upload's id from search with uploads: true.`,
+        );
       if (!media.namesResult(value)) return media.uploads.resolve(value);
       const found = await resolveOutput(value, signal);
       return (await media.resultReference(owner, found.jobId, found.index ?? 0, signal)).asset.id;

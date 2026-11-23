@@ -3557,6 +3557,10 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   assert.notEqual(f.submitted.at(-1).count, 5);
   await ask(third, { reference_asset_ids: [] });
   assert.deepEqual(f.submitted.at(-1).referenceAssets, []);
+  // A bare number could be an attachment's place, so a result reference needs its #.
+  const bare = await ask(third, { reference_asset_ids: ["1"] });
+  assert.equal(bare.isError, true);
+  assert.match(texts(bare), /ambiguous: pass #1/);
 });
 
 test("a chat picks a profile that takes its photo when the remembered profile can't", async (t) => {

@@ -532,7 +532,7 @@ export function registerGenerateTools({
         .array(z.string().min(1))
         .max(16)
         .optional()
-        .describe("Ids from search uploads or reuse reference, or a result number or letter."),
+        .describe("Ids from search uploads or reuse reference, or a result's #number or letter."),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
       reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
