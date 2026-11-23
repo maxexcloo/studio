@@ -1,3 +1,4 @@
+import { videoPosterUrl } from "../../../../shared/media.ts";
 import type { MediaItem } from "../../types";
 
 /**
@@ -16,7 +17,10 @@ export function mediaSource(item: MediaItem): {
 } {
   const upscale = item.upscaleActive && item.upscale?.url ? item.upscale : undefined;
   const url = upscale?.url || item.url;
-  const thumbnailUrl = upscale?.thumbnailUrl || item.thumbnailUrl;
+  const thumbnailUrl =
+    upscale?.thumbnailUrl ||
+    item.thumbnailUrl ||
+    (item.type === "video" ? videoPosterUrl(url) : undefined);
   const width = upscale?.width || item.width;
   const height = upscale?.height || item.height;
   return {

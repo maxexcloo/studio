@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { MediaItem } from "../../types";
-import { currentMedia, mediaIdentity, reconcileViewerItems } from "./mediaSource.ts";
+import { currentMedia, mediaIdentity, mediaSource, reconcileViewerItems } from "./mediaSource.ts";
 
 const item = (id: string, extra: Partial<MediaItem> = {}): MediaItem => ({
   id,
@@ -10,6 +10,16 @@ const item = (id: string, extra: Partial<MediaItem> = {}): MediaItem => ({
   type: "image",
   status: "done",
   ...extra,
+});
+
+test("a saved video without a thumbnail uses its original's poster address", () => {
+  const video = item("video", {
+    type: "video",
+    url: "/comfy/view?filename=clip.mp4&subfolder=owner&worker=video",
+  });
+  const source = mediaSource(video);
+  assert.equal(source.thumbnailUrl, "/comfy/thumb?filename=clip.mp4&subfolder=owner&worker=video");
+  assert.equal(source.url, video.url);
 });
 
 test("a pending output keeps its identity and viewer position when saved with a new media ID", () => {

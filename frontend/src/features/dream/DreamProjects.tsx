@@ -1,21 +1,11 @@
-import {
-  ActionIcon,
-  Alert,
-  ScrollArea,
-  Stack,
-  Text,
-  Tooltip,
-  getDefaultZIndex,
-} from "@mantine/core";
+import { Alert, Button, ScrollArea, Stack, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import type { Project } from "../../../../shared/projects";
 import { api } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { dateFormat } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -32,14 +22,6 @@ import { ProjectForm, blankProject, useSaveProject } from "./ProjectForm";
 import { ProjectInbox } from "./ProjectInbox";
 import { ProjectSheet } from "./ProjectSheet";
 import { type DreamItem, dreamQuery, inboxQuery, projectPath, projectsQuery } from "./queries";
-
-const sinceFormat = dateFormat({
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 /** New Project or Edit for one project, saved by the person. */
 function ProjectEditor({
@@ -68,12 +50,10 @@ function ProjectEditor({
 }
 
 /**
- * Dream's projects: how many of their results are new since the last visit, the Inbox of what
- * Dream proposes, then each project's card with its results waiting for a verdict, which the
- * viewer judges, moving on to the next after each; a project opens in its detail view at
- * /dream/projects/:projectId. New Project stands in Dream's toolbar (`actionTarget`).
+ * Project cards show what is new since the last visit. The viewer moves through results in
+ * project order, and the Inbox follows the project list.
  */
-export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement | null }) {
+export function DreamProjects() {
   const client = useQueryClient();
   const phone = usePhone();
   const navigate = useNavigate();
@@ -118,7 +98,6 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   const profileLabel = (id: string) =>
     models.data?.profiles.find((profile) => profile.id === id)?.label || id;
   const list = projects.data?.projects || [];
-  const empty = !list.length && inbox.isSuccess && !inbox.data.proposals.length;
   // Each project's single results waiting for a verdict, newest first; comparisons stay in the deck.
   const unseen = (projectId: string) =>
     (dream.data?.unseen ?? [])
@@ -131,7 +110,6 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
     items.filter((item) => !since || String(item.createdAt || "") > since).length;
   // The viewer flips through every project's waiting results, in the cards' order.
   const order = list.flatMap((project) => unseen(project.id));
-  const newCount = fresh(order);
   const current = viewing ? order.find((item) => item.id === viewing) : undefined;
   if (viewing && !current) setViewing(null);
   function act(item: DreamItem, verdict: Verdict) {
@@ -143,20 +121,6 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   }
   return (
     <>
-      {actionTarget &&
-        createPortal(
-          <Tooltip label="New Project">
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              aria-label="New Project"
-              onClick={() => setEditing({})}
-            >
-              <icons.add size={18} />
-            </ActionIcon>
-          </Tooltip>,
-          actionTarget,
-        )}
       {projects.isPending ? (
         <LoadingState fill label="Loading Projects" />
       ) : projects.isError ? (
@@ -165,21 +129,23 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
         </Alert>
       ) : !list.length && inbox.isPending ? (
         <LoadingState fill label="Loading Inbox" />
-      ) : empty ? (
-        <EmptyState fill>No Projects</EmptyState>
       ) : (
         <ScrollArea flex={1} mih={0}>
           <Stack w="100%" maw={760} mx="auto" gap="lg" pb="md">
-            {dream.isSuccess && list.length > 0 && (
-              <Text size="sm" c="dimmed">
-                {newCount
-                  ? `${newCount} new${since ? ` since ${sinceFormat.format(new Date(since))}` : ""}`
-                  : "Nothing new since your last visit"}
-              </Text>
-            )}
-            <ProjectInbox projects={list} />
-            {list.length > 0 && (
-              <SettingGroup title="Projects">
+            <SettingGroup
+              title="Projects"
+              toolbar={
+                <Button
+                  size="compact-sm"
+                  variant="default"
+                  leftSection={<icons.add size={14} />}
+                  onClick={() => setEditing({})}
+                >
+                  New Project
+                </Button>
+              }
+            >
+              {list.length > 0 ? (
                 <Stack gap="sm">
                   {list.map((project) => (
                     <ProjectCard
@@ -198,8 +164,11 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
                     />
                   ))}
                 </Stack>
-              </SettingGroup>
-            )}
+              ) : (
+                <EmptyState>No Projects</EmptyState>
+              )}
+            </SettingGroup>
+            <ProjectInbox projects={list} />
           </Stack>
         </ScrollArea>
       )}

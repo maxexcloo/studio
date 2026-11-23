@@ -7,6 +7,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
+import { TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
 import { useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -18,6 +19,8 @@ import {
   useAnimateWriter,
   useMediaIteration,
 } from "./useMediaAction";
+
+import textClasses from "../../ui/TextBox.module.css";
 
 /**
  * Animate's dialog for a theme. Custom Animation first asks for the instruction, with Suggestions
@@ -89,61 +92,66 @@ export function AnimateDialog({
     });
     onClose();
   };
-  return (
-    <Modal
-      opened
-      id={id}
-      onClose={closeWhenTop(id, onClose)}
-      title={asking ? "Custom Animation" : "Review Prompt"}
-      size={asking ? "sm" : "md"}
-      fullScreen={phone}
-    >
+  const title = asking ? "Custom Animation" : "Review Prompt";
+  const content = (
+    <>
       {asking ? (
         <form
+          className={phone ? textClasses.body : undefined}
+          data-text-box={phone ? "instruction" : undefined}
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
             animate();
           }}
         >
-          <Stack>
+          <Stack flex={phone ? 1 : undefined} mih={phone ? 0 : undefined}>
             <TextBox
               aria-label="Instruction"
               placeholder="What should happen in the video?"
-              autosize
+              autosize={!phone}
               minRows={3}
-              data-autofocus
+              data-autofocus={!phone || undefined}
+              inline
               value={instruction}
               onChange={setInstruction}
               tools={
                 offered ? [{ ...ideas.action, menu: [...ideas.action.menu, [ideas.refresh]] }] : []
               }
-              submit={[
-                {
-                  label: review ? "Write Prompt" : "Animate",
-                  disabled: !instruction.trim(),
-                  onSubmit: animate,
-                },
-              ]}
+              submit={
+                phone
+                  ? [
+                      {
+                        label: review ? "Write Prompt" : "Animate",
+                        disabled: !instruction.trim(),
+                        onSubmit: animate,
+                      },
+                    ]
+                  : undefined
+              }
             />
-            <DialogFooter onCancel={onClose}>
-              <Button type="submit" disabled={!instruction.trim()}>
-                {review ? "Write Prompt" : "Animate"}
-              </Button>
-            </DialogFooter>
+            {!phone && (
+              <DialogFooter onCancel={onClose}>
+                <Button type="submit" disabled={!instruction.trim()}>
+                  {review ? "Write Prompt" : "Animate"}
+                </Button>
+              </DialogFooter>
+            )}
           </Stack>
         </form>
       ) : writer.isPending ? (
         <LoadingState label="Writing Prompt…" />
       ) : (
         <form
+          className={phone ? textClasses.body : undefined}
+          data-text-box={phone ? "prompt" : undefined}
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
             submitPrompt();
           }}
         >
-          <Stack>
+          <Stack flex={phone ? 1 : undefined} mih={phone ? 0 : undefined}>
             {writer.error && (
               <Alert color="red" title="Couldn't Write the Prompt">
                 {writer.error.message}
@@ -153,13 +161,18 @@ export function AnimateDialog({
               <>
                 <TextBox
                   label="Prompt"
-                  autosize
+                  autosize={!phone}
                   minRows={4}
-                  data-autofocus
+                  data-autofocus={!phone || undefined}
+                  inline
                   value={prompt}
                   onChange={setPrompt}
                   tools={[]}
-                  submit={[{ label: "Run", disabled: !prompt.trim(), onSubmit: submitPrompt }]}
+                  submit={
+                    phone
+                      ? [{ label: "Run", disabled: !prompt.trim(), onSubmit: submitPrompt }]
+                      : undefined
+                  }
                 />
                 <Text size="sm" c="dimmed">
                   {written.profileLabel}
@@ -167,18 +180,41 @@ export function AnimateDialog({
                 </Text>
               </>
             )}
-            <DialogFooter onCancel={onClose}>
-              {written ? (
-                <Button type="submit" disabled={!prompt.trim()}>
-                  Run
-                </Button>
-              ) : (
-                <Button onClick={write}>Retry</Button>
-              )}
-            </DialogFooter>
+            {(!phone || !written) && (
+              <DialogFooter onCancel={onClose}>
+                {written ? (
+                  <Button type="submit" disabled={!prompt.trim()}>
+                    Run
+                  </Button>
+                ) : (
+                  <Button onClick={write}>Retry</Button>
+                )}
+              </DialogFooter>
+            )}
           </Stack>
         </form>
       )}
+    </>
+  );
+  return phone ? (
+    <TextEntrySheet
+      opened
+      id={id}
+      onClose={onClose}
+      title={title}
+      fieldTitles={{ instruction: title, prompt: title }}
+    >
+      {() => content}
+    </TextEntrySheet>
+  ) : (
+    <Modal
+      opened
+      id={id}
+      onClose={closeWhenTop(id, onClose)}
+      title={title}
+      size={asking ? "sm" : "md"}
+    >
+      {content}
     </Modal>
   );
 }

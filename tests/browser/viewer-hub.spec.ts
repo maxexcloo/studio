@@ -539,7 +539,7 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   await expect.poll(height).toBeLessThan(line * 1.5);
 });
 
-test("Custom Animation keeps text tools and submission in its phone editor and closes only the top layer", async ({
+test("Custom Animation edits and submits in one dialog with its text tools", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -555,30 +555,29 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu", { name: "Animate", exact: true })).toBeHidden();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
-  const summary = dialog.getByRole("textbox", { name: "Instruction", exact: true });
   const phone = testInfo.project.use.isMobile;
-  const editor = page.getByRole("dialog", { name: "Instruction", exact: true });
-  if (phone) await summary.click();
-  const surface = phone ? editor : dialog;
-  const field = surface.getByRole("textbox", { name: "Instruction", exact: true });
+  const field = dialog.getByRole("textbox", { name: "Instruction", exact: true });
   if (phone) {
-    await expect(surface.locator("[data-text-editor]")).toBeVisible();
+    await field.click();
+    await expect(field).toBeFocused();
+    await expect(page.getByRole("dialog", { name: "Instruction", exact: true })).toHaveCount(0);
+    await expect(dialog.locator("[data-text-editor]")).toBeVisible();
     await expect(
-      surface.getByRole("group", { name: "Instruction Tools", exact: true }),
+      dialog.getByRole("group", { name: "Instruction Tools", exact: true }),
     ).toBeVisible();
   }
   await field.fill("The bird unfolds its wings.");
-  const more = surface.getByRole("button", { name: "AI Instruction Actions", exact: true });
+  const more = dialog.getByRole("button", { name: "AI Instruction Actions", exact: true });
   // Phones copy and clear above the keyboard; desktop leaves both to the browser.
   if (phone) {
-    const edit = (name: string) => surface.getByRole("button", { name, exact: true }).click();
+    const edit = (name: string) => dialog.getByRole("button", { name, exact: true }).click();
     await edit("Copy");
     await expect
       .poll(() => page.evaluate(() => (window as any).copied))
       .toBe("The bird unfolds its wings.");
     await edit("Clear");
     await expect(field).toHaveValue("");
-    await expect(surface.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
     await edit("Undo");
     await expect(field).toHaveValue("The bird unfolds its wings.");
   }
@@ -589,25 +588,19 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(tools).toBeHidden();
-  await expect(surface).toBeVisible();
   await expect(dialog).toBeVisible();
   await more.click();
   // Dismissing the tools by a press on the field leaves the editor and its parent intact.
   await field.click();
   await expect(tools).toBeHidden();
-  await expect(surface).toBeVisible();
+  await expect(dialog).toBeVisible();
   if (phone) {
-    await field.press("Escape");
-    await expect(editor).toBeHidden();
-    await expect(dialog).toBeVisible();
-    await expect(summary).toBeFocused();
-    await summary.click();
     await expect(field).toHaveValue("The bird unfolds its wings.");
   } else {
-    await expect(surface.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
-    await expect(surface.getByRole("button", { name: "Clear", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Clear", exact: true })).toHaveCount(0);
   }
-  await surface.getByRole("button", { name: "Animate", exact: true }).click();
+  await dialog.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.writing).toMatchObject({
@@ -1267,6 +1260,7 @@ test("An Animate run stays with the image it started on while the viewer moves b
 
 test("Review Prompt writes the motion prompt for editing, and Run queues exactly that prompt", async ({
   page,
+  isMobile,
 }) => {
   const asked: unknown[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
@@ -1319,7 +1313,9 @@ test("Review Prompt writes the motion prompt for editing, and Run queues exactly
   await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
   await expect(prompt).toHaveValue("The bird lifts off.");
-  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: isMobile ? "Close Review Prompt" : "Cancel", exact: true })
+    .click();
   await expect(dialog).toBeHidden();
   expect(state.jobs).toHaveLength(2);
 });
@@ -1733,14 +1729,24 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     type: "video",
     status: "done",
     url: "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
-    thumbnailUrl: image,
     prompt: "A rolling wave",
     width: 1280,
     height: 720,
     createdAt: stamp,
   });
+  let posterAttempts = 0;
+  await page.route("**/comfy/thumb?filename=clip.mp4&**", (route) =>
+    ++posterAttempts === 1
+      ? route.fulfill({ status: 503 })
+      : route.fulfill({
+          contentType: "image/svg+xml",
+          body: decodeURIComponent(image.slice("data:image/svg+xml,".length)),
+        }),
+  );
   await page.goto("/videos");
-  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).hover();
+  const tile = page.getByRole("button", { name: "Open video: Rolling Wave", exact: true });
+  await expect(tile.locator("img")).toHaveJSProperty("naturalWidth", 1024);
+  await tile.hover();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");

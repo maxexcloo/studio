@@ -121,7 +121,7 @@ export function DeckButtons({
   const comparison = card.kind === "pair" && !singleImageComparison;
   const answers = dreamChoices(card, singleImageComparison).at(-1)!;
   const labels: Record<string, string> = {
-    both: "Accept",
+    both: expanded ? (card.kind === "pair" && card.items.length > 2 ? "All" : "Both") : "Accept",
     discard: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
     keep: quickRating ? "Skip" : "Accept",
     like: quickRating ? "Like" : "Super Like",
@@ -136,7 +136,7 @@ export function DeckButtons({
         comparison ? "Comparison Answers" : quickRating ? "Rating Actions" : "Dream Actions"
       }
       className={classes.buttons}
-      data-comparison-size={comparison ? card.items.length : undefined}
+      data-comparison-size={card.kind === "pair" ? card.items.length : undefined}
       aria-hidden={hidden}
       inert={hidden}
     >
@@ -174,6 +174,8 @@ export function DeckButtons({
                 <Text fw={700} fz={26}>
                   {label}
                 </Text>
+              ) : expanded && id === "both" ? (
+                <icons.compare size={24} />
               ) : (
                 looks[id].glyph
               )}

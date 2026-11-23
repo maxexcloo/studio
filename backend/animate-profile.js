@@ -146,7 +146,7 @@ export function dreamVideoSlot(profile) {
   return slot && !inputs.some((input) => input !== slot && input.required) ? slot : undefined;
 }
 
-/** Dream stays on its selected side and extends a video on that video's own profile. */
+/** Dream prefers the best available tier on its selected side and extends on the source profile. */
 export function dreamVideoProfile(profiles, options) {
   const { backend, extend, unavailable, alternate, width, height, ...placement } = options;
   const pool = profiles.filter(
@@ -167,8 +167,24 @@ export function dreamVideoProfile(profiles, options) {
     );
   }
   if (extend) return withSize({ profile: healthy[0] }, width, height);
-  const { profile } = animateProfile(healthy, { ...placement, where: backend });
-  return withSize({ profile: alternate?.(healthy, profile) ?? profile }, width, height);
+  const bestTier = tierDistance.quality.find((tier) =>
+    healthy.some((profile) => tierOf(profile) === tier),
+  );
+  const best = healthy.filter((profile) => tierOf(profile) === bestTier);
+  const { profile } = animateProfile(best, { ...placement, where: backend, tier: "quality" });
+  const slower = healthy.filter(
+    (candidate) => candidate !== profile && ["quality", "standard"].includes(tierOf(candidate)),
+  );
+  const otherFamilies = healthy.filter(
+    (candidate) => candidate.family && profile.family && candidate.family !== profile.family,
+  );
+  const slowerFamilies = slower.filter((candidate) => otherFamilies.includes(candidate));
+  const exploration = slowerFamilies.length
+    ? slowerFamilies
+    : otherFamilies.length
+      ? otherFamilies
+      : slower;
+  return withSize({ profile: alternate?.(exploration, profile) ?? profile }, width, height);
 }
 const withSize = (choice, width, height) =>
   width > 0 && height > 0 ? { ...choice, size: frameSize(choice.profile, width, height) } : choice;
