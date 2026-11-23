@@ -37,8 +37,12 @@ const instructionPatterns = [
     `\\b(?:generate|make|create)\\s+(?:me\\s+)?${number}\\s+(?:[\\w-]+\\s+){0,3}?(?:images?|pictures?|photos?|versions?)\\b`,
     "i",
   ),
-  new RegExp(`\\b${number}\\s+(?:[\\w-]+\\s+){0,3}?variations\\b`, "i"),
-  /\bvariations\b/i,
+  new RegExp(
+    `\\b${number}\\s+(?:[\\w-]+\\s+){0,3}?variations\\b(?=\\s*(?:[:;,]|please\\b|of\\s+(?:this|the same)\\s+scene\\b|$))`,
+    "i",
+  ),
+  /\bvariations\s+(?:please\b|of\s+(?:this|the same)\s+scene\b)/i,
+  /\b(?:generate|make|create)\s+(?:me\s+)?(?:some\s+|a few\s+)?variations\b/i,
   /\bof\s+this\s+scene\b/i,
 ];
 /**
@@ -61,7 +65,7 @@ export function exactPromptInstructions(prompt) {
   const count = found[1] ? numberOf(found[1]) : 0;
   const quoted = found[0].trim().replace(/\s+/g, " ");
   const counted = count ? `count: ${count}` : "count (the number of images)";
-  return `prompts run verbatim, and this one holds instructions ("${quoted}"). Call generate again with ${counted} (1–${maxJobsPerCall} per call) and prompts set to just the plain prompt, without the instructions${count ? "" : " or a number of images"}; or pass the user's words as request so Studio writes the prompts.`;
+  return `prompts run verbatim, and this one holds instructions ("${quoted}"). Call generate again with ${counted} (1–${maxJobsPerCall} per call) and prompts set to just the plain prompt when repeating one image idea. For distinct results, send one finished prompt per image. Include the user's original words as request.`;
 }
 
 const words = (prompt) =>

@@ -222,6 +222,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
           username: ${{ github.actor }}
+      - name: Set Up Docker Buildx
+        if: steps.version.outputs.version
+        uses: docker/setup-buildx-action@v4
       - name: Tag Verified Images
         id: tag
         if: steps.version.outputs.version
@@ -259,7 +262,16 @@ jobs:
           else
             echo "::notice::The worker is unchanged since $latest."
           fi
-          docker buildx imagetools create --tag "$IMAGE_NAME:$VERSION" --tag "$IMAGE_NAME:latest" "$IMAGE_NAME:sha-$GITHUB_SHA"
+          docker buildx build --file - --platform linux/amd64 --push --sbom=true --provenance=mode=max \
+            --tag "$IMAGE_NAME:$VERSION" --tag "$IMAGE_NAME:latest" \
+            --build-arg "STUDIO_CANDIDATE=$IMAGE_NAME:sha-$GITHUB_SHA" \
+            --build-arg "STUDIO_RELEASE_VERSION=v$VERSION" \
+            --label "org.opencontainers.image.version=$VERSION" . <<'DOCKERFILE'
+          ARG STUDIO_CANDIDATE
+          FROM ${STUDIO_CANDIDATE}
+          ARG STUDIO_RELEASE_VERSION
+          ENV STUDIO_RELEASE_VERSION=${STUDIO_RELEASE_VERSION}
+          DOCKERFILE
           if [ -n "$worker" ]; then
             docker buildx imagetools create --tag "$IMAGE_NAME-worker:$VERSION" --tag "$IMAGE_NAME-worker:latest" "$worker"
           fi

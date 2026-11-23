@@ -183,10 +183,22 @@ async function serve(t: TestContext, suggestions: ReturnType<typeof fixture>["su
   };
 }
 
-test("each suggestion picker caps an oversized reply at six distinct ideas", async () => {
-  assert.equal(maxSuggestions, 6);
+test("each suggestion picker caps an oversized reply at ten distinct ideas", async () => {
+  assert.equal(maxSuggestions, 10);
   for (const surface of ["composer", "viewer", "animate", "draft"]) {
-    const labels = ["Wind", "Amber", "Rain", "Fog", "Snow", "Cloud", "Sun"];
+    const labels = [
+      "Wind",
+      "Amber",
+      "Rain",
+      "Fog",
+      "Snow",
+      "Cloud",
+      "Sun",
+      "Sea",
+      "Sand",
+      "Hill",
+      "Moon",
+    ];
     const { calls, suggestions } = fixture({
       reply: () =>
         JSON.stringify({
@@ -200,11 +212,11 @@ test("each suggestion picker caps an oversized reply at six distinct ideas", asy
       jobId: "job-a",
       prompt: "A harbour",
     });
-    assert.equal(result.suggestions.length, 6, surface);
-    assert.equal(new Set(result.suggestions.map((idea) => idea.label)).size, 6);
+    assert.equal(result.suggestions.length, 10, surface);
+    assert.equal(new Set(result.suggestions.map((idea) => idea.label)).size, 10);
     assert.match(
       calls[0][0].content,
-      /(?:Write|Suggest) 6 useful, distinct|Offer up to 6 distinct/,
+      /(?:Write|Suggest) 10 useful, distinct|Offer up to 10 distinct/,
     );
   }
 });
@@ -214,13 +226,13 @@ test("older saved suggestions refresh on access, and a new short answer stays ca
   items["alice:job-a"].nextSteps = {
     steps: [{ label: "Old", request: "old", prompt: "old" }],
     at: "2026-01-01",
-    count: maxSuggestions,
+    count: 6,
   };
   const body = { surface: "viewer", jobId: "job-a" };
   const answer = await suggestions.suggest("alice", body);
   assert.equal(calls.length, 1);
   assert.equal(answer.suggestions.length, 2, "never pad a short usable answer");
-  assert.equal((items["alice:job-a"].nextSteps as { count: number }).count, 6);
+  assert.equal((items["alice:job-a"].nextSteps as { count: number }).count, maxSuggestions);
   advance(11 * 60_000);
   assert.deepEqual(await suggestions.suggest("alice", body), answer);
   assert.equal(calls.length, 1);
@@ -257,7 +269,8 @@ test("composer ideas asked again offer different ones from those shown", async (
   );
   assert.equal(again.suggestions.length, 3);
   // Each ask takes its ideas from a few angles drawn at random, so refreshes range widely.
-  assert.match(calls[0][0].content, /Take each from a different angle \([^;)]+(?:; [^;)]+){5}\)/);
+  const angleList = /Take each from a different angle \(([^)]+)\)/.exec(calls[0][0].content)?.[1];
+  assert.equal(new Set(angleList?.split("; ")).size, maxSuggestions);
 });
 
 test("composer ideas keep applied cards and the full draft, even before Studio learns taste", async () => {
@@ -416,7 +429,7 @@ test("viewer next steps vary across relevant areas, specific, and spicy only whe
   ]);
   assert.match(
     calls[0][0].content,
-    /\(expression, outfit, action, setting, lighting, framing, style\)/,
+    /distinct area \([^)]*interaction[^)]*color palette[^)]*framing/,
   );
   assert.match(calls[0][0].content, /Name the actual visible change/);
   assert.match(calls[0][0].content, /Keep the subject's identity/);
@@ -499,7 +512,7 @@ test("viewer ideas and chosen changes use current wording without changing saved
   source.parentItemId = "original-reference";
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   const saved = structuredClone(source);
-  const prompt = "A brindle greyhound with a white chest, lying on a blue boat";
+  const prompt = "A brindle greyhound with a white chest.\n\nIt lies on a blue boat.";
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", prompt });
   assert.match(calls[1][1].content, /Prompt: A brindle greyhound with a white chest/);
   assert.equal(calls[1][1].images, 1);
@@ -515,17 +528,21 @@ test("viewer ideas and chosen changes use current wording without changing saved
       JSON.stringify({
         action: "recreate",
         label: "Standing",
-        prompt: "A brindle greyhound with a white chest, standing on a blue boat",
+        prompt: "A brindle greyhound with a white chest.\n\nIt stands on a blue boat.",
       }),
   });
-  await changes.suggestions.suggest("alice", {
+  const result = await changes.suggestions.suggest("alice", {
     surface: "change",
     jobId: "job-a",
     prompt,
     request: "standing",
     actions: ["recreate"],
   });
-  assert.match(changes.calls[0][1].content, /Prompt: A brindle greyhound with a white chest/);
+  assert.ok(changes.calls[0][1].content.includes(prompt));
+  assert.equal(
+    result.suggestions[0]?.prompt,
+    "A brindle greyhound with a white chest.\n\nIt stands on a blue boat.",
+  );
   assert.equal(changes.items["alice:job-a"].prompt, "A harbour at dawn");
 });
 

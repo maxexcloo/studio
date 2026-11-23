@@ -126,7 +126,7 @@ export function animateInstructions({
       : "",
     "Keep it clean and consistent: one through-line of action that the frame sets up, each beat following from the last, not a list of unrelated motions. Keep it alive: pick what is particular to this frame (its subject, props, weather, light) and make that move, rather than a stock gesture any image would get.",
     "Make every beat concrete and physical: what the hands, eyes, head and body do; how hair, fabric, water, smoke, dust and light respond; how the subject touches or disturbs the things and people around them.",
-    "Move people the way people move, at real-time speed (no slow motion unless asked): weight shifts before a step, the eyes and head lead a turn and the shoulders follow, hands grip and set down what they hold, and each motion follows through and settles. Choose actions this person would plausibly do with what they hold, where they are (someone holding a hot drink sips it or turns with it; they don't spin with it).",
+    "Give movement real-time pacing unless slow motion is requested. Describe the balance, contact and follow-through that the chosen action needs, using the subject's visible pose and surroundings.",
     "Choose framing that keeps the action readable. Preserve requested filmmaking and camera moves, with a speed and end framing that fit the clip. Otherwise use a motivated continuous camera path or a static camera where that best serves the source and theme; do not add competing moves. Keep subjects spatially consistent as the framing changes.",
     "Keep the source lighting and mood consistent unless the action, theme or instruction motivates a change; do not invent a light source or event to force one.",
     audio

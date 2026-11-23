@@ -269,9 +269,9 @@ test("A delayed Retry finishes on its source after navigating to another image",
     await expect(picture).toBeVisible();
     await expect(retry).toHaveCount(0);
     await viewerAction(page, "Like");
-    const unlike = viewer.getByRole("button", { name: "Unlike", exact: true });
-    await expect(unlike).toHaveAttribute("aria-pressed", "true");
-    await expect(unlike).toBeEnabled();
+    const like = viewer.getByRole("button", { name: "Like", exact: true });
+    await expect(like).toHaveAttribute("aria-pressed", "true");
+    await expect(like).toBeEnabled();
 
     const refreshed = page.waitForResponse(async (response) => {
       if (new URL(response.url()).pathname !== "/api/gallery" || !response.ok()) return false;
@@ -284,7 +284,7 @@ test("A delayed Retry finishes on its source after navigating to another image",
     release();
     await refreshed;
     await expect(picture).toBeVisible();
-    await expect(unlike).toHaveAttribute("aria-pressed", "true");
+    await expect(like).toHaveAttribute("aria-pressed", "true");
     await expect(viewer.getByText("Generation resumed", { exact: true })).toHaveCount(0);
     await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
     await expect(

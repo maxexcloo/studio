@@ -459,7 +459,7 @@ function rewriteInstructions({
   return [
     `You rewrite prompts for the ${media} model ${label}. Follow its prompting guide below.`,
     precedence,
-    "Reply with the rewritten prompt only, as plain text: no preamble, labels, quotes, Markdown or notes.",
+    "Reply with the rewritten prompt only. Use section labels when the guide requires them, preserve any literal quotations, and omit preamble, Markdown, and notes.",
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
     fidelity,
     keepDescriptions,
@@ -469,7 +469,7 @@ function rewriteInstructions({
     `${matchEffort} Then apply the style below.`,
     americanEnglish,
     avoidFiller(),
-    'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
+    "Omit generation settings for model, quality tier, size, aspect, and count. Keep words that describe the scene or its motion, even when they could also name a setting.",
     references && vision
       ? `${references} reference image${references > 1 ? "s are" : " is"} attached: describe what the prompt needs from ${references > 1 ? "them" : "it"} into the rewrite, following the guide's editing advice.`
       : "",

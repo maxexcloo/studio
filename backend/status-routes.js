@@ -6,7 +6,7 @@ import { canAdmin } from "./access.js";
 import { ownedQuery, ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import { readyWorkers } from "./comfy/backends.js";
 import { isComfyTimeout } from "./comfy/comfy.js";
-import { appVersion, dataDir } from "./data-dir.js";
+import { appVersion, dataDir, releaseVersion } from "./data-dir.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { earliest } from "./domain/eta.ts";
@@ -147,6 +147,7 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
     res.json({
       ok: true,
       version: appVersion,
+      releaseVersion,
       sinceRelease: null,
       stats: galleryStats(
         recordsForRequest(

@@ -178,14 +178,12 @@ export function useChangeSuggestions<K extends QueryKey>({
   fresh,
   enabled,
   disabled,
-  limit = maxSuggestions,
   onPick,
 }: {
   query: UseQueryOptions<Suggestions<NextStep>, Error, Suggestions<NextStep>, K>;
   fresh: () => Promise<Suggestions<NextStep>>;
   enabled: boolean;
   disabled?: boolean;
-  limit?: number;
   onPick: (request: string) => void;
 }) {
   const client = useQueryClient();
@@ -195,7 +193,7 @@ export function useChangeSuggestions<K extends QueryKey>({
     onSuccess: (answer) => client.setQueryData<Suggestions<NextStep>>(query.queryKey, answer),
   });
   const list = [...(steps.data?.suggestions ?? [])]
-    .slice(0, limit)
+    .slice(0, maxSuggestions)
     .sort((a, b) => compareNames(a.label, b.label));
   const loading =
     refresh.isPending || (!list.length && (steps.isFetching || (enabled && steps.isPending)));

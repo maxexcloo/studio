@@ -121,6 +121,8 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   const dream = await serveDream(page, {
     unseen: [
       dreamItem("one", {
+        width: 1600,
+        height: 900,
         dream: { ...dreamItem("one").dream, why: "Exploring new ground · The harbour at dusk" },
       }),
       ...["two", "three", "four", "five"].map((id) => dreamItem(id)),
@@ -132,9 +134,13 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await expect(current(page).getByText("Exploring new ground", { exact: true })).toBeVisible();
   await expect(current(page).getByText("The harbour at dusk", { exact: true })).toBeVisible();
   await expect(current(page).getByText("Dream prompt one", { exact: true })).toHaveCount(0);
-  await expect(
-    current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
-  ).toBeVisible();
+  const landscape = current(page).getByRole("img", { name: "Dream prompt one", exact: true });
+  await expect(landscape).toBeVisible();
+  if (!isMobile) {
+    const picture = (await landscape.boundingBox())!;
+    expect(picture.width / picture.height).toBeCloseTo(1600 / 900, 1);
+    expect(picture.width).toBeGreaterThan(page.viewportSize()!.width * 0.8);
+  }
 
   // Undo stands before the card’s round verdict buttons.
   const bar = page.getByRole("group", { name: "Dream Actions" });

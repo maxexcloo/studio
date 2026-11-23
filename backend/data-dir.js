@@ -9,3 +9,4 @@ export const dataDir = currentDataDir();
 
 /** The short commit the image was built from (Dockerfile); "" outside an image. */
 export const appVersion = (process.env.STUDIO_COMMIT ?? "").slice(0, 7);
+export const releaseVersion = process.env.STUDIO_RELEASE_VERSION ?? "";
