@@ -7,6 +7,7 @@ import { type GallerySort, gallerySortGroups } from "../../../../shared/gallery-
 import type { MediaKind } from "../../types";
 import { ChipPopup } from "../../ui/ChipPopup";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { layerAbove } from "../../ui/popupClicks";
 import { SearchInput } from "../../ui/SearchInput";
 import { SortMenu } from "../../ui/SortMenu";
@@ -248,7 +249,7 @@ function ZoomSlider() {
         }}
         label={null}
         thumbLabel="Tile Size"
-        aria-valuetext={`${columns} Columns`}
+        thumbValueText={(value) => plural(max + min - value, "Column")}
       />
       <ActionIcon
         variant="subtle"

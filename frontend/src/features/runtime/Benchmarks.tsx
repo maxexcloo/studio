@@ -159,7 +159,11 @@ export function BenchmarkResults() {
         label="Benchmarks"
         rows={status.runs}
         rowKey={(run) => run.id}
-        rowName={(run) => run.label}
+        rowName={(run) =>
+          [run.label, run.model, run.startedAt && shortDateTime.format(new Date(run.startedAt))]
+            .filter(Boolean)
+            .join(" · ")
+        }
         empty="No Benchmarks"
         rowActions={(run) =>
           (run.startedAt || canStop(run)) && (

@@ -262,7 +262,7 @@ test("A running upscale can stop while its worker is offline and keeps the origi
   ).toHaveCount(0);
   // The viewer stops the other from its Upscale menu.
   await page.getByRole("button", { name: "Open image: Upscale Study 2", exact: true }).click();
-  await viewerAction(page, "Upscaling…", "Stop Upscale");
+  await viewerAction(page, "Upscale", "Stop Upscale");
   await expect.poll(() => cancelled).toEqual(["upscale-job-1", "upscale-job-2"]);
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();

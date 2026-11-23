@@ -1,0 +1,15 @@
+/* Every view's name shares one cell, so the trigger keeps the widest name's width. Phones, whose
+   toolbars are short of room, size it to the current name. */
+.labels {
+  display: inline-grid;
+}
+.labels > * {
+  grid-area: 1 / 1;
+}
+.labels > [data-label]::before {
+  content: attr(data-label);
+  visibility: hidden;
+}
+:where([data-phone]) .labels > [data-label] {
+  display: none;
+}

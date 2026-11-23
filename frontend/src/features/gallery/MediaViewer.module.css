@@ -19,8 +19,7 @@
 .overlay.overlay {
   inset: 0 !important;
   background: var(--overlay-bg) !important;
-  backdrop-filter: var(--overlay-filter) !important;
-  -webkit-backdrop-filter: var(--overlay-filter) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
 /* The header only names the dialog; the viewer draws its own close action. */
@@ -274,10 +273,6 @@
   line-height: 1.45;
 }
 
-:where(:root:not([data-phone])) .prompt textarea {
-  transition: height var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
 .variation {
   position: relative;
   display: grid;
@@ -300,7 +295,8 @@
 }
 
 .variation[data-entering] {
-  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
+  --studio-enter-from: scale(0.98);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .variation:hover,
@@ -358,7 +354,6 @@
   height: 100%;
   border-left: 1px solid var(--mantine-color-default-border);
   background: var(--studio-glass-chrome);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
   opacity: 0;
   transform: translateX(16px);
@@ -373,19 +368,6 @@
   transition:
     opacity var(--studio-motion-duration) var(--studio-ease-enter),
     transform var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-@keyframes arrive {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .variation[data-entering] {
-    animation: none;
-  }
 }
 
 /* Phone controls form one surface down to the bottom safe area. */

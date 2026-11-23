@@ -7,7 +7,7 @@
 .control {
   pointer-events: auto;
   opacity: 0;
-  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+  transition: opacity var(--studio-motion-exit) var(--studio-ease-exit);
   box-shadow: var(--mantine-shadow-xs);
 }
 
@@ -21,15 +21,27 @@
   visibility: hidden;
 }
 
-*:hover > .actions .control,
-*:has(:focus-visible) > .actions .control,
+/* Revealed as the tile's other overlays are (MediaTile.module.css). */
+:is(:hover, :has(:focus-visible)) > .actions .control,
 .actions[data-opened] .more {
   opacity: 1;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 @media (hover: none) {
   .control {
     opacity: 0.85;
+  }
+}
+
+/* Like and Dislike sit 4 px apart, so their touch areas meet between them. */
+@media (pointer: coarse) {
+  .ratings > :first-child::after {
+    inset-inline-end: -2px;
+  }
+
+  .ratings > :last-child::after {
+    inset-inline-start: -2px;
   }
 }
 

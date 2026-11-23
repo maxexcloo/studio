@@ -63,13 +63,7 @@
 
 /* The chips fade back in as typing ends, rather than snapping into place. */
 .editor[data-fill] .footer > [aria-label="Generation Inputs"] {
-  animation: return var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-@keyframes return {
-  from {
-    opacity: 0;
-  }
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 /*

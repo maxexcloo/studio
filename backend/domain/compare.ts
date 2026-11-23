@@ -87,11 +87,14 @@ export function registerCompareRoutes(
     cancel(ownerId: string, jobId: string): Promise<unknown>;
     read(): ComparisonRecord[];
     write(records: ComparisonRecord[]): void;
-    /** The caller's visible gallery, or `null` when the account may not use the gallery. */
+    /** The caller's gallery, disliked items included, or `null` when the account may not use it. */
     gallery(req: Request, ids: ComparisonIds): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
-    /** The sides of the caller's answered Dream comparisons. */
-    dreamSides(req: Request): GalleryItem[];
+    /**
+     * The sides of the caller's answered Dream comparisons; with `limit`, those of at least the
+     * newest that many.
+     */
+    dreamSides(req: Request, limit?: number): GalleryItem[];
     /** The variants' items with their result numbers. */
     numbered(items: GalleryItem[]): GalleryItem[];
     /** Hears the winning image and other finished variants, for the taste profile; must not throw. */
@@ -108,13 +111,16 @@ export function registerCompareRoutes(
   },
 ) {
   const { store } = options;
-  /** The variant's saved image (`itemId` when chosen), else a placeholder from its queue record. */
+  /**
+   * The variant's saved image, or a Dream pair's video (`itemId` when chosen), else a placeholder
+   * from its queue record.
+   */
   function variantItem(ownerId: string, items: GalleryItem[], jobId: string, itemId?: string) {
     const saved = items.find(
       (item) =>
         item.jobId === jobId &&
         (!itemId || item.id === itemId) &&
-        item.type === "image" &&
+        (item.type === "image" || item.type === "video") &&
         item.status !== "cancelled",
     );
     if (saved) return saved;
@@ -291,7 +297,7 @@ export function registerCompareRoutes(
                   ...records.map((record) => show(record, items)),
                   ...dreamComparisons(
                     account?.userId || "",
-                    options.dreamSides({ studioAccount: account ?? undefined, params: {} }),
+                    options.dreamSides({ studioAccount: account ?? undefined, params: {} }, 100),
                   ),
                 ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       },

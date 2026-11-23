@@ -223,9 +223,7 @@ test("The mode switcher settles on each mode without a render loop", async ({ pa
   expect(errors).toEqual([]);
 });
 
-test("The centred creative modes leave Status and More Options usable at each layout", async ({
-  page,
-}) => {
+test("The creative modes leave Status and More Options usable at each layout", async ({ page }) => {
   await fixtures(page);
   await page.goto("/images");
   const modes = page.getByRole("navigation", { name: "Creative Modes" });
@@ -233,9 +231,11 @@ test("The centred creative modes leave Status and More Options usable at each la
   for (const width of [375, 844, 1440]) {
     await page.setViewportSize({ width, height: width === 844 ? 390 : 900 });
     await expect(modes).toBeVisible();
+    // Phones keep the modes in the row beside the status; wider layouts centre them.
     await expect
       .poll(() =>
         modes.evaluate((element) => {
+          if (document.documentElement.dataset.phone !== undefined) return 0;
           const bounds = element.getBoundingClientRect();
           return Math.abs(bounds.left + bounds.width / 2 - window.innerWidth / 2);
         }),

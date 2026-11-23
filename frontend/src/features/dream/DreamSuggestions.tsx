@@ -104,6 +104,7 @@ function ItemSuggestions({
       variant="default"
       radius="xl"
       size="md"
+      data-touch-target
       aria-label="Suggestions"
       aria-disabled={Boolean(unavailable) || undefined}
       aria-description={unavailable || undefined}

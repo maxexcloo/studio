@@ -10,7 +10,15 @@ import {
   Title,
 } from "@mantine/core";
 import type { LucideIcon } from "lucide-react";
-import { type ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  Suspense,
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { LoadingState } from "./LoadingState";
@@ -185,43 +193,78 @@ export function WorkspaceSections({
         </Grid.Col>
       )}
       <Grid.Col span={phone ? 12 : 9} className={classes.body}>
-        {sections.map((section) => {
-          const body = content[section.value];
-          const heading = (
-            <div>
-              {/* Phones name the section in the header's Section Select already. */}
-              {!phone && (
-                <Title order={3} size="h4">
-                  {section.label}
-                </Title>
-              )}
-              <Text size="sm" c="dimmed">
-                {section.description}
-              </Text>
-            </div>
-          );
-          return (
-            <Box
-              key={section.value}
-              component="section"
-              aria-label={`${label}: ${section.label}`}
-              hidden={section.value !== active}
-              className={classes.section}
-            >
-              <Stack flex={1}>
-                {typeof body !== "function" && heading}
-                {visited.has(section.value) && (
-                  <SectionErrorBoundary label={section.label}>
-                    <Suspense fallback={<LoadingState label={`Loading ${section.label}`} fill />}>
-                      {typeof body === "function" ? body(heading) : body}
-                    </Suspense>
-                  </SectionErrorBoundary>
-                )}
-              </Stack>
-            </Box>
-          );
-        })}
+        {sections.map((section) => (
+          <SectionPane
+            key={section.value}
+            label={label}
+            section={section}
+            body={content[section.value]}
+            phone={phone}
+            shown={section.value === active}
+            visited={visited.has(section.value)}
+          />
+        ))}
       </Grid.Col>
     </Grid>
   );
 }
+
+/**
+ * One section's pane. A pane that stays hidden skips its parent's renders, so switching sections
+ * renders only the two whose visibility changes; it takes the latest content when shown again.
+ */
+const SectionPane = memo(
+  function SectionPane({
+    label,
+    section,
+    body,
+    phone,
+    shown,
+    visited,
+  }: {
+    label: string;
+    section: WorkspaceSection;
+    body: ReactNode | ((heading: ReactNode) => ReactNode);
+    phone: boolean;
+    shown: boolean;
+    visited: boolean;
+  }) {
+    const heading = (
+      <div>
+        {/* Phones name the section in the header's Section Select already. */}
+        {!phone && (
+          <Title order={3} size="h4">
+            {section.label}
+          </Title>
+        )}
+        <Text size="sm" c="dimmed">
+          {section.description}
+        </Text>
+      </div>
+    );
+    return (
+      <Box
+        component="section"
+        aria-label={`${label}: ${section.label}`}
+        hidden={!shown}
+        className={classes.section}
+      >
+        <Stack flex={1}>
+          {typeof body !== "function" && heading}
+          {visited && (
+            <SectionErrorBoundary label={section.label}>
+              <Suspense fallback={<LoadingState label={`Loading ${section.label}`} fill />}>
+                {typeof body === "function" ? body(heading) : body}
+              </Suspense>
+            </SectionErrorBoundary>
+          )}
+        </Stack>
+      </Box>
+    );
+  },
+  (previous, next) =>
+    !previous.shown &&
+    !next.shown &&
+    previous.visited === next.visited &&
+    previous.phone === next.phone,
+);

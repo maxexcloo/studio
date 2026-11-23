@@ -403,7 +403,7 @@ Output only the caption.`,
   "gallery-title": {
     label: "Result Title",
     area: "Gallery",
-    text: `Title what the text below describes: the prompt that made an image or video. Reply with only {{titleRule}}, without quotes or punctuation.`,
+    text: `Title what the text below describes: the prompt that made an image or video. Reply with only {{titleRule}}, without quotes or punctuation, in Australian English (colour, centre).`,
   },
   "group-issues": {
     label: "Identify Recurring Issues",
@@ -853,7 +853,7 @@ Reply with JSON only: {"likes": [<up to 12 subjects or themes they like, a few w
 {{americanEnglish}}
 The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.
 Prompting guide: {{guide}}
-Reply with JSON only: {"title": "{{titleRule}}", "prompt": "the finished prompt"}.`,
+Reply with JSON only: {"title": "{{titleRule}}", "prompt": "the finished prompt"}. Write "title" in Australian English (colour, centre); only "prompt" uses American English.`,
   },
   "video-change-directions": {
     label: "Video Change Directions",

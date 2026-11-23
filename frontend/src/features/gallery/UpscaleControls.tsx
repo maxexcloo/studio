@@ -1,3 +1,4 @@
+import { Loader } from "@mantine/core";
 import {
   keepPreviousData,
   queryOptions,
@@ -5,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import type { LucideIcon } from "lucide-react";
 
 import { titleCase } from "../../../../shared/titles";
 import {
@@ -36,6 +38,8 @@ export const upscaleStatusQuery = (quality: UpscaleQuality) =>
 
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
+/** Upscale's icon while it runs, the size of the icon it replaces so the control keeps its width. */
+const Running = (({ size }: { size?: number }) => <Loader size={size} />) as unknown as LucideIcon;
 /**
  * Stop for an upscale queued or running on a finished item: it cancels the upscale's queue job, and
  * the item keeps its original, marked Upscale Cancelled in Details.
@@ -261,7 +265,7 @@ export function useUpscaleAction(
     (upscaled || stop || quick.available || quick.queue.isPending) &&
     itemAction("upscale", {
       // With an upscale, switching between it and the original comes first, its usual click.
-      label: upscaling(item) ? "Upscaling…" : "Upscale",
+      ...(upscaling(item) && { icon: Running }),
       pressed: upscaled && Boolean(item.upscaleActive),
       loading: quick.queue.isPending && !upscaled,
       disabled: version.isPending,

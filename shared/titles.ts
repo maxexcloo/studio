@@ -18,8 +18,8 @@ export function titleCase(text: string) {
     .map((word, index) =>
       index > 0 && index < words.length - 1 && minor.test(word)
         ? word.toLowerCase()
-        : // A word with its own capitals (NASA, iPhone) keeps them.
-          /\p{Lu}/u.test(word)
+        : // A word with its own capitals (NASA, iPhone) or a version (v1.0) keeps its case.
+          /\p{Lu}|\d/u.test(word)
           ? word
           : word.replace(/(^|[-/])\p{L}/gu, (letter) => letter.toUpperCase()),
     )

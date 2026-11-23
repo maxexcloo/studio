@@ -162,6 +162,7 @@
   text-transform: uppercase;
   pointer-events: none;
   background: var(--studio-glass-raised);
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 /* Each word shows while dragging its way: right's on the left, left's on the right, like a stamp. */
 .hint[data-hint="right"] {
@@ -284,6 +285,10 @@
   overflow: hidden;
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
+/* The words and sides follow the finger, then ease back with the card. */
+.card[data-dragging] :is(.hint, .frame) {
+  transition: none;
+}
 /* Dragging toward a side keeps it bright and fades the other; down fades both. A picked side
    stays outlined while the card leaves. */
 .choice[data-side="0"] .frame {
@@ -397,4 +402,14 @@
   top: calc(env(safe-area-inset-top) + var(--mantine-spacing-xl) + 1.5rem);
   inset-inline-end: calc(env(safe-area-inset-right) + var(--mantine-spacing-sm));
   z-index: 1;
+}
+/* A media count keeps its width as it changes or loads, so the segments stay put. */
+.count {
+  display: inline-block;
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+}
+.count[data-hidden] {
+  visibility: hidden;
 }

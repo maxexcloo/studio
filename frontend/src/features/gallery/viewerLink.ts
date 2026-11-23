@@ -9,7 +9,7 @@ export const isResultNumber = (id: string) => /^[1-9]\d{0,8}$/.test(id);
 export const galleryPath = (kind: MediaKind) => (kind === "video" ? "/videos" : "/images");
 
 /** The gallery's views with their own address. Comparisons hold images only. */
-export type GalleryRouteView = "comparisons" | "review";
+type GalleryRouteView = "comparisons" | "review";
 export const galleryViewPath = (kind: MediaKind, view: GalleryRouteView) =>
   `${galleryPath(view === "comparisons" ? "image" : kind)}/${view}`;
 

@@ -240,7 +240,12 @@ export function GalleryChoices({
                   preview={{
                     // A result's prompt names its tile already.
                     label: item.uploaded ? `Preview ${title}` : "Preview",
-                    image: { src: item.url, alt: title },
+                    image: {
+                      src: item.url,
+                      alt: title,
+                      aspect:
+                        item.width && item.height ? `${item.width} / ${item.height}` : undefined,
+                    },
                     open: () => preview.open(items, index),
                   }}
                 />

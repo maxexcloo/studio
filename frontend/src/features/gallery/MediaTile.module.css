@@ -4,14 +4,8 @@
 }
 
 .tile[data-entering] {
-  animation: enter var(--studio-motion-duration) var(--studio-ease-enter) both;
-}
-
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
+  --studio-enter-from: scale(0.98);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
 
 .button {
@@ -83,7 +77,19 @@
   opacity: 0;
 }
 
-.tile:hover .videoPreview[data-previewing] {
+/* Hovering or keyboard focus reveals a tile's overlays, as it does its actions
+   (MediaTileActions.module.css): they fade in at the motion speed and out at the exit speed. */
+.caption,
+.timestamp,
+.videoPreview {
+  transition: opacity var(--studio-motion-exit) var(--studio-ease-exit);
+}
+
+.tile:is(:hover, :has(:focus-visible)) :is(.caption, .timestamp, .videoPreview) {
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.tile:is(:hover, :has(:focus-visible)) .videoPreview[data-previewing] {
   opacity: 1;
 }
 
@@ -96,7 +102,6 @@
   color: white;
   text-align: left;
   opacity: 0;
-  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .tile:has([data-tile-ratings]) .caption {
@@ -118,14 +123,14 @@
   pointer-events: none;
 }
 
-.tile:hover .caption,
-.button:focus-visible .caption,
+.tile:is(:hover, :has(:focus-visible)) .caption,
 .caption[data-pinned] {
   opacity: 1;
 }
 
+/* A touch screen's tap leaves the tile hovered. */
 @media (hover: none) {
-  .button:not(:focus-visible) .caption:not([data-pinned]) {
+  .tile:not(:has(:focus-visible)) .caption:not([data-pinned]) {
     opacity: 0;
   }
 }
@@ -210,7 +215,6 @@
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 :where(:root[data-phone]) .timestamp {
@@ -223,7 +227,7 @@
 }
 
 @media (hover: hover) {
-  :where(:root:not([data-phone])) .tile:not(:hover):not(:has(:focus-visible)) .timestamp {
+  :where(:root:not([data-phone])) .tile:not(:hover, :has(:focus-visible)) .timestamp {
     opacity: 0;
   }
 }

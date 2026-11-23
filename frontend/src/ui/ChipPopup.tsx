@@ -69,7 +69,8 @@ export function PopupHeading({
       wrap={name ? "wrap" : "nowrap"}
     >
       <Group gap="xs" wrap="nowrap" miw={0} flex={name ? "none" : undefined}>
-        <Text fw={600} truncate>
+        {/* Sized as a dialog's title, a step above its fields' labels. */}
+        <Text size="lg" fw={600} truncate>
           {title}
         </Text>
         {detail}

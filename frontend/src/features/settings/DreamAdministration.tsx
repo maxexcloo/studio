@@ -25,7 +25,7 @@ const backendNote =
 export function DreamAdministration() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  if (deployment.isPending) return <LoadingState label="Loading Dream" fill />;
+  if (deployment.isPending) return <LoadingState label="Loading Dream Defaults" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const delay = (name: DreamTiming, label: string, description: string) => {
     const setting = deployment.data.dream[name];

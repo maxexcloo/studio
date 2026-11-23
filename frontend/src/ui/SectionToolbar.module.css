@@ -1,6 +1,6 @@
 /* Switching between the toolbar and its search field fades in place without moving the rows below. */
 .enter {
-  animation: enter var(--studio-motion-duration) var(--studio-ease-enter);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 .divider {
   align-self: stretch;
@@ -67,10 +67,5 @@
   }
   [data-adaptive-search] .searchTrigger {
     display: none;
-  }
-}
-@keyframes enter {
-  from {
-    opacity: 0;
   }
 }

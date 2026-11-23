@@ -251,8 +251,8 @@ export function SectionToolbar({
         )}
         {filters && (
           <ChipPopup
-            title="Filters"
-            tooltip={`Filter ${label}`}
+            title={`Filter ${label}`}
+            tooltip
             floating
             opened={filtering}
             onOpenedChange={setFiltering}

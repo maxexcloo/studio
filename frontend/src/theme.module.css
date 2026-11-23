@@ -65,7 +65,6 @@
 .fullScreen {
   background: var(--mantine-color-body) !important;
   backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 /* Its backdrop is that surface too and reaches past the screen's edges, so nothing behind shows
@@ -74,7 +73,6 @@
   inset: -100vh 0 !important;
   background: var(--mantine-color-body) !important;
   backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 .dialogBody {
@@ -233,7 +231,6 @@
 .shellHeader::after {
   inset-block: env(safe-area-inset-top) 0;
   background: var(--studio-glass-chrome);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
 }
 

@@ -5,7 +5,6 @@
   padding: var(--mantine-spacing-xs) var(--app-shell-padding);
   background: var(--studio-glass-chrome);
   backdrop-filter: var(--studio-glass-filter);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
   border-bottom: 1px solid var(--mantine-color-default-border);
 }
 

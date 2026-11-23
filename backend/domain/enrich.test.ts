@@ -41,6 +41,7 @@ function enricher({ caption = true, title = true, brief = "", describe = false, 
     text: () => ({ side: "cloud", uncensored: false }),
     image: async () => ({ mime: "image/jpeg", data: "" }),
     save: (item, enriched) => saved.push([String(item.id), enriched]),
+    failed: () => {},
     now: () => 0,
   });
   return { work, asked, saved, held };
@@ -101,6 +102,7 @@ test("the caption work's read fails without a caption, leaving the item to retry
     text: () => ({ side: "cloud", uncensored: false }),
     image: async () => ({ mime: "image/jpeg", data: "" }),
     save: () => {},
+    failed: () => {},
   });
   await assert.rejects(failing.caption(item, new AbortController().signal), /unusable reply/);
 });

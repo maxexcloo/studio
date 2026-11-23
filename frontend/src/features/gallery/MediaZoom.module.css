@@ -7,6 +7,11 @@
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-xl);
   background: var(--studio-glass-raised);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
+}
+/* The zoom level keeps one width as it changes. */
+.percentage {
+  display: inline-block;
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
 }

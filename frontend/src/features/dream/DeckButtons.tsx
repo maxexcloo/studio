@@ -86,6 +86,7 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
         variant="subtle"
         color="gray"
         size="md"
+        data-touch-target
         aria-label="Undo"
         disabled={disabled}
         onClick={onClick}
