@@ -291,7 +291,7 @@ export function ReferencePicker({
             These images don't fit the selected profile's slots. Remove them here or choose another
             profile.
           </Text>
-          <PickerGrid label="Unused References" fixedThumbnails>
+          <PickerGrid label="Unused References">
             {unused.map((asset) => {
               const label = referenceLabel(asset, references.indexOf(asset), profile);
               return (

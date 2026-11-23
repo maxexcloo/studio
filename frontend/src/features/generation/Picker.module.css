@@ -77,10 +77,6 @@
   gap: var(--mantine-spacing-xs);
 }
 
-.grid[data-fixed-thumbnails] {
-  grid-template-columns: repeat(auto-fill, minmax(0, var(--picker-thumbnail-size)));
-}
-
 .grid[data-rows] {
   gap: 2px;
   grid-template-columns: minmax(0, 1fr);
