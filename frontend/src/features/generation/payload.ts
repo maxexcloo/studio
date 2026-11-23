@@ -115,7 +115,7 @@ export function referenceDetails(
   input: GenerationInput,
   profile?: Profile,
 ) {
-  const implicitStart = profile?.capabilities.startImage && !profile.mediaInputs?.length;
+  const implicitStart = !profile?.mediaInputs?.length && profile?.capabilities.startImage;
   return references.map((asset, index) => ({
     ...asset,
     slot: implicitStart
