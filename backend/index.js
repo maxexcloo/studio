@@ -151,7 +151,13 @@ import { importStore } from "./library/imports.js";
 import { fillVideoSizes } from "./library/library.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
-import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
+import {
+  catalogueLoraInfo,
+  familiesFromMetadata,
+  loraCatalogue,
+  loraInfos,
+  uncensoredLoraNames,
+} from "./lora/info.js";
 import { recommendedNegative } from "./lora/prompts.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
@@ -1014,6 +1020,7 @@ const dream = createDream({
     if (account && !mayUseFeature(account, "loras")) return null;
     return loadLoraLibrary(ownerId);
   },
+  uncensoredLoras: uncensoredLoraNames,
   // As submit validation (validation.js) would judge them: another family's LoRA is dropped.
   loraName: (name) => loraName(name, catalogueLoraInfo(name)),
   fitLoras: (profile, loras) =>

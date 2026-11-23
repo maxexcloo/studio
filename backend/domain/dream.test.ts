@@ -270,6 +270,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       );
     },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
+    uncensoredLoras: () => new Set(["explicit.safetensors"]),
     // As the LoRA policy would: klein.safetensors is for another model family, and film
     // recommends 0.6.
     fitLoras: (_profile, loras) =>
@@ -2222,12 +2223,25 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
 
+test("Dream loads uncensored LoRAs only with Extended Themes on", async (t) => {
+  const explicit = { ...profiles[0], options: { loras: ["explicit.safetensors"] } };
+  const { dream, state, store, dreamOnce } = fixture(t, [explicit]);
+  state.loras.alice = { ratings: { "explicit.safetensors": "liked" } };
+  state.access.alice!.uncensored = true;
+  const lorasOf = (job: { id: string }) =>
+    (store.job("alice", job.id)!.input.loras as { name: string }[]).map((lora) => lora.name);
+  await dream.save("alice", { enabled: true });
+  assert.deepEqual(lorasOf((await dreamOnce())!), []);
+  await dream.save("alice", { enabled: true, spicy: true });
+  assert.deepEqual(lorasOf((await dreamOnce())!), ["explicit.safetensors"]);
+});
+
 test("Dream asks for natural expressions and adds face terms only to a recommended negative", async (t) => {
   const { dream, state, dreamOnce } = fixture(t, [profiles[0]]);
   state.negatives.flux = "blurry";
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
-  assert.match(state.calls[0].system, /natural, relaxed, believable expressions/);
+  assert.match(state.calls[0].system, /believable expressions that suit the moment/);
   assert.equal(
     job.input.negative,
     "blurry, exaggerated expression, grimace, distorted face, tongue out, gaping mouth",

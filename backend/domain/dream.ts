@@ -710,6 +710,8 @@ export function createDream(options: {
   remove(ownerId: string, itemIds: string[]): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
+  /** The LoRAs the catalogue marks uncensored; Dream loads them only with Extended Themes. */
+  uncensoredLoras(): ReadonlySet<string>;
   /**
    * The LoRAs that can run on the profile (its model family), strengths within published ranges;
    * one without a strength starts at its recommended one.
@@ -2162,14 +2164,27 @@ export function createDream(options: {
       }
       const available = await options.catalogue(ownerId, access.account);
       const failing = failingProfiles(ownerId);
+      const hidden = allowUncensored ? new Set<string>() : options.uncensoredLoras();
       const catalogue = {
         ...available,
-        profiles: available.profiles.filter(
-          (profile) =>
-            isCloudProfile(profile) === (backend === "cloud") &&
-            (allowUncensored || !uncensoredDreamProfile(profile)) &&
-            !failing.has(profile.id),
-        ),
+        profiles: available.profiles
+          .filter(
+            (profile) =>
+              isCloudProfile(profile) === (backend === "cloud") &&
+              (allowUncensored || !uncensoredDreamProfile(profile)) &&
+              !failing.has(profile.id),
+          )
+          .map((profile) =>
+            hidden.size && profile.options?.loras
+              ? {
+                  ...profile,
+                  options: {
+                    ...profile.options,
+                    loras: profile.options.loras.filter((name) => !hidden.has(name)),
+                  },
+                }
+              : profile,
+          ),
       };
       const steer = kind === "image" && record.steer?.remaining ? record.steer : undefined;
       const restrictedSource =
