@@ -62,6 +62,7 @@ export function createImageVectors(db: DatabaseSync, version: string) {
     get size() {
       return vectors.size;
     },
+    entries: () => vectors.entries(),
     set(item: IdleItem, vector: Float32Array) {
       save.run(key(item), version, new Uint8Array(new Float16Array(vector).buffer));
       vectors.set(key(item), vector);
@@ -130,8 +131,9 @@ export function createImageSearch(options: {
     /** Deleted gallery items take their vectors with them. */
     forget: (items: Iterable<IdleItem>) => vectors.delete(items),
     /**
-     * A test for gallery items that look like `text`, or null when there is nothing to compare:
-     * Image Search off, no image read yet or the model not downloaded.
+     * A test for gallery items that look like `text`, with the gallery keys it passes (`keys`), or
+     * null when there is nothing to compare: Image Search off, no image read yet or the model not
+     * downloaded.
      */
     async near(text: string) {
       const query = text.trim().toLowerCase();
@@ -153,10 +155,10 @@ export function createImageSearch(options: {
         failed = reason;
         return null;
       }
-      return (item: IdleItem) => {
-        const vector = vectors.get(item);
-        return vector ? likeness(vector, wanted) >= nearThreshold : false;
-      };
+      const keys = new Set<string>();
+      for (const [name, vector] of vectors.entries())
+        if (likeness(vector, wanted) >= nearThreshold) keys.add(name);
+      return Object.assign((item: IdleItem) => keys.has(key(item)), { keys });
     },
     /** How alike two items' images are, undefined where either has no vector or search is off. */
     likeness(a: IdleItem, b: IdleItem) {

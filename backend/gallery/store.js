@@ -188,11 +188,13 @@ function where(query = {}) {
     add(`${chatConversation} IN (SELECT value FROM json_each(?))`, list(query.conversationIds));
   if (query.turnId) add(`${chatTurn} = ?`, String(query.turnId));
   // Words found in the row's own JSON (lowercased by SQLite, ASCII only): a cheap first pass a
-  // search's filter confirms. Pending rows always pass, as searches never hide work in progress.
+  // search's filter confirms. Pending rows always pass, as searches never hide work in progress,
+  // as do those keyed in `orKeys` (images that look like the search).
   if (query.contains?.length)
     add(
-      `(status = 'pending' OR (${query.contains.map(() => "instr(lower(value), ?) > 0").join(" AND ")}))`,
+      `(status = 'pending' OR (${query.contains.map(() => "instr(lower(value), ?) > 0").join(" AND ")})${query.orKeys ? " OR key IN (SELECT value FROM json_each(?))" : ""})`,
       ...query.contains,
+      ...(query.orKeys ? [list(query.orKeys)] : []),
     );
   if (query.prompt !== undefined) add("json_extract(value, '$.prompt') = ?", query.prompt);
   if (query.titled) add("json_extract(value, '$.title') IS NOT NULL");
