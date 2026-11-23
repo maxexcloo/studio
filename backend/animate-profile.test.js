@@ -147,7 +147,7 @@ test("A video framed by its start frame draws at the frame's proportions unless 
   assert.equal(startFrameSize({ ...framed, aspectPolicy: "manual" }, run()), null);
 });
 
-test("Dream videos stay on their selected backend and extend on the source model", () => {
+test("Dream videos prefer quality, stay on their selected backend and extend on the source model", () => {
   const dream = (options) =>
     dreamVideoProfile(profiles, {
       backend: "local",
@@ -156,8 +156,14 @@ test("Dream videos stay on their selected backend and extend on the source model
       unavailable: new Set(),
       ...options,
     });
-  assert.equal(dream({ preferred: { side: "cloud", cloud: "grok-video" } }).profile.id, "fl-fast");
+  assert.equal(
+    dream({ preferred: { side: "cloud", cloud: "grok-video" } }).profile.id,
+    "fl-quality",
+  );
+  assert.equal(dream({ preferred: { local: "fl-fast" } }).profile.id, "fl-quality");
   assert.equal(dream({ preferred: { local: "fl-quality" } }).profile.id, "fl-quality");
+  assert.equal(dream({ unavailable: new Set(["fl-quality"]) }).profile.id, "fl-fast");
+  assert.equal(dream({ extend: "fl-fast" }).profile.id, "fl-fast");
   assert.equal(dream({ backend: "cloud", localRunning: false }).profile.id, "grok-video");
   assert.equal(dream({ extend: "fl-quality" }).profile.id, "fl-quality");
   assert.throws(() => dream({ extend: "grok-video" }), {
@@ -166,4 +172,23 @@ test("Dream videos stay on their selected backend and extend on the source model
   assert.throws(() => dream({ localRunning: false }), {
     message: "Local video isn't running.",
   });
+});
+
+test("Dream tries another compatible video family and prefers a slower alternate", () => {
+  const primary = video("ltx-quality", "LTX · Quality", { family: "ltx" });
+  const similar = video("ltx-standard", "LTX · Standard", { family: "ltx" });
+  const other = video("wan-standard", "Wan · Standard", { family: "wan" });
+  const fast = video("h3-fast", "H3 · Fast", { family: "h3" });
+  const alternate = (candidates, expected) =>
+    dreamVideoProfile(candidates, {
+      backend: "local",
+      localRunning: true,
+      unavailable: new Set(),
+      alternate: (candidates) => {
+        assert.deepEqual(candidates, [expected]);
+        return candidates[0];
+      },
+    }).profile.id;
+  assert.equal(alternate([primary, similar, other, fast, grok], other), other.id);
+  assert.equal(alternate([primary, similar, fast, grok], fast), fast.id);
 });

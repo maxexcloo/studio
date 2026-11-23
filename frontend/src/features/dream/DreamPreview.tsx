@@ -49,23 +49,29 @@ const ZoomImage = lazy(() =>
   import("../gallery/ZoomImage").then((module) => ({ default: module.ZoomImage })),
 );
 
-/** Why Dream made a result, its prompt and the LoRAs it tried, each rated here; `full` unclamped. */
+/** Why Dream made a result and the LoRAs it tried, each rated here. */
 function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?: string }) {
   const info = useQuery(loraInfoQuery);
+  const why = item.dream?.why || "";
+  const [direction, ...details] = why.split(" · ");
+  const heading = title || direction || item.resultSet?.variation || item.title;
+  const reason = title ? why : details.join(" · ");
   // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
     .filter((lora) => lora?.name && lora.enabled !== false)
     .map((lora) => String(lora.name));
   return (
     <div className={classes.caption}>
-      {(title || item.dream?.why) && (
+      {heading && (
         <Text fw={600} lineClamp={full ? undefined : 1}>
-          {title || item.dream?.why}
+          {heading}
         </Text>
       )}
-      <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
-        {item.prompt || item.dream?.prompt}
-      </Text>
+      {reason && (
+        <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
+          {reason}
+        </Text>
+      )}
       {loras.map((file) => {
         const title = loraName(file, info.data?.loras[file]);
         return (

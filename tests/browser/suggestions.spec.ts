@@ -4,7 +4,6 @@ import {
   backToActionMenu,
   closeTextEditor,
   create,
-  editorMenu,
   expandAssistantMenu,
   expandComposer,
   fixtures,
@@ -250,8 +249,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
 
 test("Custom Animation suggests what could happen from the image, filling the instruction", async ({
   page,
-}, testInfo) => {
-  const phone = testInfo.project.use.isMobile;
+}) => {
   await openViewer(page);
   const asked: any[] = [];
   const motion = [
@@ -268,10 +266,10 @@ test("Custom Animation suggests what could happen from the image, filling the in
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   await viewerAction(page, "Animate");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  await expect(page.getByRole("menu", { name: "Animate", exact: true })).toBeHidden();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
-  const menu = phone
-    ? await editorMenu(dialog, "Instruction", "Suggestions")
-    : await promptMenu(dialog, "Instruction");
+  await dialog.getByRole("button", { name: "AI Instruction Actions", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" }]);
   await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(

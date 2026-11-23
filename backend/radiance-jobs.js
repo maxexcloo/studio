@@ -96,7 +96,6 @@ async function storeOutput(id, index, bytes, type, ownerId) {
   const urls = mediaUrls(filename, subfolder);
   return {
     ...urls,
-    thumbnailUrl: type === "video" ? undefined : urls.thumbnailUrl,
     filename,
     type,
   };
