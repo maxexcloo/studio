@@ -2,9 +2,9 @@ import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 
 const definitions = {
-  ai: { label: "AI", icon: icons.similar },
   animate: { label: "Animate", icon: icons.animate },
   delete: { label: "Delete", icon: icons.delete, color: "red" as const },
+  discover: { label: "Discover", icon: icons.similar },
   dislike: { label: "Dislike", icon: icons.dislike },
   edit: { label: "Edit", icon: icons.edit },
   like: { label: "Like", icon: icons.like },
@@ -19,10 +19,10 @@ type ItemActionId = keyof typeof definitions;
 const menus: ItemActionId[] = ["animate", "edit", "recreate", "upscale"];
 // Retry and Stop lead for unfinished work and running upscales; Like comes before Dislike and
 // Delete last.
-const assist: ItemActionId[] = ["ai", "share"];
+const assist: ItemActionId[] = ["discover", "share"];
 const rating: ItemActionId[] = ["like", "dislike"];
 const others: ItemActionId[] = ["report", "delete"];
-/** Bars and menus: Animate, Edit, Recreate, Upscale | AI, Share | Like, Dislike | Report, Delete. */
+/** Bars and menus: Animate, Edit, Recreate, Upscale | Discover, Share | Like, Dislike | Report, Delete. */
 const sections: ItemActionId[][] = [["retry", "stop", ...menus], assist, rating, others];
 /** Bars name Retry, Stop and the four menus; the rest are icons. */
 export const namedItemActions: string[] = ["retry", "stop", ...menus];

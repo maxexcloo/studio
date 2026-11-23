@@ -67,12 +67,12 @@ import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt
 
 /**
  * An action whose options come to one runs that option itself, so no submenu holds just one.
- * Animate loads templates as it opens. AI and Upscale can hold a choice that differs from
+ * Animate loads templates as it opens. Discover and Upscale can hold a choice that differs from
  * the menu's name.
  */
 function withoutLoneOption(action: Action): Action {
   const options = action.menu?.flat() ?? [];
-  if (options.length !== 1 || action.note || ["ai", "animate", "upscale"].includes(action.id))
+  if (options.length !== 1 || action.note || ["animate", "discover", "upscale"].includes(action.id))
     return action;
   const [option] = options;
   return {
@@ -688,7 +688,7 @@ export function useMediaActions(
             ),
     }),
     upscale,
-    discovery.length > 0 && itemAction("ai", { menu: [discovery] }),
+    discovery.length > 0 && itemAction("discover", { menu: [discovery] }),
     ready &&
       itemAction("like", {
         pressed: item.rating === "liked",
@@ -829,7 +829,7 @@ export function MediaActionMenu({
   ...options
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
   const groups = useMediaActions(item, options).flatMap((group) =>
-    group.some(({ id }) => id === "ai" || id === "share")
+    group.some(({ id }) => id === "discover" || id === "share")
       ? group.map((action) => action.menu?.flat() ?? [action])
       : [group],
   );

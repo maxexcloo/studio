@@ -478,7 +478,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(page).toHaveURL(/\/images$/);
   await page.getByRole("button", { name: "Open image: Prompt B", exact: true }).click();
   // The viewer's AI menu opens the comparison the image belongs to.
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });

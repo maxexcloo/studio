@@ -129,7 +129,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   test.skip(!!testInfo.project.use.isMobile, "Phones without captions hide More (tested below)");
   await galleryFixture(page);
   await tileMenu(page);
-  // AI and Share show their actions directly in the menu.
+  // Discover and Share show their actions directly in the menu.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
     "Animate",
@@ -513,7 +513,7 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
 
   await page.getByRole("button", { name: "Open image: Paper Moth", exact: true }).click();
   // The chip's choice holds for the next Similar.
-  await viewerAction(page, "Viewer Actions", "Similar");
+  await viewerAction(page, "Discover", "Similar");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(chip("Close to Paper Moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(

@@ -141,7 +141,7 @@ recur across features.
 - Item actions are the same, in the same groups and order, on tiles, context
   menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
-  The context menu shows AI and Share options in unlabelled sections.
+  The context menu shows Discover and Share options in unlabelled sections.
   Desktop menus open options in side submenus on hover or by keyboard.
   Phone menus move into their options and provide Back. Assistant menus share `assistMenu`:
   Suggestions and Templates carry icons and list text-only options, with

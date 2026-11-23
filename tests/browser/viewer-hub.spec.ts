@@ -752,7 +752,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
       });
     }),
   );
-  await viewerAction(page, "Viewer Actions", "Keep & Vary", "Explore Three Directions");
+  await viewerAction(page, "Discover", "Keep & Vary", "Explore Three Directions");
   const review = page.getByRole("dialog", { name: "Explore Three Directions", exact: true });
   await review.getByRole("button", { name: "Open Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
@@ -999,7 +999,7 @@ test("AI › More Like This Set asks for new variations of a result's set", asyn
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Viewer Actions", "More Like This Set");
+  await viewerAction(page, "Discover", "More Like This Set");
   await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "set" }]);
 });
 
@@ -1011,7 +1011,7 @@ test("AI › More Like This explicitly selects only the current image", async ({
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await expect(
     page.getByRole("menuitem", { name: "More Like This Set", exact: true }),
   ).toBeVisible();
@@ -1021,7 +1021,7 @@ test("AI › More Like This explicitly selects only the current image", async ({
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await expect(page.getByRole("menuitem", { name: "More Like This", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -2373,7 +2373,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Edit",
       "Recreate",
       "Upscale",
-      "Viewer Actions",
+      "Discover",
       "Share",
       "Like",
       "Dislike",
@@ -2671,7 +2671,7 @@ test("The desktop viewer bar keeps its actions on one row in a narrow window", a
   await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
 });
 
-test("Phone viewer shows Report beside Delete and Similar under Viewer Actions", async ({
+test("Phone viewer shows Report beside Delete and Similar under Discover", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
@@ -2682,7 +2682,7 @@ test("Phone viewer shows Report beside Delete and Similar under Viewer Actions",
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
-  await viewerAction(page, "Viewer Actions", "Similar");
+  await viewerAction(page, "Discover", "Similar");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
 });
