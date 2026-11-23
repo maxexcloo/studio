@@ -500,11 +500,8 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("Dream works when the queue is free · 12 of 40 today", {
-      exact: true,
-    }),
-  ).toBeVisible();
+  await expect(page.getByText("Dream works when the queue is free", { exact: true })).toBeVisible();
+  await expect(page.getByText("12 of 40 today", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
