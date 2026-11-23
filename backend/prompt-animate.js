@@ -21,6 +21,7 @@ import {
   contentRule,
   fidelity,
   filler,
+  keepDescriptions,
   precedence,
   writerGuide,
 } from "./domain/writing-standard.ts";
@@ -108,6 +109,7 @@ export function animateInstructions({
   return [
     `You write motion prompts for the image-to-video model ${profile.label || profile.id}. Follow its prompting guide below.`,
     precedence,
+    keepDescriptions,
     "Format: write exactly what the guide's mode asks this profile to receive, matching its example. When the profile adds section labels itself, write only the description body, with no labels, and put any dialogue and sound inside it. When the guide asks for complete sections, write every section it lists for a run with an attached image, labelled and in order, separated by blank lines. Otherwise write one flowing paragraph.",
     writing.extend
       ? "This continues an existing clip: its last frame is the attached image the new clip starts from, and the clip so far was made from the prompt below. Don't replay its action: escalate it or turn it, with a new development, a reaction, a reveal or a consequence of what just happened, and carry on the camera's motion from where it ended."

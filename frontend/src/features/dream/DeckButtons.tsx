@@ -106,6 +106,7 @@ export function DeckButtons({
   singleImageComparison = false,
   leading,
   trailing,
+  quickRating = false,
 }: {
   card: DeckCard;
   act: (choice: Choice["choice"]) => void;
@@ -115,14 +116,15 @@ export function DeckButtons({
   singleImageComparison?: boolean;
   leading?: ReactNode;
   trailing?: ReactNode;
+  quickRating?: boolean;
 }) {
   const comparison = card.kind === "pair" && !singleImageComparison;
   const answers = dreamChoices(card, singleImageComparison).at(-1)!;
   const labels: Record<string, string> = {
     both: "Accept",
-    discard: card.kind === "set" ? "Deny All" : "Pass",
-    keep: "Accept",
-    like: "Super Like",
+    discard: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
+    keep: quickRating ? "Skip" : "Accept",
+    like: quickRating ? "Like" : "Super Like",
     neither: "Pass",
   };
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
@@ -130,7 +132,9 @@ export function DeckButtons({
   return (
     <div
       role="group"
-      aria-label={comparison ? "Comparison Answers" : "Dream Actions"}
+      aria-label={
+        comparison ? "Comparison Answers" : quickRating ? "Rating Actions" : "Dream Actions"
+      }
       className={classes.buttons}
       data-comparison-size={comparison ? card.items.length : undefined}
       aria-hidden={hidden}
@@ -140,7 +144,8 @@ export function DeckButtons({
       {answers.map(({ choice, id, label }) => {
         const side = id === "a" || id === "b" || id === "c";
         const title = labels[id] ?? label;
-        const pass = id === "neither" || (id === "discard" && card.kind !== "set");
+        const pass =
+          !quickRating && (id === "neither" || (id === "discard" && card.kind !== "set"));
         const description = pass
           ? "Hold to Add a Reason"
           : id === "like" && card.kind === "set"

@@ -259,7 +259,9 @@ export function createIdleWork<Item extends IdleItem>(options: {
       inflight.delete(key(item));
       finished += 1;
     });
+    // Keep a completion's turn if it yields to foreground work.
     if (result === "yielded") resume = top;
+    else if (priority.get(key(item)) === item) priority.delete(key(item));
     if (all && running() && (result === "done" || result === "failed")) spawn();
     return result;
   }
@@ -333,8 +335,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
       return "none";
     }
     // More may wait beyond the recent records, so the next tick walks the whole gallery again.
-    if (prioritised) priority.delete(key(item));
-    else if (whole) {
+    if (!prioritised && whole) {
       nothing = cleared;
       if (passed) resume = { ...resume, after: passed };
     }

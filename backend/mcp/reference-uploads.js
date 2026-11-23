@@ -8,8 +8,8 @@ export const maxUploadBytes = maxUploadMegabytes * 1_000_000;
 export const maxUploadBase64 = maxUploadBytes * 1.4;
 export const uploadLinkMinutes = 15;
 
-const attachedImageHint =
-  "For an image attached in chat, search with uploads: true and its filename first. If it's missing, call upload_link and pass its reference_asset_id to generate once uploaded.";
+export const attachmentInstructions =
+  "When the user asks to use a chat attachment, search with uploads: true, kind: image, and the exact filename if known. Omit query if the filename is unknown or the filename search misses. Use a confirmed match in reference_asset_ids. If missing or ambiguous, give the user an upload_link and wait for their upload before generating.";
 const tooLarge = `Reference images must be at most ${maxUploadMegabytes} MB.`;
 const uploadReferencePattern = /^upload-link:[A-Za-z0-9_-]{16}$/;
 const uploadLinkMs = uploadLinkMinutes * 60 * 1000;
@@ -84,9 +84,9 @@ export class McpReferenceUploads {
   async fromBase64(owner, base64, filename = "reference.png") {
     if (base64.length > maxUploadBase64) throw new Error(tooLarge);
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))
-      throw new Error(`That isn't a base64 PNG, JPEG or WebP image. ${attachedImageHint}`);
+      throw new Error(`That isn't a base64 PNG, JPEG or WebP image. ${attachmentInstructions}`);
     return this.store(owner, Buffer.from(base64, "base64"), filename, {
-      advice: ` For a Studio result, call reuse with mode reference and its ref. ${attachedImageHint}`,
+      advice: ` For a Studio result, call reuse with mode reference and its ref. ${attachmentInstructions}`,
     });
   }
   /**

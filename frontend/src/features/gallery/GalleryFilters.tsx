@@ -258,7 +258,15 @@ export function useActiveFilters(
  * Every image list's toolbar shares these parts: the active filters as removable chips with
  * Clear All, and one Filter ▾ chip that opens the filters.
  */
-export function FilterChips({ chips, onClear }: { chips: FilterChip[]; onClear: () => void }) {
+export function FilterChips({
+  chips,
+  onClear,
+  children,
+}: {
+  chips: FilterChip[];
+  onClear: () => void;
+  children?: ReactNode;
+}) {
   return (
     <Scroller
       className={classes.chips}
@@ -282,6 +290,7 @@ export function FilterChips({ chips, onClear }: { chips: FilterChip[]; onClear: 
             </Button>
           ),
         )}
+        {children}
         {chips.length > 1 && (
           <Button
             {...chipProps}

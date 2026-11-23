@@ -1,7 +1,7 @@
 import { Button, Checkbox, Loader, Paper, Stack, Text, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
-import { type CSSProperties, type KeyboardEvent, type ReactNode, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 
 import { finishedItemStatuses, terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
@@ -10,7 +10,7 @@ import { useTouch } from "../../ui/usePhone";
 import { JobProgressBar, jobReason, jobStatus, statusLabels } from "../generation/JobProgress";
 import { queueQuery, useQueueAction, withQueuePosition } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
-import { mediaTitle } from "./mediaLabels";
+import { mediaTimestamp, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { upscaling, useStopUpscale } from "./UpscaleControls";
 import type { useHoldToSelect } from "./useGalleryLayout";
@@ -174,11 +174,13 @@ export function MediaTile({
   selection,
   hold,
   caption,
+  showTimestamp,
   detail,
   actions,
   className,
   style,
   onOpen,
+  onTap,
   onMenu,
   onSelectionMenu,
   onTryAgain,
@@ -191,11 +193,13 @@ export function MediaTile({
   hold: ReturnType<typeof useHoldToSelect>;
   /** Hover captions, captions always shown, or none (phones without Tile Captions). */
   caption: "hover" | "pinned" | "none";
+  showTimestamp?: boolean;
   detail?: string;
   actions?: ReactNode;
   className?: string;
   style?: CSSProperties;
   onOpen: () => void;
+  onTap?: (button: HTMLButtonElement) => void;
   onMenu?: () => void;
   onSelectionMenu?: (x: number, y: number) => void;
   onTryAgain?: (item: MediaItem) => void;
@@ -205,6 +209,7 @@ export function MediaTile({
   const selecting = Boolean(selection?.selecting);
   // Touch holds use Studio's menu or selection instead of a native drag lift.
   const touch = useTouch();
+  const tapped = useRef(false);
   // Its Stop takes the caption's place at the foot of the tile.
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
   const selected = selection?.selected.has(item.id) ?? false;
@@ -214,6 +219,8 @@ export function MediaTile({
   const [retry, setRetry] = useState({ source, count: 0 });
   const attempt = retry.source === source ? retry.count : 0;
   const title = mediaTitle(item);
+  const timestamp = showTimestamp && item.status === "done" ? mediaTimestamp(item) : undefined;
+  const drifted = !selecting && item.identity?.drifted;
   const subtitle = item.resultSet?.caption || detail;
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
@@ -257,6 +264,9 @@ export function MediaTile({
         aria-label={label || `${selecting ? "Select" : "Open"} ${item.type}: ${title}`}
         aria-pressed={selecting ? selected : undefined}
         draggable={item.status === "done" && !touch}
+        onPointerDown={(event) => {
+          tapped.current = event.pointerType === "touch";
+        }}
         onKeyDown={(event) => {
           if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
             const rect = event.currentTarget.getBoundingClientRect();
@@ -278,6 +288,10 @@ export function MediaTile({
             return;
           }
           if (selection?.click([item], event)) return;
+          if (onTap && tapped.current && event.detail > 0) {
+            onTap(event.currentTarget);
+            return;
+          }
           event.currentTarget.focus({ preventScroll: true });
           onOpen();
         }}
@@ -347,10 +361,19 @@ export function MediaTile({
           <RatingIcon size={14} fill="currentColor" />
         </div>
       )}
-      {!selecting && item.identity?.drifted && (
-        <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
-          <icons.character size={12} />
-          Face
+      {(timestamp || drifted) && (
+        <div className={classes.marks}>
+          {timestamp && (
+            <time className={classes.timestamp} dateTime={timestamp.value}>
+              {timestamp.label}
+            </time>
+          )}
+          {drifted && (
+            <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
+              <icons.character size={12} />
+              Face
+            </div>
+          )}
         </div>
       )}
       {!selecting && actions}

@@ -20,6 +20,10 @@ export const dreamState = field("dream.state");
 export const dreamArm = field("dream.arm");
 export const dreamPair = field("dream.pair");
 export const dreamProject = field("dream.projectId");
+export const chatConversation = field("chat.conversationId");
+export const chatTurn = field("chat.turnId");
+export const listedChatSet =
+  "set_id IS NOT NULL AND unlisted = 0 AND uploaded = 0 AND status = 'done'";
 
 /**
  * Columns derived from each row's JSON, so queries filter and order the gallery in SQL.
@@ -67,13 +71,18 @@ const galleryOrderIndex = `uploaded, unlisted, ${galleryOrder}, status, type, ra
  * states, Dream states (with arms and comparison sides, so Dream's counts read the index alone),
  * an owner's prompts (a repeated prompt's title), times (recent work) and runs (profile health,
  * read from the index alone). */
-const galleryIndexes: [string, string][] = [
+const galleryIndexes: [name: string, keys: string, condition?: string][] = [
   ["studio_gallery_order", galleryOrderIndex],
   ["studio_gallery_owner_order", `owner_id, ${galleryOrderIndex}`],
   ["studio_gallery_owner_rating", "owner_id, rating, unlisted, uploaded, type, status, job_id"],
   ["studio_gallery_job", "job_id"],
   ["studio_gallery_item", "item_id"],
   ["studio_gallery_set", "set_id"],
+  [
+    "studio_gallery_chat",
+    `owner_id, type, ${chatConversation}, ${chatTurn}, set_id`,
+    `${chatConversation} IS NOT NULL AND ${listedChatSet}`,
+  ],
   ["studio_gallery_status", "status"],
   ["studio_gallery_upscale", "upscale_status"],
   ["studio_gallery_dream", `${dreamState}, owner_id, ${dreamArm}, ${dreamPair}`],
@@ -112,9 +121,9 @@ export function syncGallerySchema(db: DatabaseSync) {
     ).map((index) => [index.name, index.sql]),
   );
   const wanted = new Map(
-    galleryIndexes.map(([name, keys]) => [
+    galleryIndexes.map(([name, keys, condition]) => [
       name,
-      `CREATE INDEX ${name} ON studio_gallery (${keys})`,
+      `CREATE INDEX ${name} ON studio_gallery (${keys})${condition ? ` WHERE ${condition}` : ""}`,
     ]),
   );
   const staleIndexes = [...indexes].filter(([name, sql]) => wanted.get(name) !== sql);

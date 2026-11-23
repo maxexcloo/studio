@@ -12,12 +12,31 @@ export function videoLifecycle(media: HTMLVideoElement) {
   };
 }
 
-/** Keep sound as chosen; refused autoplay leaves the native Play control available. */
-export function playVideo(media: HTMLVideoElement, refused: () => void) {
+/** Try the chosen sound first, then play silently if the browser needs a gesture for audio. */
+export function playVideo(
+  media: HTMLVideoElement,
+  refused: () => void,
+  silent: (value: boolean) => void,
+) {
   const release = videoLifecycle(media);
   let closed = false;
-  media.play().catch(() => {
-    if (!closed) refused();
+  void media.play().catch(async (error: unknown) => {
+    if (closed) return;
+    if (media.muted || (error as { name?: string })?.name !== "NotAllowedError") {
+      refused();
+      return;
+    }
+    if (document.hidden) return;
+    silent(true);
+    media.muted = true;
+    try {
+      await media.play();
+    } catch {
+      if (closed) return;
+      silent(false);
+      media.muted = false;
+      refused();
+    }
   });
   return () => {
     closed = true;

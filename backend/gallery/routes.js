@@ -26,6 +26,7 @@ import {
   filterVisibleGallery,
   forgetGalleryItems,
   galleryChangeCount,
+  galleryChatSets,
   galleryFilter,
   galleryItem,
   galleryItems,
@@ -266,6 +267,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const cursor = selection ? "" : String(query.cursor || "");
     const window = !selection && query.window === "1";
     const includeFailed = query.includeFailed !== "0";
+    const unrated = query.unrated === "1";
+    const finished = query.finished === "1" || unrated;
     const requestedSort = one(query.sort);
     const sort = Object.hasOwn(gallerySortLabels, requestedSort) ? requestedSort : "newest";
     if ((dates || window) && (query.similar || !["newest", "oldest"].includes(sort)))
@@ -323,6 +326,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           ...(window && { beforeCursor: String(query.beforeCursor || "") }),
           selection,
           includeFailed,
+          includeDisliked: finished && query.includeDisliked === "1",
           uploads: query.uploads === "1",
           query: {
             ...owned,
@@ -332,6 +336,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...(turn && { turnId: turn }),
             ...(["liked", "disliked"].includes(query.rating) && { rating: query.rating }),
             ...(work === "none" && { notStatus: "pending" }),
+            ...(finished && { status: "done" }),
+            ...(unrated && { unrated }),
             ...(Number.isFinite(since) && since && { since }),
             ...(Number.isFinite(before) && { before }),
             ...(words.length && { contains: words }),
@@ -367,6 +373,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const retried = new Set();
     const queued =
       selection === "failed" ||
+      finished ||
       work !== "queued" ||
       window ||
       cursor ||
@@ -426,6 +433,14 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     };
   }
   directRoute(app, "GET", "/api/gallery", readGallery);
+  directRoute(app, "GET", "/api/gallery/chat-sets", (account, { query }) => {
+    const scope = storedChatRecord({ conversationId: query.chat, turnId: query.turn });
+    if (!["image", "video"].includes(query.type) || !scope || (query.turn && !scope.turnId))
+      return { status: 400, payload: { error: "Supply a valid media type and chat." } };
+    const ownerId = ownerIdForRequest({ studioAccount: account });
+    const sets = ownedQuery(account) ? galleryChatSets(ownerId, query.type, scope) : [];
+    return { status: 200, payload: { sets } };
+  });
   directRoute(app, "GET", "/api/gallery/timeline", (account, request) => {
     let dates;
     try {

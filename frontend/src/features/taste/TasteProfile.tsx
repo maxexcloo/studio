@@ -211,6 +211,11 @@ function TasteEditor({
     return (
       <TagsInput
         label={label}
+        description={
+          key === "avoid"
+            ? "Add subjects, props or settings to exclude from Dream and chat prompts. For example, smoking or laundry."
+            : undefined
+        }
         value={draft[key]}
         onChange={set(key)}
         maxTags={tasteLimits[key]}

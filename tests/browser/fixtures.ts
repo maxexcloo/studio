@@ -664,15 +664,23 @@ export async function fixtures(page: Page) {
       const rating = url.searchParams.get("rating");
       const sort = url.searchParams.get("sort");
       const similar = url.searchParams.get("similar");
+      const unrated = url.searchParams.get("unrated") === "1";
+      const finished = unrated || url.searchParams.get("finished") === "1";
+      const since = url.searchParams.get("since");
       const items = gallery.filter(
         (i) =>
           (url.searchParams.get("select") !== "failed" || i.status === "failed") &&
+          (!finished || i.status === "done") &&
+          (!unrated || !i.rating) &&
+          (!since || Date.parse(i.createdAt) >= Date.parse(since)) &&
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
           (rating
             ? i.rating === rating
-            : (!similar && sort === "disliked") || i.rating !== "disliked") &&
+            : url.searchParams.get("includeDisliked") === "1" ||
+              (!similar && sort === "disliked") ||
+              i.rating !== "disliked") &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&

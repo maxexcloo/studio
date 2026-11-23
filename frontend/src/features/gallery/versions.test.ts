@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { MediaItem } from "../../types";
-import { versionGroups, versionSources, versionTree } from "./versions.ts";
+import { derivations, versionGroups, versionSources, versionTree } from "./versions.ts";
 
 const result = (id: string, minute: number, parentItemId?: string, derived?: boolean) =>
   ({
@@ -64,4 +64,21 @@ test("a result without an ID yet is an original of its own", () => {
     groups.map((group) => group.map(({ id }) => id)),
     [[undefined], ["original", "other", "edit", "again", "latest"]],
   );
+});
+
+test("Details finds the direct source, original, and both kinds of direct offshoot", () => {
+  const later = result("later", 6, latest.id);
+  const derived = result("derived", 5, latest.id, true);
+  assert.deepEqual(derivations(latest, [later, derived, ...items], []), {
+    sourceId: edit.id,
+    source: edit,
+    original,
+    versions: [later],
+    derived: [derived],
+  });
+  // A partially loaded chain still identifies its immediate source.
+  const partial = derivations(latest, [latest, edit], []);
+  assert.equal(partial.source, edit);
+  assert.equal(partial.original, undefined);
+  assert.equal(derivations(latest, [latest], []).sourceId, edit.id);
 });

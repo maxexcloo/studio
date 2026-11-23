@@ -1027,19 +1027,13 @@ test("media and administrator credentials discover only their own friendly tools
   // Studio owns the chat rules, so clients need no prompt prefix: tool use, following the user and short replies.
   assert.match(
     media.getInstructions(),
-    /^Studio makes images and videos\. Always write finished generate prompts yourself/,
+    /^Studio makes images and videos\. Read the selected model's guide/,
   );
   assert.match(media.getInstructions(), /Reply briefly as each result says/);
-  assert.match(media.getInstructions(), /Studio runs them exactly as written/);
-  assert.match(
-    media.getInstructions(),
-    /"N sets of K" is N distinct prompts with count K in one call; for creative variety keep requested identity and references fixed/,
-  );
+  assert.match(media.getInstructions(), /Studio runs the submitted prompts as written/);
+  assert.match(media.getInstructions(), /"N sets of K" uses N distinct prompts with count K/);
   // A chat keeps the user's own description, and LoRAs run only when asked.
-  assert.match(
-    media.getInstructions(),
-    /own descriptions .* word for word, changing only what they ask/,
-  );
+  assert.match(media.getInstructions(), /Translate figurative visual shorthand/);
   assert.match(media.getInstructions(), /a LoRA only when the user names one or clearly wants one/);
   // A rule such as real flaws lands as texture on the asked-for face, never a plainer or older one.
   assert.match(
@@ -1053,9 +1047,10 @@ test("media and administrator credentials discover only their own friendly tools
     /call reuse with its ref and your revised prompt, not a new generate/,
   );
   // Slow jobs hand back at once; Result runs only on the user's request.
+  assert.match(media.getInstructions(), /share the links and end the turn: one round per turn/);
   assert.match(
     media.getInstructions(),
-    /share the links and end the turn: one round per turn; review finished results before rewriting\. Call result only when the user asks to see results, never in the background/,
+    /Call result only when the user asks to see results, never in the background/,
   );
   assert.match(media.getInstructions(), /if a tool is missing or fails, say so/);
   assert.match(tools.find((tool) => tool.name === "result").description, /only when the user asks/);
@@ -1078,13 +1073,10 @@ test("media and administrator credentials discover only their own friendly tools
   assert.equal(generateSchema.count.maximum, 10);
   assert.equal(generateSchema.prompts.anyOf[0].maxItems, 30);
   assert.match(generateSchema.title.description, /Title Case/);
+  assert.match(media.getInstructions(), /Retain any set name the user explicitly supplied/);
   assert.match(
     media.getInstructions(),
-    /Name sets for the chat topic\/title; reuse unless the user renames/,
-  );
-  assert.match(
-    media.getInstructions(),
-    /search \(uploads: true, query: filename\).*reference_asset_ids.*upload_link if missing/,
+    /search with uploads: true, kind: image, and the exact filename if known\. Omit query.*reference_asset_ids.*upload_link.*wait for their upload/,
   );
   assert.doesNotMatch(media.getInstructions(), /GPU|\bapply\b/);
   assert.match(admin.getInstructions(), /get approval before apply/);
@@ -1107,25 +1099,8 @@ test("media and administrator credentials discover only their own friendly tools
   );
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
   assert.ok(
-    // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
-    // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
-    // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
-    // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
-    // generate's character, to 15,700 for its character_views (since removed), to 16,000 for its shots (Studio
-    // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
-    // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
-    // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
-    // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
-    // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
-    // a person's rules in proportion with the shape of liked portraits, to 20,050 for naming a
-    // person's age and ethnicity first, to 20,250 for Search's dislikes, pages and summary and for
-    // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters;
-    // sets, axis comparisons and the user's brief were then fitted within it; then to 21,900 for
-    // cancel_all's chat and account scopes, to 22,050 for writing prompts in American English, and
-    // to 22,300 for keeping saved preferences and taste out of MCP generation, and to 22,650 for
-    // backstory notes and characters' stories in cards and rewrite_prompt, and to 22,850 for
-    // Search's dates and the rules to queue one round per turn and never claim untaken actions.
-    JSON.stringify(tools).length + media.getInstructions().length < 22850,
+    // Include shared writing, attachment and batch instructions in what clients cache.
+    JSON.stringify(tools).length + media.getInstructions().length < 24300,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2615,7 +2590,7 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   assert.equal(empty.isError, true);
   assert.match(
     texts(empty),
-    /search with uploads: true and its filename first.*call upload_link.*pass its reference_asset_id to generate/,
+    /search with uploads: true.*Omit query.*reference_asset_ids.*upload_link.*wait for their upload/,
   );
   const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
     .png()
@@ -2978,6 +2953,15 @@ test("a chat image becomes the linked person's Upload and is refused for anyone 
   );
   // Its own chats find the filename and take that asset as a reference.
   const client = await f.client("librechat-linked");
+  const missed = await call(client, "search", {
+    uploads: true,
+    kind: "image",
+    query: "incorrect-filename.png",
+  });
+  assert.deepEqual(data(missed).results, []);
+  assert.match(texts(missed), /Omit query to check recent uploads.*use upload_link/);
+  const [recent] = data(await call(client, "search", { uploads: true, kind: "image" })).results;
+  assert.equal(recent.reference_asset_id, asset.id);
   const [match] = data(
     await call(client, "search", { uploads: true, kind: "image", query: "beach.png" }),
   ).results;
@@ -5387,6 +5371,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     seed: 10,
   });
   assert.match(texts(split), /Queued 12 images in batches of up to 8\./);
+  assert.equal(split.structuredContent.accepted, 12);
   const batches = f.submitted.slice(4);
   assert.deepEqual(
     batches.map((body) => [body.prompt, body.resultSet.index, body.seed]),
@@ -8175,9 +8160,25 @@ test("MCP generation follows supplied prompts independently of saved taste", asy
   const f = await fixture(t);
   const client = await f.client();
   // Saved taste never constrains generation.
-  const taste = { avoid: ["buttons"], models: [imageProfile.id], loras: ["film"], preferences: {} };
+  const taste = {
+    avoid: ["buttons"],
+    models: [imageProfile.id],
+    loras: ["film"],
+    preferences: { avoid: ["smoking", "laundry"] },
+  };
   f.app.get("/api/taste", (_req, res) => res.json(taste));
   await generate(client, { prompts: ["A coat with buttons"] });
+  const beforeExclusions = f.submitted.length;
+  for (const [prompt, expected] of [
+    ["A coat beside a washing machine", /your Taste Profile avoids/],
+    ["A coat beside an ashtray", /your Taste Profile avoids/],
+    ["Same as above, but switch to silk", /depends on an earlier prompt or image/],
+  ]) {
+    const refused = await call(client, "generate", { prompts: [prompt] });
+    assert.equal(refused.isError, true);
+    assert.match(texts(refused), expected);
+  }
+  assert.equal(f.submitted.length, beforeExclusions);
   const reply = await call(client, "generate", { prompts: ["A woollen coat"] });
   assert.doesNotMatch(texts(reply), /The user's brief|the user's favourite/);
   assert.equal(f.submitted.at(-1).prompt, "A woollen coat");

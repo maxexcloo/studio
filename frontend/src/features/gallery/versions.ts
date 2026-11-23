@@ -122,19 +122,35 @@ export function knownResults(items: MediaItem[], jobs: QueueJob[]) {
   return known;
 }
 
-/**
- * The result this item was made from and the results made from it that changed too much to be its
- * versions (`isVersion`), for Details › From and Derived, among the loaded `items` and the owner's
- * jobs.
- */
+/** A result's recorded ancestry and direct offshoots among loaded results and the owner's jobs. */
 export function derivations(item: MediaItem, items: MediaItem[], jobs: QueueJob[]) {
   const byJob = new Map(jobs.map((job) => [job.id, job]));
   const known = knownResults(items, jobs);
-  const made = itemDerivation(item, byJob, known);
-  const source = made ? known.get(made.source) : undefined;
-  const derived = [...known.values()].filter((result) => {
-    const from = result.url ? itemDerivation(result, byJob, known) : undefined;
-    return from?.source === item.id && !from.version;
-  });
-  return { source, derived };
+  const parentOf = (result: MediaItem) =>
+    result.parentItemId || (result.jobId && byJob.get(result.jobId)?.parentItemId);
+  const parentId = parentOf(item);
+  const sourceId = parentId === item.id ? undefined : parentId;
+  const source = sourceId ? known.get(sourceId) : undefined;
+  let original = source;
+  const seen = new Set([item.id]);
+  while (original) {
+    const parent = parentOf(original);
+    if (!parent) break;
+    seen.add(original.id);
+    original = seen.has(parent) ? undefined : known.get(parent);
+  }
+  const versions: MediaItem[] = [];
+  const derived: MediaItem[] = [];
+  for (const result of known.values()) {
+    if (!result.url || result.id === item.id || parentOf(result) !== item.id) continue;
+    const from = itemDerivation(result, byJob, known);
+    if (from) (from.version ? versions : derived).push(result);
+  }
+  return {
+    sourceId,
+    source,
+    original: original === source ? undefined : original,
+    versions,
+    derived,
+  };
 }
