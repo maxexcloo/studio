@@ -26,8 +26,10 @@ import {
   type DragEvent,
   type ReactNode,
   type Ref,
+  useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -547,11 +549,14 @@ export function useNaming() {
   const field = useRef<HTMLInputElement>(null);
   const [saved, flashSaved] = useFlash();
   /** Focuses the name field to rename the current record. */
-  const name = (mode: "rename" | null) => {
+  const name = useCallback((mode: "rename" | null) => {
     setNaming(mode);
     if (mode) setTimeout(() => field.current?.focus());
-  };
-  return { naming, name, field, saved, flashSaved };
+  }, []);
+  return useMemo(
+    () => ({ naming, name, field, saved, flashSaved }),
+    [naming, name, saved, flashSaved],
+  );
 }
 type Naming = ReturnType<typeof useNaming>;
 /** A failed save shows the shared mutation notification; the field just stays as it is. */

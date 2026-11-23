@@ -553,8 +553,12 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   await field.focus();
   await expect.poll(height).toBeGreaterThan(line * 1.5);
   await expect(summary).toHaveCount(0);
-  await field.blur();
+  // Another viewer control leaves the prompt, keeping its edit.
+  await field.fill(`${prompt} in autumn`);
+  await viewer.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Edit in Composer", exact: true })).toBeVisible();
   await expect.poll(height).toBeLessThan(line * 1.5);
+  await expect(field).toHaveValue(`${prompt} in autumn`);
 });
 
 test("Custom Animation edits and submits in one dialog with its text tools", async ({
