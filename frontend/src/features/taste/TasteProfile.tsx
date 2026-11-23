@@ -27,6 +27,7 @@ import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { isProfile, profileName } from "../generation/payload";
+import { TasteReflection } from "./TasteReflection";
 
 /** Each field as it stands, what Studio learnt, and the fields the person set. */
 export interface Taste extends TasteFields {
@@ -355,6 +356,7 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
           {error && <Alert color="red">{error.message}</Alert>}
         </Stack>
       </SettingGroup>
+      <TasteReflection />
       <SettingGroup title="Danger Zone" danger>
         <SettingRow
           label="Clear Taste Profile"

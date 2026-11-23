@@ -9,7 +9,7 @@ import { modelsQuery } from "../generation/GenerationProvider";
 import { isProfile, profileForBackend, takesReferences } from "../generation/payload";
 import { profileOptions } from "../generation/ProfilePicker";
 
-export function referenceProfilePriority(profile: Profile) {
+function referenceProfilePriority(profile: Profile) {
   const run = profileForBackend(profile, undefined, true)!;
   if (profile.availability || run.ready === false) return 3;
   if (isCloudProfile(profile)) return 2;

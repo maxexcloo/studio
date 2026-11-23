@@ -992,8 +992,7 @@ export function MediaDetails({
       <Section
         title="Output"
         rows={[
-          // The dimensions and time already show under the title.
-          ...details.output.filter(([label]) => label !== "Dimensions" && label !== "Time"),
+          ...details.output,
           ...(faceCheck
             ? [
                 [

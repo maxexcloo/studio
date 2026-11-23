@@ -9,6 +9,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { suggestionsTool, useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
@@ -41,6 +42,7 @@ export function AnimateDialog({
   onClose: () => void;
 }) {
   const phone = usePhone();
+  useReturnFocus();
   const id = useId();
   const iteration = useMediaIteration(item);
   const run = iterate ?? iteration.mutate;

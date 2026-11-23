@@ -446,12 +446,12 @@ export function withPreferredDefaults(models, preferences) {
         ? `No cloud ${kind} model is available, so this runs locally.`
         : `No local ${kind} model is running, so this runs in the cloud.`;
   }
-  const { imageAspect, imageResolution } = preferences;
+  const { imageAspect, imageCount, imageResolution } = preferences;
   const profiles =
-    imageAspect || imageResolution
+    imageAspect || imageCount || imageResolution
       ? models.profiles?.map((profile) =>
           profile.kind === "image"
-            ? { ...profile, imageSizePreference: { imageAspect, imageResolution } }
+            ? { ...profile, imagePreference: { imageAspect, imageCount, imageResolution } }
             : profile,
         )
       : models.profiles;

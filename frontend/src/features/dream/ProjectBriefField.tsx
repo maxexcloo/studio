@@ -10,7 +10,7 @@ import {
 import { post } from "../../api";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
-import { UndoButton } from "../generation/AskChange";
+import { proposalUndo } from "../generation/AskChange";
 import { changeSummary } from "../generation/changeSummary";
 import { assistantQuery } from "../generation/PromptAssistant";
 
@@ -41,10 +41,11 @@ export function ProjectBriefField({
     mutationFn: ({ name, brief }: Context) =>
       post<{ text: string }>("/api/assistant/project-brief", { name, brief, field }),
   });
-  const tool = {
-    id: "assistant",
+  const label = value.trim() ? "Improve" : "Suggest";
+  const writeAction = {
+    id: "write",
     icon: icons.assistant,
-    label: value.trim() ? "Improve" : "Suggest",
+    label,
     disabled: write.isPending,
     onClick: () =>
       write.mutate(draft, {
@@ -58,6 +59,13 @@ export function ProjectBriefField({
         },
       }),
   };
+  const tool = {
+    id: "assistant",
+    icon: icons.assistant,
+    label,
+    heading: false,
+    menu: [...proposalUndo(shown && (() => change(shown.before))), [writeAction]],
+  };
   return (
     <TextBox
       {...props}
@@ -67,7 +75,6 @@ export function ProjectBriefField({
       onChange={change}
       tools={assistant.data?.available ? [tool] : undefined}
       busy={write.isPending ? "Writing…" : undefined}
-      send={shown && <UndoButton onClick={() => change(shown.before)} />}
       below={
         shown && (
           <Text size="xs" c="dimmed" role="status">

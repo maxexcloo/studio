@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 import { finished } from "../gallery/MediaTile";
@@ -24,6 +25,8 @@ export interface Comparison {
   axis?: string;
   /** The project whose brief a vote just proposed a change to, in Dream's Inbox. */
   proposal?: { projectId: string; name: string };
+  /** A Dream comparison the account kept a side of, with its question; it is read-only. */
+  dream?: { question: string };
 }
 
 /** One compare set; it polls only while a variant is still generating. */
@@ -36,6 +39,16 @@ export const comparisonQuery = (id: string) =>
         ? false
         : 2000,
   });
+
+/** The account's comparisons with their variants, newest first. */
+export const comparisonsQuery = queryOptions({
+  queryKey: ["comparisons", "list"],
+  queryFn: () => api<{ comparisons: Comparison[] }>("/api/comparisons"),
+});
+
+/** A comparison's heading: Dream's question or the one its axis asks, else Compare. */
+export const comparisonTitle = ({ axis, dream }: Pick<Comparison, "axis" | "dream">) =>
+  dream?.question || (axis ? `Which ${titleCase(axis)}?` : "Compare");
 
 /** Which results each of the account's comparisons holds, to find an item's comparison. */
 export const comparisonMembersQuery = queryOptions({

@@ -165,7 +165,7 @@ test("cloud profiles follow the Cloud Models feature, never a grant of their own
 });
 
 test("uncensored profiles need Uncensored Models and All Models grants every local profile", () => {
-  const uncensored = { id: "image-spicy", uncensored: true };
+  const uncensored = { id: "image-uncensored", uncensored: true };
   const plain = { id: "image-plain" };
   const grok = { id: "grok-image", family: "grok" };
   const user = builtInAccessProfile;
@@ -177,7 +177,7 @@ test("uncensored profiles need Uncensored Models and All Models grants every loc
     user,
     granted: {
       name: "Granted",
-      generationProfiles: ["image-spicy"],
+      generationProfiles: ["image-uncensored"],
       features: { uncensoredModels: false },
     },
   };
@@ -200,10 +200,10 @@ test("uncensored profiles need Uncensored Models and All Models grants every loc
 
 test("an administrator that turns LoRAs or Uncensored Models off loses them for its own use", () => {
   const grok = { id: "grok-image", family: "grok" };
-  const spicy = { id: "image-spicy", uncensored: true };
+  const uncensored = { id: "image-uncensored", uncensored: true };
   const drafted = { id: "image-draft", aiDrafted: true };
   const plain = { id: "image-plain" };
-  const profiles = [grok, spicy, drafted, plain];
+  const profiles = [grok, uncensored, drafted, plain];
   const account = { id: "admin", role: "administrator" };
   const everything = effectiveAccountAccess(account, {}, null, {});
   assert.equal(hasFullAccess(everything), true);
@@ -213,7 +213,7 @@ test("an administrator that turns LoRAs or Uncensored Models off loses them for 
   assert.equal(hasFullAccess(narrowed), false, "generation checks its pick");
   // The model list (model/catalogue.js) and generation (generation-routes.js) use these checks.
   assert.deepEqual(visibleGenerationProfiles(profiles, narrowed), [grok, drafted, plain]);
-  assert.equal(mayUseGenerationProfile(narrowed, spicy), false);
+  assert.equal(mayUseGenerationProfile(narrowed, uncensored), false);
   assert.equal(mayUseFeature(narrowed, "uncensoredModels"), false, "Dream's Uncensored");
   assert.equal(mayUseFeature(narrowed, "loras"), true);
   const noLoras = effectiveAccountAccess(account, {}, null, { loras: false });

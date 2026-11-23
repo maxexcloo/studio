@@ -216,10 +216,7 @@ test("each suggestion picker caps an oversized reply at ten distinct ideas", asy
     });
     assert.equal(result.suggestions.length, 10, surface);
     assert.equal(new Set(result.suggestions.map((idea) => idea.label)).size, 10);
-    assert.match(
-      calls[0][0].content,
-      /(?:Write|Suggest) 10 useful, distinct|Offer up to 10 distinct/,
-    );
+    assert.match(calls[0][0].content, /(?:Write|Suggest) 10 useful, distinct|Offer 10 distinct/);
   }
 });
 
@@ -439,7 +436,7 @@ test("Animate saves its own image-grounded motion instructions", async () => {
   assert.match(calls[1][0].content, /each in a distinct area/);
 });
 
-test("viewer next steps vary across relevant areas, specific, and spicy only where the account may", async () => {
+test("viewer next steps vary across relevant areas, specific, and uncensored only where the account may", async () => {
   const step = (area: string, label: string) => ({ area, label, request: label });
   const reply = () =>
     JSON.stringify({

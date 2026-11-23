@@ -42,7 +42,7 @@ export function writingIssue(writing, { engine, account }) {
   if (writing.kind !== "dream" && !allowed("promptAssistant"))
     return { status: 403, error: promptAssistantOff };
   if (!engine) return { status: 503, error: "The prompt assistant is not configured." };
-  if (writing.kind === "dream" && writing.spicy && !allowed("uncensoredModels"))
+  if (writing.kind === "dream" && writing.uncensored && !allowed("uncensoredModels"))
     return { status: 403, error: "Uncensored themes need Uncensored Models for this account." };
   return writing.kind === "animate" ? animateIssue(writing, { engine, allowed }) : null;
 }
@@ -122,7 +122,7 @@ export function createPromptStage({
       writing,
       clip: animateClip(job.input, video),
       explicit: job.dream
-        ? Boolean(job.dream.spicy) && dream().allowsUncensored(job.ownerId)
+        ? Boolean(job.dream.uncensored) && dream().allowsUncensored(job.ownerId)
         : !access || mayUseFeature(access, "uncensoredModels"),
       story,
       writer,

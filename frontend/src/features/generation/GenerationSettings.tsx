@@ -9,17 +9,16 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { Dices } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import { isCloudVideoProfile } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import type { GenerationInput, Profile } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { iconChipProps } from "./chip";
 import { controlRange, stepsRange } from "./payload";
-import { ChipPopup } from "./Picker";
 
 const selections = [
   { options: "samplers", field: "sampler", label: "Sampler" },
@@ -114,7 +113,7 @@ export function GenerationSettings({
                   aria-label="Use a Random Seed"
                   onClick={() => onChange({ seed: "" })}
                 >
-                  <Dices size={16} />
+                  <icons.seed size={16} />
                 </ActionIcon>
               </Tooltip>
             )
@@ -295,7 +294,6 @@ export function GenerationSettings({
       tooltip
       floating
       position="top"
-      width={380}
       opened={opened}
       onOpenedChange={onOpenedChange}
       target={

@@ -6,6 +6,7 @@ import { startImageSlot } from "../../../../shared/characters";
 import type { GallerySort } from "../../../../shared/gallery-sort";
 import { slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { ChipPopup, PopupHeading } from "../../ui/ChipPopup";
 import { icons } from "../../ui/icons";
 import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
@@ -27,11 +28,9 @@ import {
 } from "./payload";
 import {
   ChipContent,
-  ChipPopup,
   PickerGrid,
   PickerHeader,
   PickerTile,
-  PopupHeading,
   UploadTile,
   usePickerChoices,
 } from "./Picker";
@@ -292,7 +291,7 @@ export function ReferencePicker({
             These images don't fit the selected profile's slots. Remove them here or choose another
             profile.
           </Text>
-          <PickerGrid label="Unused References" fixedThumbnails>
+          <PickerGrid label="Unused References">
             {unused.map((asset) => {
               const label = referenceLabel(asset, references.indexOf(asset), profile);
               return (
@@ -486,7 +485,6 @@ export function ReferencePicker({
     return (
       <ChipPopup
         title="References"
-        width="100%"
         opened={opened}
         onOpenedChange={setOpened}
         trap={!layer && !adding && !preview.opened}
@@ -496,7 +494,6 @@ export function ReferencePicker({
         leading={
           <ChipPopup
             title="Add References"
-            width="100%"
             opened={opened && adding}
             onOpenedChange={(adding) => {
               setAdding(adding);
@@ -524,7 +521,7 @@ export function ReferencePicker({
   return (
     <ChipPopup
       title="References"
-      width="min(56rem, calc(100vw - 2rem))"
+      wide
       opened={opened}
       onOpenedChange={setOpened}
       trap={!layer && !preview.opened}

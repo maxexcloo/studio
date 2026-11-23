@@ -45,6 +45,17 @@ function captionPrompt() {
 export const captionInstructions = () => captionPrompt().instructions;
 // The Out of Date pass retakes captions written with different instructions.
 export const captionVersion = () => captionPrompt().version;
+/** A caption as the result saves it, under the current rules. */
+export const captionRecord = (
+  reply: { text: string; tags: string[]; model: string },
+  at: number,
+): Caption => ({
+  text: reply.text,
+  tags: reply.tags,
+  model: reply.model,
+  at: new Date(at).toISOString(),
+  version: captionVersion(),
+});
 
 /**
  * Captions finished gallery images, Dream's pool included, while Studio is idle
@@ -66,6 +77,8 @@ export function createCaptioner(options: {
   /** A small (≤512 px) copy of the image, or null when there is none. */
   image(item: CaptionItem): Promise<ModelImage | null>;
   save(item: CaptionItem, caption: Caption): void;
+  /** Captions the item in one read with whatever else it needs (domain/enrich.ts), saving each. */
+  enrich?(item: CaptionItem, signal: AbortSignal): Promise<void>;
   load(): IdleDocument | null;
   persist(document: IdleDocument): void;
   now?: () => number;
@@ -96,25 +109,19 @@ export function createCaptioner(options: {
           ? !(item.caption?.at && item.caption.at >= target.startedAt)
           : item.caption?.version !== captionVersion()),
     async run(item, signal) {
+      if (options.enrich) return options.enrich(item, signal);
       const image = await options.image(item);
       if (signal.aborted) return;
       if (!image) throw new Error("no image to read");
-      const { instructions, version } = captionPrompt();
       const reply = await writer!.caption({
         image,
-        instructions,
+        instructions: captionInstructions(),
         prompt: item.prompt,
         signal,
         writer: options.text(item.ownerId || ""),
       });
       if (signal.aborted) return;
-      options.save(item, {
-        text: reply.text,
-        tags: reply.tags,
-        model: reply.model,
-        at: new Date(now()).toISOString(),
-        version,
-      });
+      options.save(item, captionRecord(reply, now()));
     },
   });
 }

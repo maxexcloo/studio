@@ -6,7 +6,6 @@ import {
   closeTextEditor,
   create,
   editorMenu,
-  expandAssistantMenu,
   fixtures,
   image,
   openReferenceChoices,
@@ -242,7 +241,7 @@ test("Picking a character on an img2img model moves the composer to a model that
   const references = await openCharacters(page);
   await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
   await expect(
-    references.getByText(
+    page.getByText(
       "Switched to Keeper Fast, which keeps a character's face and build in new scenes.",
     ),
   ).toBeVisible();
@@ -454,24 +453,23 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   ).toBeVisible();
   // Name and Description each offer ideas written from the images; a pick has Undo.
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
-  const suggestName = async () => {
-    await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
-    await expect(page.getByRole("menuitem")).toHaveText(["Suggestions", "Custom…", "Refresh"]);
-    await expandAssistantMenu(page, "Suggestions");
-  };
-  const suggested = page.getByRole("group", { name: "Suggestions", exact: true });
+  const suggestName = () =>
+    editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
   await suggestName();
-  await expect(suggested.getByRole("menuitem")).toHaveText([
+  await expect(page.getByRole("menuitem")).toHaveText([
     "Ash",
     "Ivy",
     "Mara",
     "Rook",
     "Sloane",
     "Wren",
+    "Custom…",
+    "Refresh",
   ]);
   await page.getByRole("menuitem", { name: "Wren", exact: true }).click();
   await expect(name).toHaveValue("Wren");
-  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await suggestName();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(name).toHaveValue("");
   await suggestName();
   await page.getByRole("menuitem", { name: "Mara", exact: true }).click();
@@ -481,17 +479,18 @@ test("Use as Character starts a card from a gallery image in Library › Charact
       .getByRole("textbox", { name: "Description", exact: true })
       .getAttribute("inputmode")) === "none"
   )
-    await editorMenu(editor, "Description", "Suggestions");
+    await editorMenu(editor, "Description", "Custom…");
   else await promptMenu(editor, "Description");
-  await expandAssistantMenu(page, "Suggestions");
-  await expect(suggested.getByRole("menuitem")).toHaveText([
+  const described = [
     "freckled redhead, slim build",
     "green-eyed ranger",
     "red-haired ranger, green cloak",
     "scarred ranger",
     "tall ranger",
     "young ranger",
-  ]);
+  ];
+  for (const [index, idea] of described.entries())
+    await expect(page.getByRole("menu").getByRole("menuitem").nth(index)).toHaveText(idea);
   await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();
   await closeTextEditor(page, "Description");
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(

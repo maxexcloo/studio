@@ -62,7 +62,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   const confirm = page.getByRole("dialog", { name: "Delete Failed Items", exact: true });
   await expect(confirm).toContainText("Remove member@example.test's failed and cancelled items");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(danger.getByText("2 deleted.", { exact: true })).toBeVisible();
+  await expect(confirm).toBeHidden();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   // Each worker's status comes first, under the page's own title, one line each: what it runs, its
@@ -116,7 +116,7 @@ test("Gallery Captions in Settings › Studio catches up, shows its progress and
     return route.fulfill({ json: status });
   });
   await page.goto("/settings#studio");
-  const row = page.getByRole("region", { name: "Background AI", exact: true });
+  const row = page.getByRole("region", { name: "Catch Up", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
   await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
@@ -980,24 +980,24 @@ test("Administration Dream saves shared queue delays and hands an override back 
   await idle.fill("12");
   await idle.press("Enter");
   const images = page.getByRole("radiogroup", { name: "Dream Images", exact: true });
-  const spicy = page.getByRole("radiogroup", { name: "Dream Uncensored" });
+  const uncensored = page.getByRole("radiogroup", { name: "Dream Uncensored" });
   const choice = (group: typeof images, name: string) =>
     group.getByRole("radio", { name, exact: true });
   await expect(choice(images, "Per Account")).toBeChecked();
   await images.getByText("Cloud", { exact: true }).click();
-  await spicy.getByText("Off", { exact: true }).click();
+  await uncensored.getByText("Off", { exact: true }).click();
   await expect(choice(images, "Cloud")).toBeChecked();
   await page.reload();
   await expect(delay).toHaveValue("8");
   await expect(idle).toHaveValue("12");
   await expect(choice(images, "Cloud")).toBeChecked();
-  await expect(choice(spicy, "Off")).toBeChecked();
+  await expect(choice(uncensored, "Off")).toBeChecked();
   await expect(
     choice(page.getByRole("radiogroup", { name: "Dream Videos", exact: true }), "Per Account"),
   ).toBeChecked();
-  await spicy.getByText("Per Account", { exact: true }).click();
+  await uncensored.getByText("Per Account", { exact: true }).click();
   await page.reload();
-  await expect(choice(spicy, "Per Account")).toBeChecked();
+  await expect(choice(uncensored, "Per Account")).toBeChecked();
 });
 
 test("Settings › Studio saves and clears the default Text Profile", async ({ page }) => {

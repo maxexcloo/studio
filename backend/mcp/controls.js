@@ -20,8 +20,8 @@ import { upscaleQualities } from "../../shared/upscale.ts";
 import { strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
 
-/** Images per prompt a chat gets unless the user asks for a number (videos get one); the studio UI keeps its own default. */
-export const mcpGenerationCount = 2;
+/** Results per prompt a chat gets unless the user asks for a number or the account set a Default Count. */
+export const mcpGenerationCount = 1;
 /** Images one batch of a generate call queues: its prompts times count. */
 export const maxJobsPerCall = 10;
 /** Images one generate call may queue, in batches of maxJobsPerCall. */
@@ -91,7 +91,7 @@ export function mcpControls(profile) {
   controls.count = {
     min: 1,
     max: maxJobsPerCall,
-    default: profile.kind === "video" ? 1 : mcpGenerationCount,
+    default: profile.imagePreference?.imageCount ?? mcpGenerationCount,
     note: `prompts × count is at most ${maxSplitJobs} per call.`,
   };
   if (caps.seed !== false) controls.seed = { min: 0 };

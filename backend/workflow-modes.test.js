@@ -502,3 +502,19 @@ test("a FastH3 Radiance profile takes no LoRAs, and MCP generate refuses them", 
   const profile = { id: "fast", label: "FastH3", capabilities: { lora: false } };
   assert.throws(() => prepareLoras(profile, {}, [{ name: "ink" }]), /FastH3 takes no LoRAs/);
 });
+
+test("an optional first frame on the generating node itself leaves text-to-video intact", async () => {
+  const { selectImageMode } = await import("./workflow-modes.js");
+  const graph = {
+    1: { class_type: "RadianceVideoGenerate", inputs: { prompt: "", input_reference: "" } },
+    2: { class_type: "SaveVideo", inputs: { video: ["1", 0] } },
+  };
+  const workflow = {
+    kind: "video",
+    graph,
+    mediaInputs: [
+      { id: "start", required: false, min: 0, control: { node: "1", input: "input_reference" } },
+    ],
+  };
+  assert.deepEqual(selectImageMode(workflow, { referenceAssets: [] }).graph, graph);
+});

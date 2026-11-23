@@ -267,7 +267,6 @@
 /* The padding sits outside the text, so a phone summary clips at a whole line. */
 .prompt {
   padding-block: 7px;
-  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .prompt textarea {

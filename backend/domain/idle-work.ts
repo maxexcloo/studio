@@ -441,6 +441,26 @@ export function createIdleWork<Item extends IdleItem>(options: {
           });
       }
     },
+    /**
+     * The items this work would do now, claimed for another caller's run (domain/enrich.ts) so its
+     * own walks pass them by until `release`.
+     */
+    async take(items: Item[]) {
+      const taken: Item[] = [];
+      if (options.enabled() && !(await options.unavailable()))
+        for await (const item of eligible(false, items))
+          if (!inflight.has(key(item))) {
+            direct.add(key(item));
+            taken.push(item);
+          }
+      return {
+        items: taken,
+        release() {
+          for (const item of taken) direct.delete(key(item));
+          finished += 1;
+        },
+      };
+    },
     /** Other work was admitted: items in progress step aside at once. */
     interrupt() {
       for (const controller of inflight.values()) controller.abort();

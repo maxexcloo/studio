@@ -20,7 +20,7 @@ interface McpLink {
 export const mcpLinkKey = (audience: string, owner: string, target: string, index?: unknown) =>
   JSON.stringify([audience, owner, target, index ?? "page"]);
 
-export const linkKeyOf = (link: McpLink) => {
+const linkKeyOf = (link: McpLink) => {
   const { audience, owner, jobId, index, page, all, scope, sheet, gallery } = link;
   if (all) return mcpLinkKey(audience, owner, `refs:${scope}`, "all");
   if (sheet) return mcpLinkKey(audience, owner, `sheet:${JSON.stringify(sheet)}`, "sheet");
@@ -34,7 +34,7 @@ export const linkKeyOf = (link: McpLink) => {
  * short links (several ids may share a key), the request behind each job and the asset each upload
  * link's image became.
  */
-export const createMcpTables = `CREATE TABLE IF NOT EXISTS studio_mcp_jobs (job_id TEXT PRIMARY KEY, owner TEXT NOT NULL);
+const createMcpTables = `CREATE TABLE IF NOT EXISTS studio_mcp_jobs (job_id TEXT PRIMARY KEY, owner TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS studio_mcp_assets (asset_id TEXT NOT NULL, owner TEXT NOT NULL, PRIMARY KEY (asset_id, owner));
   CREATE TABLE IF NOT EXISTS studio_mcp_refs (scope TEXT NOT NULL, number INTEGER NOT NULL, job_id TEXT NOT NULL, PRIMARY KEY (scope, number));
   CREATE INDEX IF NOT EXISTS studio_mcp_refs_job ON studio_mcp_refs (scope, job_id);

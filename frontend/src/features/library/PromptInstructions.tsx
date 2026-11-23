@@ -4,11 +4,13 @@ import { type ReactNode, useState } from "react";
 
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
+import { librarySections } from "./LibraryNavigation";
 import { type PromptInstruction, promptInstructionsPath, promptInstructionsQuery } from "./queries";
 
 function InstructionEditor({
@@ -20,6 +22,7 @@ function InstructionEditor({
 }) {
   const client = useQueryClient();
   const phone = usePhone();
+  useReturnFocus();
   const [text, setText] = useState(instruction.text);
   const path = `${promptInstructionsPath}/${encodeURIComponent(instruction.id)}`;
   const history = useQuery({
@@ -111,23 +114,33 @@ function InstructionEditor({
   );
 }
 
-export function PromptInstructions({ heading }: { heading: ReactNode }) {
+export function PromptInstructions({
+  section,
+  heading,
+}: {
+  section: "promptInstructions" | "suggestionInstructions";
+  heading: ReactNode;
+}) {
+  const { label } = librarySections[section];
   const list = useQuery(promptInstructionsQuery);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState<string | null>(null);
   const [editing, setEditing] = useState<PromptInstruction | null>(null);
-  const instructions = list.data?.instructions ?? [];
+  const instructions = (list.data?.instructions ?? []).filter(
+    ({ suggestions }) => Boolean(suggestions) === (section === "suggestionInstructions"),
+  );
   const areas = [...new Set(instructions.map(({ area }) => area))].sort();
+  const phone = usePhone();
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
         <SectionToolbar
-          label="Prompt Instructions"
+          label={label}
           query={query}
           onQueryChange={setQuery}
           filters={
             <FilterChoices
-              label="Area"
+              label="Type"
               data={areas.map((value) => ({ value, label: value }))}
               value={area}
               onChange={setArea}
@@ -141,16 +154,29 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
         <Alert color="red">{list.error.message}</Alert>
       ) : (
         <DataTable
-          label="Prompt Instructions"
-          rows={instructions.filter((instruction) => !area || instruction.area === area)}
+          label={label}
+          // Sorted by name first, so the stable type sort leaves each type in name order.
+          rows={instructions
+            .filter((instruction) => !area || instruction.area === area)
+            .sort((a, b) => compareNames(a.label, b.label))}
           rowKey={({ id }) => id}
           rowName={({ label }) => label}
-          loading={list.isPending && "Loading Prompt Instructions"}
+          loading={list.isPending && `Loading ${label}`}
           query={query}
           searchText={({ label, area, text }) => [label, area, text]}
-          empty="No Prompt Instructions"
-          initialSort={{ key: "name", descending: false }}
+          empty={`No ${label}`}
+          initialSort={{ key: "type", descending: false }}
           columns={[
+            {
+              key: "type",
+              header: "Type",
+              sortValue: ({ area }) => area,
+              cell: ({ area }) => (
+                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                  {area}
+                </Text>
+              ),
+            },
             {
               key: "name",
               header: "Name",
@@ -159,7 +185,6 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
               cell: (instruction) => (
                 <TableRecord
                   name={instruction.label}
-                  detail={instruction.area}
                   openLabel={`Edit ${instruction.label}`}
                   onOpen={() => setEditing(instruction)}
                 />

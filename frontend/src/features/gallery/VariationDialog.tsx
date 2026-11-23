@@ -14,6 +14,7 @@ import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { useGroupFeature } from "../auth/AccountGate";
 import { charactersQuery } from "../characters/queries";
 import { showVariant } from "../compare/variants";
@@ -70,6 +71,7 @@ export function VariationDialog({
   onApplied?: () => void;
 }) {
   const id = useId();
+  useReturnFocus();
   const client = useQueryClient();
   const openComposer = useOpenComposer();
   const { draftForKind, models, profiles, setDraft } = useGeneration();

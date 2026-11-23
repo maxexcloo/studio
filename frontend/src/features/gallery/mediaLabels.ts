@@ -6,11 +6,16 @@ import { isProfile, profileName, shownProfileName } from "../generation/payload"
 /**
  * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the title
  * a chat gave it in its result set, else the text model's, else the prompt's first clause until
- * that is written.
+ * that is written; an upload without one shows its file name.
  */
-export function mediaTitle(item: Pick<MediaItem, "prompt" | "title" | "resultSet">) {
+export function mediaTitle(
+  item: Pick<MediaItem, "prompt" | "title" | "resultSet" | "uploaded" | "filename">,
+) {
   return (
-    item.resultSet?.variation || item.title || promptWords(item.prompt) || "Untitled Generation"
+    item.resultSet?.variation ||
+    item.title ||
+    promptWords(item.prompt) ||
+    (item.uploaded ? item.filename || "Upload" : "Untitled Generation")
   );
 }
 

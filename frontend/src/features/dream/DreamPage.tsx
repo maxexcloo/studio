@@ -23,7 +23,6 @@ import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
-import { TasteReflection } from "../taste/TasteReflection";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamAllocation } from "./DreamAllocation";
 import { DreamDeck, type Judgement } from "./DreamDeck";
@@ -272,10 +271,7 @@ export function DreamPage() {
                 onCloseCreate={() => setCreatingProject(false)}
               />
             ) : (
-              <>
-                <TasteProfile toolbar={tasteActions} />
-                <TasteReflection />
-              </>
+              <TasteProfile toolbar={tasteActions} />
             )}
           </Stack>
         </ScrollArea>

@@ -1,14 +1,16 @@
 import { Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import type { ImageInspection } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { UndoButton, proposedClass } from "../generation/AskChange";
+import { useReturnFocus } from "../../ui/useReturnFocus";
+import { proposalUndo } from "../generation/AskChange";
 import { changeSummary } from "../generation/changeSummary";
 import { inspectImage } from "../taste/suggestions";
 import { mediaSource } from "./mediaSource";
@@ -80,7 +82,9 @@ export function ReportIssueDialog({
   onQueued?: (jobId: string) => void;
   onClose: () => void;
 }) {
+  const id = useId();
   const phone = usePhone();
+  useReturnFocus();
   const fix = useReportIssue(item, onQueued, true);
   const [picked, setPicked] = useState<string[]>([]);
   const [details, setDetails] = useState("");
@@ -115,7 +119,14 @@ export function ReportIssueDialog({
   const canInspect = item.type === "image" && Boolean(item.jobId);
   const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
-    <Modal opened onClose={onClose} title="Report Issue" size="sm" fullScreen={phone}>
+    <Modal
+      id={id}
+      opened
+      onClose={closeWhenTop(id, onClose)}
+      title="Report Issue"
+      size="sm"
+      fullScreen={phone}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -145,27 +156,33 @@ export function ReportIssueDialog({
               canInspect
                 ? [
                     {
-                      id: "inspect",
+                      id: "assistant",
                       label: "Inspect Image",
                       icon: icons.assistant,
-                      disabled: inspect.isPending || fix.isPending,
-                      onClick: inspectImageIssue,
+                      heading: false,
+                      menu: [
+                        ...proposalUndo(
+                          current &&
+                            (() => {
+                              setDetails(current.before);
+                              setProposal(null);
+                            }),
+                        ),
+                        [
+                          {
+                            id: "inspect",
+                            label: "Inspect Image",
+                            icon: icons.assistant,
+                            disabled: inspect.isPending || fix.isPending,
+                            onClick: inspectImageIssue,
+                          },
+                        ],
+                      ],
                     },
                   ]
                 : []
             }
             busy={inspect.isPending ? "Inspecting Image…" : undefined}
-            className={current ? proposedClass : undefined}
-            send={
-              current && (
-                <UndoButton
-                  onClick={() => {
-                    setDetails(current.before);
-                    setProposal(null);
-                  }}
-                />
-              )
-            }
             below={
               current ? (
                 <Text size="xs" c="dimmed">

@@ -24,6 +24,7 @@ import { useMotionDuration } from "../../ui/Appearance";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 
 import classes from "./MaskEditor.module.css";
 
@@ -47,6 +48,7 @@ export default function MaskEditor({
   const [spaceHand, setSpaceHand] = useState(false);
   const duration = useMotionDuration();
   const phone = usePhone();
+  useReturnFocus();
   const [brush, setBrush] = useState(50);
   const [tool, setTool] = useState("paint");
   const [loading, setLoading] = useState(Boolean(initialMask));

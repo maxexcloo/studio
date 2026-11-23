@@ -96,7 +96,7 @@ export function galleryFiltersTest(filters = {}) {
 }
 
 /** An item's caption tags, lowercase as the captioner writes them. */
-export const captionTags = (item) =>
+const captionTags = (item) =>
   Array.isArray(item?.caption?.tags)
     ? item.caption.tags.filter((tag) => typeof tag === "string")
     : [];

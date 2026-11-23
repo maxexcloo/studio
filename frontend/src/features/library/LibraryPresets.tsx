@@ -1,4 +1,5 @@
 import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
@@ -45,7 +46,6 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
   const [deleting, setDeleting] = useState<Preset | "selected" | null>(null);
   const [selection, setSelection] = useState<Set<string> | null>(null);
   const selected = presets.records.filter(({ id }) => selection?.has(id));
-  const failed = bulkDelete.data?.failed ?? [];
   const [replacing, setReplacing] = useState<Preset | null>(null);
   const taken = presets.records.some(
     (preset) =>
@@ -122,11 +122,6 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
             onClick={() => setDeleting("selected")}
           />
         </SelectionBar>
-      )}
-      {failed.length > 0 && (
-        <Alert color="red" role="alert">
-          Couldn't delete {failed.length} {failed.length === 1 ? "preset" : "presets"}.
-        </Alert>
       )}
       {presets.error ? (
         <Alert color="red">{presets.error.message}</Alert>
@@ -268,6 +263,11 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               onSuccess: ({ failed }) => {
                 setSelection(failed.length ? new Set(failed.map(({ id }) => id)) : null);
                 setDeleting(null);
+                if (failed.length)
+                  notifications.show({
+                    color: "red",
+                    message: `Couldn't delete ${failed.length} ${failed.length === 1 ? "preset" : "presets"}.`,
+                  });
               },
             });
           } else if (deleting) {

@@ -19,6 +19,7 @@ import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
@@ -26,7 +27,6 @@ import { chipProps, iconChipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
-import { ChipPopup } from "../generation/Picker";
 
 import classes from "./GalleryFilters.module.css";
 
@@ -65,8 +65,8 @@ const dates: { value: GalleryDate; label: string; chip: string; days: number }[]
 ];
 
 /**
- * Every gallery filter: the facets (any value matches), a date range, Liked or Disliked, Uploads
- * and Comparisons.
+ * Every gallery filter: the facets (any value matches), a date range, Liked or Disliked and
+ * Uploads.
  */
 export interface GalleryFilterValues extends Record<Facet, string[]> {
   date: GalleryDate;
@@ -74,8 +74,6 @@ export interface GalleryFilterValues extends Record<Facet, string[]> {
   rating: Rating | "";
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
   uploads: boolean;
-  /** Only results in one of the account's comparisons. */
-  comparisons: boolean;
 }
 export const emptyGalleryFilters: GalleryFilterValues = {
   model: [],
@@ -87,7 +85,6 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   date: "",
   rating: "",
   uploads: false,
-  comparisons: false,
 };
 
 /** The gallery request's filter parameters. */
@@ -95,7 +92,6 @@ export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFi
   for (const key of facets) for (const value of filters[key]) params.append(key, value);
   if (filters.rating) params.set("rating", filters.rating);
   params.set("uploads", filters.uploads ? "1" : "0");
-  if (filters.comparisons) params.set("comparisons", "1");
   const date = dates.find((option) => option.value === filters.date);
   if (date?.value) {
     const since = new Date();
@@ -210,7 +206,7 @@ interface FilterProps {
 
 /**
  * The active filters as removable chips, one per value, plus any `extra` view choices. Liked and
- * Uploads have none: their own toggle or tab shows them.
+ * Uploads have none: their own toggle or view shows them.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
@@ -220,15 +216,6 @@ export function useActiveFilters(
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
-    ...(value.comparisons
-      ? [
-          {
-            key: "comparisons",
-            label: "Comparisons",
-            remove: () => onChange({ ...value, comparisons: false }),
-          },
-        ]
-      : []),
     ...(value.rating === "disliked"
       ? [{ key: "disliked", label: "Disliked", remove: () => onChange({ ...value, rating: "" }) }]
       : []),
@@ -318,7 +305,6 @@ function ChoiceChip({
         title={choice.label}
         floating
         position="bottom-start"
-        width="max-content"
         opened={opened}
         onOpenedChange={setOpened}
         onClear={chip.remove}
@@ -430,11 +416,6 @@ export function ShowToggles({
             }
           />
         ))}
-        <FilterToggle
-          label="Comparisons"
-          on={value.comparisons}
-          onToggle={() => onChange({ ...value, comparisons: !value.comparisons })}
-        />
         {onOriginalsOnly && (
           <FilterToggle
             label="Originals Only"

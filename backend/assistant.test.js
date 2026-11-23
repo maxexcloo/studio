@@ -484,7 +484,7 @@ test("Uncensored runs on the assistant model", async () => {
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
-  const result = await live.rewrite({ profile, prompt: "a couple", preset: "spicy" });
+  const result = await live.rewrite({ profile, prompt: "a couple", preset: "uncensored" });
   assert.equal(result.model, "cloud/vision", "a changed setting applies at once");
   assert.equal(seen.calls.at(-1).body.model, "cloud/vision");
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);
@@ -722,6 +722,52 @@ test("caption sends the image and reads the description and tags, or plain text 
     tags: [],
     model: "cloud/auto",
   });
+});
+
+test("enrich reads the image once for each task asked and keeps only usable answers", async () => {
+  const seen = fakeGateway(() =>
+    json(
+      JSON.stringify({
+        caption: { text: "A red barn at noon.", tags: ["Barn"] },
+        title: "Red Barn at Noon",
+        review: { score: 3, miss: "no sea" },
+        prompt: { prompt: "" },
+      }),
+    ),
+  );
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  const reply = await engine.enrich({
+    image: { mime: "image/jpeg", data: "AAAA" },
+    prompt: "Old red barn beside a field",
+    caption: true,
+    title: true,
+    brief: "Subjects: the sea",
+    describe: true,
+  });
+  assert.deepEqual(reply, {
+    model: "cloud/auto",
+    caption: { text: "A red barn at noon.", tags: ["barn"] },
+    title: "Red Barn at Noon",
+    review: { score: 3, miss: "no sea" },
+  });
+  assert.equal(seen.calls.length, 1);
+  const [system, user] = seen.calls[0].body.messages;
+  assert.match(system.content, /Task "caption":\n.*apparent age range/s);
+  assert.match(system.content, /Task "title":/);
+  assert.match(system.content, /Task "review":/);
+  assert.match(system.content, /Task "prompt":/);
+  assert.match(system.content, /"caption": \{"text".*"review": \{"score"/s);
+  assert.match(user.content[0].text, /Prompt: Old red barn.*Brief:\nSubjects: the sea/s);
+  assert.equal(user.content[1].type, "image_url");
+
+  const unusable = fakeGateway(() => json("{}"));
+  await assert.rejects(
+    createAssistant(gateway(), { fetchImpl: unusable.fetchImpl, log: quiet }).enrich({
+      image: { mime: "image/jpeg", data: "AAAA" },
+      caption: true,
+    }),
+    /unusable reply/,
+  );
 });
 
 test("idle work's captions run two at a time", async () => {

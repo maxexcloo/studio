@@ -117,18 +117,19 @@ const rateInstructions = (kind, count) =>
     criteria: promptInstruction(cardRatings[kind]),
   });
 // The calls idle work makes on its own, and how many of them run at once.
-const backgroundCalls = new Set(["caption", "review", "title"]);
+const backgroundCalls = new Set(["caption", "enrich", "review", "title"]);
 const backgroundSlots = 2;
 
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
-export const reasoningEfforts = {
+const reasoningEfforts = {
   animate: null,
   caption: "none",
   character: "none",
   "card-ideas": "none",
   describe: "none",
   dream: "none",
+  enrich: "none",
   guide: "none",
   loras: "none",
   negative: null,
@@ -410,6 +411,50 @@ const one = (value, limit = 600) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit);
+/** Describe's system prompt: from the picture (`vision`) or its description, for a profile or none. */
+const describeInstructions = ({
+  vision,
+  explicit = false,
+  profile = {},
+  guide = null,
+  profiles = [],
+  loras = [],
+}) =>
+  promptInstruction("describe-upload", {
+    source: vision
+      ? promptInstruction("describe-visible-upload")
+      : promptInstruction("describe-captioned-upload"),
+    guide: profile?.id
+      ? promptInstruction("describe-for-selected-model", {
+          media: profile.kind === "video" ? "video" : "image",
+          model: profile.label || profile.id,
+          guide: writerGuide(guide) || "(none)",
+        })
+      : promptInstruction("describe-without-model-guide"),
+    precedence: profile?.id ? precedence : "",
+    fidelity: fidelity(),
+    keepDescriptions: keepDescriptions(),
+    standalonePrompt: standalonePrompt(),
+    americanEnglish,
+    contentRule: contentRule(explicit),
+    avoidFiller: avoidFiller(),
+    availableProfiles: JSON.stringify(profiles.map((item) => item.id).slice(0, 40)),
+    availableLoRAs: JSON.stringify(loras.map((item) => item.name).slice(0, 40)),
+  });
+/** A caption reply (parsed JSON, else its raw text) as text cut to `captionCharacters` and tags; null without text. */
+function captionReply(parsed, raw = "") {
+  const text = one(typeof parsed?.text === "string" ? parsed.text : raw, captionCharacters);
+  if (!text) return null;
+  const tags = [
+    ...new Set(
+      (Array.isArray(parsed?.tags) ? parsed.tags : [])
+        .filter((tag) => typeof tag === "string")
+        .map((tag) => one(tag.toLowerCase(), 40))
+        .filter(Boolean),
+    ),
+  ].slice(0, captionTags);
+  return { text, tags };
+}
 const isRole = (info) => ["acceleration", "supporting"].includes(info?.role) || info?.hidden;
 
 /** A LoRA's suggested strength: the publisher's recommendation, a "Strength 0.7" note, else 1. */
@@ -1116,27 +1161,7 @@ export function createAssistant(
         model,
         reason: "Add an image to describe.",
       };
-    const system = promptInstruction("describe-upload", {
-      source: vision
-        ? promptInstruction("describe-visible-upload")
-        : promptInstruction("describe-captioned-upload"),
-      guide: profile?.id
-        ? promptInstruction("describe-for-selected-model", {
-            media: profile.kind === "video" ? "video" : "image",
-            model: profile.label || profile.id,
-            guide: writerGuide(guide) || "(none)",
-          })
-        : promptInstruction("describe-without-model-guide"),
-      precedence: profile?.id ? precedence : "",
-      fidelity: fidelity(),
-      keepDescriptions: keepDescriptions(),
-      standalonePrompt: standalonePrompt(),
-      americanEnglish,
-      contentRule: contentRule(explicit),
-      avoidFiller: avoidFiller(),
-      availableProfiles: JSON.stringify(profiles.map((item) => item.id).slice(0, 40)),
-      availableLoRAs: JSON.stringify(loras.map((item) => item.name).slice(0, 40)),
-    });
+    const system = describeInstructions({ vision, explicit, profile, guide, profiles, loras });
     try {
       const text = [
         vision ? "Describe this image." : `Description: ${one(hint, 2000)}`,
@@ -1207,21 +1232,9 @@ Prompt: ${context}`
       temperature: 0.2,
       signal,
     });
-    const parsed = replyJson(reply.text);
-    const text = one(
-      typeof parsed?.text === "string" ? parsed.text : reply.text,
-      captionCharacters,
-    );
-    if (!text) throw new AssistantError("unusable reply");
-    const tags = [
-      ...new Set(
-        (Array.isArray(parsed?.tags) ? parsed.tags : [])
-          .filter((tag) => typeof tag === "string")
-          .map((tag) => one(tag.toLowerCase(), 40))
-          .filter(Boolean),
-      ),
-    ].slice(0, captionTags);
-    return { text, tags, model };
+    const read = captionReply(replyJson(reply.text), reply.text);
+    if (!read) throw new AssistantError("unusable reply");
+    return { ...read, model };
   }
 
   /**
@@ -1243,6 +1256,90 @@ Prompt: ${context}`
     const review = reviewReply(replyJson(reply.text) || {});
     if (!review) throw new AssistantError("unusable reply");
     return { ...review, model };
+  }
+
+  /**
+   * One read of a finished image for every gallery task it still needs (domain/enrich.ts): its
+   * caption, a title from its `prompt`, a review against `brief` and a suggested `prompt` for one
+   * without its own (`describe`), each by its own instructions. Answers the tasks whose replies were
+   * usable; throws AssistantError when none was. The caller checks the model reads images.
+   */
+  async function enrich({
+    image,
+    prompt = "",
+    caption = false,
+    title = false,
+    brief = "",
+    describe = false,
+    sourceTitle = "",
+    explicit = false,
+    signal,
+    writer,
+  } = {}) {
+    const tasks = [
+      caption && ["caption", captionInstructions(), '{"text": "...", "tags": ["..."]}'],
+      title && prompt && ["title", titleInstructions(), '"..."'],
+      brief && ["review", reviewInstructions(), '{"score": 7, "miss": ""}'],
+      describe && [
+        "prompt",
+        describeInstructions({ vision: true, explicit }),
+        '{"prompt": "...", "negative": "", "profile": "", "loras": []}',
+      ],
+    ].filter(Boolean);
+    const model = await modelFor("enrich", explicit && Boolean(brief || describe), writer);
+    const context = one(prompt, maxPromptCharacters);
+    const reply = await chat({
+      call: "enrich",
+      model,
+      messages: [
+        {
+          role: "system",
+          content: promptInstruction("enrich-gallery", {
+            tasks: tasks.map(([key, text]) => `Task "${key}":\n${text}`).join("\n\n"),
+            shape: `{${tasks.map(([key, , shape]) => `"${key}": ${shape}`).join(", ")}}`,
+          }),
+        },
+        {
+          role: "user",
+          content: userContent(
+            [
+              context && `Prompt: ${context}`,
+              brief && `Brief:\n${brief}`,
+              describe && sourceTitle && `It was posted with the title: ${one(sourceTitle, 300)}`,
+              "Do each task for this image.",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            [image],
+            true,
+          ),
+        },
+      ],
+      temperature: 0.2,
+      signal,
+    });
+    const parsed = replyJson(reply.text) || {};
+    const read = { model };
+    if (caption) {
+      const value = captionReply(parsed.caption);
+      if (value) read.caption = value;
+    }
+    if (title && prompt) {
+      const value = typeof parsed.title === "string" && replyTitle(parsed.title);
+      if (value) read.title = value;
+    }
+    if (brief) {
+      const value = parsed.review && reviewReply(parsed.review);
+      if (value) read.review = value;
+    }
+    if (describe) {
+      const written = cleanPrompt(
+        typeof parsed.prompt?.prompt === "string" ? parsed.prompt.prompt : "",
+      );
+      if (written && !minorAgeRefusal(written)) read.prompt = written;
+    }
+    if (Object.keys(read).length === 1) throw new AssistantError("unusable reply");
+    return read;
   }
 
   /**
@@ -1478,6 +1575,7 @@ Prompt: ${context}`
     matchLoras,
     describe,
     caption,
+    enrich,
     review,
     character,
     cardIdeas,

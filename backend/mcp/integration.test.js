@@ -1225,8 +1225,8 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   assert.deepEqual(detail.controls.cfg, { min: 0, max: 20, default: 0 });
   assert.deepEqual(detail.controls.sampler.options, ["euler", "dpmpp_2m"]);
   assert.equal(detail.controls.scheduler, undefined, "a single scheduler is fixed");
-  assert.equal(detail.defaults.count, 2);
-  assert.equal(detail.controls.count.default, 2);
+  assert.equal(detail.defaults.count, 1);
+  assert.equal(detail.controls.count.default, 1);
   assert.equal(detail.prompting, undefined);
   await failure(client, "models", { profile_id: "another-studio-profile" });
   // A guessed id or a label finds the profile; a miss names the closest profiles in one reply.
@@ -1321,6 +1321,25 @@ test("Models and Generate follow the run's backend: its sizes, reference limit a
   assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [2048, 1152]);
 });
 
+test("Generate says a plain img2img reference sets the size", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([{ ...structuredClone(imageProfile), family: "sdxl" }]);
+  const client = await f.client();
+  const asset = data(await call(client, "upload", { content_base64: png.toString("base64") })).asset
+    .id;
+  const reply = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A fox"],
+    count: 1,
+    reference_asset_ids: [asset],
+  });
+  assert.match(texts(reply), /Its reference sets the size, so it won't draw \d+×\d+\./);
+  assert.doesNotMatch(
+    texts(await call(client, "generate", { profile_id: imageProfile.id, prompts: ["A fox"] })),
+    /reference sets the size/,
+  );
+});
+
 test("Generate attaches a compact guide once per account unless it read the selected profile's whole guide, not its gist, discovery or another profile", async (t) => {
   const f = await fixture(t);
   await f.profiles([
@@ -1330,6 +1349,8 @@ test("Generate attaches a compact guide once per account unless it read the sele
         id: "fixture-guide",
         summary: "Subject first",
         rules: ["Describe the subject first"],
+        pitfalls: ["Stacked adjectives blur"],
+        example: "A lighthouse at dusk",
         sources: ["https://example.test/guide"],
       },
     },
@@ -1563,7 +1584,7 @@ test("a prompt holding generation instructions is refused with the count to pass
   assert.equal(f.submitted.at(-1).prompt, "Create two cats on a sofa");
 });
 
-test("omitted counts queue two images as one batch or one video job; a count is one image batch, or a job per video", async (t) => {
+test("omitted counts queue one image or video job; a count is one image batch, or a job per video", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   for (const profile of [imageProfile, videoProfile]) {
@@ -1574,7 +1595,7 @@ test("omitted counts queue two images as one batch or one video job; a count is 
     assert.equal(result.jobs.length, 1);
     assert.deepEqual(
       f.submitted.slice(-1).map((body) => [body.kind, body.count]),
-      [[profile.kind, profile.kind === "image" ? 2 : 1]],
+      [[profile.kind, 1]],
     );
     const pair = await generate(client, { profile_id: profile.id, count: 2 });
     const batched = profile.kind === "image";
@@ -2344,7 +2365,9 @@ test("Result reads current per-output user feedback for single, all and set requ
       ),
       feedback,
     );
-    assert.deepEqual(JSON.parse(/Recorded user feedback: (.+)/.exec(texts(reply))[1]), feedback);
+    const rated = feedback.filter(({ rating }) => rating !== "unrated");
+    const recorded = /Recorded user feedback: (.+)/.exec(texts(reply));
+    assert.deepEqual(recorded && JSON.parse(recorded[1]), rated.length ? rated : null);
     assert.equal(
       f.requests.slice(before).filter((item) => item.path === `/gallery/jobs/${id}`).length,
       1,
@@ -4310,7 +4333,7 @@ test("Result returns recorded feedback and markdown, never a settings record", a
   assert.equal(lean.content.length, 1);
   assert.match(
     lean.content[0].text,
-    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\[Open in Studio\]\([^)]+\) .*\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /^#1 is ready\. .+\n\n\[Open in Studio\]\([^)]+\) .*\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
   const { links, outputs, ...details } = lean.structuredContent;
   assert.deepEqual(details, { job_id: id, ref: "#1", link: queued.link, status: "done" });
@@ -4656,7 +4679,7 @@ test("Search finds the account's own finished work through the gallery search, a
     settings: {
       prompt: "Red waves rolling in",
       profileId: videoProfile.id,
-      modelName: "Fixture Video",
+      modelName: "fixture-video.safetensors",
       loras: [{ name: "styles/fixture-effect.safetensors", strength: 0.8 }],
     },
   });
@@ -4681,7 +4704,7 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.match(texts(result), /^4 of 6 matches, newest first\./);
   assert.match(
     texts(result),
-    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · fixture-image$/m,
+    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · Fixture Image$/m,
   );
   assert.match(texts(result), /\[#1\]\([^)]+\) · .*A red heron/);
   // The images come as one contact sheet, drawn when opened.
@@ -5458,7 +5481,10 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
   assert.match(generate.description, /at most 30 images per call\./);
-  assert.match(generate.inputSchema.properties.count.description, /default 2 for one image prompt/);
+  assert.match(
+    generate.inputSchema.properties.count.description,
+    /default 1, or the account's default/,
+  );
   assert.equal(f.submitted.length, 7);
 });
 
@@ -5572,7 +5598,7 @@ test("a Generate count is one batched job where the profile batches, else a job 
   assert.equal(f.submitted.length, 19);
 });
 
-test("each conversation gets a profile guide once, whole, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
+test("each conversation gets a profile guide once, every rule of it, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
   const f = await fixture(t);
   const long = {
     id: "long-guide",
@@ -5596,7 +5622,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   );
   const guided = replies.filter((reply) => guideOf(reply));
   assert.equal(guided.length, 1, "concurrent calls attach the guide once");
-  assert.match(guideOf(guided[0]), /Rule 40 explains/, "the whole guide, not a gist");
+  assert.match(guideOf(guided[0]), /Rule 40 explains/, "every rule, not a gist");
   assert.equal(texts(guided[0]).includes("example.test/guide"), false);
   for (const reply of replies.filter((reply) => !guideOf(reply)))
     assert.ok(texts(reply).length < 570, `${texts(reply).length} characters`);
@@ -5814,7 +5840,7 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
   // The account's Settings size starts a run the chat sized no further, as in the composer.
   await f.profiles(
-    [{ ...native, imageSizePreference: { imageAspect: "16:9", imageResolution: "2K" } }],
+    [{ ...native, imagePreference: { imageAspect: "16:9", imageResolution: "2K" } }],
     { defaults: { image: "native", video: videoProfile.id } },
   );
   assert.deepEqual(await size({}), [2048, 1152]);
@@ -5910,7 +5936,7 @@ test("ordinary MCP generation follows the configured default and keeps exact pro
     const { profileId, count, loras, width, height } = f.submitted.at(-1);
     return { profileId, count, loras, size: [width, height] };
   };
-  const vague = { profileId: quality.id, count: 2, loras: [], size: [1024, 1024] };
+  const vague = { profileId: quality.id, count: 1, loras: [], size: [1024, 1024] };
   assert.deepEqual(await run({}), vague);
   assert.deepEqual(await run({ profile_id: quality.id }), vague);
   assert.equal((await run({ profile_id: fast.id })).profileId, fast.id);
@@ -5920,7 +5946,7 @@ test("ordinary MCP generation follows the configured default and keeps exact pro
     quality.id,
   );
   assert.equal((await run({ tier: "quality" })).profileId, quality.id);
-  assert.equal((await run({ count: 1 })).count, 1);
+  assert.equal((await run({ count: 2 })).count, 2);
 });
 
 test("chat links open the exact result, set, turn or cumulative media view", async (t) => {
@@ -7551,7 +7577,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
           status: "waiting",
           settings: { enabled: true },
           today: { images: 1 },
-          spicyAvailable: false,
+          uncensoredAvailable: false,
           unseen: [
             {
               id: "dream-item",
@@ -7820,6 +7846,21 @@ test("Models tells a chat when a profile does best without LoRAs", async (t) => 
   assert.match(details.loras_note, /does best without LoRAs: add one only when the user names it/);
 });
 
+test("a set's note offers only the image names the set has", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  await call(client, "models", { profile_id: imageProfile.id });
+  const generated = (args) =>
+    call(client, "generate", { profile_id: imageProfile.id, ...args }).then(texts);
+  const one = await generated({ prompts: ["A red barn"], count: 1 });
+  assert.match(one, /Set 1\. /);
+  assert.doesNotMatch(one, /"set 1 /);
+  assert.match(
+    await generated({ prompts: ["A blue barn", "A green barn"], count: 2 }),
+    /Set 2 \("set 2 B": second image; "set 2 2b": item 2, image b\)\. /,
+  );
+});
+
 test("a generate call is a set its ref reruns, reviews, shows and rates, wholly or by item and letter", async (t) => {
   const f = await fixture(t);
   f.app.post("/api/gallery/favorite", (_req, res) => res.json({ ok: true }));
@@ -7844,7 +7885,9 @@ test("a generate call is a set its ref reruns, reviews, shows and rates, wholly 
       outputs: [0, 1].map((index) => ({ url: `/comfy/view?filename=${job.id}-${index}.png` })),
     });
   assert.equal(reviewed(await call(client, "review", { job_id: "set 1" })).length, 4);
-  assert.match(texts(await call(client, "result", { job_id: "set 1" })), /\*\*#1–#4\*\*/);
+  const shown = texts(await call(client, "result", { job_id: "set 1" }));
+  assert.match(shown, /\*\*#1–#4\*\*/);
+  assert.match(shown, /^4 results are ready\./m);
   // "set 1 2b" is the second item's second image.
   assert.equal(
     (await call(client, "gallery", { action: "like", results: ["set 1 2b"] })).isError,

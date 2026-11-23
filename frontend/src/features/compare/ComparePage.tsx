@@ -10,12 +10,12 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
-import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
@@ -30,8 +30,8 @@ import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
-import type { GalleryState } from "../gallery/viewerLink";
-import { type Comparison, comparisonQuery } from "./queries";
+import { type GalleryState, galleryViewPath } from "../gallery/viewerLink";
+import { type Comparison, comparisonQuery, comparisonTitle, comparisonsQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
@@ -64,13 +64,18 @@ export function ComparePage() {
     },
     onSuccess: ({ proposal, ...result }) => {
       client.setQueryData(comparisonQuery(id).queryKey, result);
-      if (proposal) void client.invalidateQueries({ queryKey: inboxQuery.queryKey });
+      if (!proposal) return;
+      void client.invalidateQueries({ queryKey: inboxQuery.queryKey });
+      notifications.show({ message: `Proposed for ${proposal.name}'s brief in Dream's Inbox` });
     },
     onSettled: () =>
       Promise.all(
-        [["comparison", id], galleryKey, ["gallery-filters"]].map((queryKey) =>
-          client.invalidateQueries({ queryKey }),
-        ),
+        [
+          comparisonQuery(id).queryKey,
+          comparisonsQuery.queryKey,
+          galleryKey,
+          ["gallery-filters"],
+        ].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
@@ -79,7 +84,8 @@ export function ComparePage() {
   const pick = useRef<(index: number) => void>(undefined);
   pick.current = (index) => {
     const item = comparison.data?.variants[index]?.item;
-    if (item?.status === "done" && !choose.isPending) choose.mutate(item);
+    if (item?.status === "done" && !comparison.data?.dream && !choose.isPending)
+      choose.mutate(item);
   };
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -101,7 +107,7 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, seed, prompt, negative, set, axis } = comparison.data;
+  const { variants, seed, prompt, negative, set, axis, dream } = comparison.data;
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   // Compare Again brings back every finished variant, the winner first.
   const again = items
@@ -116,31 +122,26 @@ export function ComparePage() {
     <Stack gap="md" className={classes.page}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
-          <Tooltip label={set ? "Show in Gallery" : "Back to Images"}>
+          <Tooltip label={set ? "Show in Gallery" : "Back to Comparisons"}>
             <ActionIcon
               component={Link}
-              to="/images"
+              to={set ? "/images" : galleryViewPath("image", "comparisons")}
               state={set ? ({ set } satisfies GalleryState) : undefined}
               variant="subtle"
               color="gray"
-              aria-label={set ? "Show in Gallery" : "Back to Images"}
+              aria-label={set ? "Show in Gallery" : "Back to Comparisons"}
             >
               <ArrowLeft size={18} />
             </ActionIcon>
           </Tooltip>
           <Title order={1} size="h3">
-            {axis ? `Which ${titleCase(axis)}?` : "Compare"}
+            {comparisonTitle({ axis, dream })}
           </Title>
         </Group>
         <Text size="sm" c="dimmed" ta="right">
           {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
         </Text>
       </Group>
-      {choose.data?.proposal && (
-        <Text role="status" size="sm" c="dimmed">
-          Proposed for {choose.data.proposal.name}'s brief in Dream's Inbox
-        </Text>
-      )}
       {(prompt || negative) && (
         <Stack gap={4}>
           {prompt && (
@@ -185,7 +186,9 @@ export function ComparePage() {
                   onOpen={() => item.status === "done" && setOpen(item)}
                   onTryAgain={(failed) => tryAgain([failed.jobId || ""]).then(() => undefined)}
                   actions={
-                    item.status === "done" && (
+                    // Dream's answer stands: its kept side is the winner.
+                    item.status === "done" &&
+                    !dream && (
                       <Tooltip label={won ? "Clear Winner" : "Pick as Winner"}>
                         <ActionIcon
                           className={classes.winner}

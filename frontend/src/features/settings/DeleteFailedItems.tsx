@@ -34,8 +34,7 @@ export function DeleteFailedItems() {
       ? "every account's"
       : `${owners.find((entry) => entry.value === owner)?.label}'s`;
   const remove = useMutation({
-    mutationFn: () =>
-      post<{ cleared: number }>("/api/gallery/errors/clear", multiUser ? { owner } : undefined),
+    mutationFn: () => post("/api/gallery/errors/clear", multiUser ? { owner } : undefined),
     onSuccess: () => {
       for (const queryKey of [galleryKey, ["gallery-filters"], queueQuery.queryKey])
         void client.invalidateQueries({ queryKey });
@@ -47,11 +46,9 @@ export function DeleteFailedItems() {
       wide={multiUser}
       label="Delete Failed Items"
       description={
-        remove.data
-          ? `${remove.data.cleared.toLocaleString()} deleted.`
-          : multiUser
-            ? "Remove failed and cancelled items from one account's gallery, or every account's."
-            : "Remove failed and cancelled items from the gallery."
+        multiUser
+          ? "Remove failed and cancelled items from one account's gallery, or every account's."
+          : "Remove failed and cancelled items from the gallery."
       }
     >
       {multiUser && (

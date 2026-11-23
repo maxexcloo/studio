@@ -17,6 +17,7 @@ import {
   saveCurrent,
   showLoraStack,
   stamp,
+  undoProposal,
   withSettings,
 } from "./fixtures";
 // A single style is named Improve Prompt too.
@@ -199,10 +200,9 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await finishTyping(page);
   const negativeMenu = await promptMenu(page, "Negative Prompt");
   await expect(
-    negativeMenu.getByRole("menuitem", { name: "Suggestions", exact: true }),
+    negativeMenu.getByRole("menuitem", { name: "Loading…", exact: true }),
   ).toBeDisabled();
   releaseNegative();
-  await expandAssistantMenu(negativeMenu, "Suggestions");
   const suggestion = negativeMenu.getByRole("menuitem", { name: "poor quality", exact: true });
   await expect(suggestion).toBeVisible();
   await expect(negative).toHaveValue("");
@@ -424,7 +424,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   };
   expect(asked).toEqual([suggestionsAsked, night]);
   // Undo restores the draft; Custom… keeps the request for the next time.
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("A castle at noon");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toBeHidden();
   await assist(page, "Custom…");
@@ -434,8 +434,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   // A suggestion fits the draft as it was before the proposal, reusing the menu's answer, and asks
   // at once.
   await assist(page, "Custom…");
-  const change = await promptMenu(dialog, "Change");
-  await expandAssistantMenu(change, "Suggestions");
+  await promptMenu(dialog, "Change");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => asked.length).toBe(4);

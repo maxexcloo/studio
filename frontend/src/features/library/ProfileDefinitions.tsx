@@ -321,8 +321,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 label="Download All"
                 icon={icons.download}
                 href="/api/profiles/export"
-                variant="subtle"
-                color="gray"
+                iconOnly
               />
               <ToolbarAction
                 label="Import Workflow"

@@ -1,7 +1,7 @@
 .counted {
   width: auto;
-  gap: 6px;
-  padding-inline: 4px;
+  gap: 8px;
+  padding-inline: 8px;
 }
 
 .progress {
@@ -9,6 +9,7 @@
   font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
 }
 .content {
@@ -45,7 +46,7 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  min-height: var(--studio-panel-min-height);
+  min-height: min(calc(4 * var(--studio-panel-min-height)), 60dvh);
   max-height: min(60dvh, 32rem);
 }
 /* An administrator's summary opens Settings › Workers. */

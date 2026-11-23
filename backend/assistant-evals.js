@@ -71,7 +71,7 @@ const tones = {
   ],
   photographic: ["photograph", "lens", "mm", "macro", "wide-angle", "aperture", "f/"],
   portrait: ["portrait", "close-up", "face", "expression", "eyes", "lens", "depth of field"],
-  spicy: ["sensual", "sultry", "bare", "intimate", "lingerie", "seductive", "skin"],
+  uncensored: ["sensual", "sultry", "bare", "intimate", "lingerie", "seductive", "skin"],
 };
 
 /** Scores one rewrite: a list of named checks, each passed or not. */

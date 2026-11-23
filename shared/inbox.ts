@@ -6,7 +6,7 @@ import type { ProjectBrief, ProjectContent } from "./projects.ts";
  * rule, a project's pacing (pause it, give it more turns, or vary results that look alike) or a
  * card. Recurring named card context can be saved automatically, with Undo.
  */
-export const proposalKinds = ["project", "brief", "rule", "pacing", "card"] as const;
+const proposalKinds = ["project", "brief", "rule", "pacing", "card"] as const;
 export type ProposalKind = (typeof proposalKinds)[number];
 /** What Accept applies; Edit then Accept sends its own. */
 export interface ProposalChange {

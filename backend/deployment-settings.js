@@ -101,18 +101,26 @@ const known = new Set([
   ...catalogueFlags.map((item) => item.key),
 ]);
 
-// Keys Studio no longer saves are dropped as the document is read. Reading alone never creates a
-// database (tests import this without a data folder).
-const saved = Object.fromEntries(
-  Object.entries(savedDocument(dataDir, documentName) ?? {}).filter(([key]) => known.has(key)),
-);
-// Saved values fill in what the environment leaves unset; the environment always wins.
+let saved = {};
 const applied = new Set();
-for (const [key, value] of Object.entries(saved)) {
-  if (process.env[key]) continue;
-  process.env[key] = value;
-  applied.add(key);
+
+/** Reads the saved settings again, as after migrate-runtime renames one. */
+export function reloadDeploymentSettings() {
+  for (const key of applied) delete process.env[key];
+  applied.clear();
+  // Keys Studio no longer saves are dropped as the document is read. Reading alone never creates
+  // a database (tests import this without a data folder).
+  saved = Object.fromEntries(
+    Object.entries(savedDocument(dataDir, documentName) ?? {}).filter(([key]) => known.has(key)),
+  );
+  // Saved values fill in what the environment leaves unset; the environment always wins.
+  for (const [key, value] of Object.entries(saved)) {
+    if (process.env[key]) continue;
+    process.env[key] = value;
+    applied.add(key);
+  }
 }
+reloadDeploymentSettings();
 
 const flagOn = (item) => (process.env[item.key] ? process.env[item.key] !== "0" : item.defaultOn);
 

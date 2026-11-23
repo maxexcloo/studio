@@ -69,11 +69,12 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("living"), /keeps rolling as if the photo were a candid video/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
   assert.match(theme("atmosphere"), /hold the opening composition.*surroundings move/);
-  assert.match(theme("body-bounce"), /impact first, then a small delayed bounce.*quick settle/);
-  assert.match(theme("hip-sway"), /supporting foot take weight.*hips sway/);
   assert.match(theme("dialogue"), /one brief line and leave time for a visible reaction/);
   assert.match(theme("reaction"), /gaze, ears or posture.*readable final pose/);
-  assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it must be 18 or older/);
+  assert.match(
+    theme("uncensored"),
+    /already in the frame[\s\S]*Every person in it must be 18 or older/,
+  );
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
 });
 
@@ -168,14 +169,14 @@ test("Animate is admitted only for known themes, with restricted themes behind U
   assert.equal(issue({}, { theme: "dialogue" }), undefined);
   assert.equal(issue({}, { theme: "dance" }), 400);
   assert.equal(issue({}, { theme: "custom" }), 400);
-  for (const theme of ["spicy", "body-bounce", "hip-sway"]) {
+  for (const theme of ["uncensored"]) {
     assert.equal(issue({}, { theme }), 403);
     assert.equal(issue({ uncensoredModels: true }, { theme }), undefined);
   }
   assert.equal(issue({ promptAssistant: false }, { theme: "cinematic" }), 403);
   // Dream's Uncensored needs it too.
   const dream = (features) =>
-    writingIssue(writingRequest({ kind: "dream", spicy: true }), {
+    writingIssue(writingRequest({ kind: "dream", uncensored: true }), {
       engine,
       account: user(features),
     });
@@ -235,13 +236,13 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     calls[0].messages[1].content,
     /Story context.*series Aviary; notes: The bird was rescued from a storm\./,
   );
-  const spicy = await writeAnimatePrompt({
+  const uncensored = await writeAnimatePrompt({
     engine,
     profile: video,
     guide: null,
-    writing: { theme: "spicy" },
+    writing: { theme: "uncensored" },
   });
-  assert.equal(spicy.model, "local/animate");
+  assert.equal(uncensored.model, "local/animate");
   await assert.rejects(
     writeAnimatePrompt({
       engine: { ...engine, chat: async () => ({ text: "", thinking: "Out of tokens." }) },

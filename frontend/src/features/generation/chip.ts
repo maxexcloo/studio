@@ -1,6 +1,4 @@
-import type { KeyboardEvent, PointerEvent } from "react";
-
-import { popupMiddlewares } from "../../theme";
+import type { PointerEvent } from "react";
 
 import classes from "./GenerationInputControls.module.css";
 
@@ -22,29 +20,3 @@ export const iconChipProps = {
   ...chipProps,
   className: `${classes.chip} ${classes.iconChip}`,
 } as const;
-
-/**
- * A chip's floating popup fits the screen and scrolls inside when it is taller (a phone held
- * sideways, or a chip high in a dialog). It shifts only along its trigger, never over it.
- */
-export const fittedPopup = {
-  middlewares: { ...popupMiddlewares, shift: { padding: 12 }, size: { padding: 12 } },
-  classNames: { dropdown: classes.fitted },
-};
-
-/** Nested pickers, menus, open comboboxes and keyboard drags inside a panel handle their own Escape. */
-const nestedLayers =
-  '.mantine-Popover-dropdown, [role="menu"], [role="dialog"], [aria-haspopup][aria-expanded="true"]';
-
-/**
- * A chip panel's Escape: closes the panel only when no nested layer, such as a chip popup opened
- * inside it (the picker's Filters), took the key.
- */
-export function escapePanel(event: KeyboardEvent<HTMLElement>, close: () => void) {
-  if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
-  const layer = (event.target as Element).closest(nestedLayers);
-  if (layer && layer !== event.currentTarget) return;
-  event.preventDefault();
-  event.stopPropagation();
-  close();
-}

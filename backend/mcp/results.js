@@ -15,7 +15,7 @@ const date = z
     const day = new Date(`${value}T00:00:00.000Z`);
     return Number.isFinite(day.getTime()) && day.toISOString().startsWith(`${value}T`);
   }, "Use a valid calendar date");
-export const job = {
+const job = {
   job_id: z.string().min(1).max(200).describe('A ref such as "result 3", or a job_id.'),
 };
 export const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
@@ -211,6 +211,7 @@ export function registerResultTools({
         rating: item.rating || "unrated",
         ...(item.resultSet?.caption ? { caption: item.resultSet.caption } : {}),
       }));
+      const modelOf = await media.itemModels(owner);
       // A line each: its ref, then a gist; Details and the link keep the whole prompt.
       const lines = hits.map((item, position) => {
         const { ref, link } = results[position];
@@ -218,7 +219,7 @@ export function registerResultTools({
           `- [${ref}](${link})${item.rating === "liked" ? " ♥" : ""}`,
           `user feedback: ${item.rating || "unrated"}`,
           shortPrompt(item.resultSet?.caption || item.title || item.prompt || "", 80),
-          item.settings?.modelName || item.model || item.settings?.profileId,
+          modelOf(item),
           String(item.createdAt || "").slice(0, 10),
         ]
           .filter(Boolean)

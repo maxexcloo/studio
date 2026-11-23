@@ -22,6 +22,7 @@ import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { modelFamilyLabel } from "../generation/modelFamily";
@@ -270,6 +271,7 @@ export function CatalogueEditor({
   close: () => void;
 }) {
   const phone = usePhone();
+  useReturnFocus();
   return (
     <Modal
       opened

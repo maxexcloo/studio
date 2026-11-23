@@ -1,6 +1,6 @@
 import { appearanceChoices } from "../shared/appearance.ts";
 import { defaultModelKeys } from "../shared/profiles.ts";
-import { imageAspects, resolutions } from "../shared/resolution.ts";
+import { imageAspects, maxImageCount, resolutions } from "../shared/resolution.ts";
 import { dataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
@@ -16,8 +16,9 @@ import {
  * `<kind>Cloud` and `<kind>Local` its default model on each side: an image or video profile ID, or
  * a gateway text model. Unsaved, a default is the deployment's (model/catalogue.js,
  * animate-profile.js, assistant.js). A side that can't run gives way to the other, saying so; a
- * model the person picks always wins. `galleryWork` is which unfinished work the gallery shows:
- * none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
+ * model the person picks always wins. `imageAspect`, `imageCount` and `imageResolution` start new
+ * image drafts and MCP runs that name none (model/catalogue.js). `galleryWork` is which unfinished
+ * work the gallery shows: none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
  */
 const preferenceDefaults = Object.freeze({
@@ -41,6 +42,7 @@ const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
   Object.hasOwn(imageSizeChoices, key) ||
+  key === "imageCount" ||
   modelKeys.has(key) ||
   key === "appearance";
 const cache = new Map();
@@ -64,7 +66,7 @@ export const defaultTextSide = (environment = process.env) =>
   environment[defaultTextProfileKey]?.startsWith("local/") ? "local" : "cloud";
 
 /** Where a kind runs if an account has not chosen a side. */
-export function sideOf(preferences, kind) {
+function sideOf(preferences, kind) {
   return preferences[kind] || (kind === "text" ? defaultTextSide() : "local");
 }
 
@@ -88,6 +90,11 @@ export function saveAccountPreferences(ownerId, patch) {
     if (Object.hasOwn(imageSizeChoices, key)) {
       if (value !== null && !imageSizeChoices[key].includes(value))
         throw new Error(`Set ${key} to ${imageSizeChoices[key].join(", ")}.`);
+      continue;
+    }
+    if (key === "imageCount") {
+      if (value !== null && !(Number.isInteger(value) && value >= 1 && value <= maxImageCount))
+        throw new Error(`Set imageCount to a whole number from 1 to ${maxImageCount}.`);
       continue;
     }
     const choices = preferenceChoices[key];

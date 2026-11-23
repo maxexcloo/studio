@@ -9,7 +9,7 @@ import type { ReferenceAsset } from "../../types";
 import { type Action, ActionMenuItems } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { UndoButton, assistMenu, suggested } from "../generation/AskChange";
+import { assistMenu, proposalUndo, suggested } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 
 type Field = "name" | "description";
@@ -20,7 +20,7 @@ const nouns = { name: "Name", description: "Description" } as const;
 /**
  * A card field's AI menu: Suggestions of names or descriptions the prompt assistant writes from the
  * card's images, asked for when it opens, then Custom… to say what to write and Refresh for others.
- * Picking one fills the field, with Undo beside it until the field next changes.
+ * Picking one fills the field, with Undo first in this menu until the field next changes.
  */
 export function useCardIdeas({
   kind,
@@ -70,29 +70,31 @@ export function useCardIdeas({
       label: `Suggest ${noun}`,
       icon: icons.assistant,
       heading: false,
-      menu: assistMenu({
-        suggestions: suggested(options, {
-          loading: again.isPending || ideas.isFetching,
-          answered: Boolean(ideas.data || ideas.error || again.error),
-          failure: again.error?.message || ideas.error?.message,
-          onRefresh: () => again.mutate(undefined),
+      menu: [
+        ...proposalUndo(
+          picked &&
+            value === picked.after &&
+            (() => {
+              onChange(picked.before);
+              setPicked(null);
+            }),
+        ),
+        ...assistMenu({
+          suggestions: suggested(options, {
+            loading: again.isPending || ideas.isFetching,
+            answered: Boolean(ideas.data || ideas.error || again.error),
+            failure: again.error?.message || ideas.error?.message,
+            onRefresh: () => again.mutate(undefined),
+          }),
+          templates: [],
+          custom: [
+            { id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) },
+          ],
+          last: [],
         }),
-        templates: [],
-        custom: [
-          { id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) },
-        ],
-        last: [],
-      }),
+      ],
       onOpen: () => setRequested(true),
     } satisfies Action,
-    undo: picked && value === picked.after && (
-      <UndoButton
-        onClick={() => {
-          onChange(picked.before);
-          setPicked(null);
-        }}
-      />
-    ),
     dialog: (
       <CustomDialog
         opened={custom}
@@ -112,10 +114,9 @@ export function useCardIdeas({
 
 /** The single-line Name field keeps its own suggestion picker, opened from the plain AI icon. */
 export function CardIdeas(props: Parameters<typeof useCardIdeas>[0]) {
-  const { action, undo, dialog } = useCardIdeas(props);
+  const { action, dialog } = useCardIdeas(props);
   return (
     <Group gap={2} wrap="nowrap" pr={4}>
-      {undo}
       <Menu position="bottom-end" width={menuWidth} zIndex={zIndex} onOpen={action.onOpen}>
         <Menu.Target>
           <ActionIcon variant="subtle" color="gray" aria-label={action.label}>

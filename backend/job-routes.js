@@ -53,13 +53,12 @@ export function registerJobRoutes(app, { store, queue }) {
       // A paused queue's hold is the one waiting reason a chat hears.
       ...(queued.reason === pausedReason ? { reason: pausedReason } : {}),
       ...(ahead === undefined ? {} : { ahead }),
-      // The prompt's thinking stays in Studio; a chat hears only the status.
-      progress:
-        queued.status === "writing"
-          ? undefined
-          : Number.isFinite(waitingEnd)
-            ? { ...queued.progress, endsAt: waitingEnd }
-            : queued.progress,
+      // The prompt's thinking stays in Studio, and finished work has no progress left.
+      progress: ["writing", "completed", "failed", "cancelled"].includes(queued.status)
+        ? undefined
+        : Number.isFinite(waitingEnd)
+          ? { ...queued.progress, endsAt: waitingEnd }
+          : queued.progress,
       ...(queued.resource.startsWith("provider:cliproxyapi")
         ? { provider: "cliproxyapi", kind: queued.input.kind, updatedAt: queued.updatedAt }
         : {}),

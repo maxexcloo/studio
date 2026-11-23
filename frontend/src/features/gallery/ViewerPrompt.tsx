@@ -8,11 +8,10 @@ import { TextBox } from "../../ui/TextBox";
 import {
   ProposalLabel,
   SendButton,
-  UndoButton,
   assistMenu,
   changeTemplates,
   proposalText,
-  proposedClass,
+  proposalUndo,
   useChangeSuggestions,
 } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
@@ -133,16 +132,19 @@ export function ViewerPrompt({
           label: "AI",
           heading: false,
           icon: icons.assistant,
-          menu: assistMenu({
-            suggestions,
-            ...changeTemplates(
-              assistant?.changes ?? [],
-              pick,
-              () => openCustom("recreate", undefined, true),
-              ask.pending,
-            ),
-            last: [],
-          }),
+          menu: [
+            ...proposalUndo(change && ask.undo),
+            ...assistMenu({
+              suggestions,
+              ...changeTemplates(
+                assistant?.changes ?? [],
+                pick,
+                () => openCustom("recreate", undefined, true),
+                ask.pending,
+              ),
+              last: [],
+            }),
+          ],
           onOpen: () => {
             const typed = ask.typed ?? prompt;
             setRequested({ itemId: item.id, prompt: typed !== original ? typed : undefined });
@@ -175,23 +177,13 @@ export function ViewerPrompt({
       ask.undo();
     }
   }
-  // The phone editor offers these above the keyboard; at rest they stand beside the field.
-  const sends = change
-    ? [
-        { label: "Undo", icon: icons.undo, disabled: false, keepOpen: true, onSubmit: ask.undo },
-        submit,
-      ]
-    : [submit];
   const send = (
-    <>
-      {change && <UndoButton onClick={ask.undo} />}
-      <SendButton
-        label={submit.label}
-        disabled={submit.disabled}
-        loading={!change && running}
-        onClick={submit.onSubmit}
-      />
-    </>
+    <SendButton
+      label={submit.label}
+      disabled={submit.disabled}
+      loading={!change && running}
+      onClick={submit.onSubmit}
+    />
   );
   return (
     <>
@@ -205,7 +197,7 @@ export function ViewerPrompt({
         oneLine
         minRows={1}
         maxRows={4}
-        className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
+        className={classes.prompt}
         below={
           change && (
             <ProposalLabel
@@ -223,7 +215,7 @@ export function ViewerPrompt({
         reset={change ? prompt : original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}
-        submit={sends}
+        submit={[submit]}
       />
       {custom}
     </>

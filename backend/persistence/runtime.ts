@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -78,29 +77,6 @@ function jsonStoreFiles(dataDir: string): string[] {
 export const ownerDocumentName = (name: string, ownerId = "") =>
   `${name}:${ownerId ? crypto.createHash("sha256").update(String(ownerId)).digest("hex") : ""}`;
 
-/**
- * Runs `read` on a read-only copy of a stopped studio's database (undefined without one), so
- * SQLite may create sidecars only on the private copy.
- */
-export function withOfflineDatabase<T>(dataDir: string, read: (db: DatabaseSync) => T) {
-  const file = databaseFile(dataDir);
-  if (!fs.existsSync(file)) return undefined;
-  const temporary = fs.mkdtempSync(path.join(tmpdir(), "studio-runtime-read-"));
-  try {
-    const copy = databaseFile(temporary);
-    fs.copyFileSync(file, copy);
-    if (fs.existsSync(`${file}-wal`)) fs.copyFileSync(`${file}-wal`, `${copy}-wal`);
-    const db = new DatabaseSync(copy, { readOnly: true });
-    try {
-      return read(db);
-    } finally {
-      db.close();
-    }
-  } finally {
-    fs.rmSync(temporary, { recursive: true, force: true });
-  }
-}
-
 /** Whether a migration (such as `runtime-json-v1`) has committed in this database. */
 function hasMigration(db: DatabaseSync, name: string) {
   return Boolean(
@@ -115,8 +91,9 @@ export function openDatabase(filename: string): DatabaseSync {
   const db = new DatabaseSync(filename);
   // Before WAL creates the sidecars, which take the database file's mode.
   if (filename !== ":memory:") fs.chmodSync(filename, 0o600);
+  // NORMAL in WAL mode never corrupts the database; a power loss may drop only the last commits.
   db.exec(
-    "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
+    "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
   );
   return db;
 }
@@ -186,16 +163,6 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
       "INSERT INTO studio_documents (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value",
     )
     .run(name, JSON.stringify(value));
-}
-
-/** Commits a set of related document changes together. */
-export function writeRuntimeDocuments(
-  dataDir: string,
-  documents: Iterable<readonly [string, unknown]>,
-): void {
-  runtimeTransaction(dataDir, () => {
-    for (const [name, value] of documents) writeRuntimeDocument(dataDir, name, value);
-  });
 }
 
 /** Groups synchronous writes, including those made by helpers sharing this connection. */

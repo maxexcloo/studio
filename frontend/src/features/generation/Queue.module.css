@@ -1,6 +1,8 @@
 /* Every row leads with one slot as wide as its drag handle, so titles line up. */
 .row {
   --queue-lead: 1.75rem;
+  /* Progress and sizes keep their width as their digits change. */
+  font-variant-numeric: tabular-nums;
 }
 
 @media (pointer: coarse) {

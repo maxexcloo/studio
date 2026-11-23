@@ -32,10 +32,6 @@ registerGalleryReadRoutes(
   },
   {
     near: async (q) => near(q),
-    compared:
-      (ownerId) =>
-      ({ id }) =>
-        ownerId === "account-a" && id === "compared-0",
     store: queue,
   },
 );
@@ -129,28 +125,6 @@ test("Gallery cleanup shares a job lookup across its pending outputs", () => {
   galleryStore.cleanupGalleryState(queue);
   assert.equal(status("account-a-0"), "failed");
   assert.equal(status("account-a-1"), "failed");
-});
-
-test("Gallery Comparisons includes saved comparisons and kept Dream pairs, without sets or batches", async () => {
-  const own = (id, fields) => ({ ...item("account-a", id), ...fields });
-  const pair = { state: "kept", pair: { id: "dream-comparison" } };
-  setGallery([
-    own("compared", { chat: { conversationId: "chat" } }),
-    own("paired", { dream: pair }),
-    own("paired-video", { type: "video", dream: pair }),
-    own("unseen-pair", { dream: { ...pair, state: "unseen" } }),
-    own("set", { resultSet: { id: "normal-set" } }),
-    own("batch", { queueBatch: "normal-batch" }),
-    { ...item("account-b", "foreign-pair"), dream: pair },
-  ]);
-  const read = (query) =>
-    call(routes["/api/gallery"], {
-      studioAccount: { userId: "account-a", authenticated: true },
-      query: { comparisons: "1", ...query },
-    }).then(({ items }) => items.map(({ id }) => id).sort());
-  assert.deepEqual(await read({ type: "image" }), ["compared-0", "paired-0"]);
-  assert.deepEqual(await read({ type: "video" }), ["paired-video-0"]);
-  assert.deepEqual(await read({ type: "image", origin: "chat" }), ["compared-0"]);
 });
 
 test("the owned timeline indexes local days and seeks a filtered window in both directions", async () => {

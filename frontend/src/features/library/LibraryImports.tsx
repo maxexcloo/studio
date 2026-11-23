@@ -13,6 +13,7 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
+import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, filterTableRows } from "../../ui/DataTable";
@@ -20,13 +21,12 @@ import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
-import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
 import {
   type ImportRecord,
   LibraryImportReview,
-  gradeColours,
   importBusy,
+  importStatus,
   stateLabel,
 } from "./LibraryImportReview";
 import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
@@ -35,17 +35,38 @@ type Resource = NonNullable<ImportRecord["resources"]>[number];
 
 /** The audit's groups, attention first. */
 const groups: { audit: ImportRecord["audit"]; title: string }[] = [
-  { audit: "needs-files", title: "Needs Files" },
+  { audit: "needs-files", title: "Missing Files" },
   { audit: "substitute", title: "Substitutes" },
   { audit: "failed", title: "Failed" },
   { audit: "busy", title: "In Progress" },
-  { audit: "ready", title: "Ready" },
+  { audit: "ready", title: "Installed" },
 ];
 
-/** Sorts the best grade first and unknown grades after the known ones. */
-function gradeRank(grade: string) {
-  const rank = Object.keys(gradeColours).indexOf(grade);
-  return rank < 0 ? Infinity : rank;
+const typeNames: Record<string, string> = { lora: "LoRA", vae: "VAE" };
+const kindNames: Record<string, string> = {
+  "civitai-image": "Civitai Image",
+  described: "Described Image",
+  "image-file": "Recipe Image",
+};
+/** What an import is and where its files went, such as "LoRA · Flux.1 D · loras/style.safetensors". */
+function describe(record: ImportRecord) {
+  const type = record.modelType?.toLowerCase().replaceAll("_", " ") || "";
+  const files = required(record).flatMap((resource) =>
+    resource.status === "substitute" && resource.substitute
+      ? [`${resource.substitute.folder || resource.want?.folder}/${resource.substitute.file}`]
+      : resource.status === "installed" && resource.want
+        ? [`${resource.want.folder}/${resource.want.file}`]
+        : [],
+  );
+  const offers = (record.offers || []).filter((offer) => offer.downloadable && !offer.taken).length;
+  return [
+    typeNames[type] || titleCase(type) || kindNames[record.input?.kind || ""],
+    record.baseModel,
+    files.length === 1 ? files[0] : files.length ? plural(files.length, "file") : "",
+    offers ? plural(offers, "other version") : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 const fileName = (resource: Resource) => resource.want?.file || resource.name;
 const nameOf = (record: ImportRecord) =>
@@ -116,7 +137,6 @@ export function LibraryImports({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState<ImportRecord | null>(null);
-  const [cleared, flashCleared] = useFlash<number>();
   const imports = useQuery({
     ...importsQuery,
     enabled: active,
@@ -215,10 +235,9 @@ export function LibraryImports({
     });
   }
   const clearStale = useMutation({
-    mutationFn: () => post<{ cleared: number }>("/api/library/imports/clear-stale"),
-    onSuccess: (result) => {
+    mutationFn: () => post("/api/library/imports/clear-stale"),
+    onSuccess: () => {
       setConfirming(false);
-      flashCleared(result.cleared);
       refresh();
     },
   });
@@ -280,8 +299,8 @@ export function LibraryImports({
       query={query}
       searchText={(record) => [
         nameOf(record),
-        record.grade?.value,
-        ...(record.grade?.reasons || []),
+        describe(record),
+        importStatus(record).label,
         ...lacking(record),
       ]}
       initialSort={{ key: "name", descending: false }}
@@ -297,6 +316,7 @@ export function LibraryImports({
             <>
               <TableRecord
                 name={nameOf(record)}
+                detail={describe(record)}
                 openLabel={`Review ${nameOf(record)}`}
                 onOpen={() => review(record)}
               />
@@ -304,7 +324,7 @@ export function LibraryImports({
                 ? [record.error]
                 : record.audit === "needs-files"
                   ? lacking(record)
-                  : record.grade?.reasons || []
+                  : []
               ).map((line) => (
                 <Text size="xs" c={record.audit === "failed" ? "red" : "dimmed"} key={line}>
                   {line}
@@ -314,15 +334,14 @@ export function LibraryImports({
           ),
         },
         {
-          key: "grade",
-          header: "Grade",
-          sortValue: (record) => record.grade && gradeRank(record.grade.value),
-          cell: (record) =>
-            record.grade && (
-              <Badge miw="max-content" color={gradeColours[record.grade.value] || "gray"}>
-                {stateLabel(record.grade.value)}
-              </Badge>
-            ),
+          key: "status",
+          header: "Status",
+          sortValue: (record) => importStatus(record).label,
+          cell: (record) => (
+            <Badge miw="max-content" color={importStatus(record).color}>
+              {importStatus(record).label}
+            </Badge>
+          ),
         },
       ]}
       rowActions={importActions}
@@ -409,11 +428,6 @@ export function LibraryImports({
           </Stack>
         </form>
       </Modal>
-      {cleared !== undefined && (
-        <Text c="dimmed" size="xs">
-          {cleared} cleared
-        </Text>
-      )}
       {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
       ) : !records.length ? (

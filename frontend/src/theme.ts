@@ -517,9 +517,11 @@ export function studioTheme({
           trackLabel: controlMotion,
         },
       }),
-      // A sort header is a touch target on touch screens (ui/DataTable.tsx).
+      // A sort header is a touch target on touch screens (ui/DataTable.tsx). Digits keep one
+      // width, so changing counts and progress don't resize columns.
       Table: Table.extend({
         classNames: { table: classes.hairline, ...(touch && { th: classes.touchHeader }) },
+        styles: { table: { fontVariantNumeric: "tabular-nums" } },
       }),
       // Tabs stay on one row, scrolling sideways where they outgrow it.
       Tabs: Tabs.extend({
@@ -577,7 +579,9 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
     variables: {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "820px",
-      "--studio-panel-min-height": "min(12rem, 35dvh)",
+      "--studio-panel-min-height": "min(6rem, 18dvh)",
+      "--studio-popup-width": "25rem",
+      "--studio-popup-wide-width": "56rem",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,

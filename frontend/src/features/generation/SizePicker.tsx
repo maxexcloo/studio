@@ -14,9 +14,9 @@ import {
   selectedResolution,
 } from "../../../../shared/resolution";
 import type { GenerationInput, Profile } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { chipProps } from "./chip";
 import { primaryReference } from "./payload";
-import { ChipPopup } from "./Picker";
 
 type Size = { w: number; h: number };
 
@@ -118,7 +118,6 @@ export function SizePicker({
     <ChipPopup
       title="Size & Aspect"
       floating
-      width={300}
       opened={opened}
       onOpenedChange={setOpened}
       target={

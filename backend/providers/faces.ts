@@ -209,4 +209,3 @@ export function createFaces({
     },
   };
 }
-export type Faces = ReturnType<typeof createFaces>;

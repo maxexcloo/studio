@@ -135,6 +135,7 @@ export async function fixtures(page: Page) {
     seed: comparison.seed,
     vote: comparison.vote,
     winnerItemId: comparison.winnerItemId || null,
+    ...(comparison.dream ? { dream: comparison.dream } : {}),
     ...(new Set(comparison.requests.map((variant: any) => variant.input.prompt)).size === 1
       ? { prompt: comparison.requests[0].input.prompt }
       : {}),
@@ -574,11 +575,14 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/comparisons" && method === "GET")
       return respond({
-        comparisons: comparisons.map(({ id, jobIds, itemIds }) => ({
-          id,
-          jobIds,
-          ...(itemIds ? { itemIds } : {}),
-        })),
+        comparisons:
+          url.searchParams.get("members") === "1"
+            ? comparisons.map(({ id, jobIds, itemIds }) => ({
+                id,
+                jobIds,
+                ...(itemIds ? { itemIds } : {}),
+              }))
+            : [...comparisons].reverse().map(showComparison),
       });
     if (path === "/api/comparisons/run") {
       const seed = String(body.variants[0].input.seed || "4242");
@@ -694,11 +698,7 @@ export async function fixtures(page: Page) {
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
           (!url.searchParams.has("chat") ||
             i.chat?.conversationId === url.searchParams.get("chat")) &&
-          (!url.searchParams.has("turn") || i.chat?.turnId === url.searchParams.get("turn")) &&
-          (url.searchParams.get("comparisons") !== "1" ||
-            comparisons.some((entry) =>
-              entry.itemIds ? entry.itemIds.includes(i.id) : entry.jobIds.includes(i.jobId),
-            )),
+          (!url.searchParams.has("turn") || i.chat?.turnId === url.searchParams.get("turn")),
       );
       // Similar ranks the image first.
       if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
@@ -1085,6 +1085,12 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu").first();
 }
 
+/** Takes back an assistant proposal from its box's AI menu. */
+export async function undoProposal(scope: Page | Locator, box: string) {
+  const menu = await promptMenu(scope, box);
+  await menu.getByRole("menuitem", { name: "Undo", exact: true }).click();
+}
+
 /** Edit or Recreate in the viewer's action bar. */
 export function viewerChangeButton(page: Page, action: "Edit" | "Recreate" = "Edit") {
   return page
@@ -1204,7 +1210,7 @@ export async function chooseView(page: Page, list: string, view: string) {
 }
 
 /** Closes a chip's popup with Escape, leaving the composer open. */
-export async function closePopup(page: Page, title: string) {
+async function closePopup(page: Page, title: string) {
   const popup = page.getByRole("dialog", { name: title, exact: true });
   await popup.press("Escape");
   await expect(popup).toBeHidden();
@@ -1435,11 +1441,9 @@ export async function serveDream(
     unseen?: any[];
     discarded?: any[];
     history?: import("../../shared/taste").DreamActivity[];
-    spicyAvailable?: boolean;
+    uncensoredAvailable?: boolean;
     /** The settings an administrator forces, which the account can't change. */
     locked?: (keyof typeof dreamDefaults)[];
-    /** Older gallery images offered for calibration until judged. */
-    calibration?: any[];
     library?: any[];
     /** Why Dream can't run, which makes it unavailable. */
     reason?: string;
@@ -1462,13 +1466,11 @@ export async function serveDream(
     },
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],
-    spicyAvailable: options.spicyAvailable ?? false,
-    calibration: options.calibration ?? [],
+    uncensoredAvailable: options.uncensoredAvailable ?? false,
     library: options.library ?? [],
     today: { images: 12, videos: 1 },
     usage: undefined as import("../../shared/dream").DreamCounts | undefined,
     reviewed: new Set<string>(),
-    judged: new Set<string>(),
     /** Every Dream result served, so Undo can bring one back. */
     known: new Map<string, any>(),
     projects: options.projects ?? [],
@@ -1481,7 +1483,7 @@ export async function serveDream(
     since: options.since ?? null,
     today: state.today,
     usage: state.usage,
-    spicyAvailable: state.spicyAvailable,
+    uncensoredAvailable: state.uncensoredAvailable,
     locked: options.locked ?? [],
     status: !state.settings.enabled
       ? "off"
@@ -1576,15 +1578,9 @@ export async function serveDream(
       return route.fulfill({ json: { since: options.since ?? null } });
     if (method !== "GET") state.requests.push({ method, path, body });
     for (const item of [...state.unseen, ...state.discarded]) state.known.set(item.id, item);
-    // As the backend: Undo returns results to unseen and gallery images to unjudged.
+    // As the backend: Undo returns results to unseen.
     if (path === "/api/dream/undo") {
       for (const id of body.ids) {
-        state.judged.delete(id);
-        if (body.calibration) {
-          const item = state.calibration.find((entry) => entry.id === id);
-          if (item && body.rating !== undefined) item.rating = body.rating ?? undefined;
-          continue;
-        }
         const item = state.known.get(id);
         if (!item) continue;
         state.discarded = state.discarded.filter((entry) => entry !== item);
@@ -1618,24 +1614,6 @@ export async function serveDream(
         [body.kind === "image" ? "images" : "videos"]: 0,
       };
       return route.fulfill({ json: show() });
-    }
-    if (path === "/api/dream/calibration") {
-      if (method === "GET")
-        return route.fulfill({
-          json: {
-            items: state.calibration.filter(
-              (item) =>
-                !state.judged.has(item.id) &&
-                item.type === (url.searchParams.get("media") || "image"),
-            ),
-          },
-        });
-      for (const id of [...(body.liked || []), ...(body.passed || [])]) {
-        state.judged.add(id);
-        const item = state.calibration.find((entry) => entry.id === id);
-        if (item && body.rating !== undefined) item.rating = body.rating;
-      }
-      return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {
       if (method === "DELETE") {

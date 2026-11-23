@@ -12,7 +12,7 @@ import {
   getDefaultZIndex,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
-import { ArrowUp, Check, type LucideIcon } from "lucide-react";
+import { ArrowUp, Check } from "lucide-react";
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -77,7 +77,7 @@ export function TextBox({
   menuLabel?: string;
   /** Also offers Copy in the menu before this tool. */
   copyBefore?: string;
-  /** The send, and a proposal's Undo, which stay beside the text. */
+  /** The send, which stays beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
   popups?: ReactNode;
@@ -95,13 +95,11 @@ export function TextBox({
   reset?: string;
   /**
    * The form's sends, offered in the phone editor above the keyboard; the last is primary. Each
-   * returns to the page unless `keepOpen`, as for a proposal to review in place.
+   * returns to the page.
    */
   submit?: {
     label: string;
-    icon?: LucideIcon;
     disabled: boolean;
-    keepOpen?: boolean;
     onSubmit: () => void;
   }[];
 }) {
@@ -486,9 +484,8 @@ export function TextBox({
             {!submit && send}
             {submit?.map((each, index) => {
               const primary = index === submit.length - 1;
-              const Glyph = each.icon ?? ArrowUp;
               const send = () => {
-                if (!inline && !each.keepOpen) close();
+                if (!inline) close();
                 each.onSubmit();
               };
               if (!primary)
@@ -502,7 +499,7 @@ export function TextBox({
                       onPointerDown={(event) => event.preventDefault()}
                       onClick={send}
                     >
-                      <Glyph size={16} />
+                      <ArrowUp size={16} />
                     </ActionIcon>
                   </Tooltip>
                 );
@@ -511,7 +508,7 @@ export function TextBox({
                   key={each.label}
                   aria-label={each.label}
                   radius="xl"
-                  rightSection={<Glyph size={16} />}
+                  rightSection={<ArrowUp size={16} />}
                   disabled={each.disabled}
                   // Sending before the keyboard drops keeps the text's blur from closing first.
                   onPointerDown={(event) => event.preventDefault()}

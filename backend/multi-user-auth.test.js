@@ -80,6 +80,12 @@ test("only the local machine can bootstrap the first recovery administrator, onc
     socket: { remoteAddress: "192.168.1.90" },
   });
   assert.equal(outsider.statusCode, 403);
+  const short = await call(
+    routes["POST /api/accounts/bootstrap"],
+    local({ username: "recovery", password: "short" }),
+  );
+  assert.equal(short.statusCode, 400);
+  assert.match(short.body.error, /at least 8 characters/);
 
   const created = await call(
     routes["POST /api/accounts/bootstrap"],

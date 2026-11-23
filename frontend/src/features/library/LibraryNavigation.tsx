@@ -73,7 +73,7 @@ export const librarySections = {
   promptInstructions: {
     label: "Prompt Instructions",
     description:
-      "Manage the instructions Studio sends to its writers. Every saved version is kept.",
+      "Manage the instructions Studio's writers follow for prompts, Dream, captions and reviews. Every saved version is kept.",
     icon: icons.prompt,
     admin: true,
     group: "Prompting",
@@ -82,6 +82,14 @@ export const librarySections = {
     label: "Prompt Styles",
     description:
       "Manage the assistant's styles and templates for Improve Prompt, Animate and Edit.",
+    icon: icons.assistant,
+    admin: true,
+    group: "Prompting",
+  },
+  suggestionInstructions: {
+    label: "Suggestion Instructions",
+    description:
+      "Manage the instructions behind Suggestions and the changes, ideas and proposals Studio offers. Every saved version is kept.",
     icon: icons.assistant,
     admin: true,
     group: "Prompting",

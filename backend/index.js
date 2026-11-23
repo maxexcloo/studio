@@ -69,6 +69,7 @@ import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
 import { createDream } from "./domain/dream.ts";
+import { createEnricher } from "./domain/enrich.ts";
 import { createFaceCheck } from "./domain/face-check.ts";
 import { createFaceRedo } from "./domain/face-redo.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
@@ -624,16 +625,8 @@ const assistantEngine = registerAssistantRoutes(app, {
   liked: assistant.liked,
 });
 
-const readComparisons = () => readRuntimeDocument(dataDir, "comparisons") ?? [];
 registerGalleryReadRoutes(app, {
   store,
-  compared: (ownerId) => {
-    const records = readComparisons().filter((record) => record.ownerId === ownerId);
-    // Compare Selected names its images; other comparisons hold their jobs' results.
-    const items = new Set(records.flatMap((record) => record.itemIds || []));
-    const jobs = new Set(records.flatMap((record) => (record.itemIds ? [] : record.jobIds)));
-    return (item) => items.has(item.id) || jobs.has(item.jobId);
-  },
   near: (text) => imageSearch.near(text),
   similar: (item, strictness) => imageSearch.similar(item, strictness),
 });
@@ -753,12 +746,10 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   catalogue,
   cloudProvider,
   completed: (items) => {
-    void titler.completed(items);
+    void enrichCompleted(items);
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
-    const images = items.filter((item) => item.type === "image");
-    if (images.length) captioner.prioritiseRecent(images);
     nextSteps.prioritiseRecent(items);
     if (items.some((item) => item.dream)) dream.finished();
   },
@@ -824,14 +815,13 @@ registerResultSetRoutes(app, {
 });
 registerMigrationRoutes(app, {
   dataDir,
-  store,
   adminRefusal,
 });
 registerCompareRoutes(app, {
   store,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
-  read: readComparisons,
+  read: () => readRuntimeDocument(dataDir, "comparisons") ?? [],
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req, { jobIds = [], itemIds = [], unseenSourceId }) => {
     const items = visibleGallery({ jobIds }).concat(
@@ -843,6 +833,13 @@ registerCompareRoutes(app, {
     }
     return recordsForRequest(items, req);
   },
+  dreamSides: (req) =>
+    galleryItems({
+      ownerId: ownerIdForRequest(req),
+      type: "image",
+      dreamState: ["kept", "discarded"],
+      dreamPair: true,
+    }).filter(hasGalleryMedia),
   pendingItems: makePendingItems,
   numbered: (items) => resultNumbers.numbered(items),
   voted: (ownerId, image, others) => {
@@ -1168,6 +1165,7 @@ const captioner = createCaptioner({
   visible: hasGalleryMedia,
   image: smallImage,
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
+  enrich: (item, signal) => enricher.caption(item, signal),
   load: runtimeLoad("captions"),
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
@@ -1245,6 +1243,9 @@ const faceRedo = createFaceRedo({
   admit: admitGeneration,
 });
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
+// The title the owner already has for the same prompt (another result of its run, Run Again).
+const sameTitle = (item) =>
+  findGalleryItem({ ownerId: item.ownerId ?? "", prompt: item.prompt, titled: true })?.title;
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
   enabled: () => flagEnabled("STUDIO_GALLERY_TITLES"),
@@ -1253,8 +1254,7 @@ const titler = createTitler({
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: idleItems,
-  titled: (item) =>
-    findGalleryItem({ ownerId: item.ownerId ?? "", prompt: item.prompt, titled: true })?.title,
+  titled: sameTitle,
   changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   save: (item, title) => updateGalleryJob(galleryKey(item), { title }),
@@ -1273,6 +1273,27 @@ const suggester = createPromptSuggester({
   save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
   explicit: explicitFor,
 });
+// Enrich (domain/enrich.ts): one image read for the caption, title, review and suggested prompt a
+// result still needs; each task's own work above is the backfill.
+const enricher = createEnricher({
+  writer: assistantEngine,
+  captions: captioner,
+  titles: titler,
+  reviews: selfReview,
+  prompts: suggester,
+  titled: sameTitle,
+  explicit: explicitFor,
+  text: textWriter,
+  image: smallImage,
+  save: (item, enriched) => updateGalleryJob(galleryKey(item), enriched),
+});
+/** New results' Background AI: one read each, then titles and captions it left to their own work. */
+async function enrichCompleted(items) {
+  const done = await enricher.completed(items);
+  void titler.completed(items.filter((item) => !done.get(item)?.title));
+  const images = items.filter((item) => item.type === "image" && !done.get(item)?.caption);
+  if (images.length) captioner.prioritiseRecent(images);
+}
 // Completion kicks this bounded worker; it retries recent results without walking the old gallery.
 const nextSteps = createNextStepWork({
   enabled: () => Boolean(assistantEngine) && flagEnabled("STUDIO_NEXT_STEPS"),

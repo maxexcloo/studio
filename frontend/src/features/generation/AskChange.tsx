@@ -35,9 +35,6 @@ const actionLabels: Record<ChangeAction, string> = {
   upscale: "Upscale",
 };
 
-/** The tint of a field holding a proposed change. */
-export const proposedClass = classes.proposed;
-
 /** What a proposal puts in the field: an upscale keeps the prompt, so it names the change. */
 export const proposalText = (proposal: Change) =>
   proposal.action === "upscale" ? proposal.label : proposal.prompt;
@@ -87,36 +84,9 @@ export function useAskChange<T>({
   };
 }
 
-function FieldAction({
-  label,
-  icon,
-  ...props
-}: {
-  label: string;
-  icon: ReactNode;
-  disabled?: boolean;
-  loading?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Tooltip label={label}>
-      <ActionIcon
-        variant="subtle"
-        color="gray"
-        aria-label={label}
-        onPointerDown={keepFocus}
-        {...props}
-      >
-        {icon}
-      </ActionIcon>
-    </Tooltip>
-  );
-}
-
-/** Undo: restores what the proposal replaced. */
-export function UndoButton({ onClick }: { onClick: () => void }) {
-  return <FieldAction label="Undo" icon={<icons.undo size={16} />} onClick={onClick} />;
-}
+/** While a proposal stands, Undo leads its box's AI menu in a group of its own. */
+export const proposalUndo = (undo: (() => void) | false | null | undefined): ActionGroups =>
+  undo ? [[{ id: "undo", label: "Undo", icon: icons.undo, onClick: undo }]] : [];
 
 /** The field's send (Generate, or Run for a proposal), last in its actions. */
 export function SendButton({
@@ -147,8 +117,8 @@ export function SendButton({
 }
 
 /**
- * Suggestions as a submenu and Refresh beside it. Neither spins: Suggestions greys until it has
- * options, saying why once an answer brings none, and keeps them while Refresh asks for others.
+ * Suggestions as a submenu and Refresh beside it. Neither spins: Suggestions keeps its options
+ * while Refresh asks for others.
  */
 export function suggested(
   list: Action[],
@@ -167,15 +137,19 @@ export function suggested(
     onRefresh: () => void;
   },
 ): { action: Action; refresh: Action } {
-  const empty = !list.length;
+  // Until options arrive the list holds one greyed line: loading, or why there are none.
+  const waiting: Action = {
+    id: "suggestions-status",
+    label: answered && !loading ? failure || "No suggestions." : "Loading…",
+    disabled: true,
+  };
   return {
     action: {
       id: "suggestions",
       label: "Suggestions",
       icon: icons.assistant,
-      disabled: disabled || empty,
-      description: empty && answered && !loading ? failure || "No suggestions." : undefined,
-      menu: [list],
+      disabled,
+      menu: [list.length ? list : [waiting]],
     },
     refresh: {
       id: "refresh",
@@ -225,11 +199,12 @@ export function useChangeSuggestions<K extends QueryKey>({
     disabled,
     onRefresh: () => refresh.mutate(),
   });
-  return { action, options, refresh: again };
+  return { action, refresh: again };
 }
 
 /**
- * An assistant menu's settings, Suggestions and Templates, then their actions and the run.
+ * An assistant menu's settings, Suggestions and Templates, then their actions and the run. Either
+ * alone lists its options inline; both together open as submenus.
  */
 export const assistMenu = ({
   loading,
@@ -239,7 +214,10 @@ export const assistMenu = ({
   custom = [],
   others = [],
   last,
+  ideasFirst,
 }: {
+  /** Lists Suggestions' options in place even beside Templates (an empty prompt's ideas). */
+  ideasFirst?: boolean;
   loading?: boolean;
   settings?: Action[];
   suggestions?: { action: Action; refresh: Action };
@@ -250,19 +228,22 @@ export const assistMenu = ({
 }): ActionGroups => {
   if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
   const choices = [...templates].sort((a, b) => compareNames(a.label, b.label));
-  const sections: Action[] = [
-    ...(suggestions ? [suggestions.action] : []),
-    ...(choices.length
-      ? [{ id: "templates", label: "Templates", icon: icons.templates, menu: [choices] }]
-      : []),
-  ];
-  return [
-    settings,
-    [...sections, ...custom, ...(suggestions ? [suggestions.refresh] : [])],
-    ...others,
-    last,
-  ];
+  const tail = [...custom, ...(suggestions ? [suggestions.refresh] : [])];
+  if (suggestions && choices.length) {
+    const nested = { id: "templates", label: "Templates", icon: icons.templates, menu: [choices] };
+    if (ideasFirst)
+      return [settings, suggestionItems(suggestions.action), [nested, ...tail], ...others, last];
+    return [settings, [suggestions.action, nested, ...tail], ...others, last];
+  }
+  const inline = suggestions ? suggestionItems(suggestions.action) : choices;
+  return [settings, inline, tail, ...others, last];
 };
+
+/** Suggestions' options, or its greyed status line, listed in place. */
+export function suggestionItems(action: Action): Action[] {
+  const ideas = action.menu?.[0] ?? [];
+  return action.disabled ? ideas.map((idea) => ({ ...idea, disabled: true })) : ideas;
+}
 
 export function changeTemplates(
   options: (AssistantOption & { instruction: string })[],

@@ -19,7 +19,7 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { sharedProfileFields } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
@@ -28,9 +28,11 @@ import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { backendLabel } from "../generation/payload";
@@ -597,7 +599,9 @@ export function DefinitionEditor({
   creating?: LoadedDefinition;
   existingIds?: string[];
 }) {
+  const dialog = useId();
   const phone = usePhone();
+  useReturnFocus();
   const loaded = useQuery({
     queryKey: ["definition", kind, id],
     queryFn: () => api<LoadedDefinition>(definitionPath(kind, id)),
@@ -614,8 +618,9 @@ export function DefinitionEditor({
   }, [loaded.error, client]);
   return (
     <Modal
+      id={dialog}
       opened
-      onClose={close}
+      onClose={closeWhenTop(dialog, close)}
       title={`${creating ? "Create" : "Edit"} ${kind === "profile" ? "Profile" : "Guide"}`}
       fullScreen={phone}
       closeButtonProps={{ "aria-label": "Close Definition Editor" }}

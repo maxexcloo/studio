@@ -10,7 +10,7 @@ import type { MediaItem } from "../../types";
 export type DreamMedia = "image" | "video";
 
 export type { DreamSettings } from "../../../../shared/dream";
-export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
+type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 export type DreamItem = MediaItem & {
   dream?: {
     prompt: string;
@@ -18,7 +18,7 @@ export type DreamItem = MediaItem & {
     at: string;
     state: "unseen" | "kept" | "discarded";
     decidedAt?: string;
-    spicy?: true;
+    uncensored?: true;
     /** One side of a comparison: alike but for what `question` asks about. */
     pair?: { id: string; side: 0 | 1 | 2; size?: 3; question: string; label: string };
     projectId?: string;
@@ -39,7 +39,7 @@ export interface Dream {
   today: DreamCounts;
   /** Jobs counted towards the limits, when different from the day's totals. */
   usage?: DreamCounts;
-  spicyAvailable: boolean;
+  uncensoredAvailable: boolean;
   /** The settings an administrator forces on every account, which this one can't change. */
   locked: (keyof DreamSettings)[];
   status: DreamStatus;

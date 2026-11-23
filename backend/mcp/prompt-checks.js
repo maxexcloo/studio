@@ -117,7 +117,8 @@ export function turnCountProblem(request, queued, adding) {
   const requested = requestedCount(request);
   if (!requested || queued + adding <= requested) return "";
   const left = requested - queued;
+  const asked = `the user asked for ${requested} image${requested === 1 ? "" : "s"}`;
   return left > 0
-    ? `the user asked for ${requested} images and this turn has queued ${queued}; queue at most ${left} more.`
-    : `the user asked for ${requested} images and this turn has queued them all. Share the links and end the turn.`;
+    ? `${asked} and this turn has queued ${queued}; queue at most ${left} more.`
+    : `${asked} and this turn has queued them all. Share the links and end the turn.`;
 }

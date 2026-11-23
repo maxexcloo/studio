@@ -61,6 +61,7 @@ import {
   fullBodyPerson,
   promptListProblem,
   repeatedSetProblem,
+  requestedCount,
   turnCountProblem,
 } from "./prompt-checks.js";
 import { compactGuide } from "./prompting.js";
@@ -113,10 +114,10 @@ const theme = z
  */
 function runSize(profile, aspect, resolution) {
   const { width, height } =
-    aspect || !profile.imageSizePreference?.imageAspect
+    aspect || !profile.imagePreference?.imageAspect
       ? profileAspectSize(profile, aspect ? { aspect } : {})
       : profileStartingSize(profile);
-  const preferred = profile.imageSizePreference?.imageResolution;
+  const preferred = profile.imagePreference?.imageResolution;
   const native = profile.options?.resolutions;
   const takes =
     preferred &&
@@ -272,7 +273,7 @@ export function registerGenerateTools({
       ? [
           {
             type: "text",
-            text: `Prompting guide for ${label}; apply it to later prompts: ${guide}`,
+            text: `Prompting guide for ${label} (its essentials; models with full_guide has pitfalls and examples); apply it to later prompts: ${guide}`,
           },
         ]
       : [];
@@ -456,7 +457,10 @@ export function registerGenerateTools({
       }
       if (prompts.length > size && !queued.error)
         queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${outputCount(queued.jobs)} images in batches of up to ${size * count}.`;
-      return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
+      return {
+        queued,
+        guide: fresh ? compactGuide(profile.prompting, Infinity, { essentials: true }) : "",
+      };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.
       if (fresh) reviewedGuides.forget(guideKey(profile.id));
@@ -522,7 +526,7 @@ export function registerGenerateTools({
       count: jobCount
         .optional()
         .describe(
-          `Repeats each prompt with new seeds (default ${mcpGenerationCount} for one image prompt, else 1). For distinct results provide separate prompts.`,
+          `Repeats each prompt with new seeds (default ${mcpGenerationCount}, or the account's default for one prompt). For distinct results provide separate prompts.`,
         ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),
@@ -681,10 +685,27 @@ export function registerGenerateTools({
           }),
         })
       : 0;
-  const setNote = (number) =>
-    number
-      ? `Set ${number} ("set ${number} B": second image; "set ${number} 2c": item 2, image c). `
-      : "";
+  /** The set's number, with ways to name its images that the set actually has. */
+  const setNote = (number, entries) => {
+    if (!number) return "";
+    const items = entries.flatMap(({ plan, queued }) =>
+      (plan.prompts || []).map((_, index) =>
+        (queued.jobs || [])
+          .filter((job) => job.prompt_index === index)
+          .reduce((sum, job) => sum + (job.images || 1), 0),
+      ),
+    );
+    const last = String.fromCharCode(96 + Math.max(1, items.at(-1) || 1));
+    const examples = [
+      ...(items.reduce((sum, count) => sum + count, 0) > 1
+        ? [`"set ${number} B": second image`]
+        : []),
+      ...(items.length > 1
+        ? [`"set ${number} ${items.length}${last}": item ${items.length}, image ${last}`]
+        : []),
+    ];
+    return `Set ${number}${examples.length ? ` (${examples.join("; ")})` : ""}. `;
+  };
   /** A reply naming its set in structuredContent too. */
   const withSet = (reply, number) =>
     number
@@ -697,7 +718,7 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `${setNote(number)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
+            text: `${setNote(number, entries)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
           },
         ],
         structuredContent: { status: "queued", jobs },
@@ -1041,11 +1062,12 @@ export function registerGenerateTools({
       throw new Error(
         `${unable.map(({ profile }) => profile.label || profile.id).join(", ")} can't hold ${card.name}'s face: it takes no reference to edit with, so each image would show someone else. Leave the model out (Studio picks ${keeper ? keeper.label || keeper.id : "one that edits with references"}), or pass any_model: true only if the user insists on it.`,
       );
-    // Several prompts or models are already the images asked for; one image gets a pick of a few.
-    const count = (args.count ??=
-      args.prompts.length === 1 && targets.length === 1 && targets[0].profile.kind === "image"
-        ? mcpGenerationCount
-        : 1);
+    // A lone prompt on one image model, for a request that names no number, takes the account's Default Count.
+    const preferredCount =
+      targets.length === 1 && args.prompts.length === 1 && !requestedCount(request)
+        ? targets[0].profile.imagePreference?.imageCount
+        : undefined;
+    const count = (args.count ??= preferredCount ?? mcpGenerationCount);
     const jobs = targets.length * (args.prompts?.length || 1) * count;
     if (jobs > maxSplitJobs)
       throw new Error(
@@ -1310,7 +1332,7 @@ export function registerGenerateTools({
       return withSet(
         await respondSets(
           sets,
-          `${setNote(number)}${projectNote}`,
+          `${setNote(number, sets)}${projectNote}`,
           signal,
           await comparisonOf(sets, { axis, project }),
           axis,
@@ -1344,7 +1366,7 @@ export function registerGenerateTools({
         signal,
         submission.guide,
         source,
-        `${setNote(number)}${projectNote}${tierNote || ""}${faceNote}`,
+        `${setNote(number, [{ plan, queued: submission.queued }])}${projectNote}${tierNote || ""}${faceNote}`,
       ),
       number,
     );
@@ -1481,7 +1503,7 @@ export function registerGenerateTools({
     }
     const sent = runs.filter((run) => run.queued);
     const fresh = recordSet(sent);
-    const note = `${setNote(fresh)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
+    const note = `${setNote(fresh, sent)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
     try {
       return withSet(
         sent.length === 1
