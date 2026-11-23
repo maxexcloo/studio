@@ -126,6 +126,7 @@ export function CharacterChoices({
                     withinPortal={false}
                     onEdit={() => dialogs.edit(card)}
                     onSheet={() => dialogs.sheet(card)}
+                    onFaceCheck={() => dialogs.faceCheck(card)}
                     onDelete={() => dialogs.remove(card)}
                   />
                 }

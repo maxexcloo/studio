@@ -180,6 +180,31 @@ export const galleryViewCountsQuery = (kind: MediaKind) =>
     staleTime: 30_000,
   });
 
+/**
+ * The newest finished images Face Check compared with a character card, each with its `identity`,
+ * worst match first: off-character ones, then by face similarity, those without a face last.
+ */
+export const characterResultsQuery = (characterId: string) =>
+  queryOptions({
+    queryKey: [...galleryKey, "character", characterId],
+    queryFn: async ({ signal }) => {
+      const params = galleryParams({ search: "", kind: "image", filters: emptyGalleryFilters });
+      params.set("character", characterId);
+      params.set("finished", "1");
+      params.set("limit", "200");
+      const { items } = await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
+      const rank = ({ identity }: MediaItem) => [
+        identity?.drifted ? 0 : 1,
+        // Similarity runs to 1; no face sorts after every score.
+        identity?.score ?? 2,
+      ];
+      return items.sort((a, b) => {
+        const [x, y] = [rank(a), rank(b)];
+        return x[0] - y[0] || x[1] - y[1];
+      });
+    },
+  });
+
 export const galleryReviewQuery = (
   listing: GalleryListing,
   rating: GalleryReviewRating,
