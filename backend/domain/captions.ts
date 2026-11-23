@@ -35,7 +35,7 @@ export const captionTags = 15;
 let cachedPrompt: { hash: string; instructions: string; version: string } | undefined;
 function captionPrompt() {
   const { hash } = promptInstructionStore().get("caption-gallery");
-  if (cachedPrompt?.hash === hash) return cachedPrompt;
+  if (cachedPrompt && cachedPrompt.hash === hash) return cachedPrompt;
   const instructions = promptInstruction("caption-gallery", { captionCharacters, captionTags });
   const version = createHash("sha256").update(instructions).digest("hex").slice(0, 12);
   cachedPrompt = { hash, instructions, version };
