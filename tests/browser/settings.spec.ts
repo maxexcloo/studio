@@ -70,7 +70,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   const workers = page.getByRole("list", { name: "Workers", exact: true });
   await expect(workers.getByRole("listitem")).toHaveText([
     "Image Worker · Images, Upscale, Model Library · Busy · 2 Queued · 8.0 GiB Free",
-    /^Video Worker · Videos · Offline · 0 Queued/,
+    "Video Worker · Videos · Offline",
   ]);
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -869,7 +869,7 @@ test("Workers select local text models to benchmark and list each run's figures"
   await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Stopped");
 });
 
-test("Status counts running workers, reads a parked service as Stopped and offers no Start", async ({
+test("Status counts workers that can run and their queue, reads a parked service as Stopped and offers no Start", async ({
   page,
 }) => {
   await fixtures(page);
@@ -881,7 +881,21 @@ test("Status counts running workers, reads a parked service as Stopped and offer
             state: "healthy",
             reason: "A direct runtime is healthy.",
             endpoints: [
-              { id: "image", label: "Image", state: "healthy", reason: "Ready", running: true },
+              {
+                id: "image",
+                label: "Image",
+                state: "healthy",
+                reason: "Ready",
+                running: true,
+                queued: 3,
+              },
+              {
+                id: "comfy",
+                label: "ComfyUI",
+                state: "parked",
+                reason: "Stopped on purpose. An administrator can start it.",
+                workloads: ["comfy"],
+              },
             ],
           },
           video: {
@@ -907,8 +921,11 @@ test("Status counts running workers, reads a parked service as Stopped and offer
   await expect(status).toHaveAttribute("aria-description", "Services Running · Some Stopped");
   await status.click();
   const drawer = page.getByRole("dialog", { name: "Queue", exact: true });
-  await expect(drawer.getByLabel("Images: 1 worker · 1 running", { exact: true })).toBeVisible();
-  await expect(drawer.getByLabel("Videos: 1 worker · Stopped", { exact: true })).toBeVisible();
+  // A parked worker isn't counted, and the queue shows as Settings › Workers shows it.
+  await expect(
+    drawer.getByLabel("Images: 1 worker · Busy · 3 Queued", { exact: true }),
+  ).toBeVisible();
+  await expect(drawer.getByLabel("Videos: Stopped", { exact: true })).toBeVisible();
   await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 

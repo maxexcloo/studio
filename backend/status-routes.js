@@ -40,28 +40,27 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
       .map((job) => job.backend)
       .filter(Boolean);
     const administrator = !req.studioAccount || canAdmin(req);
-    // The kind of job each worker runs now, which everyone's status summary counts.
-    const loads = [...queue.loads()];
-    const jobs = new Map(
-      queue.store
-        .jobsById(loads.map(([, load]) => load.current).filter(Boolean))
-        .map((job) => [job.id, job]),
-    );
-    const running = new Map(
-      loads.flatMap(([resource, load]) => {
-        const job = load.current && jobs.get(load.current);
-        return resource.startsWith("worker:") && job
-          ? [[resource.slice("worker:".length), job.input.kind === "video" ? "video" : "image"]]
-          : [];
-      }),
+    // Whether each worker runs a job and how many wait for it, which everyone's status summary
+    // reads as Settings › Workers does.
+    const work = new Map(
+      [...queue.loads()].flatMap(([resource, load]) =>
+        resource.startsWith("worker:")
+          ? [
+              [
+                resource.slice("worker:".length),
+                { running: Boolean(load.current), queued: load.queued },
+              ],
+            ]
+          : [],
+      ),
     );
     res.json(
       await observeServices({
         allowed: ["image", "video", "text"],
         administrator,
         waitingWorkers,
-        running,
-        // Each worker's work and its loaded model are for administrators only.
+        work,
+        // Each worker's jobs, loaded model and free memory are for administrators only.
         ...(administrator ? { loads: workerLoads(queue) } : {}),
       }),
     );
