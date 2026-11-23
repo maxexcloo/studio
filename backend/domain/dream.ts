@@ -424,6 +424,22 @@ const shares = {
   lora: 40,
   uncensored: 40,
 };
+/**
+ * A profile whose results with a LoRA keep at least `rate` of `least` judged ones loads one for
+ * `share` percent of its exploited ideas instead.
+ */
+const keptLoras = { least: 10, rate: 0.75, share: 70 };
+/**
+ * Explored profiles weigh by their keep rate; one kept less than `rate` of at least `least`
+ * judged results is left alone until those verdicts age out.
+ */
+const exploredProfiles = { least: 20, rate: 0.3 };
+/** Fewest steps Dream runs a family's models at: Krea 2 keeps far more at 8 steps than at 4. */
+const leastSteps: Record<string, number> = { "family:krea2": 8 };
+/** Learnt shapes weigh this much less where they keep poorly: 2:3 keeps about half as often. */
+const shapeWeights: Record<string, number> = { "0.67": 0.5 };
+/** Dream stops making new results while this many wait unseen, until some are judged. */
+const unseenLimit = 60;
 /** Percent of Dream's images that start a series, where the account has a liked or kept image. */
 const seriesShare = 2;
 /** Percent of videos that extend one of the account's videos rather than animate a still. */
@@ -437,7 +453,7 @@ const videoExploreDraw = 2;
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
  * Verdicts adapt the share of new ground without letting familiar anchors dominate again.
  */
-const exploreShare = { start: 0.95, low: 0.9, high: 0.98, window: 100 };
+const exploreShare = { start: 0.95, low: 0.45, high: 0.98, window: 100 };
 /** A chat keeps its project this long after its latest request, then hands it to Dream. */
 const handOffMs = 3_600_000;
 /** A handed-off project continues from its latest few chat images and its newest few picks. */
@@ -994,11 +1010,12 @@ export function createDream(options: {
     return (considering.latest ??= read());
   }
   /**
-   * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
-   * latest images within a day (`diversity`), times its keep rate among the latest judged ones: a
-   * pass for any reason but likeness counts weakly against it, as a keep counts for it.
+   * How the latest judged Dream images kept, by profile (`profile:<id>`), LoRA (`lora:<name>`) and
+   * a profile's results with any LoRA (`loras:<id>`): a pass for any reason but likeness counts
+   * against them, as a keep counts for them. Its keep rate follows Laplace's rule, so an untried
+   * profile or LoRA starts at one half.
    */
-  function spread(ownerId: string) {
+  function judgement(ownerId: string) {
     const judged = new Map<string, { kept: number; total: number }>();
     for (const item of options.gallery(ownerId, {
       dreamState: ["kept", "discarded"],
@@ -1009,6 +1026,7 @@ export function createDream(options: {
       const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
       for (const key of [
         `profile:${item.settings?.profileId}`,
+        ...(loras.length ? [`loras:${item.settings?.profileId}`] : []),
         ...loras.map((lora) => `lora:${(lora as { name?: string })?.name}`),
       ]) {
         const entry = judged.get(key) ?? { kept: 0, total: 0 };
@@ -1017,11 +1035,21 @@ export function createDream(options: {
         judged.set(key, entry);
       }
     }
-    // Laplace's rule: an untried profile or LoRA starts at one half.
-    const keepRate = (key: string) => {
-      const { kept, total } = judged.get(key) ?? { kept: 0, total: 0 };
-      return (kept + 1) / (total + 2);
+    const counts = (key: string) => judged.get(key) ?? { kept: 0, total: 0 };
+    return {
+      counts,
+      keepRate(key: string) {
+        const { kept, total } = counts(key);
+        return (kept + 1) / (total + 2);
+      },
     };
+  }
+  type Judgement = ReturnType<typeof judgement>;
+  /**
+   * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
+   * latest images within a day (`diversity`), times its keep rate (`judgement`).
+   */
+  function spread(ownerId: string, { keepRate }: Judgement) {
     const jobs = store
       .dreamJobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
       .filter((job) => kindOf(job) === "image")
@@ -1108,10 +1136,22 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
-  /** One of the person's own shapes where they set them, else one drawn by its score. */
+  /**
+   * One of the person's own shapes where they set them, else one drawn by its score, less for
+   * shapes that keep poorly (`shapeWeights`).
+   */
   const favouriteShape = (taste: TasteRecord) => {
     const own = taste.preferences.shapes;
-    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, "aspect:");
+    return own
+      ? drawn(own.map((value) => [value, 1]))
+      : drawn(
+          [...taste.scores]
+            .filter(([attribute]) => attribute.startsWith("aspect:"))
+            .map(([attribute, { score }]) => {
+              const shape = attribute.slice("aspect:".length);
+              return [shape, score * (shapeWeights[shape] ?? 1)];
+            }),
+        );
   };
   /**
    * A tag to feature: one of the person's own where they set them, else one drawn by its score
@@ -1130,16 +1170,17 @@ export function createDream(options: {
     );
   };
   /**
-   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (evenly
-   * among the person's own favourite models where any of them run there; `offSide` says when none
-   * do) less its recent share (`spread`), else the kind's default there: the account's own for
-   * that side, the catalogue's, or the first.
+   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (among the
+   * person's own favourite models where any of them run there, by keep rate; `offSide` says when
+   * none do) less its recent share (`spread`), else the kind's default there: the account's own
+   * for that side, the catalogue's, or the first.
    */
   function exploitProfile(
     kind: Kind,
     catalogue: Awaited<ReturnType<typeof options.catalogue>>,
     taste: TasteRecord,
     weigh: (key: string) => number,
+    { keepRate }: Judgement,
   ) {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
     const own = taste.preferences.models?.filter((id) =>
@@ -1147,7 +1188,7 @@ export function createDream(options: {
     );
     const scores = new Map(
       own?.length
-        ? own.map((id) => [id, 1])
+        ? own.map((id) => [id, keepRate(`profile:${id}`)])
         : [...taste.profiles.image, ...taste.profiles.video].map((entry) => [
             entry.id,
             entry.score,
@@ -1170,16 +1211,25 @@ export function createDream(options: {
     return { profile, offSide: Boolean(taste.preferences.models?.length && !own?.length) };
   }
   /**
-   * Another ready profile of the kind, the one the account ran fewest jobs on lately (unused ones
-   * first), so new and imported models get tried; its note says so. Null where there is none.
+   * Another ready profile of the kind drawn by its keep rate, those the account ran fewest jobs on
+   * lately (unused ones first) weighing double so new and imported models get tried, and none
+   * that keeps poorly (`exploredProfiles`); its note says which. Null where there is none.
    */
   function exploreProfile(
     ownerId: string,
     kind: Kind,
     profiles: DreamProfile[],
     chosen: DreamProfile,
+    judged: Judgement = judgement(ownerId),
   ) {
-    const others = profiles.filter((profile) => kindOf(profile) === kind && profile !== chosen);
+    const others = profiles.filter((profile) => {
+      const { kept, total } = judged.counts(`profile:${profile.id}`);
+      return (
+        kindOf(profile) === kind &&
+        profile !== chosen &&
+        (total < exploredProfiles.least || kept / total >= exploredProfiles.rate)
+      );
+    });
     if (!others.length) return null;
     const runs = store.profileRuns(
       ownerId,
@@ -1187,7 +1237,12 @@ export function createDream(options: {
       others.map((profile) => profile.id),
     );
     const fewest = Math.min(...others.map((profile) => runs.get(profile.id) || 0));
-    const profile = pick(others.filter((entry) => (runs.get(entry.id) || 0) === fewest));
+    const profile = drawn(
+      others.map((entry): [DreamProfile, number] => [
+        entry,
+        judged.keepRate(`profile:${entry.id}`) * ((runs.get(entry.id) || 0) === fewest ? 2 : 1),
+      ]),
+    )!;
     const label = profile.label || profile.id;
     return {
       profile,
@@ -1637,16 +1692,21 @@ export function createDream(options: {
    * For a share of exploited ideas, one LoRA the profile can load drawn by its taste score (a
    * a like adds one) less its recent share (`spread`), at the strength that scored best, else
    * its recommended strength; never a disliked one, and none without LoRA access. Where the person
-   * set their favourite LoRAs, it is one of those, drawn evenly.
+   * set their favourite LoRAs, it is one of those, drawn evenly. A profile whose LoRA results keep
+   * well loads one more often (`keptLoras`).
    */
   function exploitLoras(
     ownerId: string,
     profile: DreamProfile,
     taste: TasteRecord,
     weigh: (key: string) => number,
+    judged: Judgement,
   ) {
     const library = options.loraLibrary(ownerId);
-    if (!library || !chance(shares.lora)) return [];
+    const { kept, total } = judged.counts(`loras:${profile.id}`);
+    const share =
+      total >= keptLoras.least && kept / total >= keptLoras.rate ? keptLoras.share : shares.lora;
+    if (!library || !chance(share)) return [];
     const learnt = new Map(taste.loraScores.map((lora) => [lora.name, lora]));
     const candidates = fit(
       profile,
@@ -1667,12 +1727,23 @@ export function createDream(options: {
     return lora ? [lora] : [];
   }
   /**
-   * The steps (where the profile has a steps control) and guidance drawn by their taste scores on
-   * the profile, and for an image a size of the profile's default area in the drawn aspect ratio.
+   * The steps (where the profile has a steps control, at least its family's `leastSteps`) and
+   * guidance drawn by their taste scores on the profile, and for an image a size of the profile's
+   * default area in the drawn aspect ratio.
    */
   function exploitSettings(kind: Kind, profile: DreamProfile, taste: TasteRecord): GenerationInput {
+    const least = leastSteps[profile.workflow ?? ""] ?? 0;
+    const prefix = `steps:${profile.id}:`;
     const steps = profile.capabilities?.steps
-      ? drawnValue(taste, `steps:${profile.id}:`)
+      ? (drawn(
+          [...taste.scores]
+            .filter(([attribute]) => attribute.startsWith(prefix))
+            .map(([attribute, { score }]): [string, number] => [
+              attribute.slice(prefix.length),
+              score,
+            ])
+            .filter(([value]) => Number(value) >= least),
+        ) ?? (Number(profile.defaults?.steps) < least ? least : undefined))
       : undefined;
     const cfg = drawnValue(taste, `cfg:${profile.id}:`);
     const aspect = Number(kind === "image" && favouriteShape(taste));
@@ -2247,6 +2318,11 @@ export function createDream(options: {
     const record = read(ownerId);
     const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
+    if (options.count(ownerId, { dreamState: "unseen" }) >= unseenLimit)
+      return {
+        status: "waiting",
+        reason: `Dream waits while ${unseenLimit} results are unseen; judge some to continue.`,
+      };
     const counts = daily(ownerId, record);
     const { due, imagesDone } = kinds(record.settings, counts);
     if (!due.length) return capped;
@@ -2402,9 +2478,10 @@ export function createDream(options: {
           return { status: "generating" };
       }
       const taste = options.taste.read(ownerId);
-      const weigh = spread(ownerId);
+      const judged = judgement(ownerId);
+      const weigh = spread(ownerId, judged);
       // More Like This keeps its result's profile where it is still ready.
-      const exploited = exploitProfile(kind, catalogue, taste, weigh);
+      const exploited = exploitProfile(kind, catalogue, taste, weigh, judged);
       let profile =
         catalogue.profiles.find(
           (item) => kindOf(item) === "image" && steer && item.id === steer.profileId,
@@ -2416,7 +2493,7 @@ export function createDream(options: {
       // Equipment exploration accompanies concept exploration; More Like This keeps its source.
       const learnt = new Set(taste.loraScores.map((lora) => lora.name));
       const [fresh] = libraryLoras(ownerId, profile, true).filter((lora) => !learnt.has(lora.name));
-      const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile);
+      const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile, judged);
       const open = [...(otherProfile ? ["profile"] : []), ...(fresh ? ["lora"] : []), "prompt"];
       const made = (arm: string) =>
         options.count(ownerId, { dreamState: poolStates, dreamArm: arm, dreamPair: false });
@@ -2514,7 +2591,13 @@ export function createDream(options: {
       } else if (inspiration) note = `${note} · Inspired by an import`;
       else if (axis === "prompt") note = "Exploring new ground";
       if (!possible.includes(profile)) {
-        profile = exploitProfile(kind, { ...catalogue, profiles: possible }, taste, weigh).profile!;
+        profile = exploitProfile(
+          kind,
+          { ...catalogue, profiles: possible },
+          taste,
+          weigh,
+          judged,
+        ).profile!;
         loras = undefined;
         references = [];
         // The profile or LoRA selected for general exploration may be outside this project.
@@ -2527,7 +2610,7 @@ export function createDream(options: {
         const offSide = `Your favourite models don't run on ${backend === "cloud" ? "Cloud" : "Local"}`;
         note = note ? `${note} · ${offSide}` : offSide;
       }
-      loras ??= exploitLoras(ownerId, profile, taste, weigh);
+      loras ??= exploitLoras(ownerId, profile, taste, weigh, judged);
       if (target && !target.constraints.loras) loras = [];
       if (cards && cards.character)
         references = [
@@ -3549,6 +3632,7 @@ export function createDream(options: {
         "pair-neither": "Chose Neither",
         preferred: "Chose",
         report: "Reported",
+        skip: "Skipped",
         undislike: "Restored",
         unlike: "Unliked",
       };
@@ -3575,6 +3659,7 @@ export function createDream(options: {
               "keep",
               "pair-both",
               "pair-neither",
+              "skip",
             ].includes(signal.kind),
         )
         .map((signal) => ({
@@ -3733,6 +3818,9 @@ export function createDream(options: {
             },
             rating,
           );
+        // A plain skip on a single result counts weakly against it.
+        if (reason === "skip" && items.length === 1)
+          options.taste.record(ownerId, [tasteSignal("skip", first.jobId, itemValues(first))]);
         if (reason === "taste")
           options.taste.record(ownerId, [
             items.length > 1

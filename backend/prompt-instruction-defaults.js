@@ -273,7 +273,7 @@ Prefer a single subject unless the brief or rules ask for a group.`,
   "dream-expressions": {
     label: "Dream Expressions",
     area: "Dream",
-    text: `Give people believable expressions that suit the moment and vary from recent ideas. Avoid exaggerated or contorted expressions, grimaces, gaping mouths and tongues unless the taste profile, brief or source prompt explicitly asks for one.`,
+    text: `Give people believable expressions that suit the moment and vary from recent ideas: a slight smile, a sly or knowing look, a laugh or open curiosity. Don't default to a calm face or a closed-lip smile. Avoid exaggerated or contorted expressions, grimaces, gaping mouths and tongues unless the taste profile, brief or source prompt explicitly asks for one.`,
   },
   "dream-extended": {
     label: "Dream Uncensored",
@@ -806,7 +806,7 @@ Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}
     label: "Summarise Taste",
     area: "Dream",
     text: `You keep the words of one person's taste profile for a media studio: what they like and pass over in images and videos. Studio scores their models, LoRAs and settings itself, so leave those out.
-Revise the current profile with the recent signals: what they liked or disliked (or took back with unlike, undislike), reported an issue with (report, with the issue they named), chose in a comparison, iterated on, deleted, kept or discarded from Dream (results Studio made for them unasked), or liked or passed over when Dream showed them their own older images again (calibrate-like, calibrate-pass).
+Revise the current profile with the recent signals: what they liked or disliked (or took back with unlike, undislike), reported an issue with (report, with the issue they named), chose in a comparison, iterated on, deleted, kept or discarded from Dream (results Studio made for them unasked), skipped in Dream without a reason (skip, a weak pass), or liked or passed over when Dream showed them their own older images again (calibrate-like, calibrate-pass).
 A "preferred" signal is relative: they liked that result more than the one after "over", which may still be good to them; it is no dislike.
 A signal with a question answers a Dream comparison of results alike except for one thing. Pair-both means every variant suits them, and pair-neither means none does.
 Gallery likes are images they liked in their own gallery, sampled across their history. They show their taste best: weigh them above Dream's results, which Studio wrote from this profile and which only echo it back. Where the current profile is empty, build it from the gallery likes and signals.

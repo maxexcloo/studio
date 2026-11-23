@@ -1686,7 +1686,7 @@ test("Three independent likes, in the gallery or Super Likes, seed a concept and
   assert.doesNotMatch(String((await dreamOnce())?.dream?.arm), /^continue:/);
 });
 
-test("Fresh concepts dominate even when verdicts adapt the share", async (t) => {
+test("Verdicts set the share of fresh concepts, down to 45%", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   // A small share remains available for familiar work.
@@ -1730,13 +1730,13 @@ test("Fresh concepts dominate even when verdicts adapt the share", async (t) => 
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
   state.rolls = [1];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  // Poor verdicts still leave a majority of fresh concepts; comparisons do not count.
+  // Poor verdicts lower the fresh share to its floor of 45%; comparisons do not count.
   decided(20, "explore:lora", "discarded");
   decided(60, "continue:pose", "kept");
   decided(30, "explore:steps", "kept", true);
-  state.rolls = [9];
+  state.rolls = [54];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  state.rolls = [10];
+  state.rolls = [55];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
 });
 
@@ -2116,6 +2116,65 @@ test("an exploited idea draws its steps, guidance and aspect ratio by taste", as
     [job.input.steps, job.input.cfg, job.input.width, job.input.height],
     [28, 3.5, 832, 1216],
   );
+});
+
+test("Krea 2 runs at no fewer than 8 steps, however few its taste scores", async (t) => {
+  const krea = {
+    ...profiles[0],
+    workflow: "family:krea2",
+    capabilities: { steps: true },
+    defaults: { width: 1024, height: 1024, steps: 4 },
+  };
+  const { dream, taste, dreamOnce } = fixture(t, [krea]);
+  taste.record("alice", [tasteSignal("like", "a", { profileId: "flux", steps: 4 })]);
+  await dream.save("alice", { enabled: true });
+  assert.equal((await dreamOnce())?.input.steps, 8);
+  taste.record("alice", [tasteSignal("like", "b", { profileId: "flux", steps: 12 })]);
+  assert.equal((await dreamOnce())?.input.steps, 12);
+});
+
+test("Dream stops exploring a profile that keeps poorly", async (t) => {
+  const { dream, state, taste, dreamOnce, generated } = fixture(t);
+  taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen" })]);
+  for (let index = 0; index < 20; index++)
+    generated({
+      id: `judged-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `judged ${index}`,
+      settings: { profileId: "flux" },
+      dream: {
+        prompt: `judged ${index}`,
+        why: "",
+        at: "",
+        state: index < 2 ? "kept" : "discarded",
+        passReason: "taste",
+      },
+    });
+  await dream.save("alice", { enabled: true });
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.deepEqual([job?.input.profileId, job?.dream?.arm], ["qwen", "explore:prompt"]);
+});
+
+test("A plain skip teaches weakly, and a full backlog pauses Dream without discarding it", async (t) => {
+  const { dream, state, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const first = (await dreamOnce())!;
+  dream.pass("alice", [`${first.id}-0`], "skip");
+  assert.equal(taste.read("alice").signals[0].kind, "skip");
+  for (let index = 0; index < 60; index++)
+    state.items.push({
+      id: `waiting-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      dream: { prompt: "p", why: "", at: "", state: "unseen" },
+    });
+  assert.equal(await dreamOnce(), undefined);
+  assert.match(state.logs.at(-1)!, /Dream waits while 60 results are unseen/);
+  assert.equal(dream.unseen("alice").length, 60);
 });
 
 test("Dream mostly compares models and LoRAs, rarely steps or guidance, and steps only with a steps control", async (t) => {
