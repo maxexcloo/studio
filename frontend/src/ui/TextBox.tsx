@@ -55,7 +55,6 @@ export function TextBox({
   onChange,
   tools,
   menuLabel,
-  copyBefore,
   send,
   busy,
   popups,
@@ -75,8 +74,6 @@ export function TextBox({
   /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
   menuLabel?: string;
-  /** Also offers Copy in the menu before this tool. */
-  copyBefore?: string;
   /** The send, which stays beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
@@ -236,9 +233,7 @@ export function TextBox({
       const [first = [], ...rest] = groups;
       return [[{ id: tool.id, label: tool.label, heading: true }, ...first], ...rest];
     }),
-    (tools ?? [])
-      .filter((action) => !action.menu)
-      .flatMap((action) => (action.id === copyBefore ? [copy, action] : [action])),
+    (tools ?? []).filter((action) => !action.menu),
   ];
   // Without tools a desktop box has no menu, and a busy tool spins its Reset instead.
   const menuless = !mobile && tools?.length === 0;

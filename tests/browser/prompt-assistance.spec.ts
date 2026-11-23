@@ -346,7 +346,6 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
     "Custom…",
     "Refresh",
     "Write Negative",
-    "Copy",
     "Recent Prompts",
   ]);
   await expandAssistantMenu(menu, "Templates");
