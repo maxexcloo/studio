@@ -32,32 +32,7 @@ test("the migrations route answers administrators with every step's plan, and lo
 
   assert.deepEqual(await post({ apply: true }, "user"), { code: 403, body: refusal.payload });
   const steps = (applied) => ({
-    dreamAnimationStars: { applied, stars: 0, owners: {} },
-    mcpOwnership: { applied, document: false, rows: {}, conflicts: [] },
-    galleryRatings: { applied, likes: 0, unstarred: 0, dislikes: 0, signals: 0 },
-    characterGenerated: { applied, characters: 0, cards: [] },
-    legacyShapes: { applied, arms: 0, notes: 0, editsFile: false },
-    loraStacks: { applied, accounts: 0 },
-    dreamDefaultChoices: { applied, settings: 0, accounts: 0 },
-    tasteDislikes: { applied, accounts: 0 },
-    spicyPrompts: { applied, accounts: 0 },
-    chatBriefRemoval: { applied, accounts: 0, dropped: 0 },
-    imageSizeDefaults: { applied, profiles: [] },
-    whereWorkRuns: { applied, accounts: 0 },
-    localTextAuto: { applied, accounts: 0 },
-    profileAliases: { applied, aliases: 0, records: 0, renames: {}, unmatched: {} },
-    flux2Records: {
-      applied,
-      records: 0,
-      modelFile: 0,
-      profileName: 0,
-      textEncoder: 0,
-      unresolved: 0,
-    },
-    dreamInbox: { applied, suggestions: 0, snoozed: 0, projects: 0, accounts: 0 },
     cloudModelsPreference: { applied, accounts: 0 },
-    // Needs Studio stopped, so the running server only plans it.
-    runtimeSettings: { applied: false, settings: 0 },
   });
   assert.deepEqual(await post({}), {
     code: 200,
@@ -68,7 +43,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefRemoval: 0 nothing to do; imageSizeDefaults: 0 nothing to do; whereWorkRuns: 0 nothing to do; localTextAuto: 0 nothing to do; profileAliases: 0 nothing to do; flux2Records: 0 nothing to do; dreamInbox: 0 nothing to do; cloudModelsPreference: 0 nothing to do; runtimeSettings: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefRemoval: 0 nothing to do; imageSizeDefaults: 0 nothing to do; whereWorkRuns: 0 nothing to do; localTextAuto: 0 nothing to do; profileAliases: 0 nothing to do; flux2Records: 0 nothing to do; dreamInbox: 0 nothing to do; cloudModelsPreference: 0 nothing to do; runtimeSettings: 0 nothing to do",
+    "[migrations] Dry run: cloudModelsPreference: 0 nothing to do",
+    "[migrations] Apply: cloudModelsPreference: 0 nothing to do",
   ]);
 });

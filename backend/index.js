@@ -824,7 +824,6 @@ registerResultSetRoutes(app, {
 });
 registerMigrationRoutes(app, {
   dataDir,
-  store,
   adminRefusal,
 });
 registerCompareRoutes(app, {

@@ -269,33 +269,14 @@ export class McpMedia {
     this.profileRequests = new Map();
     this.enqueuePhase = Promise.resolve();
     this.dataDir = dataDir;
-    this.ownership = mcpOwnership(runtimeDatabase(dataDir));
-    // Until migrate-runtime's mcpOwnership step moves the old document into rows, MCP refuses work
-    // rather than miss its records.
-    this.moving = this.oldDocument();
+    /** MCP's records (persistence/mcp-ownership.ts), each change written as it happens. */
+    this.rows = mcpOwnership(runtimeDatabase(dataDir));
     this.cloudUnavailableUntil = 0;
     this.key = signingKey || savedDocument(dataDir, "mcp-signing-key");
     if (!this.key) {
-      if (this.moving)
-        throw new Error(
-          "MCP's records are still in the mcp-ownership document: apply migrate-runtime's mcpOwnership step first.",
-        );
       this.key = crypto.randomBytes(32).toString("base64url");
       writeRuntimeDocument(dataDir, "mcp-signing-key", this.key);
     }
-  }
-  /** MCP's records (persistence/mcp-ownership.ts), each change written as it happens. */
-  get rows() {
-    if (this.moving && (this.moving = this.oldDocument()))
-      throw new Error("Studio is moving its MCP records; try again in a minute.");
-    return this.ownership;
-  }
-  oldDocument() {
-    return Boolean(
-      runtimeDatabase(this.dataDir)
-        .prepare("SELECT 1 FROM studio_documents WHERE name = 'mcp-ownership'")
-        .get(),
-    );
   }
   get publicUrl() {
     return typeof this.publicBase === "function" ? this.publicBase() : this.publicBase;
