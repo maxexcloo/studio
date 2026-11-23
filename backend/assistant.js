@@ -56,6 +56,7 @@ import { cleanTriggers } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
 import { minorAgeRefusal } from "./minor-age.js";
+import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
 const gatewayKeys = [
@@ -64,34 +65,57 @@ const gatewayKeys = [
   "STUDIO_ASSISTANT_CLOUD_MODEL",
 ];
 // A gallery item's title, from its prompt.
-const titleInstructions = `Title what the text below describes: the prompt that made an image or video. Reply with only ${titleRule}, without quotes or punctuation.`;
+const titleInstructions = () =>
+  promptInstruction("gallery-title", {
+    titleRule,
+  });
 // A character card's description (Make Character), which leads a prompt with the card's images.
 // Clothing stays out: a card's character changes outfits, and a described one fights the prompt's.
-const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other outfits and scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos). Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "red-haired woman in her thirties, freckles, slim build, scar over left eye". Leave out clothing, the setting, pose, expression, lighting and style, and never guess a name or identity.`;
+const characterInstructions = () =>
+  promptInstruction("describe-character", {
+    maxCardDescription,
+  });
 // The same for outfit and scene cards (shared/characters.ts cardKinds): only what the card adds.
 const cardInstructions = {
   characters: characterInstructions,
-  outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its color, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style.`,
-  scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style.`,
+  outfits: () =>
+    promptInstruction("describe-outfit", {
+      maxCardDescription,
+    }),
+  scenes: () =>
+    promptInstruction("describe-scene", {
+      maxCardDescription,
+    }),
 };
 // A card's name and description ideas from its images (the card editors' ▾ beside each field).
 const cardIdeaInstructions = {
   name: (kind, count) =>
-    `Suggest ${count} useful, distinct names for the ${cardKinds[kind].name} in the images, short and memorable, each fitting how it looks: ${kind === "characters" ? "a given name or nickname, never a real person's name or identity" : "two to four words naming it"}, under ${maxCardName} characters, in Title Case.`,
+    promptInstruction("card-name-ideas", {
+      count,
+      cardKind: cardKinds[kind].name,
+      media:
+        kind === "characters"
+          ? "a given name or nickname, never a real person's name or identity"
+          : "two to four words naming it",
+      maxCardName,
+    }),
   description: (kind, count) =>
-    `${cardInstructions[kind]} Write ${count} useful, distinct phrases, each stressing different details or worded differently.`,
+    promptInstruction("card-description-ideas", {
+      description: cardInstructions[kind](),
+      count,
+    }),
 };
 // What makes an image a good reference for each card kind, for rating a card's images.
 const cardRatings = {
-  characters:
-    "how well it shows one person's lasting look for an image model to keep: one clearly visible person, the face sharp and unobstructed, even light, little hiding hair or features",
-  outfits:
-    "how well it shows a whole outfit to copy: the clothing fully visible from head to toe, footwear included, unobstructed and evenly lit",
-  scenes:
-    "how well it shows a setting to reuse: the place clearly visible, not crowded by people, evenly lit",
+  characters: "rate-character-reference",
+  outfits: "rate-outfit-reference",
+  scenes: "rate-scene-reference",
 };
 const rateInstructions = (kind, count) =>
-  `Rate each of the ${count} images, in order, from 1 (unusable) to 5 (ideal) for ${cardRatings[kind]}. Reply with only JSON: {"ratings":[{"rating":4,"note":"a few words why"}]}, one entry per image.`;
+  promptInstruction("rate-card-reference", {
+    count,
+    criteria: promptInstruction(cardRatings[kind]),
+  });
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
 export const reasoningEfforts = {
@@ -456,42 +480,51 @@ function rewriteInstructions({
       ? guide.presets[preset.id].trim()
       : "";
   const triggers = stack.flatMap((item) => cleanTriggers(item.triggers));
-  return [
-    `You rewrite prompts for the ${media} model ${label}. Follow its prompting guide below.`,
+  return promptInstruction("rewrite", {
+    media,
+    label,
     precedence,
-    "Reply with the rewritten prompt only. Use section labels when the guide requires them, preserve any literal quotations, and omit preamble, Markdown, and notes.",
-    "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
-    fidelity,
-    keepDescriptions,
-    standalonePrompt,
-    subjectFirst,
-    proportionate,
-    `${matchEffort} Then apply the style below.`,
+    fidelity: fidelity(),
+    keepDescriptions: keepDescriptions(),
+    standalonePrompt: standalonePrompt(),
+    subjectFirst: subjectFirst(),
+    proportionate: proportionate(),
+    matchEffort: matchEffort(),
     americanEnglish,
-    avoidFiller(),
-    "Omit generation settings for model, quality tier, size, aspect, and count. Keep words that describe the scene or its motion, even when they could also name a setting.",
-    references && vision
-      ? `${references} reference image${references > 1 ? "s are" : " is"} attached: describe what the prompt needs from ${references > 1 ? "them" : "it"} into the rewrite, following the guide's editing advice.`
+    avoidFiller: avoidFiller(),
+    referenceContext:
+      references && vision
+        ? promptInstruction("rewrite-with-visible-references", {
+            references,
+            referenceWording: references > 1 ? "s are" : " is",
+            referenceWording2: references > 1 ? "them" : "it",
+          })
+        : "",
+    unseenReferences:
+      references && !vision
+        ? promptInstruction("rewrite-without-visible-references", {
+            references,
+            referenceWording: references > 1 ? "s are" : " is",
+            referenceWording2: references > 1 ? "them" : "it",
+          })
+        : "",
+    triggerWords: triggers.length
+      ? promptInstruction("keep-lora-trigger-words", {
+          triggers: [...new Set(triggers)].join(", "),
+        })
       : "",
-    references && !vision
-      ? `${references} reference image${references > 1 ? "s are" : " is"} attached to the generation but not shown to you; keep the prompt consistent with using ${references > 1 ? "them" : "it"}.`
+    negativeAdvice: negative ? promptInstruction("rewrite-positive-prompt") : "",
+    likedExamples: examples.length
+      ? promptInstruction("use-liked-rewrite-examples", {
+          likedPrompts: examples.map((example) => JSON.stringify(one(example, 400))).join(" "),
+        })
       : "",
-    triggers.length
-      ? `Studio adds these LoRA trigger words when it runs, so don't add them; keep any the prompt already has exactly as written: ${[...new Set(triggers)].join(", ")}.`
-      : "",
-    negative ? "Describe what should be present; the negative prompt is written separately." : "",
-    examples.length
-      ? `Prompts this person liked on this model, for their taste (never copy their subjects): ${examples.map((example) => JSON.stringify(one(example, 400))).join(" ")}`
-      : "",
-    `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
-    `Style: ${override || preset.instruction}`,
-    preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
-    storyContext(context ? { notes: context } : null),
-    // An uncensored style is offered only with Uncensored Models (assistant-routes.js).
-    contentRule(explicit || Boolean(preset.uncensored)),
-  ]
-    .filter(Boolean)
-    .join("\n");
+    guide: writerGuide(guide) || "(none; write a clear, specific natural-language prompt)",
+    style: override || preset.instruction,
+    customInstruction: preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
+    story: storyContext(context ? { notes: context } : null),
+    contentRule: contentRule(explicit || Boolean(preset.uncensored)),
+  });
 }
 
 // Bifrost's cloud/ router defines both `auto` and `uncensored`; local/auto is uncensored itself, and
@@ -906,16 +939,15 @@ export function createAssistant(
       recommendedNegative(guide, { cfg: cfg ?? 2, stack, infos }) ||
       String(guide?.negative?.default || "").trim();
     const model = await modelFor("negative", false, writer);
-    const system = [
-      `You write negative prompts for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || "in use"}.`,
-      "Reply with the negative prompt only: a short comma-separated list of unwanted traits (artifacts, defects, styles to avoid), at most 40 words, no preamble.",
-      "Never list anything the positive prompt asks for, and never add subjects.",
+    const system = promptInstruction("negative", {
+      media: profile.kind === "video" ? "video" : "image",
+      model: profile.label || profile.id || "in use",
       americanEnglish,
-      guide?.negative ? `The guide's negative advice: ${JSON.stringify(guide.negative)}` : "",
-      `Prompting guide: ${writerGuide(guide) || "(none)"}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+      negativeAdvice: guide?.negative
+        ? `The guide's negative advice: ${JSON.stringify(guide.negative)}`
+        : "",
+      guide: writerGuide(guide) || "(none)",
+    });
     try {
       const reply = await chat({
         call: "negative",
@@ -982,12 +1014,11 @@ export function createAssistant(
       about: one(info.description, 200),
       strength: strengthRange(info) || undefined,
     }));
-    const system = [
-      `You choose LoRAs (style and subject adapters) for the model ${profile.label || profile.id || "in use"}.`,
-      `From the candidates only, pick at most ${limit} that clearly help the prompt; none is fine. Reply with JSON only: {"loras": [{"name": "...", "strength": 0.8, "reason": "short reason"}]}, best first.`,
-      "Strengths stay within a candidate's range when it has one; otherwise use 0.6 to 1.",
-      `Candidates: ${JSON.stringify(listed)}`,
-    ].join("\n");
+    const system = promptInstruction("suggest-loras", {
+      model: profile.label || profile.id || "in use",
+      limit,
+      candidates: JSON.stringify(listed),
+    });
     const byName = new Map(candidates.map((item) => [item.name, item]));
     try {
       const reply = await chat({
@@ -1064,24 +1095,27 @@ export function createAssistant(
         model,
         reason: "Add an image to describe.",
       };
-    const system = [
-      vision
-        ? "Describe the attached image as a prompt that would recreate it."
-        : "Write a prompt from this description of an image; you cannot see the image itself.",
-      profile?.id
-        ? `Write it for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id}, following its guide: ${writerGuide(guide) || "(none)"}`
-        : "Write clear, specific natural language.",
-      profile?.id ? precedence : "",
-      fidelity,
-      keepDescriptions,
-      standalonePrompt,
+    const system = promptInstruction("describe-upload", {
+      source: vision
+        ? promptInstruction("describe-visible-upload")
+        : promptInstruction("describe-captioned-upload"),
+      guide: profile?.id
+        ? promptInstruction("describe-for-selected-model", {
+            media: profile.kind === "video" ? "video" : "image",
+            model: profile.label || profile.id,
+            guide: writerGuide(guide) || "(none)",
+          })
+        : promptInstruction("describe-without-model-guide"),
+      precedence: profile?.id ? precedence : "",
+      fidelity: fidelity(),
+      keepDescriptions: keepDescriptions(),
+      standalonePrompt: standalonePrompt(),
       americanEnglish,
-      contentRule(explicit),
-      avoidFiller(),
-      `Reply with JSON only: {"prompt": "...", "negative": "..." or "", "profile": one of ${JSON.stringify(profiles.map((item) => item.id).slice(0, 40))} or "", "loras": names from ${JSON.stringify(loras.map((item) => item.name).slice(0, 40))}}.`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+      contentRule: contentRule(explicit),
+      avoidFiller: avoidFiller(),
+      availableProfiles: JSON.stringify(profiles.map((item) => item.id).slice(0, 40)),
+      availableLoRAs: JSON.stringify(loras.map((item) => item.name).slice(0, 40)),
+    });
     try {
       const text = [
         vision ? "Describe this image." : `Description: ${one(hint, 2000)}`,
@@ -1140,7 +1174,7 @@ Prompt: ${context}`
       call: "caption",
       model,
       messages: [
-        { role: "system", content: captionInstructions },
+        { role: "system", content: captionInstructions() },
         { role: "user", content: userContent(instruction, [image], true) },
       ],
       temperature: 0.2,
@@ -1173,7 +1207,7 @@ Prompt: ${context}`
       call: "review",
       model,
       messages: [
-        { role: "system", content: reviewInstructions },
+        { role: "system", content: reviewInstructions() },
         { role: "user", content: userContent(`Brief:\n${brief}`, [image], true) },
       ],
       temperature: 0.2,
@@ -1196,7 +1230,11 @@ Prompt: ${context}`
       messages: [
         {
           role: "system",
-          content: `${cardInstructions[kind]} Reply with only the phrase. ${americanEnglish} ${contentRule(explicit)}`,
+          content: promptInstruction("describe-card", {
+            description: cardInstructions[kind](),
+            americanEnglish,
+            contentRule: contentRule(explicit),
+          }),
         },
         {
           role: "user",
@@ -1225,7 +1263,12 @@ Prompt: ${context}`
       messages: [
         {
           role: "system",
-          content: `${cardIdeaInstructions[field](kind, count)} Reply with only JSON: {"options":["…"]}. ${americanEnglish} ${contentRule(explicit)} ${suggestionChoices("card", explicit)}`,
+          content: promptInstruction("card-ideas", {
+            suggestion: cardIdeaInstructions[field](kind, count),
+            americanEnglish,
+            contentRule: contentRule(explicit),
+            suggestionChoices: suggestionChoices("card", explicit),
+          }),
         },
         {
           role: "user",
@@ -1295,7 +1338,7 @@ Prompt: ${context}`
       call: "title",
       model,
       messages: [
-        { role: "system", content: titleInstructions },
+        { role: "system", content: titleInstructions() },
         { role: "user", content: one(prompt, maxPromptCharacters) },
       ],
       temperature: 0.2,
@@ -1321,16 +1364,14 @@ Prompt: ${context}`
   } = {}) {
     const model = await modelFor("guide");
     const started = now();
-    const system = [
-      `You write prompting guides for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || family}${family ? ` (family ${family})` : ""}.`,
-      'Reply with JSON only, a pack with: "name", "summary" (one sentence), "patterns" (list), "rules" (list), "sampling" (object of recommended settings), "pitfalls" (list), "example" (one prompt), "negative" ({"effect": "recommended"|"optional"|"none", "default": "..."}).',
-      "Use only what the source says or what the nearest guide establishes for this family; never invent settings.",
+    const system = promptInstruction("draft-guide", {
+      media: profile.kind === "video" ? "video" : "image",
+      model: profile.label || profile.id || family,
+      family: family ? ` (family ${family})` : "",
       americanEnglish,
-      nearest ? `Nearest existing guide: ${writerGuide(nearest)}` : "",
-      `Source page: ${one(sourceText, 12000)}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+      nearestGuide: nearest ? `Nearest existing guide: ${writerGuide(nearest)}` : "",
+      sourcePage: one(sourceText, 12000),
+    });
     try {
       const reply = await chat({
         call: "guide",
@@ -1373,8 +1414,7 @@ Prompt: ${context}`
     let read = {};
     let source = "template";
     if (String(sourceText).trim()) {
-      const system =
-        'From the model page below, reply with JSON only: {"name": "...", "description": "one sentence", "uncensored": true|false|null, "steps": n|null, "cfg": n|null, "sampler": "..."|null, "scheduler": "..."|null}. Use only what the page states.';
+      const system = promptInstruction("draft-profile");
       try {
         const reply = await chat({
           call: "profile",

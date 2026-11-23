@@ -1,3 +1,5 @@
+import { promptInstruction } from "../prompt-instructions.js";
+
 /**
  * Studio's prompt-writing standard: the lines every assistant surface that writes or changes a
  * prompt shares (rewrite, Animate, suggestions, describe, Dream), and the guide as writers see it,
@@ -13,34 +15,27 @@ export const americanEnglish =
   "Use American English spelling for English prompt text (color, gray, center). Keep quoted text and any requested language exactly as given.";
 
 /** What the writer may add: only what the input states or implies. */
-export const fidelity =
-  "Ground every detail in the input and any image: never add subjects or objects, or invent specific clothing, colors or materials, that the person didn't ask for or clearly imply.";
+export const fidelity = () => promptInstruction("keep-requested-details");
 
 /** Keep concrete visual traits while interpreting comparisons as the person intended. */
-export const keepDescriptions =
-  'Preserve concrete descriptions and quotes. Translate figurative visual shorthand into visible traits: human "hourglass figure" means balanced shoulders and hips with a defined waist; "Mewtwo body" means a narrow upper body and waist with fuller hips and thighs. Omit the comparison unless the person asks to depict it literally.';
+export const keepDescriptions = () => promptInstruction("visual-descriptions");
 
-export const standalonePrompt =
-  'Describe each new scene fully in the guide format. The generation model cannot read the chat or earlier prompts, so spell out details instead of saying "same as above." For edits or animation with an attached reference, follow the guide for that mode and describe what changes or moves.';
+export const standalonePrompt = () => promptInstruction("standalone-prompts");
 
 /** Lead with known identity cues, preserving details without inferring demographics. */
-export const subjectFirst =
-  "Lead with each subject's given identity and defining appearance, including any supplied age and ethnicity. Preserve identifying details from attached references. Do not infer age or ethnicity from appearance.";
+export const subjectFirst = () => promptInstruction("preserve-identity");
 
 /** Apply specific appearance preferences without changing the rest of the brief. */
-export const proportionate =
-  "Apply each rule in proportion. If the person asks for realistic imperfections, use the requested traits or a small visible detail such as skin texture, slight asymmetry, or a freckle. Preserve their requested appearance and vary only what the brief leaves open.";
+export const proportionate = () => promptInstruction("appearance-preferences");
 
 /**
  * How a requested change is written into a prompt so it lands: edited in place and in absolute
  * words, since the image model never sees the prompt it replaces, with nothing else touched.
  */
-export const applyChange =
-  'Make the change land clearly: rewrite the words it concerns in place, replacing whatever contradicts it rather than adding beside it, and state the new result in absolute words, since the image model never sees the earlier prompt ("a red satin dress", never "a redder dress", "much bigger" or "than before"); where the change is to the person themselves (body, face, hair, clothing, pose), name it where they are first described. Keep every other word as it was and add nothing the change doesn\'t ask for (no quality, skin or style tags).';
+export const applyChange = () => promptInstruction("apply-requested-change");
 
 /** How much to change: expand a short prompt, tidy a detailed one. */
-export const matchEffort =
-  "Match the effort to the input: expand a short prompt the way the guide recommends, and only tidy a detailed one (order, grammar, repeated ideas), keeping its wording where it already works.";
+export const matchEffort = () => promptInstruction("match-draft-detail");
 
 /**
  * Overrides any guide, style or instruction asking for younger people (minor-age.js refuses them),
@@ -62,17 +57,14 @@ export function contentRule(explicit: boolean) {
 /** Creative choices share context and variety rules, while each surface keeps its own task. */
 export function suggestionChoices(kind: "image" | "video" | "card", spicy: boolean) {
   return [
-    "Infer useful choices from the current prompt and reference images first; taste is secondary and never replaces the current subject. Preserve identity, species, breed, age, ethnicity and the person's own wording except for the particular change offered. Each option is an independent choice, never a change to apply automatically. Choosing one new detail is the suggestion itself; it gives no permission to change unrelated details. If the typed prompt differs from the source picture or caption, its wording describes the proposed result and the picture is source context only.",
-    "Make alternatives meaningfully different in what they offer, not synonyms or near-duplicates with different labels. Avoid repeating already offered ideas, including paraphrases; choose details specific to this context rather than generic improvements.",
+    promptInstruction("suggestion-context"),
+    promptInstruction("suggestion-distinction"),
     kind === "card"
-      ? "These choices name or describe the same reference, not alternative appearances: vary the useful visible details stressed, without inventing or changing bodies, clothing, identity or setting. Keep each card kind's scope."
+      ? promptInstruction("suggestion-card")
       : kind === "video"
-        ? "Vary motion, subject action, expression, interaction, camera movement, atmosphere, pace or sound where the scene supports them. Keep the subject's existing appearance and anatomy; static body-shape, wardrobe or setting replacements are not motion ideas."
-        : spicy &&
-          "For a clearly adult human subject, include a non-graphic body-shape, proportion or build alternative where it would be useful and visible, alongside distinct pose, framing, outfit, setting or other relevant choices. Infer a specific alternative from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.",
-    spicy &&
-      kind !== "card" &&
-      "Include distinct non-sexual choices. When the source clearly depicts adults and a sensual direction fits the scene or request, spread sensual choices across a range from lightly suggestive to bold. Make those choices differ in what changes as well as intensity, using specific wardrobe, expression, movement or interaction that fits the scene.",
+        ? promptInstruction("suggestion-video")
+        : spicy && promptInstruction("suggestion-appearance"),
+    spicy && kind !== "card" && promptInstruction("suggestion-extended"),
     spicy &&
       "Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",
   ]

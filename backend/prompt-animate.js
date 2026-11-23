@@ -26,6 +26,7 @@ import {
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { families } from "./family-catalogue.js";
+import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
 /** An enabled Animate theme (Library › Prompt Styles) or Custom, by id; null otherwise. */
@@ -58,17 +59,20 @@ function pacing(seconds, fps = 0) {
   const order =
     "in the present tense and in order, without timestamps unless the guide asks for them";
   if (!seconds)
-    return `The clip is short: play it out as two or three beats, ${order}: a start state with movement already under way, a clear change or event, then the payoff or reaction the last frame lands on. Start moving at once, let the most interesting change land by the middle so it is seen, keep something moving to the last frame, and leave out anything that needs more time than a few seconds.`;
+    return promptInstruction("animate-short", {
+      order,
+    });
   const beats = seconds <= 6 ? 2 : 3;
   const each = Math.round((seconds / beats) * 10) / 10;
-  return [
-    `The clip is only ${seconds} seconds long${fps ? ` at ${fps} fps` : ""}: write for exactly that time.`,
-    beats === 2
-      ? `Play it out as two beats of about ${each} seconds each, ${order}: a clear change or event under way from the first second, then the payoff or reaction the last frame lands on.`
-      : `Play it out as three beats of about ${each} seconds each, ${order}: the start state with the first movement already under way, a clear change or event, then the payoff or reaction the last frame lands on.`,
-    `Start moving in the first second and let the most interesting change land by about ${Math.round(seconds * 0.6)} seconds so it is seen. Each beat advances the same main action or its reaction; a brief hold can let the result read without adding another event.`,
-    `Leave out anything that needs more than ${seconds} seconds (crossing a room, changing clothes, a long conversation, several separate actions in a row).`,
-  ].join(" ");
+  return promptInstruction("animate-pacing", {
+    seconds,
+    frameRate: fps ? ` at ${fps} fps` : "",
+    beats:
+      beats === 2
+        ? promptInstruction("two-motion-beats", { each, order })
+        : promptInstruction("three-motion-beats", { each, order }),
+    payoffTime: Math.round(seconds * 0.6),
+  });
 }
 
 /** Whether the profile makes sound with the picture. */
@@ -79,11 +83,9 @@ function makesSound(profile) {
 
 /** How the writer knows the frame: it sees it, reads its description, or has only the prompt. */
 const frameKnowledge = {
-  seen: "You can see that frame. Read it before writing: who and what is in it and exactly where; the shot size, angle and where the open space is; the light, weather and mood; and what is already in motion or about to be (a raised foot, wind in the hair, a tilted cup). Ground every movement in what is visible there.",
-  described:
-    "You can't see that frame, but its description below says what it shows. Ground every movement in that description.",
-  unknown:
-    "You can't see that frame: keep to what the prompt below states and move only what it establishes.",
+  seen: "animate-frame-seen",
+  described: "animate-frame-described",
+  unknown: "animate-frame-unknown",
 };
 
 /**
@@ -106,42 +108,28 @@ export function animateInstructions({
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
   // About two and a half spoken words a second, leaving room for the action around them.
   const speech = Math.round(2.5 * (seconds || 6));
-  return [
-    `You write motion prompts for the image-to-video model ${profile.label || profile.id}. Follow its prompting guide below.`,
+  return promptInstruction("animate", {
+    model: profile.label || profile.id,
     precedence,
-    keepDescriptions,
-    "Format: write exactly what the guide's mode asks this profile to receive, matching its example. When the profile adds section labels itself, write only the description body, with no labels, and put any dialogue and sound inside it. When the guide asks for complete sections, write every section it lists for a run with an attached image, labelled and in order, separated by blank lines. Otherwise write one flowing paragraph.",
-    writing.extend
-      ? "This continues an existing clip: its last frame is the attached image the new clip starts from, and the clip so far was made from the prompt below. Don't replay its action: escalate it or turn it, with a new development, a reaction, a reveal or a consequence of what just happened, and carry on the camera's motion from where it ended."
-      : "The attached image is the first frame, made from the prompt below; the model already sees it. Don't re-describe it: open with one short sentence anchoring the frame only where the guide asks for it (such as MiniMax H3's keyframe shot or Grok's opening composition), and otherwise spend the words on what changes.",
-    frameKnowledge[known],
-    "The source prompt is guidance on intent and mood, not proof that every described subject, prop or event is visible. Where it and the frame disagree, the frame wins. Begin from the actual pose and arrangement; carry out the requested action through physically connected movements without resetting the scene.",
-    fidelity,
+    keepDescriptions: keepDescriptions(),
+    continuation: writing.extend
+      ? promptInstruction("extend-existing-clip")
+      : promptInstruction("start-animation"),
+    frameContext: promptInstruction(frameKnowledge[known]),
+    fidelity: fidelity(),
     americanEnglish,
-    "Never contradict the frame. Keep each subject's identity, face, body, outfit, setting and style as they are unless the theme or instruction changes them.",
-    pacing(seconds, fps),
-    "Choose a visible development that suits the source and theme, with preparation, action and reaction forming one achievable sequence. A held pose or quiet reaction can be a beat; do not add a separate gesture or event just to fill it.",
-    fps && fps < 20
-      ? `At ${fps} fps fast motion judders: favor fluid, moderate-speed movement and steady camera moves.`
-      : "",
-    "Keep it clean and consistent: one through-line of action that the frame sets up, each beat following from the last, not a list of unrelated motions. Keep it alive: pick what is particular to this frame (its subject, props, weather, light) and make that move, rather than a stock gesture any image would get.",
-    "Make every beat concrete and physical: what the hands, eyes, head and body do; how hair, fabric, water, smoke, dust and light respond; how the subject touches or disturbs the things and people around them.",
-    "Give movement real-time pacing unless slow motion is requested. Describe the balance, contact and follow-through that the chosen action needs, using the subject's visible pose and surroundings.",
-    "Choose framing that keeps the action readable. Preserve requested filmmaking and camera moves, with a speed and end framing that fit the clip. Otherwise use a motivated continuous camera path or a static camera where that best serves the source and theme; do not add competing moves. Keep subjects spatially consistent as the framing changes.",
-    "Keep the source lighting and mood consistent unless the action, theme or instruction motivates a change; do not invent a light source or event to force one.",
-    audio
-      ? `This model makes sound with the picture. Use ambience and sounds caused by the visible action. Preserve requested dialogue; otherwise include speech only when the scene and theme support it, without making every person speak. Assign each line to one established speaker, with their delivery and visible lip movement, and keep the listener's reaction distinct. Do not invent a second person for an exchange or give an unseen speaker lip movement; use voiceover only when requested by the theme or instruction. Use the guide's dialogue format (double quotes when it sets none), in English unless the prompt or instruction uses another language. Keep all speech to at most about ${speech} words, shortening it for physical action and pauses so delivery and reactions fit the clip. Add music only when the scene has a source for it or the theme calls for it.`
-      : "This model makes no sound: describe only what is seen, with no quoted dialogue, sound or music; show anyone talking by their lips and gestures.",
-    `Leave out filler that shows nothing (${animateFiller.join(", ")}, stacked adjectives): name the specific movement, speed and camera path instead, so every phrase is something the viewer sees${audio ? " or hears" : ""}.`,
-    `Unless the guide sets a length, write about ${words} words.`,
-    "Reply with the prompt only, as plain text: no preamble, Markdown or notes, and no quotation marks around the whole prompt.",
-    `Theme: ${theme.instruction}`,
-    // An uncensored theme (Extended Themes) is admitted only with Uncensored Models (animateIssue).
-    contentRule(explicit || Boolean(theme.uncensored)),
-    `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    pacing: pacing(seconds, fps),
+    lowFrameRate: fps && fps < 20 ? promptInstruction("low-frame-rate-motion", { fps }) : "",
+    sound: audio
+      ? promptInstruction("motion-with-sound", { speech })
+      : promptInstruction("motion-without-sound"),
+    filler: animateFiller.join(", "),
+    sound2: audio ? " or hears" : "",
+    words,
+    theme: theme.instruction,
+    contentRule: contentRule(explicit || Boolean(theme.uncensored)),
+    guide: writerGuide(guide) || "(none; write a clear, specific natural-language prompt)",
+  });
 }
 
 /** The request as admitted: a known theme, the instruction and the source image's prompt. */

@@ -24,6 +24,7 @@ import {
 import { timeSteps, track } from "../event-loop.js";
 import { livePrompting } from "../profile/store.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
+import { promptInstruction } from "./../prompt-instructions.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
 import { maxJobsPerCall, maxSplitJobs } from "./controls.js";
@@ -44,10 +45,17 @@ const generateDedupeWindowMs = 120_000;
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Read the selected model's guide before writing finished generate prompts. Send the finished prompts as prompts and the user's original words as request. Studio runs the submitted prompts as written. Consult taste only if asked. Apply the user's explicit rules and save preferences only if asked. ${precedence} ${keepDescriptions} ${standalonePrompt} ${americanEnglish} ${subjectFirst} ${proportionate}
-Add a LoRA only when the user names one or clearly wants one. When the user requests multiple creative results, write one distinct prompt per result. "N sets of K" uses N distinct prompts with count K; use repeated seeds of one prompt only when the user asks for that kind of variation or supplies exact prompts. Keep requested identity, references and other fixed details. Vary two or more open dimensions: setting, outfit, action, framing, light or style. Across batches, continue from the number already queued and use directions the conversation hasn't used. Avoid stock motifs and defaulting to phone photos. Technical comparisons change one axis and hold the rest fixed.
-Set kind. Omit settings unless requested. Tier: ${tierWords}. Save the user's recurring theme or series in context.series using their wording and keep it across its batches. Title each distinct set for its own direction and put the short shared brief in context.notes when useful. Suggest with generate preview and wait. ${attachmentInstructions} Use upload only with the real image bytes. Use models for availability and queue for progress. For a follow-up, call reuse with its ref and your revised prompt, not a new generate.
-Reply briefly as each result says. When queued, share the links and end the turn: one round per turn; review finished results before rewriting. If the overall request exceeds the accepted batch, say how many were accepted and how many remain; don't imply later batches have been queued. Call result only when the user asks to see results, never in the background. Never poll, duplicate or invent results. Retry a connection failure once; if a tool is missing or fails, say so. Offline models queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images. Batch models, generate and review in one call per tool. Retain any set name the user explicitly supplied.`;
+const mediaInstructions = () =>
+  promptInstruction("chat-media", {
+    precedence,
+    keepDescriptions: keepDescriptions(),
+    standalonePrompt: standalonePrompt(),
+    americanEnglish,
+    subjectFirst: subjectFirst(),
+    proportionate: proportionate(),
+    tierWords,
+    attachments: attachmentInstructions,
+  });
 const unlinkedMessage =
   "This chat account isn't linked to a Studio account yet. Ask an administrator to link it in Settings › Users.";
 const anonymousMessage = "The gateway must forward its user identity.";
@@ -152,7 +160,7 @@ export function registerMcpRoutes(
     domainRequest,
     cloudVideoFailures,
   });
-  const instructions = mediaInstructions;
+
   // The prompt assistant's tools need its Bifrost gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
   // ... and the account's Prompt Assistant feature (the routes they call refuse without it too).
@@ -353,8 +361,8 @@ export function registerMcpRoutes(
           scope === "control"
             ? controlInstructions
             : actor.admin
-              ? `${instructions} ${adminInstructions}`
-              : instructions,
+              ? `${mediaInstructions()} ${adminInstructions()}`
+              : mediaInstructions(),
       },
     );
     const toolError = server.createToolError.bind(server);

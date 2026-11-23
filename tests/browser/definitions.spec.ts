@@ -551,3 +551,48 @@ test("Prompt Styles sort by type and then name, and can be filtered and edited",
   });
   await expect(table.getByText("A moving camera.")).toBeVisible();
 });
+
+test("Library edits a background prompt and reads the saved version back", async ({ page }) => {
+  await fixtures(page);
+  const initial = "Summarise the recurring subjects.";
+  let instruction = {
+    id: "summarise-taste",
+    label: "Summarise Taste",
+    area: "Dream",
+    text: initial,
+    initial,
+    hash: "current",
+    version: null as number | null,
+  };
+  await page.route("**/api/profiles/prompt-instructions", (route) =>
+    route.fulfill({ json: { instructions: [instruction] } }),
+  );
+  await page.route("**/api/profiles/prompt-instructions/summarise-taste", (route) => {
+    const { text, baseHash } = route.request().postDataJSON();
+    expect(baseHash).toBe(instruction.hash);
+    instruction = { ...instruction, text, version: 1, hash: "version-1" };
+    return route.fulfill({ json: instruction });
+  });
+  await page.route("**/api/profiles/prompt-instructions/summarise-taste/history", (route) =>
+    route.fulfill({ json: { versions: [{ version: 1, text: instruction.text }] } }),
+  );
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await section(page, "Library", "Prompt Instructions");
+  const table = page.getByRole("table", { name: "Prompt Instructions", exact: true });
+  const open = async () => {
+    await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+    return page.getByRole("dialog", { name: "Summarise Taste", exact: true });
+  };
+  const editor = await open();
+  const text = editor.getByRole("textbox", { name: "Instruction", exact: true });
+  await expect(text).toHaveValue(initial);
+  const changed = "Summarise recurring subjects and lighting.";
+  await text.fill(changed);
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  await open();
+  await expect(text).toHaveValue(changed);
+  await expect(editor.getByRole("combobox", { name: "Load Version", exact: true })).toBeVisible();
+});

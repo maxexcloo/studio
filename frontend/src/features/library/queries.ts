@@ -101,3 +101,18 @@ export const promptStylesQuery = queryOptions({
   queryKey: [...definitionsKey, "prompt-styles"],
   queryFn: () => api<PromptStyleList>("/api/profiles/prompt-styles"),
 });
+
+export interface PromptInstruction {
+  id: string;
+  label: string;
+  area: string;
+  text: string;
+  initial: string;
+  hash: string;
+  version: number | null;
+}
+export const promptInstructionsPath = "/api/profiles/prompt-instructions";
+export const promptInstructionsQuery = queryOptions({
+  queryKey: [...definitionsKey, "prompt-instructions"],
+  queryFn: () => api<{ instructions: PromptInstruction[] }>(promptInstructionsPath),
+});
