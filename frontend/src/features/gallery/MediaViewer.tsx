@@ -833,7 +833,6 @@ export function MediaViewer({
                       </ActionBarSurface>
                     ) : (
                       <MediaViewerActions
-                        key={displayed.id}
                         item={displayed}
                         compare={compare}
                         iterate={iterate}
