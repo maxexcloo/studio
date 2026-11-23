@@ -30,9 +30,9 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
-`STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` pick a fresh composer's profiles (else the first ready one).
+`STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` pick a fresh composer's profiles (else the first ready one), and `STUDIO_DEFAULT_TEXT_PROFILE` the default text model (else the gateway's); administrators also set them in **Settings › Studio**.
 
-Administrators set shared Dream delays in **Settings › Administration › Dream**. Use `STUDIO_DREAM_IMAGE_IDLE_MINUTES` and `STUDIO_DREAM_VIDEO_IDLE_MINUTES` to control the wait after each account's latest generation request. `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` controls how long the shared queue must be idle before Dream changes local image models or LoRAs.
+Administrators set shared Dream delays in **Settings › Administration › Dream**. Use `STUDIO_DREAM_IMAGE_IDLE_MINUTES` and `STUDIO_DREAM_VIDEO_IDLE_MINUTES` to control the wait after each account's latest generation request. `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` controls how long the shared queue must be idle before Dream changes local image models or LoRAs. `STUDIO_DREAM_OVERRIDE_ENABLED`, `STUDIO_DREAM_OVERRIDE_SPICY` (`1` or `0`), `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` and `STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND` (`cloud` or `local`) force that Dream setting on every account; unset, each account chooses.
 
 Accounts choose Cloud or Local for Dream images and videos in **Settings › Where Work Runs**. Administrators can set either choice for all accounts in **Administration › Dream**.
 
@@ -104,7 +104,7 @@ Use an ordinary Studio account for this shared connection. Every authorised Open
 
 The optional prompt assistant accepts an OpenAI-compatible Chat Completions endpoint directly or through Bifrost. Set `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` to the endpoint's URL, key and model ID. Leave all three unset to run Studio without the assistant. With managed local text workloads, `STUDIO_LOCAL_TEXT_MODEL` supplies their model ID.
 
-**Background AI** (**Settings › Maintenance**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
+**Background AI** (**Settings › Studio**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
 
 `mise run eval:assistant` replays the recorded cases in `backend/fixtures/assistant-evals/` against the live gateway; `--record` writes the replies back for review.
 
