@@ -41,7 +41,7 @@ import {
 } from "../../shared/resolution.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
-import { dreamVideoSlot } from "../animate-profile.js";
+import { dreamVideoSlot, uncensoredDreamProfile } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { profileAspectSize } from "../generation-defaults.js";
@@ -221,6 +221,7 @@ type DreamReadiness = Pick<DreamItem, "id" | "type" | "status" | "dream" | "resu
 export interface DreamProfile extends NonNullable<Parameters<typeof availableResolutions>[0]> {
   id: string;
   provider?: string;
+  uncensored?: boolean;
   kind?: string;
   label?: string;
   model?: string;
@@ -746,6 +747,7 @@ export function createDream(options: {
       height: number;
       extend?: string;
       backend: "local" | "cloud";
+      allowUncensored: boolean;
       unavailable: ReadonlySet<string>;
       alternate?: (profiles: DreamProfile[], chosen: DreamProfile) => DreamProfile | undefined;
     },
@@ -1654,10 +1656,13 @@ export function createDream(options: {
     if (!writer) throw new Error("The prompt assistant is not configured.");
     const access = options.access(ownerId);
     if (!access) throw new Error("This account is unavailable.");
+    const record = read(ownerId);
     const profile = (await options.catalogue(ownerId, access.account)).profiles.find(
       (item) => item.id === job.input.profileId,
     );
     if (!profile) throw new Error("The model is no longer ready.");
+    const refusal = dreamProfileIssue(job, profile, record.settings.spicy && access.uncensored);
+    if (refusal) throw new Error(refusal);
     const {
       loras = [],
       reword,
@@ -1716,9 +1721,8 @@ export function createDream(options: {
           ["Pinned Scene", scene && `${scene.name}: ${scene.description}`],
         ].filter(([, value]) => value)
       : [];
-    // Rechecked here: the account may have lost Uncensored Models since the job was queued.
-    const spicy = (job.input.writing as DreamWriting).spicy && access.uncensored;
-    const record = read(ownerId);
+    const spicy =
+      (job.input.writing as DreamWriting).spicy && record.settings.spicy && access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
     const { summary, rules, likes, styles, avoid, preferences } = options.taste.read(ownerId);
     const forbidden = forbiddenMotifs(
@@ -1737,7 +1741,7 @@ export function createDream(options: {
       : [];
     const ruleLines = rules.length ? ["Their rules:", ...rules.map((rule) => `- ${rule}`)] : [];
     const media = kindOf(profile);
-    const model = await writer.model("dream", false, options.text(ownerId));
+    const model = await writer.model("dream", false, text(ownerId));
     const guide = `Prompting guide: ${writerGuide(options.guide(profile)) || "(none)"}`;
     const writingRules = [precedence, keepDescriptions, standalonePrompt];
     const briefLines = brief.length
@@ -2121,6 +2125,8 @@ export function createDream(options: {
     const judged =
       (record.judged?.length || 0) + options.count(ownerId, { dreamState: ["kept", "discarded"] });
     const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
+    const allowUncensored = record.settings.spicy && access.uncensored;
+    let checkText = !allowUncensored;
     let reason = "";
     let idle = "";
     for (const kind of due) {
@@ -2140,6 +2146,14 @@ export function createDream(options: {
         );
         continue;
       }
+      if (checkText) {
+        try {
+          await writer.model("dream", false, text(ownerId));
+        } catch (error) {
+          return { status: "unavailable", reason: (error as Error).message };
+        }
+        checkText = false;
+      }
       if (kind === "video") {
         // One Dream video runs at a time.
         if (store.openDreamJobs().some((job) => kindOf(job) === "video")) {
@@ -2153,7 +2167,11 @@ export function createDream(options: {
         const key = [
           backend,
           ...(await options.catalogue(ownerId, access.account)).profiles
-            .filter((profile) => kindOf(profile) === "video")
+            .filter(
+              (profile) =>
+                kindOf(profile) === "video" &&
+                (allowUncensored || !uncensoredDreamProfile(profile)),
+            )
             .map((profile) => `${profile.id}:${profile.mediaInputs?.length}`),
         ].join();
         const missed = videoMisses.get(ownerId);
@@ -2174,12 +2192,20 @@ export function createDream(options: {
         ...available,
         profiles: available.profiles.filter(
           (profile) =>
-            isCloudProfile(profile) === (backend === "cloud") && !failing.has(profile.id),
+            isCloudProfile(profile) === (backend === "cloud") &&
+            (allowUncensored || !uncensoredDreamProfile(profile)) &&
+            !failing.has(profile.id),
         ),
       };
       const steer = kind === "image" && record.steer?.remaining ? record.steer : undefined;
+      const restrictedSource =
+        !allowUncensored &&
+        available.profiles.some(
+          (profile) => profile.id === steer?.profileId && uncensoredDreamProfile(profile),
+        );
       if (
         steer?.profileId &&
+        !restrictedSource &&
         !catalogue.profiles.some((profile) => profile.id === steer.profileId)
       ) {
         reason = "The source image's model isn't ready.";
@@ -2735,6 +2761,32 @@ export function createDream(options: {
   function spicyShare(record: DreamRecord, access: DreamAccess) {
     return record.settings.spicy && access.uncensored && chance(shares.spicy);
   }
+  function allowsUncensored(ownerId: string) {
+    return read(ownerId).settings.spicy && options.access(ownerId)?.uncensored === true;
+  }
+  function text(ownerId: string): TextWriter {
+    const writer = options.text(ownerId);
+    return allowsUncensored(ownerId)
+      ? writer
+      : { ...writer, uncensored: false, censoredOnly: true };
+  }
+  function dreamProfileIssue(job: OwnedJob, profile: DreamProfile, allowUncensored: boolean) {
+    const pinned = profile.backendOptions?.find((option) => option.id === job.input.profileBackend);
+    if (
+      !allowUncensored &&
+      (pinned?.profile ? pinned.profile.uncensored : uncensoredDreamProfile(profile))
+    )
+      return "Dream's content setting does not allow the selected model.";
+  }
+  async function queuedProfileIssue(job: OwnedJob) {
+    if (allowsUncensored(job.ownerId)) return;
+    const access = options.access(job.ownerId);
+    if (!access) return "This account is unavailable.";
+    const { profiles } = await options.catalogue(job.ownerId, access.account);
+    const profile = profiles.find((item) => item.id === job.input.profileId);
+    if (!profile) return "The model is no longer ready.";
+    return dreamProfileIssue(job, profile, allowsUncensored(job.ownerId));
+  }
   /**
    * Queues a video that animates the account's best still or extends one of its videos
    * (videoSources), on its selected backend; answers why it couldn't, or "".
@@ -2803,6 +2855,7 @@ export function createDream(options: {
     try {
       choice = await options.videoProfile(ownerId, access.account, {
         backend: record.settings.videoBackend,
+        allowUncensored: record.settings.spicy && access.uncensored,
         width: Number(item.width) || 0,
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
@@ -3385,6 +3438,9 @@ export function createDream(options: {
     },
     tick,
     write: writeJob,
+    text,
+    allowsUncensored,
+    queuedProfileIssue,
     start() {
       timer ||= setInterval(() => void tracked("Dream", tick).catch(tickFailed), tickMs);
       timer.unref();

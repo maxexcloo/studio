@@ -140,7 +140,7 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
   ]);
 });
 
-test("Unfinished Items in Settings › Maintenance retry, stop and clear any account's stuck jobs", async ({
+test("Unfinished Items in Settings › Workers retry, stop and clear any account's stuck jobs", async ({
   page,
 }) => {
   await fixtures(page);
@@ -170,10 +170,9 @@ test("Unfinished Items in Settings › Maintenance retry, stop and clear any acc
     jobs = body.jobs ? [] : jobs.filter((entry) => entry.id !== body.id);
     return route.fulfill({ json: { job: jobs[0] } });
   });
-  await page.goto("/settings#maintenance");
-  const row = page.getByRole("region", { name: "Queue", exact: true });
-  await expect(row.getByText(/2 now\.$/)).toBeVisible();
-  await row.getByRole("button", { name: "Review", exact: true }).click();
+  await page.goto("/settings#workers");
+  const unfinished = page.getByRole("button", { name: "Unfinished Items", exact: true });
+  await unfinished.click();
   const dialog = page.getByRole("dialog", { name: "Unfinished Items", exact: true });
   await expect(dialog.getByRole("row", { name: "A lost lighthouse" })).toContainText(
     "member@example.test",
@@ -189,7 +188,7 @@ test("Unfinished Items in Settings › Maintenance retry, stop and clear any acc
   // Every listed job at once: Stop All and Clear All confirm first.
   jobs = [job("one", "member", "A first owl"), job("two", "admin", "A second owl")];
   await page.reload();
-  await row.getByRole("button", { name: "Review", exact: true }).click();
+  await unfinished.click();
   await expect(dialog.getByRole("row", { name: "A second owl" })).toBeVisible();
   await dialog.getByRole("button", { name: "Clear All", exact: true }).click();
   const clearAll = page.getByRole("dialog", { name: "Clear All Unfinished Items", exact: true });
@@ -224,8 +223,6 @@ test("Unfinished Items in Settings › Maintenance retry, stop and clear any acc
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
 
-  await page.goto("/settings#workers");
-  const unfinished = page.getByRole("button", { name: "Unfinished Items", exact: true });
   await unfinished.focus();
   await page.keyboard.press("Enter");
   await expect(dialog.getByText("No Unfinished Items", { exact: true })).toBeVisible();
@@ -266,14 +263,14 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   expect(state.preferences.preferences.tileCaptions).toBe(true);
 });
 
-test("An administrator turns LoRAs and Uncensored off for itself in Settings › Preferences", async ({
+test("An administrator turns LoRAs and Uncensored off for itself in Where Work Runs", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   state.preferences.grants = { cloudModels: true, loras: true, uncensoredModels: true };
-  await page.goto("/settings#preferences");
-  const models = page.getByRole("region", { name: "Models", exact: true });
+  await page.goto("/settings#where-work-runs");
+  const models = page.getByRole("region", { name: "Model Access", exact: true });
   await expect(models.getByRole("switch")).toHaveCount(2);
   const loras = models.getByRole("switch", { name: "LoRAs", exact: true });
   await expect(loras).toBeChecked();
@@ -349,48 +346,12 @@ test("Where Work Runs saves each group’s processing and default models", async
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Local");
   await expect.poll(() => state.preferences.preferences.videos).toBe("local");
+  await group("Images").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
+  await page.getByRole("option", { name: "16:9", exact: true }).click();
+  await expect.poll(() => state.preferences.preferences.imageAspect).toBe("16:9");
   const dreamImages = group("Dream").getByRole("radiogroup", { name: "Dream Images" });
   await dreamImages.getByText("Cloud", { exact: true }).click();
   await expect.poll(() => dream.settings.imageBackend).toBe("cloud");
-});
-
-test("Finish Liked Images in Settings › Preferences saves its switch, quality and face detail", async ({
-  page,
-}) => {
-  await fixtures(page);
-  const status = {
-    settings: { enabled: false, quality: "balanced", faceDetail: true },
-    waiting: 0,
-  };
-  const saves: Record<string, unknown>[] = [];
-  await page.route("**/api/finishing**", (route) => {
-    if (route.request().method() === "PUT") {
-      const patch = route.request().postDataJSON();
-      saves.push(patch);
-      Object.assign(status.settings, patch);
-      if (patch.enabled) status.waiting = 3;
-    }
-    return route.fulfill({ json: status });
-  });
-  await page.goto("/settings#preferences");
-  const toggle = page.getByRole("switch", { name: "Finish Liked Images", exact: true });
-  await expect(toggle).not.toBeChecked();
-  await expect(page.getByRole("combobox", { name: "Finishing Quality", exact: true })).toHaveCount(
-    0,
-  );
-  await toggle.click({ force: true });
-  await expect(toggle).toBeChecked();
-  await expect(
-    page.getByText("Upscale images you like while the GPU is idle. 3 waiting.", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("combobox", { name: "Finishing Quality", exact: true }).click();
-  await page.getByRole("option", { name: "High", exact: true }).click();
-  const face = page.getByRole("switch", { name: "Face Detail", exact: true });
-  await face.click({ force: true });
-  await expect(face).not.toBeChecked();
-  await expect
-    .poll(() => saves)
-    .toEqual([{ enabled: true }, { quality: "high" }, { faceDetail: false }]);
 });
 
 test("Header appearance preferences persist across reloads", async ({ page }) => {
@@ -989,7 +950,7 @@ test("Settings › Maintenance switches follow at once and settle back after a f
   });
   await page.goto("/settings#maintenance");
   const toggle = page
-    .getByRole("region", { name: "Background AI", exact: true })
+    .getByRole("region", { name: "Gallery", exact: true })
     .getByRole("switch", { name: "Gallery Captions", exact: true });
   await expect(toggle).toBeChecked();
   await toggle.click({ force: true });

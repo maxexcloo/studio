@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, stamp, toolbarSearch } from "./fixtures";
+import { expandAssistantMenu, fixtures, image, stamp, toolbarSearch } from "./fixtures";
 
 const result = (id: string, title: string, createdAt = stamp) => ({
   id,
@@ -97,4 +97,28 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await page.keyboard.press("Escape");
   await expect(deck).toBeHidden();
   await expect(search).toHaveValue("Bird");
+});
+
+test("Gallery Review offers suggestions for the current result", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push({ ...result("bird", "Amber Bird"), jobId: "bird-job" });
+  const asked: string[] = [];
+  await page.route("**/api/suggestions", (route) => {
+    asked.push(route.request().postDataJSON().itemId);
+    return route.fulfill({
+      json: {
+        suggestions: [
+          { label: "Later Light", request: "change the light", prompt: "Bird at dusk" },
+        ],
+      },
+    });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Review Gallery", exact: true }).click();
+  const deck = page.getByRole("dialog", { name: "Review Gallery", exact: true });
+  await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
+  const menu = page.getByRole("menu").first();
+  await expandAssistantMenu(menu, "Suggestions");
+  await expect(menu.getByRole("menuitem", { name: "Later Light", exact: true })).toBeVisible();
+  expect(asked).toEqual(["bird"]);
 });

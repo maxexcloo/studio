@@ -229,6 +229,7 @@ export function DreamDeck({
   media,
   empty,
   quickRating = false,
+  onSuggestionApplied,
 }: {
   items: DreamItem[];
   setDecided: Dispatch<SetStateAction<Set<string>>>;
@@ -241,6 +242,7 @@ export function DreamDeck({
   empty: ReactNode;
   /** Gallery's rating mode uses left for Dislike and right for Like. */
   quickRating?: boolean;
+  onSuggestionApplied?: () => void;
 }) {
   const phone = usePhone();
   const stage = useRef<HTMLDivElement>(null);
@@ -581,8 +583,13 @@ export function DreamDeck({
         hidden={!!viewing}
         leading={undoButton}
         trailing={
-          viewing || quickRating ? undefined : (
-            <DreamSuggestions card={top} side={shown} onMore={() => void act("more")} />
+          !viewing && (
+            <DreamSuggestions
+              card={top}
+              side={shown}
+              onMore={() => void act("more")}
+              onApplied={onSuggestionApplied}
+            />
           )
         }
       />
@@ -599,6 +606,7 @@ export function DreamDeck({
         <DreamPreview
           card={top}
           quickRating={quickRating}
+          onSuggestionApplied={onSuggestionApplied}
           side={shown}
           setSide={(side) => open(top, side)}
           overrides={setDraft?.key === top.key ? setDraft?.overrides : undefined}

@@ -48,8 +48,8 @@ export function createGenerationQueue({
   cloudProvider,
   completed,
   directCloud,
+  dream,
   dreamImageSwitchMinutes,
-  dreamIdleWait,
   generationRoutes,
   promptStage,
   recoverRunningJobs,
@@ -66,8 +66,8 @@ export function createGenerationQueue({
   };
   // Jobs whose admission, which takes their lease, is under way.
   const admitting = new Set();
-  // Work goes to a worker picked by load (pickWorker in workers.js); background work (MCP, Dream,
-  // finishing) breaks ties towards the last worker, keeping the first free for manual work.
+  // Work goes to a worker picked by load (pickWorker in workers.js); MCP and Dream break ties
+  // towards the last worker, keeping the first free for manual work.
   async function queueResourceFor(input, priority = queuePriority.manual) {
     if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
     const models = await mediaModels(false)
@@ -207,6 +207,7 @@ export function createGenerationQueue({
           prompt,
           preset: "custom",
           instruction: `The provider's moderation refused this prompt (${reason.slice(0, 200)}). Keep its subject, scene, action and camera; soften only the wording likely to have tripped moderation.`,
+          ...(job.dream && { writer: dream().text(job.ownerId) }),
           signal: AbortSignal.timeout(120_000),
         });
         if (written.source !== "assistant")
@@ -280,14 +281,14 @@ export function createGenerationQueue({
     {
       ...generationAdapter,
       dreamImageSwitchMinutes,
-      dreamIdleWait,
+      dreamIdleWait: (job) => dream().idleWaitForJob(job),
       releaseAdmission: (job) => releaseLease(job.id),
       // Retries, recovered work and anything queued before the check tightened meet it here too.
-      submit: (job) => {
-        const refusal = minorAgeRefusal(job.input.prompt);
-        return refusal
-          ? Promise.resolve({ status: "failed", reason: refusal })
-          : generationAdapter.submit(job);
+      submit: async (job) => {
+        const refusal =
+          minorAgeRefusal(job.input.prompt) ||
+          (job.dream && (await dream().queuedProfileIssue(job)));
+        return refusal ? { status: "failed", reason: refusal } : generationAdapter.submit(job);
       },
       // A local generation may move to another idle worker that runs it until it starts.
       alternatives: (job) => {

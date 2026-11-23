@@ -15,6 +15,7 @@ export interface Caption {
 }
 export interface CaptionItem extends IdleItem {
   caption?: Partial<Caption>;
+  prompt?: string;
 }
 /** The assistant gateway (assistant.js). */
 export interface CaptionWriter {
@@ -22,6 +23,7 @@ export interface CaptionWriter {
   supportsVision(writer?: PromptWriter): Promise<boolean>;
   caption(request: {
     image: ModelImage;
+    prompt?: string;
     signal?: AbortSignal;
     writer?: PromptWriter;
   }): Promise<{ text: string; tags: string[]; model: string }>;
@@ -90,6 +92,7 @@ export function createCaptioner(options: {
       if (!image) throw new Error("no image to read");
       const reply = await writer!.caption({
         image,
+        prompt: item.prompt,
         signal,
         writer: options.text(item.ownerId || ""),
       });

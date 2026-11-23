@@ -133,6 +133,25 @@ test("text asks for the default on the account's Text side, uncensored only wher
   );
 });
 
+test("Dream's restricted text uses a permitted model only on the selected side", async () => {
+  const engine = createAssistant(gateway(), {
+    localText: async () => ({ model: "local/auto", vision: false }),
+  });
+  const writer = {
+    side: "local",
+    local: "local/auto",
+    cloud: "cloud/uncensored",
+    uncensored: false,
+    censoredOnly: true,
+  };
+  await assert.rejects(engine.model("dream", false, writer), /No text model is available/);
+  assert.equal(
+    await engine.model("animate", false, { ...writer, local: "local/standard" }),
+    "local/standard",
+  );
+  assert.equal(await engine.model("dream", false, { ...writer, side: "cloud" }), "cloud/auto");
+});
+
 test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {
   assert.equal(gatewaySettings({}), null);
   assert.throws(
@@ -667,7 +686,10 @@ test("caption sends the image and reads the description and tags, or plain text 
     ),
   );
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
-  const reply = await engine.caption({ image: { mime: "image/jpeg", data: "AAAA" } });
+  const reply = await engine.caption({
+    image: { mime: "image/jpeg", data: "AAAA" },
+    prompt: "Old red barn beside a field",
+  });
   assert.equal(reply.model, "cloud/auto");
   assert.equal(reply.text.length, 600);
   assert.match(reply.text, /^A red barn at noon\. x/);
@@ -675,6 +697,7 @@ test("caption sends the image and reads the description and tags, or plain text 
   assert.deepEqual(reply.tags.slice(0, 4), ["red barn", "noon", "field", "t0"]);
   const [system, user] = seen.calls[0].body.messages;
   assert.match(system.content, /apparent age range.*legible text, quoted exactly.*"tags"/s);
+  assert.match(user.content[0].text, /only to help name details you can see.*Old red barn/s);
   assert.equal(user.content[1].type, "image_url");
 
   const plain = fakeGateway(() => json("  A red barn\nat noon."));

@@ -75,7 +75,9 @@ export function createPromptStage({
     const listed = (await profiles(access)).find((item) => item.id === job.input.profileId);
     if (!listed) throw new Error("The model is no longer available to this account.");
     const profile = runProfile(listed, job.input.profileBackend);
-    const writer = promptWriter(access, accountPreferences(job.ownerId || ""));
+    const writer = job.dream
+      ? dream().text(job.ownerId)
+      : promptWriter(access, accountPreferences(job.ownerId || ""));
     // The story an MCP chat gave its result set, which its variations and clips keep to.
     const story = storyContext(job.input.resultSet?.context);
     if (writing.kind === "set")
@@ -119,7 +121,9 @@ export function createPromptStage({
       guide: guide(video),
       writing,
       clip: animateClip(job.input, video),
-      explicit: !access || mayUseFeature(access, "uncensoredModels"),
+      explicit: job.dream
+        ? Boolean(job.dream.spicy) && dream().allowsUncensored(job.ownerId)
+        : !access || mayUseFeature(access, "uncensoredModels"),
       story,
       writer,
       frame: () => frame(access, start),

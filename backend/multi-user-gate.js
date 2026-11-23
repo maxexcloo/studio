@@ -82,8 +82,7 @@ const ordinaryRoutes = [
   ["DELETE", /^\/api\/dream\/projects\/[\w-]+$/],
   // More Like This Set queues into the requester's own set (result-sets.js).
   ["POST", /^\/api\/result-sets\/more$/],
-  ["GET", /^\/api\/(finishing|upscale\/status)$/],
-  ["PUT", /^\/api\/finishing\/settings$/],
+  ["GET", /^\/api\/upscale\/status$/],
   ["POST", /^\/api\/upscale(\/cancel|\/toggle)?$/],
   ["GET", /^\/comfy\/(view|thumb|video-preview)$/],
 ];

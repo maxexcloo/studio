@@ -25,7 +25,7 @@ interface DriftedItem {
  * twice) runs once more as Run Again would, with a new seed, as a version of the drifted result in
  * its session. Each original is redone once; a redo is never redone. It queues at the account's own
  * tier, behind the work the person already queued: the redo replaces the image they asked for, so it
- * should not wait below Dream's and finishing's optional work.
+ * should run before Dream's optional work.
  */
 export function createFaceRedo(options: {
   enabled(): boolean;

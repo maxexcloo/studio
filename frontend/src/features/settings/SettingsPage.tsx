@@ -101,7 +101,7 @@ export function SettingsPage() {
           "dream-policy": <DreamAdministration />,
           generation: <GenerationSettings />,
           groups: (heading) => <GroupsAdmin heading={heading} />,
-          maintenance: <MaintenanceSettings onOpenUnfinished={unfinished.open} />,
+          maintenance: <MaintenanceSettings />,
           users: (heading) => <UsersAdmin heading={heading} />,
           workers: (heading) => (
             <WorkerSettings heading={heading} onOpenUnfinished={unfinished.open} />
