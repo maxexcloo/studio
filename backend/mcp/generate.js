@@ -710,11 +710,17 @@ export function registerGenerateTools({
       const made = await media.request(
         "POST",
         `/api/characters/${encodeURIComponent(card.id)}/sheet`,
-        {},
+        conversation
+          ? { chat: { conversationId: conversation, ...(turn ? { turnId: turn } : {}) } }
+          : {},
         owner,
         { signal },
       );
       media.adopt(owner, refs, { jobs: [made.jobId] });
+      media.recordPrompt(made.jobId, {
+        kind: "image",
+        ...(conversation ? { chat: conversation, ...(turn ? { turn } : {}) } : {}),
+      });
       const { ref, link } = media.handle(owner, refs, made.jobId);
       return {
         content: [
