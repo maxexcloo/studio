@@ -264,7 +264,9 @@ recur across features.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
   text in place, leaving the box's look unchanged, with Undo first in its AI
   menu, and show the action and changed words below the field. Suggestions
-  never act on their own, and nothing floats over the text.
+  never act on their own, and nothing floats over the text. They load as
+  their menu opens, except an empty composer prompt's ideas, which load once
+  the page is idle and again after one is picked, so its menu opens ready.
 - Report actual endpoint health: configuration alone does not prove readiness.
   A deliberately parked worker reads Stopped, not failing; an unexpectedly
   unavailable one remains a failure. Runtime controls belong in

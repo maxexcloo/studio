@@ -111,6 +111,10 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   const state = await fixtures(page);
   const asked = await suggest(page);
   await page.goto("/images");
+  const first = { surface: "composer", kind: "image", profileId: "image:test", fresh: false };
+  const fresh = { ...first, fresh: true };
+  // An empty prompt's ideas are fetched once the page is idle, before any menu opens.
+  await expect.poll(() => asked).toEqual([first]);
   const dock = page.locator("[data-composer-dock]");
   const compactMenu = await promptMenu(dock, "Prompt");
   await expect(compactMenu.getByRole("menuitem", { name: "Templates", exact: true })).toBeVisible();
@@ -128,22 +132,19 @@ test("The composer groups ideas and draft suggestions in its compact and expande
       .getByRole("combobox", { name: "Suggestions", exact: true }),
   ).toHaveCount(0);
   await prompt.click();
-  // The AI menu asks for its suggestions as it opens, and the answer serves both menus.
-  expect(asked).toEqual([
-    { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
-  ]);
   let menu = await promptMenu(page, "Prompt");
   const sorted = ideas.map((idea) => idea.label).sort((a, b) => a.localeCompare(b));
   await expect(menu.getByRole("menuitem").first()).toHaveText(sorted[0]);
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
-  expect(asked).toEqual([
-    { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
-  ]);
+  // The prewarmed answer serves both menus without asking again.
+  expect(asked).toEqual([first]);
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
-  await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
+  await expect.poll(() => asked).toEqual([first, fresh]);
   await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1].prompt);
+  // Picking an idea fetches the next set in the background.
+  await expect.poll(() => asked).toEqual([first, fresh, fresh]);
   await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("");
   await prompt.fill("A fox");
@@ -180,6 +181,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const held = [0, 1].map(() => new Promise<void>((resolve) => release.push(resolve)));
   await page.route("**/api/suggestions", async (route) => {
     const body = route.request().postDataJSON();
+    if (body.surface === "composer") return route.fallback();
     asked.push(body);
     await held[body.fresh ? 1 : 0];
     return route.fulfill({ json: { suggestions: body.fresh ? others : steps } });
