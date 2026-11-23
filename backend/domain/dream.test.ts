@@ -18,6 +18,7 @@ import {
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
+import { createChatNotes } from "./chat-notes.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
 import {
   type DreamAccess,
@@ -68,6 +69,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dataDir,
     now: () => state.clock,
   });
+  const notes = createChatNotes({ dataDir, now: () => state.clock });
   const state = {
     owners: ["alice", "bob"],
     overrides: {} as Partial<DreamSettings>,
@@ -219,6 +221,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     taste,
     projects: (ownerId) => projects.list(ownerId),
     chats: (ownerId) => projects.chats(ownerId),
+    notes: (ownerId) => notes.list(ownerId),
     owners: () => state.owners,
     access: (ownerId) => state.access[ownerId] ?? null,
     catalogue: async () => ({
@@ -417,6 +420,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     generated,
     projects,
     inbox,
+    notes,
   };
 }
 
@@ -1293,7 +1297,12 @@ test("Dream skips unavailable accounts and offline services, logging each reason
 /** Serves the Dream routes; `request` answers as the user named in its last argument. */
 async function serve(
   t: TestContext,
-  { dream, projects, inbox }: Pick<ReturnType<typeof fixture>, "dream" | "projects" | "inbox">,
+  {
+    dream,
+    projects,
+    inbox,
+    notes,
+  }: Pick<ReturnType<typeof fixture>, "dream" | "projects" | "inbox" | "notes">,
 ) {
   const app = express();
   app.use(express.json());
@@ -1301,7 +1310,13 @@ async function serve(
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream, projects, inbox, listed: (items) => items });
+  registerDreamRoutes(app as never, {
+    dream,
+    projects,
+    inbox,
+    notes,
+    listed: (items) => items,
+  });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -1540,6 +1555,43 @@ test("Dream's ideas take the account's active projects, and visits record when t
     new Date(Date.parse(firstVisit) + 10 * 60_000).toISOString(),
   );
   assert.equal((await request("")).body.since, (await request("/visit", {})).body.since);
+});
+
+test("Dream's ideas draw on chat notes: a project's own, else standing ones", async (t) => {
+  const fx = fixture(t);
+  const { dream, state, projects, dreamOnce } = fx;
+  await dream.save("alice", { enabled: true });
+  const request = await serve(t, fx);
+  const noir = projects.create("alice", { name: "Noir", brief: { subjects: "a detective" } });
+  projects.attach("alice", "chat-1", noir.id);
+  // As MCP saves them: a note from the attached chat joins its project.
+  await request("/notes", { text: "Rain-soaked 1940s Los Angeles", chat: "chat-1" });
+  await request("/notes", { text: "She's a barista who loves 90s grunge" });
+  projects.attach("alice", "chat-1", null);
+  state.replies = [{ prompt: "a detective under neon rain", title: "Neon Detective" }];
+  await dreamOnce();
+  assert.match(
+    state.calls.at(-1)!.user,
+    /Notes from their chats, as background only[^\n]*\n- Rain-soaked 1940s Los Angeles/,
+  );
+  assert.doesNotMatch(state.calls.at(-1)!.user, /barista/);
+  projects.update("alice", noir.id, { paused: true }, "you");
+  state.replies = [{ prompt: "a lighthouse keeper in a flannel shirt", title: "Keeper" }];
+  await dreamOnce();
+  assert.match(state.calls.at(-1)!.user, /- She's a barista who loves 90s grunge/);
+  assert.doesNotMatch(state.calls.at(-1)!.user, /Rain-soaked/);
+  // Chat Notes lists them newest first; a deleted one is gone, and old ones expire.
+  const listed = (await request("/notes")).body.notes;
+  assert.deepEqual(
+    listed.map((note: { text: string; project?: string }) => [note.text, note.project]),
+    [
+      ["She's a barista who loves 90s grunge", undefined],
+      ["Rain-soaked 1940s Los Angeles", noir.id],
+    ],
+  );
+  assert.equal((await request(`/notes/${listed[0].id}`, {}, "DELETE")).body.notes.length, 1);
+  state.clock += 31 * 24 * 60 * 60_000;
+  assert.deepEqual((await request("/notes")).body.notes, []);
 });
 
 test("Dream varies a project after its chat hands it over, with the source settings", async (t) => {
@@ -3265,7 +3317,7 @@ test("A failed Dream video sets its profile aside rather than sending the next o
 });
 
 test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {
-  const { dream, projects, inbox, state, dataDir, dreamOnce } = fixture(t);
+  const { dream, projects, inbox, notes, state, dataDir, dreamOnce } = fixture(t);
   await dream.save("alice", { uncensored: true, dailyImages: 12 });
   state.overrides = { enabled: true, uncensored: false };
   assert.deepEqual(dream.locked(), ["enabled", "uncensored"]);
@@ -3289,7 +3341,7 @@ test("administrator overrides win over account choices, which they leave saved, 
   assert.equal(dream.read("bob").settings.enabled, false);
 
   state.overrides = { imageBackend: "cloud" };
-  const request = await serve(t, { dream, projects, inbox });
+  const request = await serve(t, { dream, projects, inbox, notes });
   assert.equal((await request("/settings", { imageBackend: "auto" }, "PUT")).status, 400);
   assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 409);
   assert.deepEqual((await request("")).body.locked, ["imageBackend"]);

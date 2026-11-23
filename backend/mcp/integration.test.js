@@ -7738,6 +7738,29 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.deepEqual(seen.at(-1).body, {
     ops: [{ op: "rating", name: "fixture-effect.safetensors", rating: "liked" }],
   });
+
+  // Chat context: generate's series and notes, and a standing note, are kept for Dream.
+  f.app.post(
+    "/api/dream/notes",
+    record("notes", (req) => ({ notes: [{ text: req.body.text }] })),
+  );
+  const noted = jobId(
+    await generate(mine, {
+      context: { series: "Noir", notes: "She's a barista into 90s grunge." },
+    }),
+  );
+  for (let wait = 0; wait < 100 && !seen.some((entry) => entry.name === "notes"); wait++)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(seen.at(-1).body, {
+    text: "Noir: She's a barista into 90s grunge.",
+    chat: "",
+    results: [noted],
+  });
+  assert.deepEqual(
+    data(await call(mine, "taste", { action: "note", note: "We're making a moody noir series." })),
+    { saved: "We're making a moody noir series.", notes: 1 },
+  );
+  assert.deepEqual(seen.at(-1).body, { text: "We're making a moody noir series.", chat: "" });
   assert.ok(seen.every((entry) => entry.authorization.startsWith("Bearer ")));
 });
 

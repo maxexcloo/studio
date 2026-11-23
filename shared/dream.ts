@@ -92,3 +92,15 @@ export function dreamSettingError(key: keyof DreamSettings, value: unknown): str
   }
   return typeof value === "boolean" ? "" : `Set ${key} to true or false.`;
 }
+/** Context a chat gave Studio (MCP), which Dream may draw on as a soft hint. */
+export interface ChatNote {
+  id: string;
+  text: string;
+  at: string;
+  /** The project the chat was attached to. */
+  project?: string;
+  /** The jobs of the results it came with. */
+  results?: string[];
+  /** The character card it came with. */
+  card?: string;
+}

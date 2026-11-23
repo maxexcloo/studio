@@ -6,6 +6,7 @@ import {
   dreamSettingError,
 } from "../../shared/dream.ts";
 import { maxDismissReason } from "../../shared/inbox.ts";
+import type { ChatNotes } from "./chat-notes.ts";
 import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 import type { InboxStore } from "./inbox.ts";
@@ -21,11 +22,13 @@ export function registerDreamRoutes(
     dream,
     projects,
     inbox,
+    notes,
     listed,
   }: {
     dream: Dream;
     projects: Projects;
     inbox: InboxStore;
+    notes: ChatNotes;
     /** The results as lists carry them, numbered (domain/result-numbers.ts) and without what Details reads. */
     listed: <T extends object>(items: T[]) => T[];
   },
@@ -189,6 +192,23 @@ export function registerDreamRoutes(
   route("POST", "/api/dream/projects/activity", (account, { body }) =>
     answer(() => ({ project: projects.activity(owner(account), chatOf(body)) })),
   );
+  // Chat Notes: context a chat gave (MCP), under the project that chat is attached to.
+  route("GET", "/api/dream/notes", (account) => ({
+    status: 200,
+    payload: { notes: notes.list(owner(account)) },
+  }));
+  route("POST", "/api/dream/notes", (account, { body }) =>
+    answer(() => {
+      const ownerId = owner(account);
+      const { chat, text, results, card } = body || {};
+      const project = typeof chat === "string" ? projects.chats(ownerId)[chat]?.projectId : "";
+      return { notes: notes.add(ownerId, { text, results, card, project }) };
+    }),
+  );
+  route("DELETE", "/api/dream/notes/:noteId", (account, { params }) => ({
+    status: 200,
+    payload: { notes: notes.remove(owner(account), params.noteId) },
+  }));
   // Dream › Projects' Inbox: Accept (with the person's edits) applies a proposal, Undo takes it
   // back, and Dismiss or Clear snooze proposals with an optional reason.
   const shown = <T extends { proposals: { evidence: object[]; drafts?: object[] }[] }>(
