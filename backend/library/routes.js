@@ -3,7 +3,7 @@
  *
  *   GET  /api/library/imports                 import history, newest first
  *   POST /api/library/imports {url}           import a Civitai image or model link, or a Hugging Face link
- *   GET  /api/library/imports/:id             one import, its files checked in full
+ *   GET  /api/library/imports/:id             one import; its unverified files are hashed in the background
  *   DELETE /api/library/imports/:id           remove one import record (its downloaded files stay)
  *   POST /api/library/imports/clear-stale     remove every failed import, and every one waiting on a file no provider gives: {cleared}
  *   POST /api/library/imports/download-missing  Download Missing for every import: {queued, imports, failures}

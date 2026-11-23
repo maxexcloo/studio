@@ -535,7 +535,21 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
       error: "HTTP 451",
       resources: [],
     },
-    { id: "imp-ready", name: "Kept Model", state: "ready", audit: "ready", resources: [] },
+    {
+      id: "imp-ready",
+      name: "Kept Model",
+      state: "ready",
+      audit: "ready",
+      modelType: "LORA",
+      baseModel: "Flux.1 D",
+      resources: [
+        {
+          name: "kept.safetensors",
+          want: { file: "kept.safetensors", folder: "loras" },
+          status: "installed",
+        },
+      ],
+    },
   ];
   await page.route("**/api/library/imports**", (route) => {
     const { pathname } = new URL(route.request().url());
@@ -563,7 +577,11 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  const needs = page.getByRole("region", { name: "Needs Files · 1", exact: true });
+  // Each row says what the import gave and where it went.
+  const installed = page.getByRole("region", { name: "Installed · 1", exact: true });
+  await expect(installed).toContainText("LoRA · Flux.1 D · loras/kept.safetensors");
+  await expect(installed.getByText("Installed", { exact: true })).toBeVisible();
+  const needs = page.getByRole("region", { name: "Missing Files · 1", exact: true });
   await expect(needs).toContainText("missing.safetensors: Not downloaded yet");
   await needs.getByRole("button", { name: "Download All Missing", exact: true }).click();
   // A substitute shows beside the file it stands in for.
