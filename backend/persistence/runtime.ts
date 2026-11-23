@@ -115,8 +115,9 @@ export function openDatabase(filename: string): DatabaseSync {
   const db = new DatabaseSync(filename);
   // Before WAL creates the sidecars, which take the database file's mode.
   if (filename !== ":memory:") fs.chmodSync(filename, 0o600);
+  // NORMAL in WAL mode never corrupts the database; a power loss may drop only the last commits.
   db.exec(
-    "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
+    "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
   );
   return db;
 }
