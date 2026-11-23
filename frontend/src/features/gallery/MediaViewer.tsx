@@ -28,6 +28,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { usePrefetchImages } from "../../ui/usePrefetch";
 import { useRemembered } from "../auth/useRemembered";
 import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
@@ -206,7 +207,6 @@ function ViewerVideo({
  * lands on a picture.
  */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
-  const held = useRef(new Map<string, HTMLImageElement>());
   const urls =
     index < 0 || items.length < 2
       ? []
@@ -217,23 +217,7 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
             item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
           )
           .filter((url) => url !== undefined);
-  const key = urls.join("\n");
-  useEffect(() => {
-    const keep = new Map<string, HTMLImageElement>();
-    for (const url of urls) {
-      let image = held.current.get(url);
-      if (!image) {
-        image = new window.Image();
-        image.decoding = "async";
-        image.fetchPriority = "low";
-        image.src = url;
-        void image.decode().catch(() => {});
-      }
-      keep.set(url, image);
-    }
-    for (const [url, image] of held.current) if (!keep.has(url)) image.src = "";
-    held.current = keep;
-  }, [key]);
+  usePrefetchImages(urls, 4);
 }
 
 export function MediaViewer({

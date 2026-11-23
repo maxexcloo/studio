@@ -19,14 +19,14 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
-import { mediaSource } from "../gallery/mediaSource";
+import { usePrefetchImages, usePrefetchVideoMetadata } from "../../ui/usePrefetch";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import type { Verdict } from "./choices";
-import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
+import { type DeckCard, type PairDeckCard, cardIds, deckCards, deckPrefetch } from "./deck";
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
 import { CardText, DreamPreview } from "./DreamPreview";
@@ -82,17 +82,6 @@ const passLabels = {
   glitch: "Glitch",
 } satisfies Record<Exclude<DreamPassReason, "skip">, string>;
 const passReasons = Object.keys(passLabels) as (keyof typeof passLabels)[];
-/** Warms the browser cache for a card that is not on screen yet. */
-function usePrefetch(card?: DeckCard) {
-  useEffect(() => {
-    if (!card) return;
-    for (const item of card.kind === "pair" ? card.items : [card.item]) {
-      const source = mediaSource(item);
-      new Image().src = item.type === "video" ? source.thumbnailUrl || "" : source.displayUrl;
-    }
-  }, [card]);
-}
-
 export type Judgement = (
   | { card: SingleCard; verdict: Verdict; likedId?: string; overrides?: SetOverrides }
   | { card: PairDeckCard; verdict: PairAnswer }
@@ -286,14 +275,16 @@ export function DreamDeck({
     },
     (card) => decide(card),
   );
+  // The three cards shown and the five after the top one, which load ahead.
   const libraryCards: DeckCard[] = (libraryItems || [])
-    .slice(0, 3)
+    .slice(0, 6)
     .map((item) => ({ kind: "library", key: item.id, item }));
-  const cards = libraryItems
+  const coming = libraryItems
     ? current?.kind === "library" && libraryItems.some((item) => item.id === current.key)
-      ? [current, ...libraryCards.filter((card) => card.key !== current.key)].slice(0, 3)
+      ? [current, ...libraryCards.filter((card) => card.key !== current.key)].slice(0, 6)
       : libraryCards
-    : deckCards(items, { media, current });
+    : deckCards(items, { depth: 6, media, current });
+  const cards = coming.slice(0, 3);
   const [top] = cards;
   if (top !== current) setCurrent(top);
   const requestedSide =
@@ -304,7 +295,9 @@ export function DreamDeck({
         : 0;
   const shown =
     top?.kind === "set" || top?.kind === "pair" ? Math.min(requestedSide, top.items.length - 1) : 0;
-  usePrefetch(cards[2]);
+  const prefetch = deckPrefetch(coming);
+  usePrefetchImages(prefetch.images, 10);
+  usePrefetchVideoMetadata(prefetch.videos);
   const fly = useRef<Fly | null>(null);
   const previewFly = useRef<Fly | null>(null);
   const busy = useRef(false);
