@@ -40,6 +40,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
               id: "owned",
               name: document.studio.name,
               family: "flux2",
+              kind: "image",
               version: attempts > 1 ? 2 : 1,
             },
           ],
@@ -321,6 +322,7 @@ test("A combined profile's Backend select is a saved edit that switches what the
               id: "krea",
               name: document.studio.name,
               family: "krea2",
+              kind: "image",
               version: 1,
               backend: "radiance",
             },
@@ -392,7 +394,7 @@ test("Import Workflow opens a workflow, and a row's Duplicate copies its profile
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/profiles/editable")
       return route.fulfill({
-        json: { profiles: [{ id: "owned", name: "Owned Profile", version: 1 }] },
+        json: { profiles: [{ id: "owned", name: "Owned Profile", kind: "image", version: 1 }] },
       });
     return route.fulfill({ json: { id: "owned", text: JSON.stringify(original), hash: "h" } });
   });
@@ -440,7 +442,9 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
 }) => {
   await fixtures(page);
   await page.route("**/api/profiles/editable", (route) =>
-    route.fulfill({ json: { profiles: [{ id: "owned", name: "Owned Profile", version: 1 }] } }),
+    route.fulfill({
+      json: { profiles: [{ id: "owned", name: "Owned Profile", kind: "image", version: 1 }] },
+    }),
   );
   await page.route("**/api/profiles/guides", (route) =>
     route.fulfill({ json: { packs: [{ packId: "krea2", name: "Krea 2", version: 1 }] } }),
