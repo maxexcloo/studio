@@ -174,7 +174,13 @@ export function suggested(
       label: "Suggestions",
       icon: icons.assistant,
       disabled: disabled || empty,
-      description: empty && answered && !loading ? failure || "No suggestions." : undefined,
+      description: !empty
+        ? undefined
+        : loading
+          ? "Loading…"
+          : answered
+            ? failure || "No suggestions."
+            : undefined,
       menu: [list],
     },
     refresh: {
