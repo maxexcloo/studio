@@ -76,7 +76,7 @@ test("uncensoredNames renames Spicy records and prompt styles to Uncensored, onc
   });
 });
 
-test("uncensoredNames renames queue records, and a conflict applies nothing", (t) => {
+test("uncensoredNames renames queue records and settings, and a conflict applies nothing", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-uncensored-names-"));
   t.after(() => {
     closeRuntimeDatabase(dataDir);
@@ -90,18 +90,23 @@ test("uncensoredNames renames queue records, and a conflict applies nothing", (t
   db.prepare("INSERT INTO studio_queue VALUES ('j', 'a', 's', '', 'completed', ?)").run(
     JSON.stringify({ input: { writing: { spicy: true } }, outputs: [{ dream: { spicy: true } }] }),
   );
-  const both = { settings: { spicy: true, uncensored: false } };
-  writeRuntimeDocument(dataDir, "dream:b", both);
+  writeRuntimeDocument(dataDir, "dream:b", { settings: { spicy: true, uncensored: false } });
+  const both = { STUDIO_DREAM_OVERRIDE_SPICY: "1", STUDIO_DREAM_OVERRIDE_UNCENSORED: "0" };
+  writeRuntimeDocument(dataDir, "settings", both);
 
   const conflicted = uncensoredNames(dataDir, { apply: true });
   assert.equal(conflicted.applied, false);
   assert.deepEqual(conflicted.conflicts, [
-    "studio_documents dream:b: holds both spicy and uncensored.",
+    "studio_documents settings: holds both Dream overrides.",
   ]);
-  assert.deepEqual(readRuntimeDocument(dataDir, "dream:b"), both);
+  assert.deepEqual(readRuntimeDocument(dataDir, "settings"), both);
 
-  writeRuntimeDocument(dataDir, "dream:b", { settings: { uncensored: false } });
+  writeRuntimeDocument(dataDir, "settings", { STUDIO_DREAM_OVERRIDE_SPICY: "1" });
   assert.equal(uncensoredNames(dataDir, { apply: true }).applied, true);
+  assert.deepEqual(readRuntimeDocument(dataDir, "settings"), {
+    STUDIO_DREAM_OVERRIDE_UNCENSORED: "1",
+  });
+  assert.deepEqual(readRuntimeDocument(dataDir, "dream:b"), { settings: { uncensored: false } });
   const record = (table) => JSON.parse(db.prepare(`SELECT record FROM ${table}`).get().record);
   assert.deepEqual(record("studio_sessions"), {
     inputs: { writing: { theme: "uncensored", uncensored: true } },

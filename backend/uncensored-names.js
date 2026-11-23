@@ -40,6 +40,27 @@ function rename(value, conflicts, where) {
   return true;
 }
 
+/**
+ * Renames, in place, the Spicy names in runtime document `name` that `rename` does not reach,
+ * returning whether it renamed any.
+ */
+function renameDocument(name, value, conflicts) {
+  if (name === "settings" && Object.hasOwn(value, "STUDIO_DREAM_OVERRIDE_SPICY")) {
+    if (Object.hasOwn(value, "STUDIO_DREAM_OVERRIDE_UNCENSORED"))
+      conflicts.push("studio_documents settings: holds both Dream overrides.");
+    value.STUDIO_DREAM_OVERRIDE_UNCENSORED = value.STUDIO_DREAM_OVERRIDE_SPICY;
+    delete value.STUDIO_DREAM_OVERRIDE_SPICY;
+    return true;
+  }
+  // Dream merges each settings change into the saved ones, so a choice made since the rename
+  // leaves both names; that `uncensored` is the newer.
+  const settings = name.startsWith("dream:") && value.settings;
+  if (!settings || !Object.hasOwn(settings, "spicy") || !Object.hasOwn(settings, "uncensored"))
+    return false;
+  delete settings.spicy;
+  return true;
+}
+
 /** A prompt style list with the built-in Spicy styles named Uncensored. */
 function renamedStyles(styles, conflicts, where) {
   const kinds = new Set(styles.filter((style) => style.id === "spicy").map((style) => style.kind));
@@ -54,8 +75,8 @@ function renamedStyles(styles, conflicts, where) {
 }
 
 /**
- * The migrate-runtime step that renames Spicy to Uncensored in stored records: Dream settings,
- * Dream marks and writing, saved suggestion steps and every other `spicy` flag become `uncensored`;
+ * The migrate-runtime step that renames Spicy to Uncensored in stored records: Dream settings
+ * and the deployment's Dream override, Dream marks and writing, saved suggestion steps and every other `spicy` flag become `uncensored`;
  * the built-in Spicy prompt styles become `uncensored` (labelled Uncensored where still Spicy) in
  * `prompt-styles.json` and its history, as do the rewrites and animations that name them. Online:
  * each table's rows are read and written in one turn, but work the server holds in memory may be
@@ -81,7 +102,9 @@ export function uncensoredNames(dataDir, { apply = false } = {}) {
         .all("%spicy%")
         .flatMap((row) => {
           const value = JSON.parse(row.value);
-          return rename(value, conflicts, `${table} ${row.key}`)
+          const document =
+            table === "studio_documents" && renameDocument(row.key, value, conflicts);
+          return rename(value, conflicts, `${table} ${row.key}`) || document
             ? [{ key: row.key, value: JSON.stringify(value) }]
             : [];
         });

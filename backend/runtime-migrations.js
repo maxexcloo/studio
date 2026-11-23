@@ -1,6 +1,7 @@
 import { reloadAccountPreferences } from "./account-preferences.js";
 import { cloudModelsPreference } from "./cloud-models-preference.js";
 import { logger } from "./crash-log.js";
+import { reloadDeploymentSettings } from "./deployment-settings.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { uncensoredNames } from "./uncensored-names.js";
 
@@ -27,6 +28,7 @@ const steps = [
     changes: (plan) =>
       Object.values(plan.rows).reduce((total, count) => total + count, plan.styleFiles),
     online: true,
+    reload: reloadDeploymentSettings,
   },
 ];
 
