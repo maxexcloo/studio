@@ -171,7 +171,6 @@ type DreamQuery = {
   dreamProject?: string;
   notDreamArm?: string;
   dreamPair?: false;
-  dreamSuperLiked?: true;
   dreamPassReason?: DreamPassReason;
   dreamDecidedSince?: string;
   liked?: boolean;
@@ -1506,13 +1505,12 @@ export function createDream(options: {
     return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden, paused)];
   };
 
-  /** Three independent Super Likes on the same concept can seed an automatic variant. */
+  /** Three independent likes (in the gallery or Super Likes) on the same concept can seed an automatic variant. */
   async function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const strong = await readyGenerations(ownerId, {
       type: "image",
       status: "done",
       rating: "liked",
-      dreamSuperLiked: true,
       limit: recentSeeds,
     });
     if (strong.length < 3) return null;

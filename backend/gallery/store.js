@@ -174,7 +174,6 @@ function where(query = {}) {
   }
   if (query.dreamDraft !== undefined)
     add("json_extract(value, '$.dream.draft') = ?", query.dreamDraft);
-  if (query.dreamSuperLiked) add("json_extract(value, '$.dream.superLiked') = 1");
   if (query.dreamPassReason)
     add("json_extract(value, '$.dream.passReason') = ?", query.dreamPassReason);
   if (query.dreamDecidedSince)
