@@ -9,7 +9,12 @@ import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
-import { askDraftChange, askDraftSteps, draftStepsQuery } from "../taste/suggestions";
+import {
+  askDraftChange,
+  askDraftSteps,
+  draftStepsQuery,
+  draftSuggestionContext,
+} from "../taste/suggestions";
 import {
   ChangeSuggestions,
   ProposalLabel,
@@ -58,7 +63,12 @@ export function useDraftChange({
           : references.length
             ? ["edit", "recreate"]
             : ["recreate"];
-      return askDraftChange(input.kind, typed.prompt, request, actions);
+      return askDraftChange(
+        draftSuggestionContext(input, references),
+        typed.prompt,
+        request,
+        actions,
+      );
     },
     show: ({ action, prompt }) => {
       onChange({ prompt });
@@ -83,6 +93,7 @@ export function useGenerationPromptAssistant({
   ...options
 }: Omit<Parameters<typeof usePromptAssistant>[0], "change"> & { ask?: DraftChange }) {
   const { input } = options;
+  const context = draftSuggestionContext(input, options.references ?? []);
   const prompt = (ask?.typed?.prompt ?? input.prompt).trim();
   return usePromptAssistant({
     ...options,
@@ -92,8 +103,8 @@ export function useGenerationPromptAssistant({
           pending: ask.pending,
           suggestions: (pick, render) => (
             <ChangeSuggestions
-              query={draftStepsQuery(input.kind, prompt)}
-              fresh={() => askDraftSteps(input.kind, prompt, true)}
+              query={draftStepsQuery(context, prompt)}
+              fresh={() => askDraftSteps(context, prompt, true)}
               disabled={!prompt || ask.pending}
               onPick={pick}
             >
@@ -155,10 +166,11 @@ export function PromptFields({
   const proposal = ask?.proposal;
   // Suggestions change the prompt as it was before any proposal.
   const base = ask?.typed?.prompt ?? input.prompt;
-  const steps = draftStepsQuery(input.kind, base.trim());
+  const context = draftSuggestionContext(input, references);
+  const steps = draftStepsQuery(context, base.trim());
   const draftSuggestions = useChangeSuggestions({
     query: steps,
-    fresh: () => askDraftSteps(input.kind, base.trim(), true),
+    fresh: () => askDraftSteps(context, base.trim(), true),
     enabled: false,
     disabled: ask?.pending,
     onPick: (request) => ask?.sendRequest(request),
