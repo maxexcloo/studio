@@ -1,6 +1,6 @@
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
-import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
@@ -8,14 +8,48 @@ import { type Action, ActionMenuItems, useActionMenuBounds } from "../../ui/Acti
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
-import { useItemChange } from "../gallery/useItemChange";
+import { canSuggestChangeForItem, useItemChange } from "../gallery/useItemChange";
 import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
 import { suggestionItems, useChangeSuggestions } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
 import { sideControl, sideIconSize } from "./DeckButtons";
 import { sideLabel } from "./PairCard";
+
+export const librarySuggestionCount = 5;
+
+export function usePrefetchLibrarySuggestions(items: MediaItem[] | undefined, currentId?: string) {
+  const client = useQueryClient();
+  const assistant = useQuery({ ...assistantQuery, enabled: !!items?.length });
+  const available = assistant.data?.available;
+  const attempted = useRef(new Set<string>());
+  const pending = useRef<Promise<void> | undefined>(undefined);
+
+  useEffect(() => {
+    if (!available || !items?.length || !currentId) return;
+    const upcoming = items.filter(({ id }) => id !== currentId).slice(0, librarySuggestionCount);
+    let cancelled = false;
+    async function prefetch() {
+      for (const item of upcoming) {
+        if (attempted.current.has(item.id) || !canSuggestChangeForItem(item)) continue;
+        // A verdict can change the deck while a suggestion is still being written.
+        await pending.current;
+        if (cancelled) return;
+        attempted.current.add(item.id);
+        pending.current = client.prefetchQuery(nextStepsQuery(item));
+      }
+    }
+    const idle = window.requestIdleCallback ?? setTimeout;
+    const cancelIdle = window.cancelIdleCallback ?? clearTimeout;
+    const handle = idle(() => void prefetch());
+    return () => {
+      cancelled = true;
+      cancelIdle(handle);
+    };
+  }, [available, client, currentId, items]);
+}
 
 interface DreamSuggestionsProps {
   card: DeckCard;

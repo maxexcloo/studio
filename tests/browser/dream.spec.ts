@@ -382,6 +382,48 @@ test("Dream video Suggestions can stage an extension from the current clip", asy
   expect(dream.requests).toHaveLength(0);
 });
 
+test("Dream Library shows result details and preloads the next five Suggestions across pages", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const library = Array.from({ length: 7 }, (_, index) =>
+    dreamItem(`review-${index}`, {
+      dream: undefined,
+      title: `Library Result ${index}`,
+      settings: { profileName: "Archipelago", steps: 16 },
+    }),
+  );
+  await serveDream(page, { library });
+  const asked: string[] = [];
+  await page.route("**/api/suggestions", (route) => {
+    const { itemId } = route.request().postDataJSON();
+    asked.push(itemId);
+    return route.fulfill({
+      json: { suggestions: [{ label: "Closer Crop", request: "crop closer" }] },
+    });
+  });
+  await page.goto("/dream/library");
+  const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card.getByText("Library Result 0", { exact: true })).toBeVisible();
+  await expect(card.getByText("Archipelago", { exact: true })).toBeVisible();
+  await expect(card.locator("time")).toHaveAttribute("datetime", stamp);
+  await expect.poll(() => asked).toEqual(library.slice(1, 6).map(({ id }) => id));
+
+  await card.getByRole("button", { name: "View", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
+  await expect(header.getByText("Library Result 0", { exact: true })).toBeVisible();
+  await expect(header.getByText("Archipelago", { exact: true })).toBeVisible();
+  await expect(header.locator("time")).toHaveAttribute("datetime", stamp);
+  await preview.getByRole("button", { name: "Accept", exact: true }).click();
+
+  await expect(header.getByText("Library Result 1", { exact: true })).toBeVisible();
+  await expect.poll(() => asked).toEqual(library.slice(1).map(({ id }) => id));
+  await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
+  expect(asked).toEqual(library.slice(1).map(({ id }) => id));
+});
+
 test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, {
