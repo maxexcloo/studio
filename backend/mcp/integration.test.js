@@ -4656,7 +4656,7 @@ test("Search finds the account's own finished work through the gallery search, a
     settings: {
       prompt: "Red waves rolling in",
       profileId: videoProfile.id,
-      modelName: "Fixture Video",
+      modelName: "fixture-video.safetensors",
       loras: [{ name: "styles/fixture-effect.safetensors", strength: 0.8 }],
     },
   });
@@ -4681,7 +4681,7 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.match(texts(result), /^4 of 6 matches, newest first\./);
   assert.match(
     texts(result),
-    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · fixture-image$/m,
+    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · Fixture Image$/m,
   );
   assert.match(texts(result), /\[#1\]\([^)]+\) · .*A red heron/);
   // The images come as one contact sheet, drawn when opened.
