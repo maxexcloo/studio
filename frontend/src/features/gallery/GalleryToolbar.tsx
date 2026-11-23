@@ -105,8 +105,6 @@ export function GalleryToolbar({
     <SearchInput
       ref={searchInput}
       aria-label="Search Gallery"
-      size="sm"
-      radius="xl"
       value={query}
       onChange={(event) => onQueryChange(event.currentTarget.value)}
       onClear={() => onQueryChange("")}

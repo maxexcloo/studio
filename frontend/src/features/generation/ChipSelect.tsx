@@ -14,11 +14,13 @@ import {
   getParsedComboboxData,
   isOptionsGroup,
   useCombobox,
+  useComboboxTargetProps,
 } from "@mantine/core";
 import { Check, ChevronDown } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, type Ref, useState } from "react";
 
 import { popupMiddlewares } from "../../theme";
+import { SearchInput } from "../../ui/SearchInput";
 import { useTouch } from "../../ui/usePhone";
 import { chipProps } from "./chip";
 
@@ -189,12 +191,12 @@ export function ChipSelect({
       </ComboboxPopover.Target>
       <Combobox.Dropdown>
         {searchable && (
-          <Combobox.Search
+          <OptionSearch
+            ref={combobox.searchRef}
             aria-label={`Search ${name}`}
-            placeholder="Search"
             value={search}
-            onChange={(event) => {
-              setSearch(event.currentTarget.value);
+            onSearch={(value) => {
+              setSearch(value);
               combobox.resetSelectedOption();
             }}
           />
@@ -207,6 +209,38 @@ export function ChipSelect({
         </ScrollArea.Autosize>
       </Combobox.Dropdown>
     </Combobox>
+  );
+}
+
+/** The shared search field at the top of a chip's list, moving through its options by keyboard. */
+function OptionSearch({
+  value,
+  onSearch,
+  ...props
+}: {
+  "aria-label": string;
+  value: string;
+  onSearch: (value: string) => void;
+  ref: Ref<HTMLInputElement>;
+}) {
+  const keyboard = useComboboxTargetProps({
+    targetType: "input",
+    withAriaAttributes: true,
+    withKeyboardNavigation: true,
+    withExpandedAttribute: false,
+    autoComplete: "off",
+    onKeyDown: undefined,
+    onClick: undefined,
+  });
+  return (
+    <SearchInput
+      {...keyboard}
+      {...props}
+      m={4}
+      value={value}
+      onChange={(event) => onSearch(event.currentTarget.value)}
+      onClear={() => onSearch("")}
+    />
   );
 }
 

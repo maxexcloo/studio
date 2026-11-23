@@ -365,8 +365,6 @@ export function PickerHeader<Tab extends string>({
             className={classes.search}
             data-autofocus
             aria-label={`Search ${searched}`}
-            size="sm"
-            radius="xl"
             value={query}
             onChange={(event) => onQueryChange(event.currentTarget.value)}
             onClear={() => onQueryChange("")}

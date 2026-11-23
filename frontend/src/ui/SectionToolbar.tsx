@@ -199,8 +199,6 @@ export function SectionToolbar({
           if (expanded) close();
           else event.currentTarget.blur();
         }}
-        size="sm"
-        radius="xl"
         className={expanded ? classes.expandedSearch : classes.inlineSearch}
       />
     );
