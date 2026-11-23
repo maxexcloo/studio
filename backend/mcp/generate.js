@@ -25,7 +25,7 @@ import {
 } from "../../shared/characters.ts";
 import { compareVariants } from "../../shared/compare.ts";
 import { isCloudProfile, loraStrengthSweep, profileBackendLabels } from "../../shared/profiles.ts";
-import { resolutions } from "../../shared/resolution.ts";
+import { availableResolutions, profileStartingSize, resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 import { maxResultCaption } from "../gallery/records.js";
@@ -56,7 +56,13 @@ import {
   projectTargets,
   rulesLine,
 } from "./project.js";
-import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
+import {
+  exactPromptInstructions,
+  fullBodyPerson,
+  promptListProblem,
+  repeatedSetProblem,
+  turnCountProblem,
+} from "./prompt-checks.js";
 import { compactGuide } from "./prompting.js";
 import { output, shortPrompt } from "./results.js";
 import {
@@ -100,7 +106,32 @@ const theme = z
       context.addIssue({ code: "custom", message: `Use one of ${themeIds().join(", ")}` });
   })
   .describe(`One of ${themeIds().join(", ")}.`);
+/**
+ * A run's size: the shape the chat named as the profile's preset, else the account's Settings
+ * aspect as the composer starts (profileStartingSize), else the profile's own canvas. The account's
+ * resolution applies where the chat named none and the profile draws it.
+ */
+function runSize(profile, aspect, resolution) {
+  const { width, height } =
+    aspect || !profile.imageSizePreference?.imageAspect
+      ? profileAspectSize(profile, aspect ? { aspect } : {})
+      : profileStartingSize(profile);
+  const preferred = profile.imageSizePreference?.imageResolution;
+  const native = profile.options?.resolutions;
+  const takes =
+    preferred &&
+    !resolution &&
+    (native?.length
+      ? native.some((value) => value.toUpperCase() === preferred)
+      : availableResolutions(profile, { kind: profile.kind, width, height }).includes(preferred));
+  return { width, height, ...(takes ? { resolution: preferred } : {}) };
+}
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
+/**
+ * What each chat turn has queued, `{ images, sets }`, so the turn stops at the number its request
+ * asked for and its later calls bring new prompts.
+ */
+const turnRuns = new Map();
 const outputCount = (jobs) => jobs.reduce((total, job) => total + (job.images || 1), 0);
 const setTitle = z.string().trim().min(1).max(80);
 // Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
@@ -186,6 +217,7 @@ export function registerGenerateTools({
   chatChoices,
 }) {
   const { owner, refs, conversation, turn } = actor;
+  const turnKey = JSON.stringify([owner, conversation, turn]);
   // A guide goes to each conversation (each MCP session without a conversation header, else the account).
   const guideKey = (profileId) => JSON.stringify([refs, profileId]);
   const review = (profileId) => reviewedGuides.due(guideKey(profileId));
@@ -512,7 +544,7 @@ export function registerGenerateTools({
         .array(z.string().min(1))
         .max(16)
         .optional()
-        .describe("Ids from search uploads or reuse reference, or a result number or letter."),
+        .describe("Ids from search uploads or reuse reference, or a result's #number or letter."),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
       reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
@@ -538,8 +570,8 @@ export function registerGenerateTools({
       aspect: z
         .string()
         .optional()
-        .describe("Only if asked: Profile preset (e.g. 16:9), landscape, portrait or square."),
-      resolution: z.enum(resolutions).optional().describe("Native sizes only."),
+        .describe("Only if the user asks: their word (portrait, landscape, square) or ratio."),
+      resolution: z.enum(resolutions).optional().describe("Only if the user asks for a size."),
       steps: z.number().int().positive().max(10000).optional(),
       seed: z
         .number()
@@ -578,6 +610,18 @@ export function registerGenerateTools({
       reply.then(
         () => {
           entry.at = Date.now();
+          const images = outputCount(accepted.entries.flatMap(({ queued }) => queued.jobs));
+          if (turn && images) {
+            const run = turnRuns.get(turnKey) || { images: 0, sets: [] };
+            run.images += images;
+            run.sets.push({
+              number: accepted.set,
+              prompts: accepted.entries.flatMap(({ plan }) => plan.prompts || []),
+            });
+            turnRuns.delete(turnKey);
+            if (turnRuns.size >= 1000) turnRuns.delete(turnRuns.keys().next().value);
+            turnRuns.set(turnKey, run);
+          }
         },
         () => {
           if (recentGenerates.get(key) === entry) recentGenerates.delete(key);
@@ -699,6 +743,8 @@ export function registerGenerateTools({
       args.reference_asset_ids = await Promise.all(
         args.reference_asset_ids.map((id) => referenceAsset(id, signal)),
       );
+    if (Array.isArray(input.reference_asset_ids))
+      chatChoices.rememberReferences(owner, conversation, args.reference_asset_ids);
     const sheet = args.character_sheet === true;
     delete args.character_sheet;
     if (sheet && !args.character)
@@ -710,11 +756,17 @@ export function registerGenerateTools({
       const made = await media.request(
         "POST",
         `/api/characters/${encodeURIComponent(card.id)}/sheet`,
-        {},
+        conversation
+          ? { chat: { conversationId: conversation, ...(turn ? { turnId: turn } : {}) } }
+          : {},
         owner,
         { signal },
       );
       media.adopt(owner, refs, { jobs: [made.jobId] });
+      media.recordPrompt(made.jobId, {
+        kind: "image",
+        ...(conversation ? { chat: conversation, ...(turn ? { turn } : {}) } : {}),
+      });
       const { ref, link } = media.handle(owner, refs, made.jobId);
       return {
         content: [
@@ -824,7 +876,10 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const listProblem = promptListProblem(args.prompts);
+    // Each call of a turn ("200 more") brings new ideas rather than repeating the turn's earlier sets.
+    const listProblem =
+      promptListProblem(args.prompts) ||
+      repeatedSetProblem(args.prompts, turnRuns.get(turnKey)?.sets || []);
     if (listProblem) throw new Error(listProblem);
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
@@ -951,12 +1006,8 @@ export function registerGenerateTools({
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)
       throw new Error(`Compare at least ${compareVariants.min} models.`);
-    chatChoices.remember(
-      owner,
-      conversation,
-      input,
-      input.profile_id !== undefined && targets.length === 1 ? targets[0].profile.id : undefined,
-    );
+    const namedProfile =
+      input.profile_id !== undefined && targets.length === 1 ? targets[0].profile.id : undefined;
     // Each target as the backend its run uses, whose sizes and slots then apply; a combined
     // profile's reply names it for a run with LoRAs or one that leaves the default backend.
     targets = targets.map((target) => {
@@ -1000,8 +1051,11 @@ export function registerGenerateTools({
       throw new Error(
         `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxSplitJobs}. Lower count, pass fewer profile_ids, or name a tier.`,
       );
+    const tooMany = turnCountProblem(request, turnRuns.get(turnKey)?.images || 0, jobs);
+    if (tooMany) throw new Error(tooMany);
     // A preview's prompts run as shown when the same call follows without preview.
-    const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;
+    // Keyed by what the call runs, so references a preview named carry into the call that confirms it.
+    const previewKey = `${refs || owner}\n${stableJson({ ...remembered.args, preview: undefined })}`;
     const previewed = previews.get(previewKey);
     if (!preview) previews.delete(previewKey);
     const plans =
@@ -1009,7 +1063,7 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              const sized = profileAspectSize(profile, aspect ? { aspect } : {});
+              const sized = runSize(profile, aspect, args.resolution);
               // A character sends its first image (characterImages; the run adds its others where
               // there is room) only to a model that keeps its face: into its Identity slot, the
               // named references filling the others in order, or after them on a model that edits
@@ -1165,11 +1219,13 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `${projectNote}Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
+            text: `${projectNote}Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.${args.reference_asset_ids?.length ? ` References: ${args.reference_asset_ids.join(", ")}.` : ""}\n\n${lines.join("\n")}`,
           },
         ],
       };
     }
+    // Only a call that queues teaches the chat's later calls (a refused or previewed one doesn't).
+    chatChoices.remember(owner, conversation, input, namedProfile);
     // A call of several results, or one the chat titled or described, is one titled set, with the
     // character it was made with and the chat's context; the gallery titles each prompt's results
     // by titles, by a one-prompt call's title, or by its prompt where they are missing.
@@ -1513,6 +1569,10 @@ export function registerGenerateTools({
         throw new Error('only, add and swap are for a set ref ("set 3"). Call reuse again.');
       const found = await resolveOutput(job_id, signal);
       const id = found.jobId;
+      if (found.index !== undefined && chosenIndex > 0 && found.index !== chosenIndex)
+        throw new Error(
+          `${job_id} already names one image; leave output_index out, or name the result's job with the image you want.`,
+        );
       const output_index = found.index ?? chosenIndex ?? 0;
       // A reference is the result's image as it is, so other arguments change nothing; they are
       // named back rather than refused, and the chat carries on to generate.
@@ -1755,8 +1815,19 @@ export function registerGenerateTools({
         owner,
         { signal },
       );
-      const nameKey = (name) => name.trim().normalize("NFKC").toLowerCase();
-      const taken = new Set(existing.map(({ name }) => nameKey(name)));
+      const comparable = (text) => text.trim().normalize("NFKC").toLowerCase();
+      const words = (name) =>
+        comparable(name)
+          .split(/[^\p{L}\p{N}]+/u)
+          .filter(Boolean);
+      // One name's words within another's ("Ben", "Him Ben"), or the same looks, is the same character.
+      const within = (a, b) => a.words.length && a.words.every((word) => b.words.includes(word));
+      const sameAs = (a, b) => within(a, b) || within(b, a) || a.description === b.description;
+      const known = existing.map(({ name, description }) => ({
+        name,
+        words: words(name),
+        description: comparable(description),
+      }));
       for (const { portrait, ...card } of characters) {
         const { name, description, age } = card;
         if (!name.trim() || name.trim().length > maxCardName)
@@ -1771,12 +1842,13 @@ export function registerGenerateTools({
         const trait = characterTraits.find((key) => card[key]?.trim().length > maxCharacterTrait);
         if (trait)
           throw new Error(`Keep ${name}'s ${trait} within ${maxCharacterTrait} characters.`);
-        const key = nameKey(name);
-        if (taken.has(key))
+        const entry = { name, words: words(name), description: comparable(description) };
+        const same = known.find((other) => sameAs(entry, other));
+        if (same)
           throw new Error(
-            `${name} is already named in this request or Library. Pick a different name or update the existing card.`,
+            `${name} looks like ${same.name}, already in this request or Library (${same.description}). Use or update ${same.name}, or give a clearly different name and looks.`,
           );
-        taken.add(key);
+        known.push(entry);
         const refusal = minorAgeRefusal(Object.values(card).join("\n"));
         if (refusal) throw new Error(refusal);
       }

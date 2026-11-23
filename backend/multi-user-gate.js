@@ -39,11 +39,11 @@ const ordinaryRoutes = [
   ["POST", /^\/api\/queue\/cancel$/],
   [
     "GET",
-    /^\/api\/(gallery(\/export|\/filters|\/jobs\/[\w-]+|\/items\/[^/]+|\/timeline)?|results\/\d+)$/,
+    /^\/api\/(gallery(\/chat-sets|\/export|\/filters|\/jobs\/[\w-]+|\/items\/[^/]+|\/library-review|\/results\/\d+|\/timeline)?|results\/\d+)$/,
   ],
   [
     "POST",
-    /^\/api\/gallery\/(delete|export|favorite|frame|import\/link|errors\/clear|recreate|video-edit)$/,
+    /^\/api\/gallery\/(delete|export|favorite|frame|import\/link|errors\/clear|library-review\/[^/]+|recreate|video-edit)$/,
   ],
   ["DELETE", /^\/api\/gallery\/[^/]+$/],
   ["GET", /^\/api\/prompts$/],
@@ -63,15 +63,18 @@ const ordinaryRoutes = [
   ["DELETE", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
   ["GET", /^\/api\/assistant$/],
-  ["POST", /^\/api\/assistant\/(animate|cards\/(describe|ideas|rate)|loras|negative|rewrite)$/],
+  [
+    "POST",
+    /^\/api\/assistant\/(animate|cards\/(describe|ideas|rate)|loras|negative|project-brief|rewrite)$/,
+  ],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   [
     "GET",
-    /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/count|\/discarded|\/inbox)?)$/,
+    /^\/api\/(comparisons(\/[\w-]+)?|taste(\/reflection)?|dream(\/calibration|\/count|\/discarded|\/history|\/inbox)?)$/,
   ],
   [
     "POST",
-    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions(\/inspect)?|dream\/(calibration|reset-limit|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
+    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions(\/inspect)?|dream\/(calibration|pass|reset-limit|undo|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more|super-like)|dream\/(pairs|sets)\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],

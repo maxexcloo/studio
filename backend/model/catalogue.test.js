@@ -134,4 +134,16 @@ test("default profiles sit on the preferred side while it can run, otherwise the
   // With nothing that can run, the deployment's default stays and its jobs wait.
   assert.equal(noCloud.defaults.videoModel, "wan");
   assert.equal(noCloud.defaultNotes.video, undefined);
+  // Where the deployment's default can't run, a profile on Radiance comes before the rest.
+  const parked = withPreferredDefaults(
+    {
+      ...models,
+      profiles: [
+        ...models.profiles.filter((profile) => profile.id !== "flux"),
+        { id: "radiant", label: "Radiant", kind: "image", backend: "radiance" },
+      ],
+    },
+    {},
+  );
+  assert.equal(parked.defaults.imageModel, "radiant");
 });

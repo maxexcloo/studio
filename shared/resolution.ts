@@ -87,7 +87,7 @@ export function availableResolutions(profile?: SizedProfile, input?: SizedInput)
       width: Number(input.width) || 1024,
       height: Number(input.height) || Number(input.width) || 1024,
     };
-    const intended = resolutionSize(size, tier, { constraints: steps });
+    const intended = resolutionSize(size, tier, { ...profile, constraints: steps });
     const limited = resolutionSize(size, tier, profile);
     return intended.width === limited.width && intended.height === limited.height;
   });
@@ -99,12 +99,31 @@ export function selectedResolution(input: SizedInput, profile?: SizedProfile) {
   return choices.find((tier) => tier === input.resolutionTier);
 }
 
-/** `size`'s aspect with its long edge at the tier, each side rounded to the profile's multiple. */
+/**
+ * `size`'s aspect with its long edge at the tier, each side rounded to the profile's multiple. At
+ * the profile's own tier (the one nearest its canvas's long edge) a size with a preset's
+ * proportions takes that preset, so the profile's own sizes never shrink to the tier's edge.
+ */
 export function resolutionSize(
   size: { width: number; height: number },
   resolution: Resolution,
-  profile?: SizedProfile,
+  profile?: SizedProfile & { aspectPresets?: readonly object[] },
 ) {
+  const presets = (profile?.aspectPresets as { w?: number; h?: number }[] | undefined)?.filter(
+    (preset): preset is { w: number; h: number } => Number(preset.w) > 0 && Number(preset.h) > 0,
+  );
+  if (presets?.length) {
+    const canvas = profileImageSize(profile as DefaultSizedProfile);
+    const edge = Math.max(canvas.width, canvas.height);
+    const away = (tier: Resolution) => Math.abs(Math.log(longEdges[tier] / edge));
+    const own = resolutions.reduce((closest, tier) =>
+      away(tier) < away(closest) ? tier : closest,
+    );
+    const preset =
+      resolution === own &&
+      presets.find(({ w, h }) => Math.abs(Math.log((w / h) * (size.height / size.width))) < 0.01);
+    if (preset) return { width: preset.w, height: preset.h };
+  }
   const scale = longEdges[resolution] / Math.max(size.width, size.height);
   return {
     width: snapDimension(size.width * scale, profile?.constraints?.width),

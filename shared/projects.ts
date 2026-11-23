@@ -1,5 +1,5 @@
 import type { CardKind } from "./characters.ts";
-import type { Resolution } from "./resolution.ts";
+import { type Resolution, imageAspects } from "./resolution.ts";
 
 /** A project brief's free-text fields, in the order its one-line summary lists them. */
 const briefTexts = ["subjects", "ethnicity", "age", "body", "styles", "rules"] as const;
@@ -71,7 +71,13 @@ export interface ProjectStats<Item> {
   results: Item[];
 }
 
-export const projectAspects = ["square", "portrait", "landscape", "16:9", "9:16", "3:2", "2:3"];
+/** The shapes, then every standard ratio but 1:1, which square already is. */
+export const projectAspects = [
+  "square",
+  "portrait",
+  "landscape",
+  ...imageAspects.filter((aspect) => aspect !== "1:1"),
+];
 export const maxProjectName = 80;
 export const maxProjectBrief = 600;
 export const maxProjectProfiles = 20;

@@ -14,9 +14,11 @@ const tooLarge = `Reference images must be at most ${maxUploadMegabytes} MB.`;
 const uploadReferencePattern = /^upload-link:[A-Za-z0-9_-]{16}$/;
 const uploadLinkMs = uploadLinkMinutes * 60 * 1000;
 
+// An upload link's reference row holds its asset id once used: "" while open, this while saving.
+const saving = "saving";
+
 export class McpReferenceUploads {
   #media;
-  #openLinks = new Map();
 
   constructor(media) {
     this.#media = media;
@@ -24,21 +26,17 @@ export class McpReferenceUploads {
 
   /**
    * A one-time upload page's link (UploadLink) for the owner and the reference its image becomes:
-   * sealed like a result link, it takes one image within uploadLinkMs. Open links are held in
-   * memory only, so a restart ends them.
+   * sealed like a result link, it takes one image within uploadLinkMs. The reference's row keeps
+   * the link open across restarts.
    */
   link(owner) {
-    const now = Date.now();
-    for (const [nonce, expires] of this.#openLinks)
-      if (expires <= now) this.#openLinks.delete(nonce);
-    const nonce = crypto.randomBytes(16).toString("base64url");
-    const expires = now + uploadLinkMs;
-    this.#openLinks.set(nonce, expires);
+    const expires = Date.now() + uploadLinkMs;
     const reference = `upload-link:${crypto.randomBytes(12).toString("base64url")}`;
+    this.#media.rows.setUpload(reference, "");
     const token = this.#media.seal("u2", {
       audience: this.#media.publicUrl,
       owner,
-      nonce,
+      nonce: crypto.randomBytes(16).toString("base64url"),
       expires,
       reference,
     });
@@ -52,23 +50,24 @@ export class McpReferenceUploads {
     if (
       claims.audience !== this.#media.publicUrl ||
       !(claims.expires > Date.now()) ||
-      this.#openLinks.get(claims.nonce) !== claims.expires
+      !this.isOpen(claims)
     )
       throw new Error("Invalid upload link.");
     return claims;
   }
-  isOpen({ nonce }) {
-    return this.#openLinks.has(nonce);
+  isOpen({ reference }) {
+    return this.#media.rows.upload(reference) === "";
   }
   /** Saves the page's image as the link owner's upload and closes the link; a failed save leaves it open. */
   async redeem(claims, file, credential) {
-    if (!this.#openLinks.delete(claims.nonce)) throw new Error("Invalid upload link.");
+    if (!this.isOpen(claims)) throw new Error("Invalid upload link.");
+    this.#media.rows.setUpload(claims.reference, saving);
     try {
       const { asset } = await this.store(claims.owner, file.buffer, file.name, { credential });
       this.#media.rows.setUpload(claims.reference, asset.id);
       return asset;
     } catch (error) {
-      if (claims.expires > Date.now()) this.#openLinks.set(claims.nonce, claims.expires);
+      this.#media.rows.setUpload(claims.reference, "");
       throw error;
     }
   }
@@ -76,7 +75,7 @@ export class McpReferenceUploads {
   resolve(id) {
     if (!uploadReferencePattern.test(id)) return id;
     const asset = this.#media.rows.upload(id);
-    if (asset) return asset;
+    if (asset && asset !== saving) return asset;
     throw new Error(
       "The user hasn't uploaded the image through its upload link yet. Ask them to, then call again; if the link has expired, call upload_link for a new one.",
     );

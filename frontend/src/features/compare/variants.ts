@@ -30,13 +30,18 @@ import { queueQuery } from "../generation/Queue";
 import { letter, runSeeds, variantLabels } from "./inputs";
 import type { Comparison } from "./queries";
 
-/** Every variant of `draft`, the one being edited as it stands; just it outside a comparison. */
+/**
+ * Every variant of `draft`, the one being edited as it stands; just it outside a comparison. A
+ * given label (Keep & Vary's) names the variant only until it is edited.
+ */
 export function draftVariants(draft: Draft): Variant[] {
   const current = { input: draft.input, references: draft.references };
   return draft.compare
-    ? draft.compare.variants.map((variant, index) =>
-        index === draft.compare!.active ? { ...variant, ...current } : variant,
-      )
+    ? draft.compare.variants.map((variant, index) => {
+        if (index !== draft.compare!.active) return variant;
+        const edited = variant.input !== draft.input || variant.references !== draft.references;
+        return edited ? current : { ...variant, ...current };
+      })
     : [current];
 }
 
