@@ -79,19 +79,21 @@ function usePassHold(cardId: string, open: () => void) {
   };
 }
 
+/** Undo and Suggestions, the smaller bordered controls either side of the verdicts. */
+export const sideControl = { variant: "default", size: "lg", radius: "xl" } as const;
+export const sideIconSize = 20;
+
 export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
     <Tooltip label="Undo">
       <ActionIcon
-        variant="subtle"
-        color="gray"
-        size="md"
+        {...sideControl}
         data-touch-target
         aria-label="Undo"
         disabled={disabled}
         onClick={onClick}
       >
-        <icons.undo size={18} />
+        <icons.undo size={sideIconSize} />
       </ActionIcon>
     </Tooltip>
   );
