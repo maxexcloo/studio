@@ -42,7 +42,7 @@ export function DreamPreferences() {
   const locked = (key: keyof DreamSettings) => lockedKeys.includes(key);
   const note = (key: keyof DreamSettings) => (locked(key) ? ` ${lockedByAdministrator}` : "");
   const toggle = (
-    key: "enabled" | "images" | "spicy" | "videos",
+    key: "enabled" | "images" | "uncensored" | "videos",
     label: string,
     description: string,
   ) => (
@@ -82,7 +82,8 @@ export function DreamPreferences() {
           </Text>
         )}
         {toggle("enabled", "Dream", "Make new media from your taste while Studio is idle.")}
-        {dream.data.spicyAvailable && toggle("spicy", "Uncensored", "Allow explicit themes.")}
+        {dream.data.uncensoredAvailable &&
+          toggle("uncensored", "Uncensored", "Allow explicit themes.")}
         {toggle("images", "Images", "Make new images.")}
         {number(
           "dailyImages",

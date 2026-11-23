@@ -109,7 +109,7 @@ export const seedStyles = Object.freeze([
       "Portrait: make the person the clear focus when the scene already has one. Use the existing face, expression, eye line and pose, with a light direction and depth of field that separate them from the existing background. Preserve distinctive facial features, age, build and visible marks. For a nonhuman subject, work with the features and pose it has. In video, retain the requested action within a readable portrait framing.",
   },
   {
-    id: "spicy",
+    id: "uncensored",
     kind: "improve",
     enabled: true,
     label: "Uncensored",
@@ -193,7 +193,7 @@ export const seedStyles = Object.freeze([
       "Reaction: pick a person or animal and something already present that could draw their attention. Show what changes first in their gaze, ears or posture, then the expression or weight shift that follows. Settle on a readable final pose. Hold the framing on the subject and keep the response small. Where there is no living subject, show one visible physical response between elements already present.",
   },
   {
-    id: "spicy",
+    id: "uncensored",
     kind: "animate",
     enabled: true,
     label: "Uncensored",

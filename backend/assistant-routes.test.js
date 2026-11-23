@@ -32,16 +32,16 @@ const uncensored = {
 const user = builtInAccessProfile;
 const profiles = {
   user,
-  spicy: {
+  uncensored: {
     ...user,
-    id: "spicy",
+    id: "uncensored",
     features: { ...user.features, uncensoredModels: true, loras: true },
   },
 };
 const accounts = {
   admin: { id: "a1", role: "administrator" },
   user: { id: "u1", role: "user", accessProfileId: "user" },
-  spicy: { id: "u3", role: "user", accessProfileId: "spicy" },
+  uncensored: { id: "u3", role: "user", accessProfileId: "uncensored" },
 };
 const encoder = new TextEncoder();
 const calls = [];
@@ -162,7 +162,7 @@ test("A project brief suggestion can fill an empty field and responds only with 
 test("the assistant is for every account, and only for profiles the account may use", async () => {
   const status = await get("/api/assistant", "user");
   assert.deepEqual(
-    [status.available, status.spicy, status.loras, status.presets.map((preset) => preset.id)],
+    [status.available, status.uncensored, status.loras, status.presets.map((preset) => preset.id)],
     [
       true,
       false,
@@ -246,33 +246,35 @@ test("Uncensored needs Uncensored Models, whatever the profile, and runs on the 
     (
       await post(
         "/api/assistant/rewrite",
-        { profileId: plain.id, prompt: "a couple", preset: "spicy" },
+        { profileId: plain.id, prompt: "a couple", preset: "uncensored" },
         "user",
       )
     ).status,
     403,
   );
-  assert.equal((await get("/api/assistant", "user")).spicy, false);
+  assert.equal((await get("/api/assistant", "user")).uncensored, false);
   // Text offers and defaults to uncensored models only for accounts that may use them.
   const writing = (status) => [status.writingModel, status.models];
   assert.deepEqual(writing(await get("/api/assistant", "user")), [
     "cloud/auto",
     ["cloud/auto", "local/auto", "local/stopped"],
   ]);
-  assert.deepEqual(writing(await get("/api/assistant", "spicy")), [
+  assert.deepEqual(writing(await get("/api/assistant", "uncensored")), [
     "cloud/uncensored",
     ["cloud/auto", "cloud/uncensored", "local/auto", "local/stopped"],
   ]);
   assert.equal(
-    (await get("/api/assistant", "spicy")).presets.some((preset) => preset.id === "spicy"),
+    (await get("/api/assistant", "uncensored")).presets.some(
+      (preset) => preset.id === "uncensored",
+    ),
     true,
   );
-  const spicy = await post(
+  const uncensored = await post(
     "/api/assistant/rewrite",
-    { profileId: plain.id, prompt: "a couple", preset: "spicy" },
-    "spicy",
+    { profileId: plain.id, prompt: "a couple", preset: "uncensored" },
+    "uncensored",
   );
-  assert.equal(spicy.status, 200, "an unmarked profile is fine with Uncensored Models");
+  assert.equal(uncensored.status, 200, "an unmarked profile is fine with Uncensored Models");
   assert.equal(calls.at(-1).model, "cloud/uncensored");
 });
 
@@ -286,7 +288,7 @@ test("Custom needs an instruction and keeps it non-explicit without Uncensored M
   assert.equal((await custom("user", "")).status, 400);
   assert.equal((await custom("user", "make it explicit")).status, 200);
   assert.match(calls.at(-1).messages[0].content, /Don't make it any more sexual/);
-  assert.equal((await custom("spicy", "make it explicit")).status, 200);
+  assert.equal((await custom("uncensored", "make it explicit")).status, 200);
   assert.match(
     calls.at(-1).messages[0].content,
     /\nEvery person in it must be 18 or older,[^\n]*Explicit/,
@@ -306,7 +308,8 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
     403,
   );
   const suggested = JSON.parse(
-    (await post("/api/assistant/loras", { profileId: plain.id, prompt: "a cabin" }, "spicy")).text,
+    (await post("/api/assistant/loras", { profileId: plain.id, prompt: "a cabin" }, "uncensored"))
+      .text,
   );
   assert.deepEqual(
     suggested.loras.map((item) => [item.name, item.triggers]),
@@ -378,7 +381,7 @@ test("Settings shows the model Studio's own text calls use", async () => {
 });
 
 test("the composer learns which profiles take no negative", async () => {
-  assert.deepEqual((await get("/api/assistant", "spicy")).noNegative, [uncensored.id]);
+  assert.deepEqual((await get("/api/assistant", "uncensored")).noNegative, [uncensored.id]);
   assert.deepEqual(
     (await get("/api/assistant", "user")).noNegative,
     [],

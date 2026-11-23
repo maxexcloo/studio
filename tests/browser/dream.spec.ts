@@ -495,7 +495,7 @@ test("On a phone held sideways, a deck card's caption stands beside its media", 
 
 test("Dream explains itself while off and saves its settings in Settings", async ({ page }) => {
   await fixtures(page);
-  const dream = await serveDream(page, { enabled: false, spicyAvailable: true });
+  const dream = await serveDream(page, { enabled: false, uncensoredAvailable: true });
   await page.goto("/dream");
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
@@ -561,7 +561,7 @@ test("Dream settings an administrator forces stay locked for the account", async
   await fixtures(page);
   await serveDream(page, {
     enabled: false,
-    spicyAvailable: true,
+    uncensoredAvailable: true,
     locked: ["enabled", "imageBackend"],
   });
   await page.goto("/dream");

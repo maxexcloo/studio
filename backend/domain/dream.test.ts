@@ -429,7 +429,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
     dailyVideos: 4,
     images: true,
     videos: false,
-    spicy: false,
+    uncensored: false,
     imageBackend: "local",
     videoBackend: "local",
   });
@@ -715,7 +715,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   liked("b", "qwen");
   liked("d", "qwen");
   taste.record("alice", [tasteSignal("discard", "c", { profileId: "flux" })]);
-  await dream.save("alice", { enabled: true, spicy: true });
+  await dream.save("alice", { enabled: true, uncensored: true });
   const job = await dreamOnce();
   assert.equal(job?.input.profileId, "qwen");
   assert.equal(job?.dream?.arm, "exploit");
@@ -726,13 +726,13 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
   state.access.alice!.uncensored = true;
-  const spicy = await dreamOnce();
+  const uncensored = await dreamOnce();
   assert.equal(state.calls[1].model, "writer");
   assert.match(state.calls[1].system, /Uncensored: sensual/);
-  assert.equal(spicy?.dream?.spicy, true);
+  assert.equal(uncensored?.dream?.uncensored, true);
   // Losing the grant after queueing: the job is written safe for work.
   state.access.alice!.uncensored = false;
-  await dream.write(spicy!, {
+  await dream.write(uncensored!, {
     signal: new AbortController().signal,
     onThinking() {},
     onDelta() {},
@@ -1388,7 +1388,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
     shown.unseen.map((item: DreamItem) => item.prompt),
     ["dream 1", "dream 2", "dream 3"],
   );
-  assert.equal(shown.spicyAvailable, false);
+  assert.equal(shown.uncensoredAvailable, false);
   assert.equal((await request("", undefined, "GET", "bob")).body.unseen.length, 0);
   const [one, two, three] = shown.unseen.map((item: DreamItem) =>
     encodeURIComponent(String(item.id)),
@@ -1400,7 +1400,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
     undefined,
   );
   assert.equal((await request("/settings", { videos: "yes" }, "PUT")).status, 400);
-  assert.equal((await request("/settings", { spicy: true }, "PUT")).status, 403);
+  assert.equal((await request("/settings", { uncensored: true }, "PUT")).status, 403);
   const saved = await request("/settings", { paused: true, dailyVideos: 2 }, "PUT");
   assert.equal(saved.body.settings.paused, true);
   assert.equal(saved.body.settings.dailyVideos, 2);
@@ -2249,7 +2249,7 @@ test("Dream loads uncensored LoRAs only with Uncensored on", async (t) => {
     (store.job("alice", job.id)!.input.loras as { name: string }[]).map((lora) => lora.name);
   await dream.save("alice", { enabled: true });
   assert.deepEqual(lorasOf((await dreamOnce())!), []);
-  await dream.save("alice", { enabled: true, spicy: true });
+  await dream.save("alice", { enabled: true, uncensored: true });
   assert.deepEqual(lorasOf((await dreamOnce())!), ["explicit.safetensors"]);
 });
 
@@ -3458,26 +3458,26 @@ test("A failed Dream video sets its profile aside rather than sending the next o
 
 test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {
   const { dream, projects, inbox, state, dataDir, dreamOnce } = fixture(t);
-  await dream.save("alice", { spicy: true, dailyImages: 12 });
-  state.overrides = { enabled: true, spicy: false };
-  assert.deepEqual(dream.locked(), ["enabled", "spicy"]);
+  await dream.save("alice", { uncensored: true, dailyImages: 12 });
+  state.overrides = { enabled: true, uncensored: false };
+  assert.deepEqual(dream.locked(), ["enabled", "uncensored"]);
   assert.deepEqual(dream.read("alice").settings, {
     ...dreamDefaults,
     enabled: true,
     dailyImages: 12,
   });
   const forced = await dreamOnce();
-  assert.equal(forced?.dream?.spicy, undefined);
+  assert.equal(forced?.dream?.uncensored, undefined);
   assert.match(state.calls[0].system, /safe for work/);
-  await assert.rejects(dream.save("alice", { spicy: true }), { status: 409 });
+  await assert.rejects(dream.save("alice", { uncensored: true }), { status: 409 });
   // Saving the forced value, or anything else, still works.
   await dream.save("alice", { enabled: true, dailyImages: 18 });
   assert.deepEqual(
     (readRuntimeDocument(dataDir, "dream:alice") as { settings: Partial<DreamSettings> }).settings,
-    { spicy: true, dailyImages: 18, enabled: true, paused: false },
+    { uncensored: true, dailyImages: 18, enabled: true, paused: false },
   );
   state.overrides = {};
-  assert.equal(dream.read("alice").settings.spicy, true);
+  assert.equal(dream.read("alice").settings.uncensored, true);
   assert.equal(dream.read("bob").settings.enabled, false);
 
   state.overrides = { imageBackend: "cloud" };
@@ -3511,7 +3511,7 @@ test("Dream's content setting limits image and video model choices and waiting w
   state.writingRefusal = "";
   assert.equal((await dreamOnce())?.input.profileId, "qwen");
   assert.equal(dream.text("alice").censoredOnly, true);
-  await dream.save("alice", { spicy: true });
+  await dream.save("alice", { uncensored: true });
   assert.equal(dream.text("alice").censoredOnly, undefined);
   const unrestrictedImage = (await dreamOnce())!;
   assert.equal(unrestrictedImage.input.profileId, "flux");
@@ -3530,7 +3530,7 @@ test("Dream's content setting limits image and video model choices and waiting w
   assert.equal(video.input.profileId, unrestrictedVideo.id);
   assert.equal(await dream.queuedProfileIssue(video), undefined);
 
-  await dream.save("alice", { spicy: false });
+  await dream.save("alice", { uncensored: false });
   for (const job of [unrestrictedImage, video])
     assert.match((await dream.queuedProfileIssue(job))!, /does not allow the selected model/);
   assert.equal(

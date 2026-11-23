@@ -44,9 +44,9 @@ before(async () => {
   const sample = JSON.parse(
     fs.readFileSync(new URL("../config/profiles/sdxl-base-refiner.json", import.meta.url), "utf8"),
   );
-  sample.studio = { ...sample.studio, id: "spicy", name: "Uncensored", uncensored: true };
+  sample.studio = { ...sample.studio, id: "uncensored", name: "Uncensored", uncensored: true };
   fs.mkdirSync(path.join(directory, "workflows"));
-  fs.writeFileSync(path.join(directory, "workflows", "spicy.json"), JSON.stringify(sample));
+  fs.writeFileSync(path.join(directory, "workflows", "uncensored.json"), JSON.stringify(sample));
   child = fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
     env: {
       PATH: process.env.PATH,
@@ -176,7 +176,7 @@ test(
     const editable = await call("/api/profiles/editable", { cookie: admin });
     assert.equal(editable.status, 200, editable.body.error);
     assert.equal(
-      editable.body.profiles.find((profile) => profile.id === "spicy")?.uncensored,
+      editable.body.profiles.find((profile) => profile.id === "uncensored")?.uncensored,
       true,
     );
     await call("/api/preferences", {
