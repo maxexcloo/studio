@@ -77,6 +77,13 @@ export function registerDreamRoutes(
     status: 200,
     payload: dream.unseenCount(owner(account)),
   }));
+  // Pickers show these beside every profile and LoRA, so an account without Dream has none.
+  directRoute(app, "GET", "/api/dream/keep-rates", (account) => ({
+    status: 200,
+    payload: dream.access(owner(account))
+      ? dream.keepRates(owner(account))
+      : { profiles: {}, loras: {}, tags: {} },
+  }));
   route("POST", "/api/dream/visit", (account) => ({
     status: 200,
     payload: { since: dream.visit(owner(account)) },

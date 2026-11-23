@@ -32,6 +32,22 @@ export function dreamLimitReached(
   return settings.enabled && enabled && limit > 0 && used >= limit;
 }
 
+/** How many of the latest judged Dream images a profile, LoRA or caption tag was in, and kept. */
+export type KeepCount = { kept: number; total: number };
+/** `GET /api/dream/keep-rates`: the account's keeps by profile id, LoRA file and caption tag. */
+export type KeepRates = {
+  profiles: Record<string, KeepCount>;
+  loras: Record<string, KeepCount>;
+  tags: Record<string, KeepCount>;
+};
+/** A keep rate shows once this many judged images back it. */
+export const keepRateMinimum = 10;
+/** "Kept 63%", or nothing below `keepRateMinimum` judged images. */
+export const keptLabel = (count?: KeepCount) =>
+  count && count.total >= keepRateMinimum
+    ? `Kept ${Math.round((count.kept / count.total) * 100)}%`
+    : undefined;
+
 export const dreamSeriesLength = 4;
 export const dreamPassReasons = ["taste", "similar", "glitch", "skip"] as const;
 export type DreamPassReason = (typeof dreamPassReasons)[number];

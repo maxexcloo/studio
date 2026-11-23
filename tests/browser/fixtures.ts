@@ -3,12 +3,15 @@ import { execFileSync } from "node:child_process";
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import {
+  type KeepRates,
   dreamCardCounts,
   dreamDefaults,
   dreamOverrideKeys,
   dreamTimingSettings,
 } from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
+
+const noKeepRates: KeepRates = { profiles: {}, loras: {}, tags: {} };
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
@@ -969,6 +972,7 @@ export async function fixtures(page: Page) {
       });
     // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
     if (path === "/api/dream/history") return respond({ items: [] });
+    if (path === "/api/dream/keep-rates") return respond(noKeepRates);
     if (path === "/api/gallery/library-review")
       return respond({ items: [], remaining: 0, nextCursor: "" });
     if (path === "/api/dream/count")
@@ -1510,6 +1514,7 @@ export async function serveDream(
     reason?: string;
     /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
     taste?: Record<string, unknown>;
+    keepRates?: KeepRates;
     /** Dream's projects, which create, edit, Pause, Undo and Delete change. */
     projects?: any[];
     /** Each project's stats, by id. */
@@ -1637,6 +1642,8 @@ export async function serveDream(
     } catch {}
     if (path === "/api/dream/visit")
       return route.fulfill({ json: { since: options.since ?? null } });
+    if (path === "/api/dream/keep-rates")
+      return route.fulfill({ json: options.keepRates ?? noKeepRates });
     if (method !== "GET") state.requests.push({ method, path, body });
     for (const item of [...state.unseen, ...state.discarded]) state.known.set(item.id, item);
     // As the backend: Undo returns results to unseen.
