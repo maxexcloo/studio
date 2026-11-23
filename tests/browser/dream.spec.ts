@@ -134,13 +134,9 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await expect(current(page).getByText("Exploring new ground", { exact: true })).toBeVisible();
   await expect(current(page).getByText("The harbour at dusk", { exact: true })).toBeVisible();
   await expect(current(page).getByText("Dream prompt one", { exact: true })).toHaveCount(0);
-  const landscape = current(page).getByRole("img", { name: "Dream prompt one", exact: true });
-  await expect(landscape).toBeVisible();
-  if (!isMobile) {
-    const picture = (await landscape.boundingBox())!;
-    expect(picture.width / picture.height).toBeCloseTo(1600 / 900, 1);
-    expect(picture.width).toBeGreaterThan(page.viewportSize()!.width * 0.8);
-  }
+  await expect(
+    current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
+  ).toBeVisible();
 
   // Undo stands before the card’s round verdict buttons.
   const bar = page.getByRole("group", { name: "Dream Actions" });
@@ -149,10 +145,14 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
     .toEqual(["Undo", "Pass", "Super Like", "Accept", "Suggestions"]);
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeDisabled();
+  // The square card after the wide one keeps the same box, so neither it nor the buttons move.
+  const boxes = async () => [await current(page).boundingBox(), await bar.boundingBox()];
+  const steady = await boxes();
   await page.keyboard.press("ArrowRight");
   await expect(
     current(page).getByRole("img", { name: "Dream prompt two", exact: true }),
   ).toBeVisible();
+  await expect.poll(boxes).toEqual(steady);
   await undo.click();
   await expect(
     current(page).getByRole("img", { name: "Dream prompt one", exact: true }),
