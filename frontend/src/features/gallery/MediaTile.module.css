@@ -4,14 +4,8 @@
 }
 
 .tile[data-entering] {
-  animation: enter var(--studio-motion-duration) var(--studio-ease-enter) both;
-}
-
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
+  --studio-enter-from: scale(0.98);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
 
 .button {

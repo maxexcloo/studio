@@ -1,19 +1,7 @@
 /* Search and the normal row replace one another in place on phones. */
 .mode {
   container-type: inline-size;
-  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mode {
-    animation: none;
-  }
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 /* The search shares the free width with the chips and gives it up first; the toolbar's buttons keep

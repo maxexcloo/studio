@@ -295,7 +295,8 @@
 }
 
 .variation[data-entering] {
-  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
+  --studio-enter-from: scale(0.98);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .variation:hover,
@@ -367,19 +368,6 @@
   transition:
     opacity var(--studio-motion-duration) var(--studio-ease-enter),
     transform var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-@keyframes arrive {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .variation[data-entering] {
-    animation: none;
-  }
 }
 
 /* Phone controls form one surface down to the bottom safe area. */

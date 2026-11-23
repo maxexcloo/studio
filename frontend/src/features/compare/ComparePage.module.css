@@ -27,14 +27,8 @@
 }
 
 .applied {
-  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter) both;
-}
-
-@keyframes arrive {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
+  --studio-enter-from: translateY(4px);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
 
 .grid {

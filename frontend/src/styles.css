@@ -97,6 +97,19 @@ select {
   --studio-composer-gap: 0.5rem;
 }
 
+/* The shared entrance (`animation: global(studio-enter)` in a CSS module): a fade, moving from any
+   --studio-enter-from transform the element sets. */
+@property --studio-enter-from {
+  syntax: "*";
+  inherits: false;
+}
+@keyframes studio-enter {
+  from {
+    opacity: 0;
+    transform: var(--studio-enter-from, none);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
