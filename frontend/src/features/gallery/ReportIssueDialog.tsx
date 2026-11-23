@@ -1,4 +1,4 @@
-import { ActionIcon, Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
+import { Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
@@ -8,6 +8,8 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { UndoButton, proposedClass } from "../generation/AskChange";
+import { changeSummary } from "../generation/changeSummary";
 import { inspectImage } from "../taste/suggestions";
 import { mediaSource } from "./mediaSource";
 import { askItemChange } from "./useItemChange";
@@ -82,12 +84,34 @@ export function ReportIssueDialog({
   const fix = useReportIssue(item, onQueued, true);
   const [picked, setPicked] = useState<string[]>([]);
   const [details, setDetails] = useState("");
+  // An inspection's issue joins the details in place, with Undo until they next change.
+  const [proposal, setProposal] = useState<{ before: string; after: string } | null>(null);
+  const current = proposal?.after === details ? proposal : null;
   const [finding, setFinding] = useState<ImageInspection>();
   const upscaled = mediaSource(item).upscaled;
   const inspect = useItemMutation(item.id, `inspect:${upscaled}`, {
     meta: { inlineError: true },
     mutationFn: () => inspectImage(item.jobId!, item.id, upscaled),
   });
+  const inspectImageIssue = () =>
+    inspect.mutate(undefined, {
+      onSuccess: (found) => {
+        setFinding(found);
+        if (found.status !== "issue") return;
+        const before = current?.before ?? details;
+        const after = [before.trim(), found.issue].filter(Boolean).join("\n");
+        setProposal({ before, after });
+        setDetails(after);
+      },
+    });
+  const note =
+    !inspect.isPending &&
+    (inspect.error?.message ||
+      (finding?.status === "clear"
+        ? "The model found no clear visual issue."
+        : finding?.status === "unavailable"
+          ? finding.reason
+          : undefined));
   const canInspect = item.type === "image" && Boolean(item.jobId);
   const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
@@ -103,7 +127,7 @@ export function ReportIssueDialog({
           <Chip.Group multiple value={picked} onChange={setPicked}>
             <Group gap="xs" role="group" aria-label="What's Wrong">
               {issues.map((label) => (
-                <Chip key={label} value={label} size="sm">
+                <Chip key={label} value={label} size="xs" variant="light">
                   {label}
                 </Chip>
               ))}
@@ -117,48 +141,45 @@ export function ReportIssueDialog({
             inline
             value={details}
             onChange={setDetails}
-            rightSection={
-              canInspect && (
-                <ActionIcon
-                  aria-label="Inspect Image"
-                  variant="subtle"
-                  color="gray"
-                  loading={inspect.isPending}
-                  disabled={fix.isPending}
-                  onClick={() => inspect.mutate(undefined, { onSuccess: setFinding })}
-                >
-                  <icons.assistant size={16} />
-                </ActionIcon>
+            tools={
+              canInspect
+                ? [
+                    {
+                      id: "inspect",
+                      label: "Inspect Image",
+                      icon: icons.assistant,
+                      disabled: inspect.isPending || fix.isPending,
+                      onClick: inspectImageIssue,
+                    },
+                  ]
+                : []
+            }
+            busy={inspect.isPending ? "Inspecting Image…" : undefined}
+            className={current ? proposedClass : undefined}
+            send={
+              current && (
+                <UndoButton
+                  onClick={() => {
+                    setDetails(current.before);
+                    setProposal(null);
+                  }}
+                />
               )
             }
-            rightSectionWidth={canInspect ? 44 : undefined}
-            rightSectionPointerEvents="all"
-            rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 4 } }}
+            below={
+              current ? (
+                <Text size="xs" c="dimmed">
+                  {changeSummary(current.before, current.after, 160) || current.after}
+                </Text>
+              ) : (
+                note && (
+                  <Text size="xs" c="dimmed" role="status">
+                    {note}
+                  </Text>
+                )
+              )
+            }
           />
-          {canInspect && !inspect.isPending && (inspect.error || finding) && (
-            <Stack gap="xs" align="start">
-              <Text size="sm" role="status">
-                {inspect.error?.message ||
-                  (finding?.status === "issue"
-                    ? finding.issue
-                    : finding?.status === "clear"
-                      ? "The model found no clear visual issue."
-                      : finding?.reason)}
-              </Text>
-              {!inspect.error && finding?.status === "issue" && (
-                <Button
-                  variant="subtle"
-                  size="compact-sm"
-                  disabled={details.includes(finding.issue)}
-                  onClick={() =>
-                    setDetails((value) => [value.trim(), finding.issue].filter(Boolean).join("\n"))
-                  }
-                >
-                  Add to Details
-                </Button>
-              )}
-            </Stack>
-          )}
           {fix.error && (
             <Alert color="red" title="Couldn't Fix">
               {fix.error.message}

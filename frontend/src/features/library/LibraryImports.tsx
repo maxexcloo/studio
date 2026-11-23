@@ -482,14 +482,14 @@ export function LibraryImports({
                   rowActions={(row) => (
                     <>
                       <Menu.Item
-                        leftSection={<icons.keep size={16} />}
+                        leftSection={<icons.accept size={16} />}
                         disabled={deciding}
                         onClick={() => substitute.mutate({ row, accept: true })}
                       >
                         Accept
                       </Menu.Item>
                       <Menu.Item
-                        leftSection={<icons.clear size={16} />}
+                        leftSection={<icons.reject size={16} />}
                         disabled={deciding}
                         onClick={() => substitute.mutate({ row, accept: false })}
                       >

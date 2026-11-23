@@ -60,10 +60,10 @@ export function useGallerySelection(
         : next;
     });
   }, [ids]);
-  // Keep the loader current without passing its changing identity down to every tile.
-  const load = useRef(more.load);
-  load.current = more.load;
-  return useMemo(() => {
+  // The actions read the latest state, so they keep one identity and memoised tiles skip renders.
+  const latest = useRef({ items, selected, more });
+  latest.current = { items, selected, more };
+  const actions = useMemo(() => {
     function cancelQuickSelect() {
       request.current?.abort();
       request.current = null;
@@ -82,28 +82,7 @@ export function useGallerySelection(
         return next;
       });
     }
-    const loaded = new Map(items.map((item) => [item.id, item]));
-    const selectedItems = [];
-    if (selected) {
-      const seen = new Set<string>();
-      for (const item of [...(snapshot?.items || []), ...items])
-        if (selected.has(item.id) && !seen.has(item.id)) {
-          seen.add(item.id);
-          selectedItems.push(loaded.get(item.id) || item);
-        }
-    }
-    const known = more.complete ? items : snapshot?.match === "all" ? snapshot.items : undefined;
     return {
-      scope: resetKey,
-      selecting: selected !== null,
-      selected: selected || new Set<string>(),
-      selectedItems,
-      all: Boolean(known?.length && known.every((item) => selected?.has(item.id))),
-      noFailed:
-        known !== undefined &&
-        !known.some((item) => (loaded.get(item.id) || item).status === "failed"),
-      quickReady: more.ready,
-      pending,
       start: () => setSelected((current) => current || new Set()),
       end: () => {
         setSelected(null);
@@ -122,9 +101,10 @@ export function useGallerySelection(
       select: (match: (item: MediaItem) => boolean) => {
         cancelQuickSelect();
         setSnapshot(null);
-        setSelected(new Set(items.filter(match).map((item) => item.id)));
+        setSelected(new Set(latest.current.items.filter(match).map((item) => item.id)));
       },
       selectMatching: async (match: GalleryQuickSelect) => {
+        const { items, more } = latest.current;
         if (!more.ready || request.current) return;
         const matches = (item: MediaItem) => match === "all" || item.status === "failed";
         if (more.complete) {
@@ -137,7 +117,7 @@ export function useGallerySelection(
         request.current = controller;
         setPending(match);
         try {
-          const matchesInScope = await load.current(match, controller.signal);
+          const matchesInScope = await more.load(match, controller.signal);
           if (controller.signal.aborted) return;
           setSnapshot({ items: matchesInScope, match });
           setSelected(new Set(matchesInScope.filter(matches).map((item) => item.id)));
@@ -150,6 +130,7 @@ export function useGallerySelection(
       retain: (ids: string[]) => setSelected(new Set(ids)),
       /** Handles a tile click when it selects; returns false when the tile should open instead. */
       click: (group: MediaItem[], event: MouseEvent | KeyboardEvent) => {
+        const { items, selected } = latest.current;
         const modified = event.ctrlKey || event.metaKey || event.shiftKey;
         if (!selected && !modified) {
           anchor.current = group[0]?.id ?? null;
@@ -170,6 +151,34 @@ export function useGallerySelection(
         return true;
       },
     };
-  }, [selected, items, pending, snapshot, more.complete, more.ready, resetKey]);
+  }, []);
+  return useMemo(() => {
+    const loaded = new Map(items.map((item) => [item.id, item]));
+    const selectedItems = [];
+    if (selected) {
+      const seen = new Set<string>();
+      for (const item of [...(snapshot?.items || []), ...items])
+        if (selected.has(item.id) && !seen.has(item.id)) {
+          seen.add(item.id);
+          selectedItems.push(loaded.get(item.id) || item);
+        }
+    }
+    const known = more.complete ? items : snapshot?.match === "all" ? snapshot.items : undefined;
+    return {
+      ...actions,
+      actions,
+      scope: resetKey,
+      selecting: selected !== null,
+      selected: selected || new Set<string>(),
+      selectedItems,
+      all: Boolean(known?.length && known.every((item) => selected?.has(item.id))),
+      noFailed:
+        known !== undefined &&
+        !known.some((item) => (loaded.get(item.id) || item).status === "failed"),
+      quickReady: more.ready,
+      pending,
+    };
+  }, [actions, selected, items, pending, snapshot, more.complete, more.ready, resetKey]);
 }
 export type GallerySelection = ReturnType<typeof useGallerySelection>;
+export type SelectionActions = GallerySelection["actions"];

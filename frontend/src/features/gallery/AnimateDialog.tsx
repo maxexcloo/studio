@@ -9,7 +9,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
-import { useChangeSuggestions } from "../generation/AskChange";
+import { suggestionsTool, useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import {
@@ -115,9 +115,7 @@ export function AnimateDialog({
               inline
               value={instruction}
               onChange={setInstruction}
-              tools={
-                offered ? [{ ...ideas.action, menu: [...ideas.action.menu, [ideas.refresh]] }] : []
-              }
+              tools={offered ? [suggestionsTool(ideas)] : []}
               submit={
                 phone
                   ? [

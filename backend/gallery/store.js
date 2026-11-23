@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { setImmediate as yieldTurn } from "node:timers/promises";
 
+import sharp from "sharp";
+
 import { replyTitle } from "../../shared/titles.ts";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { localOutputFile } from "../comfy/comfy.js";
@@ -29,7 +31,6 @@ import {
   runtimeTransaction,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
-import { loadSharp } from "../sharp-loader.js";
 import { galleryFiltersTest } from "./filters.js";
 import { compareGalleryKeys } from "./order.js";
 import {
@@ -1391,14 +1392,10 @@ export function cleanupGalleryState(queue, query = {}) {
 
 /** A saved output's own size, read from its file (sharp for an image, ffmpeg otherwise); null when unreadable. */
 export async function outputFileSize(file, type) {
-  if (type === "image") {
-    const sharp = await loadSharp();
-    return sharp
-      ? sharp(file)
-          .metadata()
-          .catch(() => null)
-      : null;
-  }
+  if (type === "image")
+    return sharp(file)
+      .metadata()
+      .catch(() => null);
   const { probeVideo } = await import("../video-previews.js");
   return probeVideo(file);
 }

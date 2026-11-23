@@ -105,8 +105,8 @@ const views = [
     { value: "taste", label: "Taste" },
   ],
   [
-    { value: "history", label: "History" },
     { value: "discarded", label: "Discards" },
+    { value: "history", label: "History" },
   ],
 ] as const;
 const mediaLabels = { image: "Images", video: "Videos" };
@@ -161,8 +161,8 @@ export function DreamPage() {
     : [];
   const count = data && dreamCardCounts(deckUnseen, data.settings);
   const pending = {
-    image: reviewing ? imageReview.remaining : view === "dream" ? count?.images : undefined,
-    video: reviewing ? videoReview.remaining : view === "dream" ? count?.videos : undefined,
+    image: reviewing ? imageReview.remaining : count?.images,
+    video: reviewing ? videoReview.remaining : count?.videos,
   };
 
   useEffect(() => {
@@ -201,7 +201,10 @@ export function DreamPage() {
       onChange={(value) => setMedia(value as DreamMedia)}
       data={(["image", "video"] as const).map((kind) => ({
         value: kind,
-        label: pending[kind] ? `${mediaLabels[kind]} (${pending[kind]})` : mediaLabels[kind],
+        label:
+          pending[kind] === undefined
+            ? mediaLabels[kind]
+            : `${mediaLabels[kind]} (${pending[kind]})`,
       }))}
     />
   );

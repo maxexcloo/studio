@@ -13,7 +13,6 @@ import {
   startImageSlot,
   withCharacter,
   withPart,
-  withoutCharacter,
   withoutPart,
 } from "../shared/characters.ts";
 
@@ -30,7 +29,7 @@ test("a character's lead starts a prompt once, and removing it restores the prom
   ]) {
     assert.equal(withCharacter(prompt, description), led);
     assert.equal(withCharacter(led, description), led);
-    assert.equal(withoutCharacter(led, description), prompt);
+    assert.equal(withoutPart(led, characterLead(description)), prompt);
   }
   assert.equal(
     characterLead(""),

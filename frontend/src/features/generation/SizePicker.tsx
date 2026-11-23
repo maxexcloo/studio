@@ -1,13 +1,4 @@
-import {
-  Button,
-  FocusTrap,
-  NumberInput,
-  Popover,
-  SegmentedControl,
-  SimpleGrid,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Button, NumberInput, SegmentedControl, SimpleGrid, Stack, Text } from "@mantine/core";
 import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import { useState } from "react";
 
@@ -23,9 +14,9 @@ import {
   selectedResolution,
 } from "../../../../shared/resolution";
 import type { GenerationInput, Profile } from "../../types";
-import { useTouch } from "../../ui/usePhone";
-import { chipProps, fittedPopup } from "./chip";
+import { chipProps } from "./chip";
 import { primaryReference } from "./payload";
+import { ChipPopup } from "./Picker";
 
 type Size = { w: number; h: number };
 
@@ -38,7 +29,6 @@ export function SizePicker({
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
 }) {
-  const touch = useTouch();
   const presets = orderedAspects(profile?.aspectPresets || []);
   const cloudVideo = isCloudVideoProfile(profile);
   const references = input.referenceDetails || [];
@@ -113,6 +103,7 @@ export function SizePicker({
     current;
   const opening = matched || "custom";
   const [tab, setTab] = useState(opening);
+  const [opened, setOpened] = useState(false);
   const view = tabs.some((item) => item.value === tab) ? tab : opening;
   const label = framed
     ? ["Reference", aspect, native.length ? nativeResolution.toUpperCase() : ""]
@@ -124,115 +115,106 @@ export function SizePicker({
         ? `${active.label} · ${shown.w} × ${shown.h}`
         : `${shown.w} × ${shown.h}`;
   return (
-    <Popover
-      position="top-start"
+    <ChipPopup
+      title="Size & Aspect"
+      floating
       width={300}
-      trapFocus
-      onOpen={() => setTab(opening)}
-      {...fittedPopup}
-    >
-      <Popover.Target>
+      opened={opened}
+      onOpenedChange={setOpened}
+      target={
         <Button
           {...chipProps}
           aria-label="Aspect"
-          title={framed ? undefined : `${shown.w} × ${shown.h}`}
+          aria-expanded={opened}
           leftSection={<RectangleHorizontal size={16} />}
           rightSection={<ChevronDown size={14} />}
+          onClick={() => {
+            if (!opened) setTab(opening);
+            setOpened(!opened);
+          }}
         >
           {label}
         </Button>
-      </Popover.Target>
-      <Popover.Dropdown
-        data-composer-layer
-        aria-label="Size & Aspect"
-        onFocusCapture={(event) => {
-          // Mantine overlays reserve Escape for the focused inner control.
-          (event.target as HTMLElement).setAttribute("data-mantine-stop-propagation", "true");
-        }}
-      >
-        {/* Touch screens focus the popup itself, as ChipPopup does, so Width doesn't raise the keyboard. */}
-        {touch && <FocusTrap.InitialFocus />}
-        <Stack gap="sm">
-          {tabs.length > 1 && (!framed || native.length > 1) && (
-            <SegmentedControl
-              aria-label="Resolution"
-              fullWidth
-              value={view}
-              onChange={(value) => {
-                setTab(value);
-                if (native.length) onChange({ resolution: value });
-                else if (isResolution(value)) onChange({ resolutionTier: value });
-                // Custom starts from the size drawn now.
-                else if (value === "custom" && tier)
-                  onChange({ width: shown.w, height: shown.h, resolutionTier: undefined });
-              }}
-              data={tabs}
-            />
-          )}
-          {framed ? (
-            <Stack gap="xs">
-              <Text size="sm">
-                The reference sets the output framing{aspect ? ` to ${aspect}` : ""}.
+      }
+    >
+      <Stack gap="sm">
+        {tabs.length > 1 && (!framed || native.length > 1) && (
+          <SegmentedControl
+            aria-label="Resolution"
+            fullWidth
+            value={view}
+            onChange={(value) => {
+              setTab(value);
+              if (native.length) onChange({ resolution: value });
+              else if (isResolution(value)) onChange({ resolutionTier: value });
+              // Custom starts from the size drawn now.
+              else if (value === "custom" && tier)
+                onChange({ width: shown.w, height: shown.h, resolutionTier: undefined });
+            }}
+            data={tabs}
+          />
+        )}
+        {framed ? (
+          <Stack gap="xs">
+            <Text size="sm">
+              The reference sets the output framing{aspect ? ` to ${aspect}` : ""}.
+            </Text>
+            {!cloudVideo && (
+              <Text size="xs" c="dimmed">
+                Remove the reference or use Reference mode to change it. Your custom size is kept.
               </Text>
-              {!cloudVideo && (
-                <Text size="xs" c="dimmed">
-                  Remove the reference or use Reference mode to change it. Your custom size is kept.
-                </Text>
-              )}
-            </Stack>
-          ) : view === "custom" || !tabs.length ? (
-            <SimpleGrid cols={2} spacing="xs">
-              {(["width", "height"] as const).map((key) => (
-                <NumberInput
-                  key={key}
-                  label={key === "width" ? "Width" : "Height"}
-                  value={input[key]}
-                  min={profile?.constraints?.[key]?.min}
-                  max={profile?.constraints?.[key]?.max}
-                  step={profile?.constraints?.[key]?.step}
-                  onChange={(value) =>
-                    onChange({ [key]: Number(value), resolutionTier: undefined })
+            )}
+          </Stack>
+        ) : view === "custom" || !tabs.length ? (
+          <SimpleGrid cols={2} spacing="xs">
+            {(["width", "height"] as const).map((key) => (
+              <NumberInput
+                key={key}
+                label={key === "width" ? "Width" : "Height"}
+                value={input[key]}
+                min={profile?.constraints?.[key]?.min}
+                max={profile?.constraints?.[key]?.max}
+                step={profile?.constraints?.[key]?.step}
+                onChange={(value) => onChange({ [key]: Number(value), resolutionTier: undefined })}
+              />
+            ))}
+          </SimpleGrid>
+        ) : (
+          <Stack gap={4} role="group" aria-label="Aspect Presets">
+            {presets.map((preset) => {
+              const size = sizeAt(preset, view);
+              const selected = preset === active && view === matched;
+              return (
+                <Button
+                  key={preset.label}
+                  fullWidth
+                  justify="space-between"
+                  variant={selected ? "light" : "subtle"}
+                  color={selected ? undefined : "gray"}
+                  aria-pressed={selected}
+                  rightSection={
+                    size && (
+                      <Text component="span" size="xs" c="dimmed">
+                        {size.w} × {size.h}
+                      </Text>
+                    )
                   }
-                />
-              ))}
-            </SimpleGrid>
-          ) : (
-            <Stack gap={4} role="group" aria-label="Aspect Presets">
-              {presets.map((preset) => {
-                const size = sizeAt(preset, view);
-                const selected = preset === active && view === matched;
-                return (
-                  <Button
-                    key={preset.label}
-                    fullWidth
-                    justify="space-between"
-                    variant={selected ? "light" : "subtle"}
-                    color={selected ? undefined : "gray"}
-                    aria-pressed={selected}
-                    rightSection={
-                      size && (
-                        <Text component="span" size="xs" c="dimmed">
-                          {size.w} × {size.h}
-                        </Text>
-                      )
-                    }
-                    onClick={() =>
-                      onChange({
-                        width: preset.w,
-                        height: preset.h,
-                        resolutionTier: isResolution(view) ? view : undefined,
-                        ...(native.length ? { resolution: view } : {}),
-                      })
-                    }
-                  >
-                    {preset.label}
-                  </Button>
-                );
-              })}
-            </Stack>
-          )}
-        </Stack>
-      </Popover.Dropdown>
-    </Popover>
+                  onClick={() =>
+                    onChange({
+                      width: preset.w,
+                      height: preset.h,
+                      resolutionTier: isResolution(view) ? view : undefined,
+                      ...(native.length ? { resolution: view } : {}),
+                    })
+                  }
+                >
+                  {preset.label}
+                </Button>
+              );
+            })}
+          </Stack>
+        )}
+      </Stack>
+    </ChipPopup>
   );
 }

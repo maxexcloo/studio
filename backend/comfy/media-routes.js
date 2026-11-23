@@ -255,14 +255,6 @@ export function registerComfyMediaRoutes(app) {
         res.status(404).json({ ok: false, error: "Source image is unavailable." });
         return;
       }
-      // No sharp (see sharp-loader.js): the full image stands in for the thumbnail.
-      if (thumbnail.original) {
-        res.redirect(
-          302,
-          `/comfy/view?${new URLSearchParams({ filename, subfolder, type, ...(worker ? { worker } : {}) })}`,
-        );
-        return;
-      }
       // The ETag is a source-content hash, so revalidation safely handles a reused filename.
       res.setHeader("Cache-Control", thumbnailCacheControl(req));
       if (req.headers["if-none-match"] === thumbnail.etag) {

@@ -744,7 +744,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             <>
               {account.disabled && (
                 <Menu.Item
-                  leftSection={<icons.enable size={16} />}
+                  leftSection={<icons.enableAccount size={16} />}
                   onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
                 >
                   Enable
@@ -791,7 +791,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   {galleryOf(account) > 0 && (
                     <Menu.Item
                       color="red"
-                      leftSection={<icons.delete size={16} />}
+                      leftSection={<icons.deleteGallery size={16} />}
                       rightSection={
                         <Text size="xs" c="dimmed">
                           {galleryOf(account)}
@@ -805,7 +805,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   {!account.disabled && (
                     <Menu.Item
                       color="red"
-                      leftSection={<icons.disable size={16} />}
+                      leftSection={<icons.disableAccount size={16} />}
                       onClick={act("disable")}
                     >
                       Disable

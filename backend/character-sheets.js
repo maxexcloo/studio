@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 import {
   characterImage,
   characterImageIds,
@@ -14,7 +16,6 @@ import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { isGalleryHidden } from "./gallery/store.js";
 import { publicGalleryBuffer, saveUpload } from "./references.js";
-import { loadSharp } from "./sharp-loader.js";
 
 /**
  * Make Sheet: a character's first image redrawn as a character design sheet by Qwen-Image 2.1, which
@@ -70,8 +71,6 @@ function runs(counts, noise, gap) {
  * found by the background between them; where the gaps aren't clear, by the layout's proportions.
  */
 export async function sheetPanels(buffer) {
-  const sharp = await loadSharp();
-  if (!sharp) throw new Error("Image resizing is off, so the sheet can't be split.");
   const { width, height } = await sharp(buffer).metadata();
   const scale = Math.min(1, readWidth / width);
   const w = Math.round(width * scale);
@@ -316,7 +315,6 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
   /** Cuts a finished sheet into its panels and keeps them on its character. */
   async function keep(ownerId, card, item) {
     const { buffer } = await publicGalleryBuffer(item);
-    const sharp = await loadSharp();
     const found = await sheetPanels(buffer);
     const panels = [{ role: "sheet", referenceId: item.id }];
     for (const { role, ...box } of found) {

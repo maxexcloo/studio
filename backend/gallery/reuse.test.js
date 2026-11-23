@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import sharp from "sharp";
+
 import { temporaryFolder } from "../fixtures/temporary.js";
 
 const outputDir = temporaryFolder("studio-output-");
@@ -204,9 +206,6 @@ test("a video that cannot be probed still completes with its requested dimension
 });
 
 test("a finished image records the size its file came out at, not the size asked for", async () => {
-  const { loadSharp } = await import("../sharp-loader.js");
-  const sharp = await loadSharp();
-  if (!sharp) return;
   const filename = "reference-framed.png";
   const square = { width: 40, height: 40, channels: 3, background: "white" };
   fs.writeFileSync(
@@ -348,9 +347,6 @@ test("a finished image is listed at once, before the folder listing catches up",
 });
 
 test("an image shown upscaled is used upscaled, at the original's size", async () => {
-  const { loadSharp } = await import("../sharp-loader.js");
-  const sharp = await loadSharp();
-  if (!sharp) return;
   const { bytesForReferenceAccount } = await import("../references.js");
   const png = (width, height, r) =>
     sharp({ create: { width, height, channels: 3, background: { r, g: 0, b: 0 } } })

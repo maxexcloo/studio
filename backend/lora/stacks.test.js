@@ -6,15 +6,13 @@ import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-loras-"));
 process.env.STUDIO_DATA_DIR = dir;
-const { applyLoraOps, clearLoraState, forgetLora, loadLoraLibrary } = await import("./stacks.js");
+const { applyLoraOps, forgetLora, loadLoraLibrary } = await import("./stacks.js");
 const { ownerDocumentName, readRuntimeDocument, runtimeDatabase } =
   await import("../persistence/runtime.ts");
 const { Store } = await import("../domain/store.ts");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test("account LoRA ratings use separate files", () => {
-  clearLoraState("account-a");
-  clearLoraState("account-b");
   applyLoraOps([{ op: "rating", name: "private-a.safetensors", rating: "liked" }], "account-a");
   applyLoraOps([{ op: "rating", name: "private-b.safetensors", rating: "disliked" }], "account-b");
   assert.deepEqual(loadLoraLibrary("account-a").ratings, { "private-a.safetensors": "liked" });
@@ -28,7 +26,6 @@ test("account LoRA ratings use separate files", () => {
 });
 
 test("replayed ratings are harmless", () => {
-  clearLoraState();
   applyLoraOps([
     { op: "rating", name: "a", rating: "liked" },
     { op: "rating", name: "a", rating: "liked" },
@@ -39,7 +36,6 @@ test("replayed ratings are harmless", () => {
 });
 
 test("a removed LoRA leaves every account's ratings and presets", () => {
-  clearLoraState("account-c");
   applyLoraOps(
     [
       { op: "rating", name: "gone.safetensors", rating: "liked" },

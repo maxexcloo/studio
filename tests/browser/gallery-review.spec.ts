@@ -104,7 +104,7 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await page.keyboard.press("Escape");
   await expect(deck.getByText("Common Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeHidden();
-  await deck.getByRole("button", { name: "Back", exact: true }).click();
+  await showGalleryView(page, "Gallery");
   await expect(page).toHaveURL(/\/images$/);
   await expect(deck).toBeHidden();
   await expect(search).toHaveValue("Bird");
@@ -148,7 +148,7 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   expect(asked).toEqual(["bird"]);
 });
 
-test("Opening Video Review directly returns to the video gallery", async ({ page }) => {
+test("Video Review opened directly leaves for the video gallery", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push(result("image", "Still Bird"), {
     ...result("video", "Flying Bird"),
@@ -158,7 +158,9 @@ test("Opening Video Review directly returns to the video gallery", async ({ page
   const deck = page.getByRole("region", { name: "Review", exact: true });
   await expect(deck.getByText("Flying Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Still Bird", { exact: true })).toBeHidden();
-  await deck.getByRole("button", { name: "Back", exact: true }).click();
+  // Review leaves through the view menu, as the gallery's other views do.
+  await expect(page.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+  await showGalleryView(page, "Gallery");
   await expect(page).toHaveURL(/\/videos$/);
   await expect(page.getByRole("button", { name: "Open video: Flying Bird" })).toBeVisible();
 });

@@ -83,8 +83,8 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
   return (
     <Tooltip label="Undo">
       <ActionIcon
-        variant="default"
-        radius="xl"
+        variant="subtle"
+        color="gray"
         size="md"
         aria-label="Undo"
         disabled={disabled}

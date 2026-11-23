@@ -1,4 +1,4 @@
-import { loadSharp } from "./sharp-loader.js";
+import sharp from "sharp";
 
 /** Shrink to a pixel budget, preserving framing and never enlarging either side. */
 export function inputImageSize(width, height, pixels, step = 1) {
@@ -13,9 +13,6 @@ export function inputImageSize(width, height, pixels, step = 1) {
 /** Only the generation copy is changed; PNG preserves alpha used as a LoadImage mask. */
 export async function prepareInputImage(bytes, { pixels, step = 1 } = {}) {
   if (!pixels) return bytes;
-  const sharp = await loadSharp();
-  if (!sharp)
-    throw new Error("Automatic input resizing is unavailable. Repair the Studio installation.");
   const metadata = await sharp(bytes.buffer, { limitInputPixels: 80_000_000 }).metadata();
   if (metadata.pages > 1) throw new Error("Use a still image as a start or reference image.");
   const oriented =

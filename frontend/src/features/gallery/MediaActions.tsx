@@ -1,17 +1,5 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeftRight,
-  Check,
-  ImageDown,
-  ListChecks,
-  Loader,
-  type LucideIcon,
-  Repeat,
-  Rewind,
-  Snail,
-  TextQuote,
-  Waves,
-} from "lucide-react";
+import { Check, Loader, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -156,7 +144,7 @@ function useSaveFrame(item: MediaItem): Action {
   return {
     id: "save-frame",
     label: saved === item.id ? "Saved to Uploads" : "Save Frame as Image",
-    icon: saved === item.id ? Check : ImageDown,
+    icon: saved === item.id ? Check : icons.saveFrame,
     disabled: save.isPending,
     loading: save.isPending,
     keepOpen: true,
@@ -379,7 +367,8 @@ export function useMediaActions(
   const [review, setReview] = useAnimateReview();
   const { menu: animateProfiles, profileId: animationProfileId } = useActionProfile("video");
   const { menu: editProfiles, profileId: selectedEdit, profiles } = useActionProfile("image");
-  const [savedCount, setRecreateCount] = useRemembered("recreate-count", 1);
+  // Recreate makes as many as the original did until a count is chosen.
+  const [savedCount, setRecreateCount] = useRemembered<number | null>("recreate-count", null);
   const original = profiles?.find((profile) =>
     item.settings?.profileId
       ? isProfile(profile, item.settings.profileId)
@@ -392,7 +381,7 @@ export function useMediaActions(
     Array.isArray(item.settings?.loras) && item.settings.loras.length > 0,
   );
   const countLimit = generationCountLimit(recreateProfile, item.type);
-  const recreateCount = Math.min(savedCount, countLimit);
+  const recreateCount = Math.min(savedCount ?? (Number(item.settings?.count) || 1), countLimit);
   const automaticEdit = image && automaticEditProfile(profiles || [], item);
   const editProfileId =
     selectedEdit ||
@@ -641,10 +630,10 @@ export function useMediaActions(
           : [
               [saveFrame, ...(reference ? [reference] : [])],
               [
-                editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-                editAction("reverse", "Reverse", Rewind, "reverse"),
-                editAction("slow-motion", "Slow Motion", Snail, "slow"),
-                editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+                editAction("back-and-forth", "Back & Forth", icons.backAndForth, "loop"),
+                editAction("reverse", "Reverse", icons.reverse, "reverse"),
+                editAction("slow-motion", "Slow Motion", icons.slowMotion, "slow"),
+                editAction("smooth-motion", "Smooth Motion", icons.smoothMotion, "smooth"),
               ],
             ],
       }),
@@ -675,7 +664,7 @@ export function useMediaActions(
                   {
                     id: "exact-repeat",
                     label: "Run Again, Same Seed",
-                    icon: Repeat,
+                    icon: icons.sameSeed,
                     disabled: changedPrompt === "",
                     onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
@@ -734,13 +723,13 @@ export function useMediaActions(
           {
             id: "copy-details",
             label: "Copy Details",
-            icon: ListChecks,
+            icon: icons.copyDetails,
             onClick: () => void copyText(settingsText(), "Details"),
           },
           {
             id: "copy-prompt",
             label: "Copy Prompt",
-            icon: TextQuote,
+            icon: icons.copyPrompt,
             onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
           // A video also downloads as a GIF, beside it rather than in a submenu.

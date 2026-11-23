@@ -128,7 +128,14 @@ function ItemSuggestions({
         <Menu.Dropdown>
           <ActionMenuItems
             leading={
-              available && card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>
+              available && (
+                <>
+                  {card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>}
+                  {suggestions.action.description && (
+                    <Menu.Label fw={400}>{suggestions.action.description}</Menu.Label>
+                  )}
+                </>
+              )
             }
             groups={[
               ...(available

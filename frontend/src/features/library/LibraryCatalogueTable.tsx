@@ -2,6 +2,7 @@ import { Alert, Badge, Menu, Stack, Text } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
+import { menuWidth } from "../../theme";
 import { copyText } from "../../ui/clipboard";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
@@ -233,7 +234,7 @@ export function LibraryCatalogueTable({
           }}
           actions={
             onCheckUpdates && (
-              <Menu position="bottom-end">
+              <Menu position="bottom-end" width={menuWidth}>
                 <Menu.Target>
                   {/* Filled while free updates wait to be applied. */}
                   <ToolbarAction

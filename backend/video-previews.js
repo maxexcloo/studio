@@ -15,7 +15,7 @@ import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { digest } from "./values.js";
 
-const encoder = process.env.STUDIO_FFMPEG_PATH || "ffmpeg";
+const encoder = "ffmpeg";
 const dir = path.join(dataDir, ".video-previews");
 // Grid tiles run up to ~700 CSS px on a 2x screen: 720 keeps them sharp at a few MB per clip.
 const version = "v2-720-24-8";

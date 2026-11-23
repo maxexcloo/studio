@@ -1,4 +1,4 @@
-import { Route, Server, Shield, UsersRound, Wrench } from "lucide-react";
+import { Route, Server, Shield, SlidersVertical, UsersRound } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -52,7 +52,7 @@ const settingSections = {
   studio: {
     label: "Studio",
     description: "Set Studio-wide defaults, the AI work Studio does on its own, and failed items.",
-    icon: Wrench,
+    icon: SlidersVertical,
     admin: true,
     group: "Administration",
   },

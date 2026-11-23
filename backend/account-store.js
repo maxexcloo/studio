@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { promisify } from "node:util";
 
 import {
   accountRoles,
@@ -10,13 +11,16 @@ import {
 } from "./account-policy.js";
 import { accountPreferences, forgetAccountPreferences } from "./account-preferences.js";
 import { dataDir } from "./data-dir.js";
-import { scryptAsync } from "./kdf.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { digest } from "./values.js";
 
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
 const maxSessions = 500;
 const kdf = "scrypt-n32768-r8-p1";
+const scrypt = promisify(crypto.scrypt);
+// Async, on libuv's thread pool: scryptSync at this cost blocks the server for 50-100 ms per guess.
+const scryptAsync = (password, salt) =>
+  scrypt(String(password || ""), salt, 32, { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
 let cache;
 
 const emptyStore = () => ({

@@ -48,8 +48,7 @@ test("local account passwords and bearer sessions are stored only as verifiers",
   assert.equal(saved.includes("a secure local password"), false);
   assert.equal(saved.includes(session.token), false);
   assert.match(saved, /scrypt-n32768-r8-p1/);
-  if (process.platform !== "win32")
-    assert.equal(fs.statSync(path.join(dataDir, "studio.sqlite")).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(path.join(dataDir, "studio.sqlite")).mode & 0o777, 0o600);
 
   store.revokeAccountSession(session.token);
   assert.equal(store.accountSession(session.token), null);

@@ -44,16 +44,6 @@ export class CliProxyMedia {
   private cached?: { expires: number; models: string[] };
 
   constructor(base: string, key: string, fetchImpl = fetch) {
-    const endpoint = new URL(base);
-    if (
-      !["http:", "https:"].includes(endpoint.protocol) ||
-      endpoint.username ||
-      endpoint.password ||
-      endpoint.search ||
-      endpoint.hash
-    )
-      throw new Error("STUDIO_CLIPROXYAPI_URL must be a plain provider HTTP(S) base URL.");
-    if (!key) throw new Error("STUDIO_CLIPROXYAPI_KEY is required.");
     this.base = base.replace(/\/$/, "");
     this.key = key;
     this.fetchImpl = fetchImpl;
@@ -210,5 +200,7 @@ export class CliProxyMedia {
 export function configuredCliProxy(environment = process.env): CliProxyMedia | undefined {
   const base = environment.STUDIO_CLIPROXYAPI_URL;
   if (!base) return;
-  return new CliProxyMedia(base, environment.STUDIO_CLIPROXYAPI_KEY || "");
+  const key = environment.STUDIO_CLIPROXYAPI_KEY;
+  if (!key) throw new Error("STUDIO_CLIPROXYAPI_KEY is required.");
+  return new CliProxyMedia(base, key);
 }
