@@ -535,12 +535,12 @@ export function createSuggestions({
   /** The taste profile and the prompts the owner liked, as the model's context. */
   function tasteContext(ownerId: string) {
     const record = taste.read(ownerId);
-    // Signals keep whole prompts; a few opening sentences show the taste.
+    // Signals keep a prompt's opening sentences, which show the taste.
     const prompts = (kinds: string[]) => [
       ...new Set(
         record.signals
           .filter((signal) => kinds.includes(signal.kind) && signal.prompt)
-          .map((signal) => signal.prompt!.slice(0, 300)),
+          .map((signal) => signal.prompt!),
       ),
     ];
     const liked = prompts(["like", "compare"]);
