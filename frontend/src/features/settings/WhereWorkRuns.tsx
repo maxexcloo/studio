@@ -193,7 +193,7 @@ export function WhereWorkRuns() {
                       value: String(index + 1),
                       label: plural(index + 1, "Image"),
                     }))}
-                    placeholder="1 Image"
+                    placeholder="Profile Default"
                     value={preferences.imageCount ? String(preferences.imageCount) : null}
                     clearable
                     onChange={(choice) =>
