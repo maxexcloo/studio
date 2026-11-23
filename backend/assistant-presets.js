@@ -5,6 +5,7 @@
 // with its own `presets.<id>` text. Each sets only the tone; the content rule
 // (domain/writing-standard.ts) decides how explicit it may be, and an `uncensored` style is only
 // for accounts with Uncensored Models.
+import { promptInstruction } from "./prompt-instructions.js";
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 export const seedStyles = Object.freeze([
@@ -302,8 +303,9 @@ export const customStyles = Object.freeze({
     description: "Your own instruction.",
     custom: true,
     enabled: true,
-    instruction:
-      "Custom: apply the person's instruction below in full. Where it changes a subject, detail or style, it overrides keeping them; keep everything else as asked.",
+    get instruction() {
+      return promptInstruction("custom-rewrite");
+    },
   },
   animate: {
     id: "custom",
@@ -312,8 +314,9 @@ export const customStyles = Object.freeze({
     description: "Your own instruction.",
     custom: true,
     enabled: true,
-    instruction:
-      "Custom: the person's instruction decides what happens. Make it happen with what is in the frame, and build the beats, camera and any sound around it without changing it. Bring in only what the instruction names, entering naturally (from out of frame, through a door) rather than appearing from nowhere.",
+    get instruction() {
+      return promptInstruction("custom-animate");
+    },
   },
 });
 
@@ -343,14 +346,14 @@ export const settingWords = Object.freeze([
 ]);
 
 /**
- * Families meant to run behind a maker's prompt upsampler: Enhance uses the maker's system prompt
- * verbatim (prompt-upsamplers.js), so the caption matches what the model was trained on, and runs
+ * Families meant to run behind a maker's prompt upsampler: Enhance uses its Library instruction
+ * (prompt-upsamplers.js), which defaults to the maker's wording, and runs
  * on the maker's upsampler `model` once the gateway lists it.
  */
-const flux3 = { ...flux3Upsampler, model: "local/flux-pup" };
+const flux3 = () => ({ ...flux3Upsampler, model: "local/flux-pup" });
 const upsamplers = { flux3, flux3_klein: flux3 };
 const familyKey = (family) => String(family || "").replace(/-/g, "_");
 
 export function familyUpsampler(profile) {
-  return upsamplers[familyKey(profile?.family)] || null;
+  return upsamplers[familyKey(profile?.family)]?.() || null;
 }

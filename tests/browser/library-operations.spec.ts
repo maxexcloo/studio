@@ -27,7 +27,7 @@ test("The Library opens on Presets, groups Cards and Generation, and sets Files 
   await page.goto("/library");
   const groups = {
     Cards: ["Characters", "Outfits", "Scenes"],
-    Generation: ["Guides", "LoRAs", "Profiles", "Prompt Styles"],
+    Generation: ["Guides", "LoRAs", "Profiles", "Prompt Instructions", "Prompt Styles"],
   };
   const order = ["Presets", ...Object.values(groups).flat(), "Files", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
