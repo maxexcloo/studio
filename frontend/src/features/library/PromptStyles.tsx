@@ -278,7 +278,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                     <>
                       {style.label}{" "}
                       {style.uncensored && (
-                        <Badge size="sm" color="orange">
+                        <Badge component="span" size="sm" color="orange">
                           Uncensored
                         </Badge>
                       )}

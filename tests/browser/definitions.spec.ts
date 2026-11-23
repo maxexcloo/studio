@@ -509,17 +509,10 @@ test("Prompt Styles sort by type and then name, and can be filtered and edited",
   await openNav(page, "Library");
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
-  await expect(table.getByRole("row").locator("td:first-child p:first-child")).toHaveText([
-    "Cinematic Camera",
-    "Candid",
-    "Extended Themes Uncensored",
-  ]);
+  const names = table.getByRole("row").locator("td:first-child > p:first-child");
+  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Extended Themes Uncensored"]);
   await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
-  await expect(table.getByRole("row").locator("td:first-child p:first-child")).toHaveText([
-    "Candid",
-    "Cinematic Camera",
-    "Extended Themes Uncensored",
-  ]);
+  await expect(names).toHaveText(["Candid", "Cinematic Camera", "Extended Themes Uncensored"]);
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   const type = page.getByRole("radiogroup", { name: "Type", exact: true });
   await type.getByText("Improve Prompt", { exact: true }).click();
