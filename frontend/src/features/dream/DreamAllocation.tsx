@@ -48,7 +48,7 @@ export function DreamAllocation({ dream }: { dream: Dream }) {
   if (!allocations.some(({ capped }) => capped)) return null;
 
   return (
-    <Popover position="bottom-end" width={280} trapFocus returnFocus>
+    <Popover position="bottom-end" width="var(--studio-popup-width)" trapFocus returnFocus>
       <PopupTooltip label="Daily Dream Limit Reached">
         <Popover.Target>
           <ActionIcon variant="subtle" color="yellow" aria-label="Dream Allocation">

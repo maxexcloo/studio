@@ -162,7 +162,6 @@ export function GalleryToolbar({
         spacious={false}
         opened={filtering}
         onOpenedChange={setFiltering}
-        width={340}
         position="bottom-start"
         detail={
           results && (

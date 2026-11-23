@@ -185,7 +185,6 @@ export function CompareMenu({ labels }: { labels: string[] }) {
       }
       opened={opened}
       onOpenedChange={setOpened}
-      width={draft.compare ? 360 : 420}
       floating={!!draft.compare}
       spacious
       target={

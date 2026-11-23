@@ -578,6 +578,8 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "820px",
       "--studio-panel-min-height": "min(6rem, 18dvh)",
+      "--studio-popup-width": "25rem",
+      "--studio-popup-wide-width": "56rem",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,

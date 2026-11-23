@@ -222,7 +222,6 @@ export function LoraPicker({
     return (
       <ChipPopup
         title="LoRAs"
-        width="100%"
         opened={picker.opened}
         onOpenedChange={picker.setOpened}
         trap={!adding}
@@ -232,7 +231,6 @@ export function LoraPicker({
         leading={
           <ChipPopup
             title="Add LoRAs"
-            width="100%"
             opened={picker.opened && adding}
             onOpenedChange={setAdding}
             target={
@@ -260,7 +258,7 @@ export function LoraPicker({
     <ChipPopup
       title="LoRAs"
       position={position}
-      width="min(56rem, calc(100vw - 2rem))"
+      wide
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
       target={trigger}

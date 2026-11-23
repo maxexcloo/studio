@@ -185,7 +185,6 @@ export function usePromptHistory({
     <ChipPopup
       title={title}
       position="top-end"
-      width={500}
       opened={opened}
       onOpenedChange={setOpened}
       target={<span />}

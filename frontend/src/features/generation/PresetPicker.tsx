@@ -221,7 +221,6 @@ export function PresetPicker({
       title="Presets"
       tooltip
       position="top-end"
-      width={400}
       floating
       spacious
       opened={opened}

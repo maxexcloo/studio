@@ -305,7 +305,6 @@ function ChoiceChip({
         title={choice.label}
         floating
         position="bottom-start"
-        width="max-content"
         opened={opened}
         onOpenedChange={setOpened}
         onClear={chip.remove}

@@ -294,7 +294,6 @@ export function GenerationSettings({
       tooltip
       floating
       position="top"
-      width={380}
       opened={opened}
       onOpenedChange={onOpenedChange}
       target={

@@ -106,7 +106,7 @@ export function ChipPopup({
   target,
   tooltip = false,
   actions,
-  width,
+  wide = false,
   position = "top-start",
   trap = true,
   withinPortal = true,
@@ -129,7 +129,8 @@ export function ChipPopup({
   /** Icon-only chips name themselves with a tooltip: the title, or the label given. */
   tooltip?: boolean | string;
   actions?: ReactNode;
-  width: number | string;
+  /** Room for a picker grid beside an aside, such as LoRAs and References. */
+  wide?: boolean;
   position?: PopoverProps["position"];
   /** Off while a confirmation over the popup owns focus and clicks. */
   trap?: boolean;
@@ -207,7 +208,7 @@ export function ChipPopup({
     <Popover
       opened={opened}
       onChange={onOpenedChange}
-      width={width}
+      width={wide ? "var(--studio-popup-wide-width)" : "var(--studio-popup-width)"}
       position={position}
       trapFocus={trap}
       closeOnClickOutside={trap}

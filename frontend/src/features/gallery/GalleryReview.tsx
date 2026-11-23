@@ -57,7 +57,6 @@ export function GalleryReview({
             spacious={false}
             opened={filtering}
             onOpenedChange={setFiltering}
-            width={340}
             position="bottom-start"
             clearDisabled={!filterCount}
             onClear={() => {

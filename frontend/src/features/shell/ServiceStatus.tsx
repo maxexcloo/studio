@@ -167,7 +167,7 @@ export function StatusAction() {
           opened={opened}
           onChange={setOpened}
           position="bottom-start"
-          width={400}
+          width="var(--studio-popup-width)"
           closeOnClickOutside={false}
           closeOnEscape={false}
           returnFocus

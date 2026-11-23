@@ -74,7 +74,6 @@ function FieldChip({
       floating
       // The project dialog stacks above popovers.
       withinPortal={false}
-      width={340}
       position="bottom-start"
       opened={opened}
       onOpenedChange={setOpened}

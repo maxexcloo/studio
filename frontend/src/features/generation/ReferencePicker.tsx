@@ -485,7 +485,6 @@ export function ReferencePicker({
     return (
       <ChipPopup
         title="References"
-        width="100%"
         opened={opened}
         onOpenedChange={setOpened}
         trap={!layer && !adding && !preview.opened}
@@ -495,7 +494,6 @@ export function ReferencePicker({
         leading={
           <ChipPopup
             title="Add References"
-            width="100%"
             opened={opened && adding}
             onOpenedChange={(adding) => {
               setAdding(adding);
@@ -523,7 +521,7 @@ export function ReferencePicker({
   return (
     <ChipPopup
       title="References"
-      width="min(56rem, calc(100vw - 2rem))"
+      wide
       opened={opened}
       onOpenedChange={setOpened}
       trap={!layer && !preview.opened}

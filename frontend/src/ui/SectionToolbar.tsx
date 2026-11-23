@@ -256,7 +256,6 @@ export function SectionToolbar({
             floating
             opened={filtering}
             onOpenedChange={setFiltering}
-            width={300}
             position="bottom-end"
             onClear={onClearFilters}
             clearDisabled={!filterCount}

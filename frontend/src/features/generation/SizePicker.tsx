@@ -118,7 +118,6 @@ export function SizePicker({
     <ChipPopup
       title="Size & Aspect"
       floating
-      width={300}
       opened={opened}
       onOpenedChange={setOpened}
       target={

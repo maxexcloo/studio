@@ -169,7 +169,6 @@ export function PickerHeader<Tab extends string>({
               spacious={false}
               opened={filtering}
               onOpenedChange={setFiltering}
-              width={340}
               position="bottom-end"
               withinPortal={false}
               onClear={onClearFilters}
