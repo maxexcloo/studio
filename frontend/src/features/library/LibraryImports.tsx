@@ -33,14 +33,19 @@ import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
 type Resource = NonNullable<ImportRecord["resources"]>[number];
 
-/** The audit's groups, attention first. */
-const groups: { audit: ImportRecord["audit"]; title: string }[] = [
+/** The toolbar's views, attention first; Needs Action keeps a group per audit. */
+const views = [
+  { value: "action", label: "Needs Action" },
+  { value: "busy", label: "In Progress" },
+  { value: "ready", label: "Installed" },
+];
+const actionGroups: { audit: ImportRecord["audit"]; title: string }[] = [
   { audit: "needs-files", title: "Missing Files" },
   { audit: "substitute", title: "Substitutes" },
   { audit: "failed", title: "Failed" },
-  { audit: "busy", title: "In Progress" },
-  { audit: "ready", title: "Installed" },
 ];
+const viewOf = (record: ImportRecord) =>
+  record.audit === "busy" || record.audit === "ready" ? record.audit : "action";
 
 const typeNames: Record<string, string> = { lora: "LoRA", vae: "VAE" };
 const kindNames: Record<string, string> = {
@@ -117,7 +122,7 @@ const chooseSubstitute = (row: SubstituteRow, accept: boolean, bulk = false) =>
   );
 
 /**
- * Library › Imports: shared model and recipe imports grouped by what they need, with Download
+ * Library › Imports: shared model and recipe imports in views by what they need, with Download
  * Missing, substitutes to accept or reject and Clear Stale; Library › Downloads follows the files.
  */
 export function LibraryImports({
@@ -134,6 +139,7 @@ export function LibraryImports({
   const [adding, setAdding] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [chosenView, setView] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState<ImportRecord | null>(null);
@@ -252,6 +258,13 @@ export function LibraryImports({
   });
   const records = imports.data?.imports || [];
   const stale = records.filter((record) => record.stale).length;
+  // The first view with imports opens and stays put as they move between views.
+  const view =
+    chosenView ??
+    views.find(({ value }) => records.some((record) => viewOf(record) === value))?.value ??
+    "ready";
+  if (!chosenView && imports.data) setView(view);
+  const inView = records.filter((record) => viewOf(record) === view);
   const failed = importing.error || uploading.error;
   const offered = records
     .filter((record) => record.audit === "substitute")
@@ -352,11 +365,14 @@ export function LibraryImports({
       <SectionHeader heading={heading}>
         <SectionToolbar
           label="Imports"
+          views={views}
+          view={view}
+          onViewChange={setView}
           query={query}
           onQueryChange={records.length ? setQuery : undefined}
           actions={
             <>
-              {stale > 0 && (
+              {view === "action" && stale > 0 && (
                 <ToolbarAction
                   label="Clear Stale"
                   icon={icons.clear}
@@ -430,19 +446,27 @@ export function LibraryImports({
       </Modal>
       {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
-      ) : !records.length ? (
+      ) : !inView.length ? (
         <DataTable
           label="Imports"
-          rows={records}
+          rows={inView}
           rowKey={(record) => record.id}
           rowName={nameOf}
           loading={imports.isPending && "Loading Imports"}
-          empty="No Imports"
+          empty={
+            view === "action"
+              ? "Nothing Needs Action"
+              : view === "busy"
+                ? "Nothing In Progress"
+                : "No Imports Installed"
+          }
           columns={[]}
         />
+      ) : view !== "action" ? (
+        importTable(view === "busy" ? "In Progress" : "Installed", inView)
       ) : (
-        groups.map(({ audit, title }) => {
-          const rows = records.filter((record) => record.audit === audit);
+        actionGroups.map(({ audit, title }) => {
+          const rows = inView.filter((record) => record.audit === audit);
           if (!rows.length) return null;
           if (audit === "substitute")
             return (
