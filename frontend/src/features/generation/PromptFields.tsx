@@ -23,7 +23,7 @@ import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptHistory } from "./PromptHistory";
 import { usePromptIdeas } from "./PromptIdeas";
-import { referenceKey } from "./references";
+import { referenceKey, referenceLabel } from "./references";
 
 import classes from "./PromptFields.module.css";
 
@@ -109,7 +109,6 @@ export function CompactPromptFields({
   assistantScope,
   ...props
 }: Omit<Parameters<typeof PromptFields>[0], "assistant" | "compact" | "negative"> & {
-  profile?: Profile;
   assistantScope: string;
 }) {
   const assistant = useGenerationPromptAssistant({ ...props, scopeKey: assistantScope });
@@ -122,6 +121,7 @@ export function CompactPromptFields({
 export function PromptFields({
   input,
   references,
+  profile,
   onChange,
   assistant,
   negative,
@@ -134,6 +134,7 @@ export function PromptFields({
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
+  profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   assistant: ReturnType<typeof usePromptAssistant>;
   /** Shows the negative prompt, for profiles that use one. */
@@ -186,9 +187,18 @@ export function PromptFields({
       : undefined);
   const preview = useMediaPreview();
   const pictures = compact
-    ? references.flatMap((reference) => {
+    ? references.flatMap((reference, index) => {
         const url = reference.url || reference.thumbnailUrl;
-        return url ? [pictureItem({ ...reference, id: referenceKey(reference), url })] : [];
+        return url
+          ? [
+              pictureItem({
+                ...reference,
+                id: referenceKey(reference),
+                name: referenceLabel(reference, index, profile),
+                url,
+              }),
+            ]
+          : [];
       })
     : [];
   const cover = pictures[0];
@@ -240,7 +250,13 @@ export function PromptFields({
                 size={44}
                 onClick={() => preview.open(pictures)}
               >
-                <Image src={cover.thumbnailUrl || cover.url} alt="" w={34} h={34} radius="md" />
+                <Image
+                  src={cover.thumbnailUrl || cover.url}
+                  alt={cover.prompt || ""}
+                  w={34}
+                  h={34}
+                  radius="md"
+                />
               </ActionIcon>
             )
           }
