@@ -214,7 +214,7 @@ test("an administrator that turns LoRAs or Uncensored Models off loses them for 
   // The model list (model/catalogue.js) and generation (generation-routes.js) use these checks.
   assert.deepEqual(visibleGenerationProfiles(profiles, narrowed), [grok, drafted, plain]);
   assert.equal(mayUseGenerationProfile(narrowed, spicy), false);
-  assert.equal(mayUseFeature(narrowed, "uncensoredModels"), false, "Dream's Extended Themes");
+  assert.equal(mayUseFeature(narrowed, "uncensoredModels"), false, "Dream's Uncensored");
   assert.equal(mayUseFeature(narrowed, "loras"), true);
   const noLoras = effectiveAccountAccess(account, {}, null, { loras: false });
   assert.equal(mayUseFeature(noLoras, "loras"), false, "the picker, admission and Dream");

@@ -6,7 +6,7 @@ import { isCloudProfile } from "../shared/profiles.ts";
  * always knows the frame: it sees it when the running text model reads images, and otherwise reads
  * the frame's gallery caption; the prompt that made the frame is guidance on top. It also gets the
  * video profile's prompting guide, the clip's length and frame rate, and whether the model makes
- * sound. Its themes are Library › Prompt Styles' Animate records; an uncensored theme (Extended Themes), and
+ * sound. Its themes are Library › Prompt Styles' Animate records; an uncensored theme, and
  * explicit wording in a Custom instruction, need Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }

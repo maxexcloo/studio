@@ -747,7 +747,7 @@ export function createDream(options: {
   remove(ownerId: string, itemIds: string[]): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
-  /** The LoRAs the catalogue marks uncensored; Dream loads them only with Extended Themes. */
+  /** The LoRAs the catalogue marks uncensored; Dream loads them only with Uncensored. */
   uncensoredLoras(): ReadonlySet<string>;
   /**
    * The LoRAs that can run on the profile (its model family), strengths within published ranges;
@@ -2475,7 +2475,7 @@ export function createDream(options: {
             source: "character",
           },
         ];
-      // Extended Themes goes to a share of ideas, so the rest stay plain.
+      // Uncensored goes to a share of ideas, so the rest stay plain.
       const spicy = spicyShare(record, access);
       const explore = Boolean(axis);
       const feature =
@@ -2856,7 +2856,7 @@ export function createDream(options: {
     return false;
   }
 
-  /** Whether a job is Extended Themes: a share of them, where the setting and Uncensored Models allow. */
+  /** Whether a job is Uncensored: a share of them, where the setting and Uncensored Models allow. */
   function spicyShare(record: DreamRecord, access: DreamAccess) {
     return record.settings.spicy && access.uncensored && chance(shares.spicy);
   }

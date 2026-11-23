@@ -7,7 +7,7 @@
  * feature grants them all.
  *
  * A generation profile marked `uncensored` needs the Uncensored Models feature on top of its
- * grant. The prompt assistant's Extended Themes preset needs Uncensored Models too, whatever profile is selected,
+ * grant. The prompt assistant's Uncensored preset needs Uncensored Models too, whatever profile is selected,
  * and its own prompt ideas, suggestions and proposed changes are worded explicitly only with it.
  * `allModels` grants every local profile, including ones added later.
  *
