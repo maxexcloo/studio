@@ -1,13 +1,16 @@
-/* Search and the normal row replace one another in place on phones. */
 .mode {
   container-type: inline-size;
+}
+
+/* Search and the normal row replace one another in place on phones. */
+:root[data-phone] .mode {
   animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* The search shares the free width with the chips and gives it up first; the toolbar's buttons keep
+/* The search keeps its width as the count loads and gives up width first; the toolbar's buttons keep
    their labels whole. */
 .search {
-  flex: 1 1 18rem;
+  flex: 0 1 24rem;
   min-width: 6rem;
 }
 

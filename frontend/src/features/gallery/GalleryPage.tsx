@@ -1,4 +1,4 @@
-import { Alert, Button, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
+import { Alert, Button, Group, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
 import { useDebouncedCallback } from "@mantine/hooks";
 import {
   type InfiniteData,
@@ -89,6 +89,7 @@ import {
   viewerPathId,
 } from "./viewerLink";
 
+import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "./GalleryPage.module.css";
 
 type PageState = GalleryState &
@@ -782,9 +783,20 @@ function Gallery() {
       onChange={showView}
     />
   );
+  // While a view's code loads, its toolbar and loading state already sit where the view puts them.
+  const loadingView = (label: string) => (
+    <Stack gap="sm" className={classes.page}>
+      <div className={toolbarClasses.band}>
+        <Group gap="xs" mih={44} wrap="nowrap">
+          {view}
+        </Group>
+      </div>
+      <LoadingState fill label={label} />
+    </Stack>
+  );
   if (review) {
     return (
-      <Suspense fallback={<LoadingState fill label="Loading Review" />}>
+      <Suspense fallback={loadingView("Loading Review")}>
         <GalleryReview
           key={kind}
           listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
@@ -797,7 +809,7 @@ function Gallery() {
   }
   if (routeView === "comparisons") {
     return (
-      <Suspense fallback={<LoadingState fill label="Loading Comparisons" />}>
+      <Suspense fallback={loadingView("Loading Comparisons")}>
         <ComparisonList view={view} />
       </Suspense>
     );
