@@ -182,8 +182,18 @@ const localVideo = (job: OwnedJob) =>
 const videoWaitReason = "Waiting for another video to finish.";
 const videoModelReason = "Waiting for the running video to finish before loading another model.";
 const dreamVideoModelIdleMinutes = 2;
-/** How long a worker's run may show no progress before it is given up: a video's steps take longer. */
-const stallMinutes = (job: OwnedJob) => (job.input.kind === "video" ? 30 : 10);
+/**
+ * How long a run may show no progress before it is given up: an image a worker reports on, 10
+ * minutes; anything else (a video's longer steps, a cloud provider, recovery, a cancellation the
+ * worker hasn't confirmed), 30 minutes, longer than any one provider request may take.
+ */
+const stallMinutes = (job: OwnedJob) =>
+  job.input.kind !== "video" &&
+  job.resource.startsWith("worker:") &&
+  job.status === "running" &&
+  !job.cancelRequested
+    ? 10
+    : 30;
 
 /** Only this database's recorded IDs reach the provider adapter. Recoverable work keeps its run. */
 export class GenerationQueue {
@@ -468,10 +478,11 @@ export class GenerationQueue {
             const observed = await this.adapter.observe(job);
             if (!observed) {
               const latest = this.store.job(job.ownerId, job.id)!;
-              if (!terminalStatuses.has(latest.status))
-                saveObservation(latest, {
-                  reason: "Recovering the recorded generation; it will not be submitted again.",
-                });
+              if (terminalStatuses.has(latest.status)) return;
+              job = saveObservation(latest, {
+                reason: "Recovering the recorded generation; it will not be submitted again.",
+              });
+              if (this.stalled(job)) await this.giveUpStalled(job);
               return;
             }
             const latest = this.store.job(job.ownerId, job.id)!;
@@ -532,9 +543,10 @@ export class GenerationQueue {
           } catch (error) {
             const latest = this.store.job(job.ownerId, job.id)!;
             if (terminalStatuses.has(latest.status)) return;
-            saveObservation(latest, {
+            job = saveObservation(latest, {
               reason: `Waiting for the recorded generation: ${(error as Error).message}`,
             });
+            if (this.stalled(job)) await this.giveUpStalled(job);
           } finally {
             this.observing.delete(initial.id);
           }
@@ -761,14 +773,13 @@ export class GenerationQueue {
   }
 
   /**
-   * Whether a worker's running generation has shown no new progress for its stallMinutes, while
-   * the worker still lists it (a hung run keeps its worker from all other work).
+   * Whether accepted work has shown no new progress for its stallMinutes (a hung run keeps its
+   * worker from all other work). Saving work has its outputs and keeps trying.
    */
   private stalled(job: OwnedJob) {
-    if (!job.resource.startsWith("worker:") || job.operation === "upscale") return false;
-    if (job.status !== "running" || job.cancelRequested) return false;
+    if (job.operation === "upscale" || !["starting", "running"].includes(job.status)) return false;
     const { value, max, node, phase } = (job.progress ?? {}) as Record<string, unknown>;
-    const key = JSON.stringify([value, max, node, phase]);
+    const key = JSON.stringify([job.status, value, max, node, phase]);
     const seen = this.progressSeen.get(job.id);
     if (seen?.key !== key) {
       this.progressSeen.set(job.id, { key, at: this.now() });
@@ -785,6 +796,11 @@ export class GenerationQueue {
     const minutes = stallMinutes(job);
     logWarning("Run stalled", { job: job.id, worker: job.resource, minutes });
     this.progressSeen.delete(job.id);
+    // A cancellation its worker never confirmed ends as cancelled.
+    if (job.cancelRequested) {
+      await this.end(job.ownerId, job.id, "");
+      return;
+    }
     await Promise.resolve(this.adapter.cancel(job)).catch(() => undefined);
     const failed = this.store.save({
       ...this.store.job(job.ownerId, job.id)!,

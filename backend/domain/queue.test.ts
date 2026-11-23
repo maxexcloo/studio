@@ -519,6 +519,40 @@ test("a run without progress for 10 minutes is stopped, failed and queued once o
   }
 });
 
+test("work nothing reports on for 30 minutes ends: a lost recovery fails, an unconfirmed Stop cancels", async () => {
+  const { store, queue, adapter, observations } = fixture();
+  let at = 0;
+  queue.now = () => at;
+  try {
+    const session = store.createSession("alice");
+    const lost = store.enqueue(
+      "alice",
+      session.id,
+      { kind: "video" },
+      "animate",
+      undefined,
+      "worker:primary",
+    ).id;
+    const stopping = store.enqueue("alice", session.id, {}, "image", undefined, "worker:other").id;
+    await queue.tick();
+    observations.delete(lost);
+    observations.set(stopping, { status: "running" });
+    adapter.cancel = async () => {};
+    await queue.cancel("alice", stopping);
+    await queue.tick();
+    at = 29 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", lost)?.status, "running");
+    at = 30 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", lost)?.status, "failed");
+    assert.equal(store.job("alice", lost)?.reason, "Stopped: no progress for 30 min.");
+    assert.equal(store.job("alice", stopping)?.status, "cancelled");
+  } finally {
+    store.close();
+  }
+});
+
 test("failed output persistence retains saving state and blocks conflicting work", async () => {
   const { store, queue, adapter, observations, submitted } = fixture();
   try {
