@@ -74,7 +74,7 @@ export interface GalleryFilterValues extends Record<Facet, string[]> {
   rating: Rating | "";
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
   uploads: boolean;
-  /** Only results in one of the account's comparisons. */
+  /** Only results in one of the account's comparisons: the gallery's Comparisons tab. */
   comparisons: boolean;
 }
 export const emptyGalleryFilters: GalleryFilterValues = {
@@ -209,8 +209,8 @@ interface FilterProps {
 }
 
 /**
- * The active filters as removable chips, one per value, plus any `extra` view choices. Liked and
- * Uploads have none: their own toggle or tab shows them.
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Liked,
+ * Uploads and Comparisons have none: their own toggle or tab shows them.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
@@ -220,15 +220,6 @@ export function useActiveFilters(
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
-    ...(value.comparisons
-      ? [
-          {
-            key: "comparisons",
-            label: "Comparisons",
-            remove: () => onChange({ ...value, comparisons: false }),
-          },
-        ]
-      : []),
     ...(value.rating === "disliked"
       ? [{ key: "disliked", label: "Disliked", remove: () => onChange({ ...value, rating: "" }) }]
       : []),
@@ -430,11 +421,6 @@ export function ShowToggles({
             }
           />
         ))}
-        <FilterToggle
-          label="Comparisons"
-          on={value.comparisons}
-          onToggle={() => onChange({ ...value, comparisons: !value.comparisons })}
-        />
         {onOriginalsOnly && (
           <FilterToggle
             label="Originals Only"

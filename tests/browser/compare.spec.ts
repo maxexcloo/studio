@@ -12,6 +12,7 @@ import {
   section,
   selectionMenuItem,
   serveProfiles,
+  showGalleryView,
   stamp,
   viewerAction,
 } from "./fixtures";
@@ -535,10 +536,9 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
   ).toHaveAttribute("aria-pressed", "false");
   expect(state.comparisons[0].winnerItemId).toBeNull();
 
-  // The Comparisons filter keeps only compared results.
+  // The Comparisons view keeps only compared results.
   await page.getByRole("link", { name: "Back to Images", exact: true }).click();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Comparisons", exact: true }).click();
+  await showGalleryView(page, "Comparisons");
   await expect(page.getByRole("button", { name: "Open image: Felt Owl", exact: true })).toHaveCount(
     0,
   );

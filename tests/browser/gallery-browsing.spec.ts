@@ -1050,12 +1050,6 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   // Liked applies in Gallery, while Uploads is its own view.
   await showOnly(page, "Liked");
   await showOnly(page, "Uploads");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", /^Generating/);
   await status.click();
@@ -1216,7 +1210,6 @@ test("Gallery filters submit repeated models and origins together with LoRA, siz
   await pick("Models", "Motion Quality");
   await pick("LoRAs", "Detail Slider");
   const show = page.getByRole("group", { name: "Show", exact: true });
-  await expect(show.getByRole("button", { name: "Comparisons", exact: true })).toBeVisible();
   await show.getByRole("button", { name: "Dream", exact: true }).click();
   await show.getByRole("button", { name: "Chat", exact: true }).click();
   await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
@@ -1691,7 +1684,6 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(dislikedChip).toBeVisible();
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
-  await page.getByRole("button", { name: "Comparisons", exact: true }).click();
   await page.keyboard.press("Escape");
   // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
@@ -1699,10 +1691,6 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await liked.click();
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
-  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
   await page.keyboard.press("Escape");
   await expect(search).toHaveValue("Browse");
   // Filters persist across reloads; the transient search does not.
