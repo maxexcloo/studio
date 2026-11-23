@@ -1,16 +1,18 @@
 import {
   ActionIcon,
+  Box,
   Button,
   Checkbox,
   Group,
   Menu,
   Stack,
   Table,
+  Text,
   UnstyledButton,
   VisuallyHidden,
 } from "@mantine/core";
 import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { menuWidth } from "../theme";
 import { EmptyState } from "./EmptyState";
@@ -54,6 +56,22 @@ export const compareNames = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: "base",
 }).compare;
+
+export function TableRecord({ name, detail }: { name: ReactNode; detail?: ReactNode }) {
+  return (
+    <>
+      <Text size="sm" fw={500} className={classes.recordText}>
+        {name}
+      </Text>
+      {detail && (
+        <Text size="xs" c="dimmed" className={classes.recordText}>
+          {detail}
+        </Text>
+      )}
+    </>
+  );
+}
+
 function compare(a: string | number | undefined, b: string | number | undefined) {
   if (a === undefined || a === "") return b === undefined || b === "" ? 0 : 1;
   if (b === undefined || b === "") return -1;
@@ -223,10 +241,17 @@ export function DataTable<T>({
                 >
                   {column.cell(row)}
                   {column.main && folded.length > 0 && (
-                    <Group gap="xs" mt={4}>
-                      {folded.map((other) => (
-                        <Fragment key={other.key}>{other.cell(row)}</Fragment>
-                      ))}
+                    <Group gap="xs" mt={4} align="baseline">
+                      {folded.map((other) => {
+                        const content = other.cell(row);
+                        return (
+                          content && (
+                            <Box key={other.key} miw={0} maw="100%" className={classes.recordText}>
+                              {content}
+                            </Box>
+                          )
+                        );
+                      })}
                     </Group>
                   )}
                 </Table.Td>

@@ -365,7 +365,7 @@ test("The Profiles toolbar gives Download All its own link beside Import Workflo
   const toolbar = page
     .getByRole("button", { name: "Filter Profiles", exact: true })
     .locator("xpath=..");
-  const search = toolbar.getByLabel("Search Profiles", { exact: true });
+  const search = toolbar.getByRole("textbox", { name: "Search Profiles", exact: true });
   const filter = toolbar.getByRole("button", { name: "Filter Profiles", exact: true });
   const download = toolbar.getByRole("link", { name: "Download All", exact: true });
   const importing = toolbar.getByRole("button", { name: "Import Workflow", exact: true });

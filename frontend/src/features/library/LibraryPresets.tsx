@@ -2,10 +2,11 @@ import { Alert, Anchor, Button, Group, Menu, Modal, Stack, Text, TextInput } fro
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable } from "../../ui/DataTable";
+import { DataTable, TableRecord } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { usePhone } from "../../ui/usePhone";
 import {
   defaultProfile,
   draftForInput,
@@ -32,6 +33,7 @@ const savedOn = (preset: Preset) =>
  * where Save Preset updates it; Rename and Delete act here.
  */
 export function LibraryPresets({ heading }: { heading: ReactNode }) {
+  const phone = usePhone();
   const presets = usePresets();
   const bulkDelete = useDeletePresets();
   const { setDraft, draftForKind, profiles, models } = useGeneration();
@@ -168,17 +170,16 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               sortValue: (preset) => preset.title,
               cell: (preset) =>
                 selection ? (
-                  <Text size="sm" fw={500} truncate>
-                    {preset.title}
-                  </Text>
+                  <TableRecord name={preset.title} />
                 ) : (
                   <Anchor
                     component="button"
                     type="button"
                     size="sm"
                     fw={500}
-                    truncate
                     maw="100%"
+                    ta="start"
+                    style={{ overflowWrap: "anywhere" }}
                     aria-label={`Edit ${preset.title} in Composer`}
                     onClick={() => {
                       if (loading(preset).replaces) setReplacing(preset);
@@ -194,7 +195,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               header: "Holds",
               sortValue: presetHolds,
               cell: (preset) => (
-                <Text size="sm" c="dimmed">
+                <Text size={phone ? "xs" : "sm"} c="dimmed">
                   {presetHolds(preset)}
                 </Text>
               ),
@@ -202,10 +203,9 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
             {
               key: "saved",
               header: "Saved",
-              hideOnPhone: true,
               sortValue: (preset) => preset.savedAt,
               cell: (preset) => (
-                <Text size="sm" style={{ whiteSpace: "nowrap" }}>
+                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
                   {savedOn(preset)}
                 </Text>
               ),

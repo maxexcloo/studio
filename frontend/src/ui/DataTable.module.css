@@ -6,3 +6,7 @@
 .cell:last-child {
   padding-inline-end: 0;
 }
+
+.recordText {
+  overflow-wrap: anywhere;
+}

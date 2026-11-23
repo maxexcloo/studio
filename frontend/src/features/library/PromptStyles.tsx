@@ -16,7 +16,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, compareNames } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import {
   FilterChoices,
@@ -273,19 +273,19 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
               sortValue: (style) => style.label,
               main: true,
               cell: (style) => (
-                <Stack gap={2}>
-                  <Text size="sm" fw={500}>
-                    {style.label}{" "}
-                    {style.uncensored && (
-                      <Badge size="sm" color="orange">
-                        Uncensored
-                      </Badge>
-                    )}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {style.description}
-                  </Text>
-                </Stack>
+                <TableRecord
+                  name={
+                    <>
+                      {style.label}{" "}
+                      {style.uncensored && (
+                        <Badge size="sm" color="orange">
+                          Uncensored
+                        </Badge>
+                      )}
+                    </>
+                  }
+                  detail={style.description}
+                />
               ),
             },
             {
@@ -294,7 +294,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
               sortValue: (style) => kinds.find((kind) => kind.value === style.kind)?.label,
               // The main column takes the free width, so the type keeps its line instead.
               cell: (style) => (
-                <Text span inherit style={{ whiteSpace: "nowrap" }}>
+                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
                   {kinds.find((kind) => kind.value === style.kind)!.label}
                 </Text>
               ),
