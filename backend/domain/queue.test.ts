@@ -2025,3 +2025,22 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
   // A finished job's provider journal goes with it.
   assert.equal(store.providerRecord("alice", own.id), undefined);
 });
+
+test("Only a refusal marked permanent fails a generation for good", async () => {
+  const answers = [
+    { status: 409, payload: { error: "Radiance isn't ready." } },
+    { status: 400, payload: { error: "Staging failed." } },
+    { status: 403, payload: { permanent: true, error: "LoRAs are off for this account." } },
+  ];
+  const adapter = createGenerationQueueAdapter({
+    submitGeneration: async () => answers.shift()!,
+    jobs: new Map(),
+    items: () => [],
+    accountForOwner: () => ({ authenticated: true }),
+    cancelPrompt: async () => undefined,
+  });
+  const job = { id: "j", ownerId: "alice" } as OwnedJob;
+  assert.equal((await adapter.submit(job)).permanent, undefined);
+  assert.equal((await adapter.submit(job)).permanent, undefined);
+  assert.equal((await adapter.submit(job)).permanent, true);
+});
