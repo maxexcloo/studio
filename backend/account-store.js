@@ -248,6 +248,12 @@ export function assignAccessProfile(accountId, profileId) {
   return { id: account.id, accessProfileId: account.accessProfileId };
 }
 
+/** Refuses a password shorter than every password form asks for. */
+function checkPassword(password, label = "a password") {
+  if (typeof password !== "string" || password.length < 8)
+    throw new Error(`Use ${label} of at least 8 characters.`);
+}
+
 export async function createLocalAccount({
   username,
   password,
@@ -263,6 +269,7 @@ export async function createLocalAccount({
   // An ordinary account may start without a password and sign in through single sign-on only.
   const withPassword = Boolean(String(password || ""));
   if (!withPassword && role !== accountRoles.user) throw new Error("Enter a password.");
+  if (withPassword) checkPassword(password);
   if (![accountRoles.administrator, accountRoles.user].includes(role))
     throw new Error("Choose administrator or user.");
   if (
@@ -475,8 +482,7 @@ export function validateOwnAccountChange(accountId, { username, newPassword } = 
     )
   )
     throw new Error("An account with that email already exists.");
-  if (nextPassword !== undefined && nextPassword.length < 8)
-    throw new Error("Use a new password of at least 8 characters.");
+  if (nextPassword !== undefined) checkPassword(nextPassword, "a new password");
   return { found, nextUsername, nextPassword, emailChanges, needsPassword };
 }
 
@@ -604,8 +610,7 @@ export async function resetAccountPassword(accountId, password) {
   if (!found) throw new Error("That account was not found.");
   if (!found.password || found.identity?.provider === "pocket-id")
     throw new Error("This account doesn't sign in with a password.");
-  if (typeof password !== "string" || password.length < 8)
-    throw new Error("Use a password of at least 8 characters.");
+  checkPassword(password);
   const salt = crypto.randomBytes(16);
   const hashed = {
     kdf,

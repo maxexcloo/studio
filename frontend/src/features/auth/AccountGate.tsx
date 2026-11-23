@@ -181,6 +181,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                   <PasswordInput
                     label="Password"
                     autoComplete={bootstrap ? "new-password" : "current-password"}
+                    minLength={bootstrap ? 8 : undefined}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.currentTarget.value)}
