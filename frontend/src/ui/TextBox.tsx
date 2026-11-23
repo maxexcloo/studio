@@ -173,12 +173,16 @@ export function TextBox({
   const [active, setActive] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar. Such a
-  // box shows its tools there while typing.
-  const barred =
-    mobile &&
-    inline &&
-    bar !== null &&
-    bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]');
+  // box shows its tools there while typing. Its surface is known once it has mounted, before paint.
+  const [barred, setBarred] = useState(false);
+  useLayoutEffect(() => {
+    setBarred(
+      mobile &&
+        inline &&
+        bar !== null &&
+        bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]'),
+    );
+  }, [mobile, inline, bar]);
   const inBar = barred && active ? bar : null;
   const restingTools = barred && !active && !hideTools && Boolean(tools?.length || send);
   const spins =

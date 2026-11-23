@@ -1180,6 +1180,7 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
   const negative = sheet.getByRole("textbox", { name: "Negative Prompt", exact: true });
   const bar = sheet.getByRole("group", { name: "Generation Actions", exact: true });
   const tools = sheet.getByRole("group", { name: "Prompt Tools", exact: true });
+  const negativeTools = sheet.getByRole("group", { name: "Negative Prompt Tools", exact: true });
   const output = sheet.getByRole("radiogroup", { name: "Generation Output", exact: true });
   const bottom = async () => {
     const box = (await bar.boundingBox())!;
@@ -1192,6 +1193,10 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
   await expect(output).toBeVisible();
   await expect(negative).toBeVisible();
   await expect(tools).toHaveCount(0);
+  await expect(negativeTools).toHaveCount(0);
+  await expect(
+    sheet.getByRole("button", { name: "AI Negative Prompt Actions", exact: true }),
+  ).toBeVisible();
   // The menu opens from the text's corner and leaves the keyboard down.
   await sheet.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
   const menu = page.getByRole("menu");
@@ -1252,9 +1257,14 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
     sheet.getByRole("button", { name: "Close Negative Prompt", exact: true }),
   ).toBeVisible();
   await expect(prompt).toBeHidden();
-  await expect(
-    bar.getByRole("group", { name: "Negative Prompt Tools", exact: true }),
-  ).toBeVisible();
+  // The negative prompt's bar matches the prompt's.
+  await expect
+    .poll(() =>
+      negativeTools
+        .getByRole("button")
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+    )
+    .toEqual(["AI Negative Prompt Actions", "Copy", "Clear"]);
   await done.click();
   await expect(negative).not.toBeFocused();
   await expect(negative).toHaveValue("Blurry feathers");
