@@ -162,6 +162,7 @@
   text-transform: uppercase;
   pointer-events: none;
   background: var(--studio-glass-raised);
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 /* Each word shows while dragging its way: right's on the left, left's on the right, like a stamp. */
 .hint[data-hint="right"] {
@@ -283,6 +284,10 @@
   outline-offset: -3px;
   overflow: hidden;
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+}
+/* The words and sides follow the finger, then ease back with the card. */
+.card[data-dragging] :is(.hint, .frame) {
+  transition: none;
 }
 /* Dragging toward a side keeps it bright and fades the other; down fades both. A picked side
    stays outlined while the card leaves. */
