@@ -2,8 +2,6 @@ import { Button, Center, Loader, Stack, Text } from "@mantine/core";
 import type { UseInfiniteQueryResult } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const pageMargin = 800;
-
 /**
  * Loads a neighbouring page as the listing's edge nears `root`'s view (the window's without one), keeping
  * the pages loaded. A page that fails stops the loading and offers Retry until `results`, the
@@ -32,6 +30,7 @@ export function MorePages({
   const [near, setNear] = useState(false);
   const { isFetching, dataUpdatedAt } = listing;
   const previous = direction === "previous";
+  const pageMargin = root || previous ? 800 : 1600;
   const hasPage = previous ? listing.hasPreviousPage : listing.hasNextPage;
   const fetching = previous ? listing.isFetchingPreviousPage : listing.isFetchingNextPage;
   const fetchError = previous ? listing.isFetchPreviousPageError : listing.isFetchNextPageError;
@@ -55,7 +54,7 @@ export function MorePages({
       observer.disconnect();
       setNear(false);
     };
-  }, [hasPage, root]);
+  }, [hasPage, pageMargin, root]);
   // Each loaded page checks again: a quick page's fetching and fetched states can reach one render.
   useEffect(() => {
     if (!near || !hasPage || isFetching || failed || fetchError || paused) return;
@@ -68,7 +67,19 @@ export function MorePages({
     )
       return;
     more();
-  }, [near, hasPage, isFetching, fetchError, failed, more, paused, dataUpdatedAt, previous, root]);
+  }, [
+    near,
+    hasPage,
+    isFetching,
+    fetchError,
+    failed,
+    more,
+    paused,
+    dataUpdatedAt,
+    pageMargin,
+    previous,
+    root,
+  ]);
   if (!hasPage) return null;
   return (
     <Center ref={trigger} mih={44}>
