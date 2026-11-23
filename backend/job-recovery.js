@@ -70,10 +70,10 @@ function restoreRecoveredRecords(outputs, tiles = [], entry = {}, promptId = "")
 }
 
 /**
- * How long a cancelled job with no recorded prompt must stay absent from its worker before it counts
- * as cancelled: longer than a lost /prompt request could still take to land.
+ * How long a recovered job with no recorded prompt must stay absent from its worker before it counts
+ * as gone: longer than a lost /prompt request could still take to land.
  */
-const promptlessCancelMs = 3 * 60_000;
+const promptlessMs = 3 * 60_000;
 
 /**
  * Reattach persisted tiles to their existing prompts; never submit replacement work. `gallery`:
@@ -95,8 +95,22 @@ export function createJobRecovery({
 }) {
   let active;
   const missing = new Map();
-  // When each recovered cancellation without a prompt was first found absent from its worker.
+  // When each recovered job without a prompt was first found absent from its worker.
   const absentSince = new Map();
+  /** Whether a recovered job is gone from its worker: missed twice, or absent long enough without a prompt. */
+  const gone = (id) => {
+    if (jobs.get(id).promptId) {
+      const misses = (missing.get(id) || 0) + 1;
+      missing.set(id, misses);
+      if (misses < 2) return false;
+      missing.delete(id);
+      return true;
+    }
+    if (!absentSince.has(id)) absentSince.set(id, now());
+    if (now() - absentSince.get(id) < promptlessMs) return false;
+    absentSince.delete(id);
+    return true;
+  };
   // A job its runner (jobs.js) is still following: progress, delivery and timing are the runner's.
   const runnerOwned = (id) => {
     const current = jobs.get(id);
@@ -212,23 +226,13 @@ export function createJobRecovery({
               absentSince.delete(id);
               jobs.set(id, { ...current, promptId: place.promptId, comfyBackend: backend });
               await cancel(backend, place.promptId).catch(() => {});
-            } else if (current.promptId) {
-              const misses = (missing.get(id) || 0) + 1;
-              missing.set(id, misses);
-              if (misses >= 2) finishJob(id, { status: "cancelled" });
-            } else {
-              // No prompt was recorded: nothing of it is on the worker once it stays absent long enough.
-              if (!absentSince.has(id)) absentSince.set(id, now());
-              if (now() - absentSince.get(id) >= promptlessCancelMs) {
-                absentSince.delete(id);
-                finishJob(id, { status: "cancelled" });
-              }
-            }
+            } else if (gone(id)) finishJob(id, { status: "cancelled" });
             continue;
           }
           if (place && !["cancelling", "cancelled"].includes(current?.status)) {
             untracked.delete(id);
             missing.delete(id);
+            absentSince.delete(id);
             const progress =
               place.status === "queued"
                 ? { value: 0, max: 0, phase: "Queued", steps: false }
@@ -295,9 +299,7 @@ export function createJobRecovery({
               });
             }
           } else if (current?.recovered && current.comfyBackend) {
-            const misses = (missing.get(id) || 0) + 1;
-            missing.set(id, misses);
-            if (misses < 2) continue;
+            if (!gone(id)) continue;
             const status = ["cancelling", "cancelled"].includes(current.status)
               ? "cancelled"
               : "failed";
@@ -305,7 +307,6 @@ export function createJobRecovery({
               status === "failed" ? "ComfyUI no longer has this generation." : undefined;
             patchJob(id, (item) => ({ ...item, status, error, progress: null }), true);
             finishJob(id, { status, error });
-            missing.delete(id);
           }
         }
         scanned++;
