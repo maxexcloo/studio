@@ -105,13 +105,7 @@ const dailyShare = (today: number, used: number, limit: number, kind: "images" |
 
 export const dreamWhen = ({ settings, today, usage = today, status }: Dream) =>
   [
-    status === "off"
-      ? "Dream is off"
-      : status === "paused"
-        ? "Dream is paused"
-        : status === "capped"
-          ? "Dream has made today's share"
-          : "Dream works when the queue is free",
+    status === "capped" ? "Dream has made today's share" : "Dream works when the queue is free",
     ...(settings.images
       ? [dailyShare(today.images, usage.images, settings.dailyImages, "images")]
       : []),

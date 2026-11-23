@@ -234,22 +234,25 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await expect(picker.getByRole("alert").filter({ hasText: failure })).toBeVisible();
   await expect(page.getByText(failure, { exact: true })).toHaveCount(1);
   await showLoraStack(page);
-  await expect(picker.getByRole("alert").filter({ hasText: failure })).toBeVisible();
-  await suggest.click();
-  await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();
-  // The backend adds trigger words when it runs; the prompt stays as written.
-  await expect(
-    page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
-  ).toBeDisabled();
-  await expect(prompt).toHaveValue("My later direction in warm light");
+  await expect(page.getByRole("alert").filter({ hasText: failure })).toBeVisible();
   if (testInfo.project.use.isMobile)
     await page.getByRole("button", { name: "Add LoRAs", exact: true }).click();
+  // A suggestion joins the stack at once; the backend adds trigger words when it runs.
+  await suggest.click();
+  await expect(prompt).toHaveValue("My later direction in warm light");
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await showLoraStack(page);
+  await expect(
+    page.getByRole("switch", { name: "Enable Detail Slider", exact: true }),
+  ).toBeChecked();
   await closeLoras(page);
-  await undoAssistance(page, "LoRA applied");
+  await undoAssistance(page, "LoRA added");
   await expect(prompt).toHaveValue("My later direction in warm light");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Enable Detail Slider", exact: true })).toHaveCount(
+    0,
+  );
   await closeLoras(page);
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);

@@ -288,11 +288,13 @@ test("composer ideas use the selected guide and the owner's references without n
       );
     },
   });
+  // A gallery result's reference id encodes its media URL, so it runs long.
+  const second = `gallery:${Buffer.from("/comfy/view?filename=".padEnd(120, "x")).toString("base64url")}`;
   const request = {
     surface: "composer",
     kind: "video",
     profileId: "video:example",
-    referenceIds: ["first", "second"],
+    referenceIds: ["first", second],
   };
   assert.ok((await suggestions.suggest("carol", request)).suggestions.length);
   const [system, user] = calls[0];
@@ -301,7 +303,7 @@ test("composer ideas use the selected guide and the owner's references without n
   assert.match(system.content, /The generation model cannot read the chat or earlier prompts/);
   assert.match(user.content, /Reference 1: A scarf on a railing\.\nReference 2: Attached image 1/);
   assert.equal(user.images, 1);
-  await suggestions.suggest("carol", { ...request, referenceIds: ["second", "first"] });
+  await suggestions.suggest("carol", { ...request, referenceIds: [second, "first"] });
   assert.equal(calls.length, 2);
 });
 

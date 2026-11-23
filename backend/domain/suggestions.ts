@@ -889,7 +889,7 @@ export function createSuggestions({
         references !== undefined &&
         (!Array.isArray(references) ||
           references.length > maxSuggestionReferences ||
-          references.some((id) => typeof id !== "string" || !id || id.length > 120))
+          references.some((id) => typeof id !== "string" || !id))
       )
         throw failure("Choose up to four reference images.", 400);
       const referenceIds = (references ?? []) as string[];
