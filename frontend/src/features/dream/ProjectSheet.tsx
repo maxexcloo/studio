@@ -36,7 +36,7 @@ const fieldNames: Record<string, string> = {
   loras: "Favourite LoRAs",
   cards: "Pinned Cards",
   constraints: "Constraints",
-  paused: "Paused",
+  paused: "Enabled",
   favoured: "More Turns",
   created: "Created",
 };
