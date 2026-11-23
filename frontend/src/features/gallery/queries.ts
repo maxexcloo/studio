@@ -155,21 +155,25 @@ export const galleryArrivalsQuery = (listing: GalleryListing, leftAt: number) =>
     refetchOnWindowFocus: false,
   });
 
+/** How many results a listing holds, reading a single item; `unrated` counts Review's. */
+async function galleryCount(listing: GalleryListing, signal: AbortSignal, unrated?: boolean) {
+  const params = galleryParams(listing);
+  params.set("limit", "1");
+  if (unrated) params.set("unrated", "1");
+  return (await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal })).totalApprox;
+}
+
 /** How many results the gallery, Uploads and Review (unrated) each hold, for the view menu. */
 export const galleryViewCountsQuery = (kind: MediaKind) =>
   queryOptions({
     queryKey: [...galleryKey, "view-counts", kind],
     queryFn: async ({ signal }) => {
-      const count = async (uploads: boolean, unrated?: boolean) => {
-        const params = galleryParams({
-          search: "",
-          kind,
-          filters: { ...emptyGalleryFilters, uploads },
-        });
-        params.set("limit", "1");
-        if (unrated) params.set("unrated", "1");
-        return (await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal })).totalApprox;
-      };
+      const count = (uploads: boolean, unrated?: boolean) =>
+        galleryCount(
+          { search: "", kind, filters: { ...emptyGalleryFilters, uploads } },
+          signal,
+          unrated,
+        );
       const [gallery, uploads, review] = await Promise.all([
         count(false),
         count(true),
@@ -177,6 +181,14 @@ export const galleryViewCountsQuery = (kind: MediaKind) =>
       ]);
       return { gallery, uploads, review };
     },
+    staleTime: 30_000,
+  });
+
+/** How many results a saved view's listing holds, for the view menu. */
+export const galleryListingCountQuery = (listing: GalleryListing) =>
+  queryOptions({
+    queryKey: [...galleryListingKey(listing), "count"],
+    queryFn: ({ signal }) => galleryCount(listing, signal),
     staleTime: 30_000,
   });
 

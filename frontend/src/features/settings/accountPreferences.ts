@@ -6,6 +6,7 @@ import type { ImagePreference } from "../../../../shared/resolution";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
+import type { SavedGalleryView } from "../gallery/SavedViews";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 /** Where the account prefers a kind to run; the other side takes over, saying so, when it can't. */
@@ -30,6 +31,8 @@ interface PreferenceValues {
   videos?: SidePreference;
   /** The header's Appearance settings; unsaved, the browser's. */
   appearance?: Partial<Appearance>;
+  /** The gallery's saved views, in the order saved. */
+  galleryViews?: SavedGalleryView[];
 }
 /** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
 export type Preferences = PreferenceValues &

@@ -2461,3 +2461,60 @@ test("Comparisons lists each comparison and kept Dream comparison as a card that
     page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
   ).toBeVisible();
 });
+
+test("Saved views keep a search, filters and sort with the account and show their counts", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(3));
+  await page.goto("/images");
+  const view = page.getByRole("button", { name: "Gallery View", exact: true });
+  const tile = (index: number) =>
+    page.getByRole("button", { name: `Open image: Browse Result ${index}`, exact: true });
+  const menu = async (item: string) => {
+    await view.click();
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+  };
+  const name = async (title: string, value: string) => {
+    const dialog = page.getByRole("dialog", { name: title, exact: true });
+    await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(value);
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+  };
+  const search = await toolbarSearch(page);
+  await search.fill("Result 1");
+  await expect(tile(0)).toHaveCount(0);
+  // Save View names it after what the gallery shows.
+  await menu("Save View…");
+  await expect(
+    page
+      .getByRole("dialog", { name: "Save View", exact: true })
+      .getByRole("textbox", { name: "Name", exact: true }),
+  ).toHaveValue("Result 1");
+  await name("Save View", "Ones");
+  await expect(view).toHaveText("Ones");
+  await expect
+    .poll(() => state.preferences.preferences.galleryViews)
+    .toMatchObject([
+      { name: "Ones", search: "Result 1", sort: "newest", filters: { uploads: false } },
+    ]);
+  // Leaving it shows the whole gallery; choosing it restores its search, with its count.
+  await menu("Gallery");
+  await expect(tile(0)).toBeVisible();
+  await view.click();
+  await expect(page.getByRole("menuitem", { name: "Ones", exact: true })).toContainText("1");
+  await page.getByRole("menuitem", { name: "Ones", exact: true }).click();
+  await expect(view).toHaveText("Ones");
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(0)).toHaveCount(0);
+  await menu("Rename View…");
+  await name("Rename View", "Singles");
+  await expect(view).toHaveText("Singles");
+  await menu("Delete View");
+  await page
+    .getByRole("dialog", { name: "Delete View", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(view).toHaveText("Gallery");
+  await expect.poll(() => state.preferences.preferences.galleryViews).toEqual([]);
+});
