@@ -7820,6 +7820,21 @@ test("Models tells a chat when a profile does best without LoRAs", async (t) => 
   assert.match(details.loras_note, /does best without LoRAs: add one only when the user names it/);
 });
 
+test("a set's note offers only the image names the set has", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  await call(client, "models", { profile_id: imageProfile.id });
+  const generated = (args) =>
+    call(client, "generate", { profile_id: imageProfile.id, ...args }).then(texts);
+  const one = await generated({ prompts: ["A red barn"], count: 1 });
+  assert.match(one, /Set 1\. /);
+  assert.doesNotMatch(one, /"set 1 /);
+  assert.match(
+    await generated({ prompts: ["A blue barn", "A green barn"], count: 2 }),
+    /Set 2 \("set 2 B": second image; "set 2 2b": item 2, image b\)\. /,
+  );
+});
+
 test("a generate call is a set its ref reruns, reviews, shows and rates, wholly or by item and letter", async (t) => {
   const f = await fixture(t);
   f.app.post("/api/gallery/favorite", (_req, res) => res.json({ ok: true }));
@@ -7844,7 +7859,9 @@ test("a generate call is a set its ref reruns, reviews, shows and rates, wholly 
       outputs: [0, 1].map((index) => ({ url: `/comfy/view?filename=${job.id}-${index}.png` })),
     });
   assert.equal(reviewed(await call(client, "review", { job_id: "set 1" })).length, 4);
-  assert.match(texts(await call(client, "result", { job_id: "set 1" })), /\*\*#1–#4\*\*/);
+  const shown = texts(await call(client, "result", { job_id: "set 1" }));
+  assert.match(shown, /\*\*#1–#4\*\*/);
+  assert.match(shown, /^4 results are ready\./m);
   // "set 1 2b" is the second item's second image.
   assert.equal(
     (await call(client, "gallery", { action: "like", results: ["set 1 2b"] })).isError,

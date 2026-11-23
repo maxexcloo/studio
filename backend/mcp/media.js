@@ -2293,8 +2293,13 @@ export class McpMedia {
     ]
       .filter(Boolean)
       .join("\n\n");
+    // Each image or video is its own numbered result, however many a job made.
+    const ready = shown.reduce(
+      (sum, { job }) => sum + job.outputs.filter((item) => mcpOutputPath(item?.url)).length,
+      0,
+    );
     const message = shown.length
-      ? `${shown.length === 1 ? "One result is" : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ""}. ${replyRule}`
+      ? `${ready === 1 ? "One result is" : `${ready} results are`} ready${pending.length ? `, ${pending.length} still running` : ""}. ${replyRule}`
       : "No result has finished yet. Share the links below and end your turn; do not poll.";
     return {
       content: [

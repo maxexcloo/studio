@@ -681,10 +681,27 @@ export function registerGenerateTools({
           }),
         })
       : 0;
-  const setNote = (number) =>
-    number
-      ? `Set ${number} ("set ${number} B": second image; "set ${number} 2c": item 2, image c). `
-      : "";
+  /** The set's number, with ways to name its images that the set actually has. */
+  const setNote = (number, entries) => {
+    if (!number) return "";
+    const items = entries.flatMap(({ plan, queued }) =>
+      (plan.prompts || []).map((_, index) =>
+        (queued.jobs || [])
+          .filter((job) => job.prompt_index === index)
+          .reduce((sum, job) => sum + (job.images || 1), 0),
+      ),
+    );
+    const last = String.fromCharCode(96 + Math.max(1, items.at(-1) || 1));
+    const examples = [
+      ...(items.reduce((sum, count) => sum + count, 0) > 1
+        ? [`"set ${number} B": second image`]
+        : []),
+      ...(items.length > 1
+        ? [`"set ${number} ${items.length}${last}": item ${items.length}, image ${last}`]
+        : []),
+    ];
+    return `Set ${number}${examples.length ? ` (${examples.join("; ")})` : ""}. `;
+  };
   /** A reply naming its set in structuredContent too. */
   const withSet = (reply, number) =>
     number
@@ -697,7 +714,7 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `${setNote(number)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
+            text: `${setNote(number, entries)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
           },
         ],
         structuredContent: { status: "queued", jobs },
@@ -1310,7 +1327,7 @@ export function registerGenerateTools({
       return withSet(
         await respondSets(
           sets,
-          `${setNote(number)}${projectNote}`,
+          `${setNote(number, sets)}${projectNote}`,
           signal,
           await comparisonOf(sets, { axis, project }),
           axis,
@@ -1344,7 +1361,7 @@ export function registerGenerateTools({
         signal,
         submission.guide,
         source,
-        `${setNote(number)}${projectNote}${tierNote || ""}${faceNote}`,
+        `${setNote(number, [{ plan, queued: submission.queued }])}${projectNote}${tierNote || ""}${faceNote}`,
       ),
       number,
     );
@@ -1481,7 +1498,7 @@ export function registerGenerateTools({
     }
     const sent = runs.filter((run) => run.queued);
     const fresh = recordSet(sent);
-    const note = `${setNote(fresh)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
+    const note = `${setNote(fresh, sent)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
     try {
       return withSet(
         sent.length === 1
