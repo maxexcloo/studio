@@ -83,7 +83,7 @@ test("The viewer resolves an older result’s checkpoint to its profile name", a
   });
   const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
   await expect(header.getByText("Amber Bird", { exact: true })).toBeVisible();
-  await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
+  await expect(header.getByText(/^Krea 2 Turbo( · |$)/)).toBeVisible();
   const timestamp = header.locator("time");
   await expect(timestamp).toHaveAttribute("datetime", stamp);
   await expect(timestamp).toHaveText(/^(?:[01]\d|2[0-3]):[0-5]\d, Today$/);
