@@ -2,7 +2,9 @@ import { Alert, Badge, Menu, Stack, Text } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
+import { loraName } from "../../../../shared/profiles";
 import { menuWidth } from "../../theme";
+import { formatBytes } from "../../ui/bytes";
 import { copyText } from "../../ui/clipboard";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
@@ -25,7 +27,9 @@ export interface LibraryItem {
   install?: { state: string; note?: string };
   note?: string;
   description?: string;
+  bytes?: number;
   families?: string[];
+  triggers?: string[];
   type?: string;
   kind?: string;
   folder?: string;
@@ -76,7 +80,8 @@ export function libraryItemCategory(item: LibraryItem) {
     item.folder === "loras" ? "loras" : modelFolders[item.folder || ""] ? "models" : undefined;
   return kind && folder && kind !== folder ? "unclassified" : kind || folder || "unclassified";
 }
-const resourceName = (item: LibraryItem) => item.title || item.name || item.file || item.key;
+const resourceName = (item: LibraryItem) =>
+  item.title || item.name || loraName(item.file || item.key);
 const canUpdate = (item: LibraryItem) =>
   item.installed &&
   item.update?.state === "available" &&
@@ -111,14 +116,15 @@ function resourceType(item: LibraryItem) {
     modelKinds[item.kind || ""] || modelKinds[modelFolders[item.folder || ""]] || "Unclassified"
   );
 }
-function statusOf(item: LibraryItem) {
+/** A status that needs attention has a colour; Installed and Not Installed are plain text. */
+function statusOf(item: LibraryItem): { label: string; color?: string } {
   if (item.applied?.state === "downloading") return { label: "Updating", color: "blue" };
   if (canUpdate(item)) return { label: "Update Available", color: "yellow" };
-  if (item.installed) return { label: "Installed", color: "green" };
+  if (item.installed) return { label: "Installed" };
   if (item.install?.state === "queued") return { label: "Queued", color: "blue" };
   if (item.install?.state === "downloading") return { label: "Installing", color: "blue" };
   if (item.install?.state === "failed") return { label: "Install Failed", color: "red" };
-  return { label: "Not Installed", color: "gray" };
+  return { label: "Not Installed" };
 }
 const unique = (values: string[]) => [...new Set(values)].sort(compareNames);
 const views = [
@@ -174,18 +180,27 @@ export function LibraryCatalogueTable({
   const withModelType = models && items.some((item) => item.modelType);
   // LoRA types are set only by editing an entry; until one is, every row would read Unclassified.
   const withType = models || items.some((item) => item.type);
+  const withSize = items.some((item) => item.bytes);
   const families = unique(items.flatMap(familiesOf));
   const typeLabel = (item: LibraryItem) =>
     [resourceType(item), item.modelType && modelTypes[item.modelType]].filter(Boolean).join(" · ");
   const inView = items.filter((item) =>
     view === "outdated" ? updating(item) : item.installed === (view === "installed"),
   );
-  const rows = inView.filter(
-    (item) =>
-      (!family || familiesOf(item).includes(family)) &&
-      (!type || resourceType(item) === type) &&
-      (!modelType || (item.modelType || "unclassified") === modelType),
-  );
+  // Sorted by type, family and name first, so the stable sort on the first column keeps that order.
+  const rows = inView
+    .filter(
+      (item) =>
+        (!family || familiesOf(item).includes(family)) &&
+        (!type || resourceType(item) === type) &&
+        (!modelType || (item.modelType || "unclassified") === modelType),
+    )
+    .sort(
+      (a, b) =>
+        compareNames(typeLabel(a), typeLabel(b)) ||
+        compareNames(familySummary(a), familySummary(b)) ||
+        compareNames(resourceName(a), resourceName(b)),
+    );
   const filterCount = Number(!!family) + Number(!!type) + Number(!!modelType);
   const unclassified = items.filter((item) => libraryItemCategory(item) === "unclassified").length;
   return (
@@ -280,10 +295,11 @@ export function LibraryCatalogueTable({
           item.note,
           ...(item.families || []),
           ...familiesOf(item),
+          ...(item.triggers || []),
           typeLabel(item),
           statusOf(item).label,
         ]}
-        initialSort={{ key: "name", descending: false }}
+        initialSort={{ key: withType ? "type" : "family", descending: false }}
         empty={
           inView.length
             ? "No Matches"
@@ -294,70 +310,6 @@ export function LibraryCatalogueTable({
                 : `No Other ${label} Catalogued`
         }
         columns={[
-          {
-            key: "name",
-            header: "Name",
-            main: true,
-            sortValue: resourceName,
-            cell: (item) => (
-              <>
-                <TableRecord
-                  name={resourceName(item)}
-                  openLabel={`Edit ${resourceName(item)}`}
-                  onOpen={onEdit && (() => onEdit(item))}
-                  detail={
-                    phone &&
-                    [familySummary(item), typeLabel(item)]
-                      .filter((part) => part !== "Unclassified")
-                      .join(" · ")
-                  }
-                />
-                {(item.description || item.note) && (
-                  <Text size="xs" c="dimmed" lineClamp={1}>
-                    {item.description || item.note}
-                  </Text>
-                )}
-                {canUpdate(item) && (
-                  <Text size="xs">
-                    {/* The note names the update, as "v2 is newer than v1." */}
-                    Update Available: {item.update?.note || item.update?.latest?.name}
-                  </Text>
-                )}
-                {item.update?.state === "error" && item.update.note && (
-                  <Text size="xs" c="red">
-                    {item.update.note}
-                  </Text>
-                )}
-                {item.applied?.note && (
-                  <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
-                    {item.applied.note}
-                  </Text>
-                )}
-                {item.install?.note && (
-                  <Text size="xs" c="red">
-                    {item.install.note}
-                  </Text>
-                )}
-              </>
-            ),
-          },
-          {
-            key: "family",
-            header: "Family",
-            hideOnPhone: true,
-            width: 170,
-            sortValue: (item) => (item.families?.length ? familySummary(item) : undefined),
-            cell: (item) => (
-              <Text
-                size="sm"
-                lineClamp={2}
-                title={familiesOf(item).join(", ")}
-                c={item.families?.length ? undefined : "dimmed"}
-              >
-                {familySummary(item)}
-              </Text>
-            ),
-          },
           ...(withType
             ? [
                 {
@@ -380,15 +332,100 @@ export function LibraryCatalogueTable({
               ]
             : []),
           {
+            key: "family",
+            header: "Family",
+            hideOnPhone: true,
+            sortValue: (item) => (item.families?.length ? familySummary(item) : undefined),
+            cell: (item) => (
+              <Text
+                size="sm"
+                style={{ whiteSpace: "nowrap" }}
+                title={familiesOf(item).join(", ")}
+                c={item.families?.length ? undefined : "dimmed"}
+              >
+                {familySummary(item)}
+              </Text>
+            ),
+          },
+          {
+            key: "name",
+            header: "Name",
+            main: true,
+            sortValue: resourceName,
+            cell: (item) => (
+              <>
+                <TableRecord
+                  name={resourceName(item)}
+                  openLabel={`Edit ${resourceName(item)}`}
+                  onOpen={onEdit && (() => onEdit(item))}
+                  detail={
+                    phone &&
+                    [typeLabel(item), familySummary(item)]
+                      .filter((part) => part !== "Unclassified")
+                      .join(" · ")
+                  }
+                />
+                {(item.description || item.note) && (
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    {item.description || item.note}
+                  </Text>
+                )}
+                {canUpdate(item) && (
+                  <Text size="xs">
+                    {/* The note names the update, as "v2 is newer than v1." */}
+                    {item.update?.note || `${item.update?.latest?.name} is newer.`}
+                  </Text>
+                )}
+                {item.update?.state === "error" && item.update.note && (
+                  <Text size="xs" c="red">
+                    {item.update.note}
+                  </Text>
+                )}
+                {item.applied?.note && (
+                  <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
+                    {item.applied.note}
+                  </Text>
+                )}
+                {item.install?.note && (
+                  <Text size="xs" c="red">
+                    {item.install.note}
+                  </Text>
+                )}
+              </>
+            ),
+          },
+          ...(withSize
+            ? [
+                {
+                  key: "size",
+                  header: "Size",
+                  hideOnPhone: true,
+                  sortValue: (item: LibraryItem) => item.bytes || undefined,
+                  cell: (item: LibraryItem) => (
+                    <Text size="sm" style={{ whiteSpace: "nowrap" }}>
+                      {formatBytes(item.bytes)}
+                    </Text>
+                  ),
+                },
+              ]
+            : []),
+          {
             key: "status",
             header: "Status",
             width: 160,
             sortValue: (item) => statusOf(item).label,
-            cell: (item) => (
-              <Badge color={statusOf(item).color} miw="max-content">
-                {statusOf(item).label}
-              </Badge>
-            ),
+            cell: (item) => {
+              const { label, color } = statusOf(item);
+              return color ? (
+                <Badge color={color} miw="max-content">
+                  {label}
+                </Badge>
+              ) : (
+                <Text size={phone ? "xs" : "sm"} c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                  {label}
+                </Text>
+              );
+            },
           },
         ]}
         rowActions={(item) => {
