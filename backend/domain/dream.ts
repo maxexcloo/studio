@@ -428,7 +428,8 @@ const seriesShare = 2;
 const extendShare = 35;
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
-const videoExploreDraw = 3;
+/** One video in this many runs on another video model than the account's default, so videos vary. */
+const videoExploreDraw = 2;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.

@@ -3602,7 +3602,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     status: "done",
     rating: "liked",
   });
-  fx.state.draws[3] = [1];
+  fx.state.draws[2] = [1];
   const varied = await fx.dreamOnce();
   assert.equal(varied?.input.profileId, alternate.id);
   assert.equal(varied.parentItemId, "other-still");
