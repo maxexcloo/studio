@@ -1,10 +1,10 @@
 import {
+  Badge,
   Button,
   Checkbox,
   Chip,
   Group,
   Input,
-  MultiSelect,
   NumberInput,
   SegmentedControl,
   Select,
@@ -33,8 +33,10 @@ import type { GenerationInput } from "../../types";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
+import { SelectionList } from "../../ui/SelectionList";
 import { TextBox } from "../../ui/TextBox";
 import { TitleSelect } from "../../ui/TitleSelect";
+import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
@@ -58,7 +60,6 @@ import {
   fitsComparison,
   modelInputs,
   showVariant,
-  useDraftComparison,
 } from "./variants";
 
 const noChoices: string[] = [];
@@ -71,8 +72,9 @@ const modelName = (name: string) =>
     .join(" · ");
 
 /** Chooses one comparison axis and its values, then stages editable variants in the composer. */
-export function CompareMenu() {
+export function CompareMenu({ labels }: { labels: string[] }) {
   const { draft, setDraft, profiles, profile } = useGeneration();
+  const phone = usePhone();
   const metadata = useQuery(loraInfoQuery);
   const info = metadata.data?.loras ?? {};
   const [opened, setOpened] = useState(false);
@@ -170,16 +172,25 @@ export function CompareMenu() {
     searchable: true,
     maxDropdownHeight: 240,
   };
-  return (
+  const popup = (
     <ChipPopup
       title="Compare"
+      detail={
+        draft.compare && (
+          <Text size="sm" c="dimmed">
+            {plural(draft.compare.variants.length, "variant")}
+          </Text>
+        )
+      }
       opened={opened}
       onOpenedChange={setOpened}
-      width={360}
+      width={draft.compare ? 360 : 420}
       floating={!!draft.compare}
       target={
         <Button
           {...chipProps}
+          aria-expanded={opened}
+          variant={draft.compare ? "light" : "default"}
           onClick={() => setOpened(!opened)}
           leftSection={<icons.compare size={15} />}
           rightSection={<ChevronDown size={14} />}
@@ -202,7 +213,9 @@ export function CompareMenu() {
         </Button>
       }
     >
-      {!draft.compare && (
+      {draft.compare ? (
+        opened && <VariantOverview labels={labels} />
+      ) : (
         <Stack gap="sm">
           <Select
             label="What to Vary"
@@ -213,28 +226,26 @@ export function CompareMenu() {
             onChange={(value) => setAxis(value!)}
           />
           {axis === "Model" && (
-            <MultiSelect
-              {...selection}
+            <SelectionList
               label="Models"
-              placeholder="Choose models"
-              data={modelOptions}
+              groups={modelOptions}
               value={chosen.map((each) => each.id)}
               onChange={setModels}
-              maxValues={compareVariants.max - 1}
-              nothingFoundMessage="No models found"
+              max={compareVariants.max - 1}
+              searchable
+              empty="No Other Models Available"
             />
           )}
           {axis === "LoRA" && (
             <>
-              <MultiSelect
-                {...selection}
+              <SelectionList
                 label="LoRAs"
-                placeholder="Choose LoRAs"
-                data={loraOptions}
+                groups={[{ items: loraOptions }]}
                 value={selectedLoras}
                 onChange={setLoras}
-                maxValues={compareVariants.max - Number(withoutLora)}
-                nothingFoundMessage="No compatible LoRAs"
+                max={compareVariants.max - Number(withoutLora)}
+                searchable
+                empty="No Compatible LoRAs"
               />
               <Checkbox
                 label="Include Without Selected LoRAs"
@@ -278,13 +289,13 @@ export function CompareMenu() {
             </>
           )}
           {axis === "Resolution" && (
-            <MultiSelect
+            <SelectionList
               label="Resolutions"
-              data={sizeOptions}
+              groups={[{ items: sizeOptions }]}
               value={selectedSizes}
               onChange={setSizes}
-              comboboxProps={{ withinPortal: false }}
-              nothingFoundMessage="No native resolutions available"
+              max={compareVariants.max}
+              empty="No Resolutions Available"
             />
           )}
           {axis === "Seed" && (
@@ -322,6 +333,29 @@ export function CompareMenu() {
       )}
     </ChipPopup>
   );
+  return phone || !draft.compare ? (
+    popup
+  ) : (
+    <Group gap={6} wrap="nowrap">
+      {popup}
+      <VariantStrip labels={labels} />
+    </Group>
+  );
+}
+
+function VariantOverview({ labels }: { labels: string[] }) {
+  return (
+    <Stack component="ol" aria-label="Variants" gap="xs" m={0} p={0}>
+      {labels.map((label, index) => (
+        <Group component="li" key={index} gap="xs" align="baseline" wrap="nowrap">
+          <Badge variant="default" size="sm">
+            {letter(index)}
+          </Badge>
+          <Text size="sm">{label}</Text>
+        </Group>
+      ))}
+    </Stack>
+  );
 }
 
 /** The variant picker beside Generate in the phone sheet's header. */
@@ -345,24 +379,22 @@ export function GenerateVariantSelect() {
 }
 
 /** Which variant the composer edits; each one's tooltip names what sets it apart. */
-export function VariantStrip() {
+function VariantStrip({ labels }: { labels: string[] }) {
   const { draft, setDraft } = useGeneration();
-  const { variants, labels } = useDraftComparison();
   const active = draft.compare?.active ?? 0;
   return (
     <SegmentedControl
       aria-label="Variant"
       size="xs"
       radius="xl"
-      style={{ alignSelf: "flex-start" }}
       value={String(active)}
       onChange={(value) =>
         setDraft((previous) => showVariant(previous, draftVariants(previous), Number(value)))
       }
-      data={variants.map((_, index) => ({
+      data={labels.map((label, index) => ({
         value: String(index),
         label: (
-          <Tooltip label={labels[index]} events={{ hover: true, focus: true, touch: true }}>
+          <Tooltip label={label} events={{ hover: true, focus: true, touch: true }}>
             <span>{letter(index)}</span>
           </Tooltip>
         ),

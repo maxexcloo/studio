@@ -7,8 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { StudioSession } from "../../../../shared/queue";
 import { post } from "../../api";
 import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
-import { usePhone } from "../../ui/usePhone";
-import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
+import { CompareMenu } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
 import { galleryKey } from "../gallery/queries";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
@@ -105,7 +104,6 @@ export function GenerationForm({
   onNegativeWritten?: () => void;
 }) {
   const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
-  const phone = usePhone();
   // A draft without a picked profile runs on the account's default, following it as it changes.
   const preferred = defaultProfile(models.data, input.kind);
   const defaulted = !input.profileId || draft.defaultedProfileId === input.profileId;
@@ -256,8 +254,7 @@ export function GenerationForm({
           }}
         />
       }
-      compare={<CompareMenu />}
-      variants={!phone && draft.compare && <VariantStrip />}
+      compare={<CompareMenu labels={comparison.labels} />}
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
       fill={fill}
