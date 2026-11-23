@@ -3,6 +3,10 @@
   border-radius: var(--mantine-radius-lg);
 }
 
+.tile:has(.timestamp) {
+  container-type: inline-size;
+}
+
 .tile[data-entering] {
   animation: enter var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
@@ -173,11 +177,33 @@
   z-index: 2;
 }
 
+.marks {
+  position: absolute;
+  inset: var(--mantine-spacing-xs) calc(var(--mantine-spacing-xs) + 2rem) auto
+    var(--mantine-spacing-xs);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.timestamp {
+  max-inline-size: 100%;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: var(--mantine-radius-sm);
+  background: rgb(0 0 0 / 0.72);
+  color: white;
+  font-size: var(--mantine-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Face Check's mark on a result that shows someone else or the character twice. */
 .drift {
-  position: absolute;
-  top: calc(var(--mantine-spacing-xs) + 2px);
-  inset-inline-start: var(--mantine-spacing-xs);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -188,5 +214,4 @@
   color: white;
   font-size: var(--mantine-font-size-xs);
   font-weight: 500;
-  pointer-events: none;
 }

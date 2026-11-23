@@ -132,9 +132,14 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
       },
     }),
   );
-  await page.route("**/api/assistant/negative", (route) =>
-    route.fulfill({ json: { negative: "poor quality", source: "model" } }),
-  );
+  let releaseNegative!: () => void;
+  const negativeReply = new Promise<void>((resolve) => {
+    releaseNegative = resolve;
+  });
+  await page.route("**/api/assistant/negative", async (route) => {
+    await negativeReply;
+    await route.fulfill({ json: { negative: "poor quality", source: "model" } });
+  });
   await page.route("**/api/assistant/loras", (route) =>
     route.fulfill({
       json: {
@@ -177,7 +182,17 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
     await prompt.click();
     await expect(negative).toBeHidden();
   }
-  await assist(page, "Write Negative");
+  await finishTyping(page);
+  const negativeMenu = await promptMenu(page, "Negative Prompt");
+  await expandAssistantMenu(negativeMenu, "Suggestions");
+  await expect(
+    negativeMenu.getByRole("group", { name: "Suggestions", exact: true }).getByText("Loading…"),
+  ).toBeVisible();
+  releaseNegative();
+  const suggestion = negativeMenu.getByRole("menuitem", { name: "poor quality", exact: true });
+  await expect(suggestion).toBeVisible();
+  await expect(negative).toHaveValue("");
+  await suggestion.click();
   await expect(negative).toBeVisible();
   await expect(negative).toHaveValue("poor quality");
   await expect(prompt).toBeVisible();

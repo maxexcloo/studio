@@ -196,9 +196,7 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("Gallery Fit clears the dock and can use the header space for tall media", async ({
-  page,
-}) => {
+test("Gallery Fit keeps both wide and tall media between the header and dock", async ({ page }) => {
   const state = await fixtures(page);
   for (const [shape, width, height, model] of [
     ["wide", 2048, 768, "Wide Rendering Profile"],
@@ -261,7 +259,7 @@ test("Gallery Fit clears the dock and can use the header space for tall media", 
       .toEqual({
         centred: true,
         fitted: true,
-        headerClear: shape !== "tall",
+        headerClear: true,
         dockClear: true,
         titleFits: true,
       });

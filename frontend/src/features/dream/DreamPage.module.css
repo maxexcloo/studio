@@ -345,7 +345,7 @@
   overflow-y: auto;
   background: rgb(0 0 0 / 0.85);
 }
-/* The preview stage reaches from the screen edge to the verdict bar. */
+/* The header, fitted preview and verdict bar take their own rows. */
 .previewContent.previewContent[data-full-screen] {
   padding: 0;
 }

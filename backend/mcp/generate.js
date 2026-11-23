@@ -45,9 +45,10 @@ import { findCard } from "./manage.js";
 import { aboutTime, assertJobCount, mcpJson, readyIn, scopeMarkdown, setItems } from "./media.js";
 import { namedInTier, referenceCount, registerModelTool, tier } from "./models.js";
 import {
-  accountRules,
+  accountTaste,
   assertAvoided,
   assertProjectReuse,
+  assertTasteExclusions,
   briefLine,
   converging,
   keptChoices,
@@ -100,6 +101,7 @@ const theme = z
   })
   .describe(`One of ${themeIds().join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
+const outputCount = (jobs) => jobs.reduce((total, job) => total + (job.images || 1), 0);
 const setTitle = z.string().trim().min(1).max(80);
 // Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
 const cardContext = z.object({ name: z.string(), description: z.string().optional() });
@@ -109,11 +111,14 @@ const chatContext = z
     character: cardContext.optional(),
     outfit: cardContext.optional(),
     scene: cardContext.optional(),
-    series: z.string().optional(),
+    series: z
+      .string()
+      .optional()
+      .describe("The user's theme or series name, shared across its sets."),
     notes: z.string().max(maxContextNotes).optional(),
   })
   .describe(
-    "Who and what it shows; series names a story or project; notes: backstory for Studio's writers.",
+    "Who and what it shows; series names the user's theme; notes explain the direction for this set.",
   );
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */
@@ -208,8 +213,11 @@ export function registerGenerateTools({
       ahead,
     } = await media.finishTimes(owner, [submission], { signal });
     const left = endsAt === null ? 0 : Math.max(0, endsAt - Date.now());
+    const accepted = outputCount(submission.jobs);
+    const resultCount = `${accepted} ${profile.kind || "image"}${accepted === 1 ? "" : "s"}`;
     const structured = {
       status: submission.status,
+      accepted,
       profile: {
         id: profile.id,
         label,
@@ -251,8 +259,8 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links and end the turn. Call result only if asked. Never poll or resubmit. ${followUp}`
-        : `${submission.error} ${ignoredNote(submission)}${note}Share the links; never resubmit.`;
+        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Studio accepted ${resultCount} in this batch. Share the links and end the turn. Call result only if asked. Never poll or resubmit. ${followUp}`
+        : `${submission.error} ${ignoredNote(submission)}${note}Studio accepted ${resultCount} in this batch. Share the links; never resubmit.`;
     return {
       content: [{ type: "text", text: `${message}\n\n${pending}` }, ...extra],
       structuredContent: {
@@ -414,8 +422,8 @@ export function registerGenerateTools({
           : part;
         if (queued.error) break;
       }
-      if (prompts.length > size)
-        queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${prompts.length * count} images in batches of up to ${size * count}.`;
+      if (prompts.length > size && !queued.error)
+        queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${outputCount(queued.jobs)} images in batches of up to ${size * count}.`;
       return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.
@@ -441,7 +449,9 @@ export function registerGenerateTools({
       prompts: z
         .union([promptList, promptListText.pipe(promptList)])
         .optional()
-        .describe('Use prompts: ["..."], not prompt.'),
+        .describe(
+          "One finished prompt per distinct creative result. Continue with new directions when batching.",
+        ),
       base: z
         .string()
         .trim()
@@ -480,7 +490,7 @@ export function registerGenerateTools({
       count: jobCount
         .optional()
         .describe(
-          `Per prompt, only if the user gives a number; default ${mcpGenerationCount} for one image prompt, else 1.`,
+          `Repeats each prompt with new seeds (default ${mcpGenerationCount} for one image prompt, else 1). For distinct results provide separate prompts.`,
         ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),
@@ -652,11 +662,12 @@ export function registerGenerateTools({
     );
   };
   const generateOnce = async (input, signal, accepted) => {
-    const [project, rules, alike] = await Promise.all([
+    const [project, taste, alike] = await Promise.all([
       attachedProject(signal),
-      accountRules(media, owner, signal),
+      accountTaste(media, owner, signal),
       converging(media, owner, signal),
     ]);
+    const { rules } = taste;
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -774,7 +785,6 @@ export function registerGenerateTools({
           : `${base.replace(/[\s,.;]+$/, "")}, ${delta}`,
       );
     }
-    if (project) assertAvoided(project, args.prompts);
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
@@ -1089,6 +1099,22 @@ export function registerGenerateTools({
               };
             }),
           );
+    for (const { plan } of plans) {
+      if (project) assertAvoided(project, plan.prompts);
+      assertTasteExclusions(taste, plan.prompts);
+      if (
+        !plan.reference_asset_ids?.length &&
+        !plan.prompt_references?.some((refs) => refs.length)
+      ) {
+        const relative = plan.prompts.findIndex((prompt) =>
+          /^(?:the )?same as (?:above|before|the previous (?:prompt|image))\b/i.test(prompt),
+        );
+        if (relative >= 0)
+          throw new Error(
+            `Prompt ${relative + 1} depends on an earlier prompt or image. Describe the complete scene, or attach the image if the user wants to edit it.`,
+          );
+      }
+    }
     let strengthOptions;
     if (strengthChoice) {
       const [{ profile, plan }] = plans;
@@ -1315,8 +1341,12 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const project = await attachedProject(signal);
+    const [project, taste] = await Promise.all([
+      attachedProject(signal),
+      accountTaste(media, owner, signal),
+    ]);
     if (project) assertAvoided(project, checked);
+    assertTasteExclusions(taste, checked);
     // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
     const all = await media.profiles("all", owner);
     const seed = crypto.randomInt(2 ** 31);
@@ -1658,8 +1688,12 @@ export function registerGenerateTools({
       }
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
-      const project = await attachedProject(signal);
+      const [project, taste] = await Promise.all([
+        attachedProject(signal),
+        accountTaste(media, owner, signal),
+      ]);
       if (project) assertAvoided(project, plan.args.prompts);
+      assertTasteExclusions(taste, plan.args.prompts);
       const known = project?.constraints.profiles.length
         ? (await media.catalogue(owner)).profiles
         : [];

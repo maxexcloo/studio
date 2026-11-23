@@ -120,8 +120,18 @@ export function useGalleryLayout() {
     let pinch: number | null = null;
     const spread = (touches: TouchList) =>
       Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    function stopPinch() {
+      pinch = null;
+      element.removeEventListener("touchmove", onTouchMove);
+    }
     function onTouchStart(event: TouchEvent) {
-      pinch = event.touches.length === 2 ? spread(event.touches) : null;
+      if (event.touches.length !== 2) {
+        stopPinch();
+        return;
+      }
+      pinch = spread(event.touches);
+      // Keep ordinary one-finger scrolling on the browser's native path.
+      element.addEventListener("touchmove", onTouchMove, { passive: false });
     }
     function onTouchMove(event: TouchEvent) {
       if (pinch === null || event.touches.length !== 2) return;
@@ -135,21 +145,21 @@ export function useGalleryLayout() {
       });
     }
     function onTouchEnd(event: TouchEvent) {
-      if (event.touches.length < 2) pinch = null;
+      if (event.touches.length < 2) stopPinch();
     }
     // Safari pinches the page itself unless its gesture events are refused.
     const refuse = (event: Event) => event.preventDefault();
     const listeners = [
       ["wheel", onWheel, { passive: false }],
       ["touchstart", onTouchStart, { passive: true }],
-      ["touchmove", onTouchMove, { passive: false }],
       ["touchend", onTouchEnd, { passive: true }],
-      ["touchcancel", onTouchEnd, { passive: true }],
+      ["touchcancel", stopPinch, { passive: true }],
       ["gesturestart", refuse, { passive: false }],
     ] as const;
     for (const [type, listener, options] of listeners)
       element.addEventListener(type, listener as EventListener, options);
     return () => {
+      stopPinch();
       for (const [type, listener] of listeners)
         element.removeEventListener(type, listener as EventListener);
     };

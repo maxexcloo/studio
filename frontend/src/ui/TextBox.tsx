@@ -5,13 +5,11 @@ import {
   Loader,
   Menu,
   Modal,
-  type ModalProps,
   Textarea,
   type TextareaProps,
   Tooltip,
   VisuallyHidden,
   getDefaultZIndex,
-  useProps,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
 import { ArrowUp, Check, type LucideIcon } from "lucide-react";
@@ -36,7 +34,7 @@ import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
-import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
+import { useKeyboardDrop, useVisibleRect } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 
 import classes from "./TextBox.module.css";
@@ -113,8 +111,10 @@ export function TextBox({
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
   const openedFrom = useRef<Element | null>(null);
-  const keyboard = useKeyboard(editing, content);
-  const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
+  const viewport = useVisibleRect(editing);
+  const [closingViewport, setClosingViewport] = useState<typeof viewport>();
+  const closing = useRef(false);
+  const editorViewport = editing ? viewport : closingViewport;
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => close());
   // The text an in-place box had when it took focus: changed since, Reset returns to it.
@@ -199,7 +199,7 @@ export function TextBox({
     );
   const [focused, setFocused] = useState(false);
   const resting = oneLine && !focused;
-  const centreTools = oneLine && Boolean(send) && !phone;
+  const centreTools = oneLine && Boolean(send);
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
   // takes the textarea's font, padding and border so the two line up.
   const ref = useMergedRef(field, props.ref);
@@ -381,9 +381,13 @@ export function TextBox({
     </div>
   );
   const close = () => {
+    if (!editing || closing.current) return;
+    closing.current = true;
+    setClosingViewport(viewport);
     setMenuOpened(false);
     setEditing(false);
-    setTimeout(() => field.current?.focus({ preventScroll: true }));
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && content.current?.contains(focused)) focused.blur();
   };
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -571,8 +575,12 @@ export function TextBox({
           fullScreen
           closeOnEscape={false}
           returnFocus={false}
-          // The page returns at once, rather than showing through a fade while the keyboard drops.
-          transitionProps={{ ...modal.transitionProps, exitDuration: 0 }}
+          onExitTransitionEnd={() => {
+            closing.current = false;
+            setClosingViewport(undefined);
+            if (field.current && !layerAbove(field.current))
+              field.current.focus({ preventScroll: true });
+          }}
           // A column of header and body. Inline, since Paper's `display: block` has a module
           // class's specificity.
           styles={{ content: { display: "flex", flexDirection: "column", overflow: "clip" } }}
@@ -584,10 +592,18 @@ export function TextBox({
             ref={content}
             data-composer-layer
             aria-label={title}
+            aria-hidden={!editing || undefined}
+            inert={!editing}
             style={
               {
-                translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
-                "--keyboard-inset": `${keyboard.inset}px`,
+                translate: editorViewport?.y ? `0 ${editorViewport.y}px` : undefined,
+                height: editorViewport?.height,
+                maxHeight: editorViewport?.height,
+                "--text-editor-safe-bottom":
+                  editorViewport &&
+                  window.innerHeight - editorViewport.y - editorViewport.height > 100
+                    ? "0px"
+                    : undefined,
               } as CSSProperties
             }
             onKeyDownCapture={escape}

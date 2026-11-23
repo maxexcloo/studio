@@ -26,7 +26,7 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
-import { isTallMedia, mediaSource } from "../gallery/mediaSource";
+import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome } from "../gallery/ViewerChrome";
@@ -201,6 +201,7 @@ export function DreamPreview({
   act,
   askPass,
   undo,
+  quickRating,
 }: {
   card: DeckCard;
   side: number;
@@ -214,6 +215,7 @@ export function DreamPreview({
   act: (choice: Choice["choice"]) => void;
   askPass: () => void;
   undo: () => void;
+  quickRating?: boolean;
 }) {
   const id = useId();
   const closeIfTop = closeWhenTop(id, close);
@@ -283,7 +285,6 @@ export function DreamPreview({
           <div
             ref={stageRef}
             className={`${classes.previewStage} ${viewerClasses.viewerStage}`}
-            data-tall={isTallMedia(mediaSource(item)) || undefined}
             onClick={(event) => {
               if (
                 event.detail &&
@@ -388,12 +389,17 @@ export function DreamPreview({
             )}
             <DeckButtons
               card={card}
+              quickRating={quickRating}
               act={act}
               askPass={askPass}
               hidden={false}
               expanded
               singleImageComparison={card.kind === "pair" && item.type === "image"}
-              trailing={<DreamSuggestions card={card} side={side} onMore={() => act("more")} />}
+              trailing={
+                quickRating ? undefined : (
+                  <DreamSuggestions card={card} side={side} onMore={() => act("more")} />
+                )
+              }
               leading={<DeckUndo disabled={!canUndo} onClick={undo} />}
             />
           </div>

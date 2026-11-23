@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { mediaProfileName, mediaTitle } from "./mediaLabels";
+import { mediaProfileName, mediaTimestamp, mediaTitle } from "./mediaLabels";
 
 import classes from "./MediaViewer.module.css";
 
@@ -32,6 +32,7 @@ export function ViewerChrome({
   if (hidden) return null;
   const title = item && mediaTitle(item);
   const model = item && mediaProfileName(item, profiles);
+  const timestamp = item && mediaTimestamp(item);
   return (
     <Group
       className={classes.topBar}
@@ -49,10 +50,29 @@ export function ViewerChrome({
             <Text size="sm" fw={500} truncate title={title}>
               {title}
             </Text>
-            {model && (
-              <Text size="xs" truncate title={model}>
-                {model}
-              </Text>
+            {(model || timestamp) && (
+              <Group gap={6} wrap="nowrap">
+                {model && (
+                  <Text size="xs" truncate title={model} miw={0}>
+                    {model}
+                  </Text>
+                )}
+                {model && timestamp && (
+                  <Text size="xs" c="dimmed" aria-hidden>
+                    ·
+                  </Text>
+                )}
+                {timestamp && (
+                  <Text
+                    component="time"
+                    size="xs"
+                    dateTime={timestamp.value}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {timestamp.label}
+                  </Text>
+                )}
+              </Group>
             )}
           </Paper>
         )}

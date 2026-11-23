@@ -3,6 +3,7 @@ mcpServers:
     type: streamable-http
     url: https://studio.example.com/mcp
     requiresOAuth: false
+    serverInstructions: true
     startup: false
     apiKey:
       source: user

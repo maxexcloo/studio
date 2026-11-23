@@ -248,7 +248,8 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
   );
   assert.doesNotMatch(body.messages[0].content, /x\.invalid/, "no guide sources");
   // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.
-  assert.match(body.messages[0].content, /own descriptions of people and things .* word for word/);
+  assert.match(body.messages[0].content, /Translate figurative visual shorthand/);
+  assert.match(body.messages[0].content, /generation model cannot read the chat/);
   assert.match(body.messages[0].content, /real flaws means subtle texture/);
   assert.match(body.messages[0].content, /age and ethnicity in the prompt's first words/);
   assert.equal(body.messages[1].content, "secret cabin");

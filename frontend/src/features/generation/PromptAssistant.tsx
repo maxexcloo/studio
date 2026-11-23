@@ -122,6 +122,7 @@ export function usePromptAssistant({
   // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [negativeIdea, setNegativeIdea] = useState<{ key: string; value: string }>();
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(false);
   const scope = useRef(0);
@@ -148,6 +149,7 @@ export function usePromptAssistant({
   const negativeOffered =
     profile?.capabilities.negativePrompt !== false &&
     !info?.noNegative?.includes(profile?.id || "");
+  const negativeKey = JSON.stringify([profile?.id, input.prompt, input.cfg, input.loras]);
   const lorasOffered = Boolean(
     info?.loras && profile?.capabilities.lora && profile.options?.loras?.length,
   );
@@ -204,10 +206,12 @@ export function usePromptAssistant({
       action,
       preset,
       instruction,
+      preview,
     }: {
       action: Action;
       preset?: string;
       instruction?: string;
+      preview?: boolean;
     }) => {
       if (!profile || !input.prompt.trim())
         throw new Error("Write a prompt and choose a profile first.");
@@ -240,15 +244,15 @@ export function usePromptAssistant({
       abort.signal.throwIfAborted();
       if (action !== "loras" && result.source === "fallback")
         throw new Error(`The prompt assistant is unavailable (${result.reason || "no reply"}).`);
-      return { action, result, source, preset };
+      return { action, result, source, preset, preview, negativeKey };
     },
-    onSuccess: ({ action, result, source, preset }) => {
+    onSuccess: ({ action, result, source, preset, preview, negativeKey }) => {
       if (!mounted.current || source.scope !== scope.current) return;
       const current = latest.current;
       if (
         current.profile?.id !== source.profileId ||
         current.input.prompt !== source.prompt ||
-        (action === "negative" && current.input.negative !== source.negative)
+        (action === "negative" && !preview && current.input.negative !== source.negative)
       ) {
         notifications.show({
           message: "Your inputs changed while the assistant worked. Try again to use them.",
@@ -275,6 +279,10 @@ export function usePromptAssistant({
           });
         }
       } else if (action === "negative") {
+        if (preview) {
+          setNegativeIdea({ key: negativeKey, value: result.negative?.trim() || "" });
+          return;
+        }
         if (result.unused || !result.negative?.trim()) {
           notifications.show({ message: "This model does not use a negative prompt." });
           return;
@@ -413,5 +421,60 @@ export function usePromptAssistant({
       })}
     </Stack>
   ) : null;
-  return { templates, custom: customActions, more, stop, working, dialog, suggestions: list };
+  const preview = negativeIdea?.key === negativeKey ? negativeIdea.value : undefined;
+  const loadNegative = () => assistance.mutate({ action: "negative", preview: true });
+  const negativeLoading = assistance.isPending && assistance.variables.action === "negative";
+  const negativeFailed = assistance.isError && assistance.variables?.action === "negative";
+  const negativeTool: ToolAction | undefined = negativeOffered
+    ? {
+        id: "negative-assistant",
+        label: "Improve Negative Prompt",
+        icon: icons.assistant,
+        menu: [
+          [
+            {
+              id: "negative-suggestions",
+              label: "Suggestions",
+              icon: icons.assistant,
+              disabled,
+              onOpen: () => {
+                if (!preview && !assistance.isPending) loadNegative();
+              },
+              menu: [
+                [
+                  negativeLoading || (preview === undefined && !negativeFailed)
+                    ? { id: "loading-negative", label: "Loading…", disabled: true }
+                    : preview
+                      ? {
+                          id: "negative-idea",
+                          label: preview,
+                          onClick: () =>
+                            applyChange("Negative prompt written", { negative: preview }),
+                        }
+                      : { id: "no-negative", label: "No Suggestions", disabled: true },
+                ],
+              ],
+            },
+            {
+              id: "refresh-negative",
+              label: "Refresh",
+              icon: icons.refresh,
+              disabled: disabled || assistance.isPending,
+              keepOpen: true,
+              onClick: loadNegative,
+            },
+          ],
+        ],
+      }
+    : undefined;
+  return {
+    templates,
+    custom: customActions,
+    more,
+    stop,
+    working,
+    dialog,
+    suggestions: list,
+    negativeTool,
+  };
 }

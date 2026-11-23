@@ -68,6 +68,7 @@ async function seed(
 }
 
 test("The viewer resolves an older result’s checkpoint to its profile name", async ({ page }) => {
+  await page.clock.setFixedTime(new Date(stamp));
   const model = "krea2_turbo_int8_convrot";
   const { viewer } = await seed(page, { settings: { modelName: model } }, async (page) => {
     await serveProfiles(page, [
@@ -81,6 +82,9 @@ test("The viewer resolves an older result’s checkpoint to its profile name", a
   const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
   await expect(header.getByText("Amber Bird", { exact: true })).toBeVisible();
   await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
+  const timestamp = header.locator("time");
+  await expect(timestamp).toHaveAttribute("datetime", stamp);
+  await expect(timestamp).toHaveText(/^Today, (?:[01]\d|2[0-3]):[0-5]\d$/);
 });
 
 /** Recreate › Run Again: queues the same settings with a new seed, without the composer. */
@@ -502,8 +506,30 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   expect(await summary.evaluate((line) => line.scrollWidth > line.clientWidth)).toBe(true);
   // Phones edit in the full-screen editor; elsewhere focus, by click or keyboard, unfolds it.
   if (testInfo.project.use.isMobile) {
+    const ai = (await viewer
+      .getByRole("button", { name: "AI Prompt Actions", exact: true })
+      .boundingBox())!;
+    const send = (await viewer
+      .getByRole("button", { name: "Generate", exact: true })
+      .boundingBox())!;
+    expect(Math.abs(ai.y + ai.height / 2 - send.y - send.height / 2)).toBeLessThan(4);
     await field.click();
-    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeVisible();
+    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+    await expect(editor).toBeVisible();
+    await editor.getByRole("textbox", { name: "Prompt", exact: true }).focus();
+    const keyboardTop = await page.evaluate(() => {
+      const height = window.innerHeight - 300;
+      Object.defineProperty(window.visualViewport, "height", { configurable: true, value: height });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      return height;
+    });
+    const submit = editor.getByRole("button", { name: "Generate", exact: true });
+    await expect
+      .poll(async () => {
+        const box = (await submit.boundingBox())!;
+        return box.y + box.height;
+      })
+      .toBeLessThanOrEqual(keyboardTop);
     return;
   }
   await field.focus();
@@ -818,7 +844,7 @@ test("Details shows the source, exact set, original chat and applied reference",
   await seed(
     page,
     {
-      chat: { conversationId },
+      chat: { conversationId, turnId: "turn-2" },
       parentItemId: "parent",
       resultSet,
       settings: {
@@ -847,6 +873,7 @@ test("Details shows the source, exact set, original chat and applied reference",
         ...state.gallery[0],
         id: "parent",
         parentItemId: undefined,
+        chat: { conversationId, turnId: "turn-1" },
         resultSet: { ...resultSet, id: "different-set" },
         settings: { seed: 0, loras: [{ name: "Detail.safetensors", strength: 0.4 }] },
         prompt: "A grey heron",
@@ -864,11 +891,23 @@ test("Details shows the source, exact set, original chat and applied reference",
   const chat = page.getByRole("link", { name: "Continue in Chat", exact: true });
   await expect(chat).toHaveAttribute("href", `https://chat.example.test/c/${conversationId}`);
   await expect(chat).toHaveAttribute("target", "_blank");
+  await expect(
+    page.getByRole("link", { name: "Results From This Chat", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Identity", { exact: true })).toBeVisible();
   await expect(page.getByText("Heron Upload", { exact: true })).toBeVisible();
   await expect(page.getByText("Strength 0.7", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Bird Studies", exact: true }).click();
   await expect(page.getByRole("button", { name: "Remove Set: Bird Studies Filter" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Grey Heron", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+  await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await page.getByRole("link", { name: "Results From This Turn", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Remove This Turn Filter", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open image: Grey Heron", exact: true }),
   ).toHaveCount(0);
@@ -1727,7 +1766,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect(page.getByRole("menuitem", { name: /Back & Forth/ })).toHaveCount(0);
 });
 
-test("Details fold only a long caption, keep its tags in sight and copy the prompts", async ({
+test("Details keep the caption, run notes and source ahead of model and prompts", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -1743,43 +1782,83 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
     "\n",
   );
   const caption = Array.from({ length: 12 }, (_, line) => `Caption line ${line + 1}`).join("\n");
-  const { viewer } = await seed(page, {
-    title: "my favourite bird",
-    number: 866,
-    settings: { profileId: "image:test", profileName: "Retired Image · ComfyUI · Quality" },
-    negative,
-    caption: {
-      text: caption,
-      tags: ["branch", "bird"],
-      model: "vision-model",
-      at: stamp,
-      version: 2,
+  const notes = "A softer palette for the second version.";
+  const runCaption = "Second palette study.";
+  const { viewer } = await seed(
+    page,
+    {
+      title: "my favourite bird",
+      number: 866,
+      parentItemId: "lineage-source",
+      resultSet: {
+        id: "set-bird",
+        title: "Bird Studies",
+        caption: runCaption,
+        context: { notes },
+        index: 0,
+      },
+      settings: {
+        profileId: "image:test",
+        profileName: "Retired Image · ComfyUI · Quality",
+        loras: [{ name: "linen.safetensors", strength: 0.5 }],
+      },
+      negative,
+      caption: {
+        text: caption,
+        tags: ["branch", "bird"],
+        model: "vision-model",
+        at: stamp,
+        version: 2,
+      },
     },
-  });
+    async (_page, state) => {
+      state.gallery.push({
+        id: "lineage-source",
+        type: "image",
+        status: "done",
+        number: 865,
+        title: "Original Bird",
+        prompt: "A brown bird",
+        url: image,
+        thumbnailUrl: image,
+        createdAt: stamp,
+      });
+    },
+  );
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
   await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   if (testInfo.project.use.isMobile)
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
   // The title's line holds when and how big; Output carries no result number.
-  await expect(
-    details.getByText(`${formatDateTime(stamp)} · 1024 × 1024`, { exact: true }),
-  ).toBeVisible();
+  await expect(details.getByText(/^23 Oct(?: 2026)?, \d{2}:\d{2} · 1024 × 1024$/)).toBeVisible();
   await expect(details.getByRole("cell", { name: "#866", exact: true })).toHaveCount(0);
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
   const tags = details.getByLabel("Caption Tags", { exact: true });
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
   await expect(tags).toBeVisible();
+  await expect(
+    details.getByRole("heading", {
+      name: /^(Caption|Lineage|Model|LoRAs|Prompt|Negative Prompt)$/,
+    }),
+  ).toHaveText(["Caption", "Lineage", "Model", "LoRAs", "Prompt", "Negative Prompt"]);
+  await expect(details.getByText(notes, { exact: true })).toBeVisible();
+  await expect(details.getByText(runCaption, { exact: true })).toBeVisible();
+  await expect(details.getByRole("link", { name: "Original Bird", exact: true })).toHaveAttribute(
+    "href",
+    "/images/865",
+  );
   const expand = details.getByRole("button", { name: "Expand Caption", exact: true });
   await expand.click();
   await details.getByRole("button", { name: "Collapse Caption", exact: true }).click();
   await expect(expand).toBeVisible();
   // Every other section shows in full, however long.
   await expect(details.getByRole("button", { name: /^Expand / })).toHaveCount(1);
-  // Only the prompts have Copy.
+  // Run notes and prompts can be copied without changing the text.
   const copied = () => page.evaluate(() => (window as any).copied);
-  await expect(details.getByRole("button", { name: /^Copy / })).toHaveCount(2);
+  await details.getByRole("button", { name: "Copy Notes", exact: true }).click();
+  await expect.poll(copied).toBe(`${notes}\n\n${runCaption}`);
   await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
   await expect.poll(copied).toBe("An amber bird");
   await details.getByRole("button", { name: "Copy Negative Prompt", exact: true }).click();
@@ -2124,7 +2203,7 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
         !!bounds &&
         !!top &&
         !!bottom &&
-        bounds.y < top.y + top.height &&
+        bounds.y >= top.y + top.height - 1 &&
         bounds.y + bounds.height <= bottom.y + 1
       );
     })
@@ -2157,6 +2236,17 @@ test("Work still generating and videos take the same swipes as a picture", async
     !testInfo.project.use.isMobile || testInfo.project.use.browserName === "webkit",
     "Touch input is dispatched through Chromium's protocol.",
   );
+  await page.addInitScript(() => {
+    const played: string[] = [];
+    Object.assign(window, { played });
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      const source = this.getAttribute("src");
+      if (source === "/test-media/clip-2.mp4" && !this.muted)
+        return Promise.reject(new DOMException("Audio needs a tap", "NotAllowedError"));
+      if (source) played.push(source);
+      return Promise.resolve();
+    };
+  });
   const state = await fixtures(page);
   state.gallery.push(
     {
@@ -2213,6 +2303,10 @@ test("Work still generating and videos take the same swipes as a picture", async
   await expect(video).toHaveAttribute("src", "/test-media/clip.mp4");
   await swipeLeft(video);
   await expect(video).toHaveAttribute("src", "/test-media/clip-2.mp4");
+  await expect
+    .poll(() => page.evaluate(() => (window as any).played))
+    .toEqual(["/test-media/clip.mp4", "/test-media/clip-2.mp4"]);
+  await expect(video).toHaveJSProperty("muted", true);
 });
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({
