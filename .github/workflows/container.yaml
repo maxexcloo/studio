@@ -4,9 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
-    # Docs a build doesn't read; README.md stays, as a test checks its Troubleshooting headings.
+    # The failure-message test reads CONFIGURATION.md.
     paths-ignore:
       - AGENTS.md
+      - README.md
       - SECURITY.md
       - config/profiles/README.md
       - worker/**/*.md

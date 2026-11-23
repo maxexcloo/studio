@@ -168,7 +168,7 @@ export function assertCurrentStorage(dataDir: string): void {
   }
   if (pending.length)
     throw new Error(
-      `${dataDir} still holds ${pending.join(", ")}, so it predates current storage. Migrate it first with migrate-runtime from Studio v2026.11.10.4, the last release with those steps (see README.md, Data & Migrations), then start this Studio.`,
+      `${dataDir} still holds ${pending.join(", ")}, so it predates current storage. Migrate it first with migrate-runtime from Studio v2026.11.10.4, the last release with those steps (see CONFIGURATION.md, Data & Migrations), then start this Studio.`,
     );
 }
 
