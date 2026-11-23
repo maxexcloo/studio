@@ -14,6 +14,7 @@ import {
 } from "../../../../shared/characters";
 import { api, post } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
+import { defaultProfile, modelsQuery } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
 import { nextReferenceTarget, placeReference } from "../generation/references";
 import { type CardParts, rememberCard, removeCharacter } from "./cardParts";
@@ -77,6 +78,32 @@ export function useSaveCharacter(id?: string) {
         )
       ).character,
     onSuccess: () => client.invalidateQueries({ queryKey: charactersQuery.queryKey }),
+  });
+}
+
+/**
+ * Generate References: saves the card as typed (new without `id`) and queues candidates drawn from
+ * its description on the account's default image model as one comparison, whose pick joins its
+ * images (backend/card-references.js). Answers the comparison's id.
+ */
+export function useGenerateReferences(kind: CardKind, id?: string) {
+  const client = useQueryClient();
+  return useMutation({
+    meta: { inlineError: true },
+    mutationFn: async (fields: Omit<CharacterFields, "age"> & { age?: number }) => {
+      const profile = defaultProfile(await client.fetchQuery(modelsQuery), "image");
+      if (!profile) throw new Error("No image model is available.");
+      const made = await post<{ comparison: { id: string } }>(`/api/${kind}/references`, {
+        ...fields,
+        ...(id ? { id } : {}),
+        profileId: profile.id,
+      });
+      return made.comparison.id;
+    },
+    onSuccess: () => {
+      for (const queryKey of [[kind], queueQuery.queryKey, ["comparisons"]])
+        void client.invalidateQueries({ queryKey });
+    },
   });
 }
 

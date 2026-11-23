@@ -17,7 +17,7 @@ import {
 import { dreamPairAnswers } from "../../shared/dream.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
 import { shapeName } from "../../shared/taste.ts";
-import { mcpJson, outputIndex } from "./media.js";
+import { mcpJson, outputIndex, scopeMarkdown } from "./media.js";
 
 const maxResults = 50;
 const maxListed = 25;
@@ -345,14 +345,15 @@ export function registerManageTools({
     ...story(card),
     image_ids: imageIds(card),
     ...(card.portrait ? { portrait: card.portrait.status } : {}),
+    ...(card.candidates ? { candidates: `${media.publicUrl}/compare/${card.candidates}` } : {}),
   });
   tool(
     server,
     "cards",
     "manage cards",
-    "The user's character, outfit and scene cards, when asked. list (one with id); create, or update by id or name: name, description, image_ids (reference_asset_ids or result numbers; a character 1–4, clearest first, an outfit or scene 0–1), a character's age and story. describe writes one from the first image; rate scores each 1–5 as a reference.",
+    "The user's character, outfit and scene cards. list (one with id); create/update (id or name): name, description, image_ids (asset ids or result numbers, clearest first; character 1–4, else 0–1), age, story. describe: from an image; improve: rewrite description; rate: 1–5. references: queue lettered candidates; variants pick adds one.",
     {
-      action: z.enum(["list", "create", "update", "describe", "rate"]),
+      action: z.enum(["list", "create", "update", "describe", "improve", "rate", "references"]),
       kind: z.enum(Object.keys(cardKinds)),
       id: z.string().trim().min(1).max(200).optional(),
       name: z.string().trim().min(1).max(maxCardName).optional(),
@@ -370,6 +371,18 @@ export function registerManageTools({
         const card = findCard(await list(), id);
         if (!card) throw new Error(`No ${noun} "${id}". Call cards list to see them.`);
         return mcpJson({ [noun]: shownCard(card) });
+      }
+      if (action === "improve") {
+        const card = id ? findCard(await list(), id) : null;
+        const draft = description ?? card?.description;
+        if (!draft) throw new Error("Pass description, or id of a described card, to improve.");
+        const { description: improved } = await api(
+          "POST",
+          "/api/assistant/cards/improve",
+          { kind, name: name ?? card?.name ?? "", description: draft },
+          signal,
+        );
+        return mcpJson({ description: improved });
       }
       const image_ids =
         named && (await Promise.all(named.map((value) => referenceAsset(value, signal))));
@@ -395,21 +408,55 @@ export function registerManageTools({
         });
       }
       let current = null;
-      if (action === "update") {
+      if (action === "update" || (action === "references" && id)) {
         if (!id) throw new Error(`Pass id: the ${noun}'s id or name from list.`);
         current = findCard(await list(), id);
         if (!current) throw new Error(`No ${noun} "${id}". Call cards list to see them.`);
       }
+      const fields = {
+        name: name ?? current?.name,
+        description: description ?? current?.description ?? "",
+        ...(current ? story(current) : {}),
+        ...(kind === "characters" ? traits : {}),
+        referenceIds: image_ids ?? (current ? imageIds(current) : []),
+      };
+      if (action === "references") {
+        const { profile } = await media.choose(owner, { kind: "image" });
+        const made = await api(
+          "POST",
+          `/api/${kind}/references`,
+          {
+            ...fields,
+            ...(current ? { id: current.id } : {}),
+            profileId: profile.id,
+            ...(chat ? { chat: { conversationId: chat } } : {}),
+          },
+          signal,
+        );
+        const { comparison } = made;
+        const jobs = comparison.variants.map(({ jobId }) => jobId);
+        media.adopt(owner, refs, { jobs });
+        media.noteNumbers(comparison.variants.map((variant) => variant.item).filter(Boolean));
+        media.offer(owner, refs, comparison.id, jobs);
+        const link = `${media.publicUrl}/compare/${encodeURIComponent(comparison.id)}`;
+        const lines = jobs.map(
+          (jobId, index) =>
+            `[${String.fromCharCode(65 + index)}](${media.pageUrl(owner, jobId)}) ${media.refOf(jobId) || ""}`,
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Saved ${made[noun].name} and queued ${jobs.length} reference candidates on ${profile.label || profile.id}. Share the comparison link, ask the user to pick a letter (variants pick adds it to the card's images, or cards update image_ids sets them), and end your turn.\n\n[Compare Side by Side](${link})\n${lines.join("\n")}\n${scopeMarkdown(media.scopeLinks(owner, "image", jobs, chat), "image")}`,
+            },
+          ],
+          structuredContent: { [noun]: shownCard(made[noun]), compare: link },
+        };
+      }
       const saved = await api(
         current ? "PUT" : "POST",
         current ? `/api/${kind}/${encodeURIComponent(current.id)}` : `/api/${kind}`,
-        {
-          name: name ?? current?.name,
-          description: description ?? current?.description ?? "",
-          ...(current ? story(current) : {}),
-          ...(kind === "characters" ? traits : {}),
-          referenceIds: image_ids ?? (current ? imageIds(current) : []),
-        },
+        fields,
         signal,
       );
       return mcpJson({ [noun]: shownCard(saved[noun]) });
