@@ -176,7 +176,6 @@ test("the assistant is for every account, and only for profiles the account may 
         "guide",
         "graphic-poster",
         "illustration",
-        "monochrome",
         "photographic",
         "portrait",
         "custom",

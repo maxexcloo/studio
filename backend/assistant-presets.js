@@ -82,15 +82,6 @@ export const seedStyles = Object.freeze([
       "Illustration: render the scene in one chosen art medium. Use the medium the prompt names or choose one that suits the subject. Describe the marks and surfaces that distinguish it, such as ink contours and paper grain or opaque gouache strokes. For video, keep that rendering consistent as the requested action plays out.",
   },
   {
-    id: "monochrome",
-    kind: "improve",
-    enabled: true,
-    label: "Monochrome",
-    description: "Grayscale tones that separate shapes and textures.",
-    instruction:
-      "Monochrome: keep the original medium and use grayscale tonal separation. State which existing surfaces catch the highlights, which read as midtones and where the shadows define shape. Where a named color carries story information or identifies an object, preserve its role with a clearly distinguishable tone. For video, keep moving subjects readable against their backgrounds.",
-  },
-  {
     id: "photographic",
     kind: "improve",
     enabled: true,
@@ -137,6 +128,15 @@ export const seedStyles = Object.freeze([
       "Atmosphere: hold the opening composition and make one established part of the surroundings move. Describe where the movement starts, what path it takes and what changes in the frame as it passes or settles. Choose something this setting can already support, such as a shifting reflection, water running off an edge or a draft moving loose fabric. Keep the subject's movement secondary and make the change readable without sound.",
   },
   {
+    id: "changing-light",
+    kind: "animate",
+    enabled: true,
+    label: "Changing Light",
+    description: "The light or weather changes once as the moment carries on.",
+    instruction:
+      "Changing Light: let the light or weather change once while the moment carries on. Choose a change this setting supports, such as a cloud passing over the sun, a lamp switching on at dusk, headlights sweeping across a wall or rain starting on a window. Describe where the change begins, how it travels across the subject and surfaces, and the light the shot settles in. Hold the framing steady and keep the subject's identity, outfit and pose continuous, with only a natural response such as a squint or a glance toward the source.",
+  },
+  {
     id: "cinematic",
     kind: "animate",
     enabled: true,
@@ -164,6 +164,24 @@ export const seedStyles = Object.freeze([
       "Living Photo: the moment keeps rolling as if the photo were a candid video. Carry the activity already under way through its next ordinary step and let it settle. Describe how one visible detail responds to the subject's movement, such as a cup tilting with the wrist. Let hair, clothing and the body move naturally with it. Keep the original shot size, with a steady frame or a slight handheld reframe only if it helps keep the activity visible.",
   },
   {
+    id: "locked-camera",
+    kind: "animate",
+    enabled: true,
+    label: "Locked Camera",
+    description: "A fixed shot where the subject and environment do the moving.",
+    instruction:
+      "Locked Camera: hold the camera position, framing and focal length fixed. Start exactly from the supplied frame. One physically plausible subject action or environmental change begins early, develops once, and settles into a readable final pose or composition. Preserve subject identity and object positions. No automatic push-in, orbit, hard cut or sudden reveal.",
+  },
+  {
+    id: "playful",
+    kind: "animate",
+    enabled: true,
+    label: "Playful Moment",
+    description: "A light, playful exchange with someone or something in the frame.",
+    instruction:
+      "Playful Moment: give the subject one light, playful interaction with a person, animal or object already in the frame, such as a teasing nudge, a quick toss and catch or a pet batting at a sleeve. Begin from the established pose, show the playful action and the response it draws, and end on a shared smile, a laugh or a settled gesture. Keep it good-natured and readable within the clip, with a steady frame or one small reframe that keeps both parties visible.",
+  },
+  {
     id: "reaction",
     kind: "animate",
     enabled: true,
@@ -171,6 +189,15 @@ export const seedStyles = Object.freeze([
     description: "One visible response to something established in the frame.",
     instruction:
       "Reaction: pick a person or animal and something already present that could draw their attention. Show what changes first in their gaze, ears or posture, then the expression or weight shift that follows. Settle on a readable final pose. Hold the framing on the subject and keep the response small. Where there is no living subject, show one visible physical response between elements already present.",
+  },
+  {
+    id: "reveal",
+    kind: "animate",
+    enabled: true,
+    label: "Reveal",
+    description: "Movement brings something the frame hints at into view.",
+    instruction:
+      "Reveal: bring into view something the frame already hints at, such as what a person is looking at, the far side of a doorway or an object half hidden behind the subject. Let the subject's own movement or one motivated camera move uncover it. Describe what appears first, what it turns out to be and the final composition that shows the subject and the revealed detail together. Give the revealed detail only the appearance the scene implies, and keep the subject's identity and outfit unchanged.",
   },
   {
     id: "uncensored",
@@ -210,15 +237,6 @@ export const seedStyles = Object.freeze([
       "Warmer Light: give the existing light a warm cast. Name its source or direction if established and where the amber highlights fall. Retain the time of day, materials, framing and shadow softness.",
   },
   {
-    id: "cooler",
-    kind: "change",
-    enabled: true,
-    label: "Cooler Light",
-    description: "Cool, blue-toned light.",
-    instruction:
-      "Cooler Light: give the existing light a cool cast. Name its source or direction if established and where the blue-gray highlights fall. Retain the time of day, materials, framing and shadow softness.",
-  },
-  {
     id: "night",
     kind: "change",
     enabled: true,
@@ -226,15 +244,6 @@ export const seedStyles = Object.freeze([
     description: "The same scene at night.",
     instruction:
       "Night Version: set the established scene after dark. Use one plausible source of light for this place and describe the surfaces it reaches and the shadows it leaves. Keep the subject, activity, composition and location.",
-  },
-  {
-    id: "detail",
-    kind: "change",
-    enabled: true,
-    label: "Add Detail",
-    description: "Richer textures and small details.",
-    instruction:
-      "Add Detail: make two or three existing surfaces or materials more tactile through visible texture, seams, grain or finish. Keep the subject's appearance and the existing objects, composition and action.",
   },
   {
     id: "simple-background",
@@ -246,15 +255,6 @@ export const seedStyles = Object.freeze([
       "Simplify Background: clear or soften secondary details behind the subject. Retain the features that establish the location and any objects the subject uses. Keep the foreground, light and framing the same.",
   },
   {
-    id: "colour-accent",
-    kind: "change",
-    enabled: true,
-    label: "Colour Accent",
-    description: "A single colour accent on an existing object or garment.",
-    instruction:
-      "Color Accent: change the color of one already visible garment or object to draw the eye. Name the item and its new color. Retain its shape and material, any identity-defining colors, the surrounding palette and the light.",
-  },
-  {
     id: "new-angle",
     kind: "change",
     enabled: true,
@@ -264,13 +264,40 @@ export const seedStyles = Object.freeze([
       "New Angle: choose a plausible change in viewing height or position that reveals something already in the scene. Name the viewpoint and what is visible from it. Retain the established shot size, subject, pose, setting and light.",
   },
   {
-    id: "shift-focus",
+    id: "new-action",
     kind: "change",
     enabled: true,
-    label: "Shift Focus",
-    description: "Guide attention with sharpness and depth of field.",
+    label: "New Action",
+    description: "Give the same subject a different thing to do.",
     instruction:
-      "Shift Focus: place sharp focus on one established detail that matters to the scene and let the other planes soften. Name the subject or object in focus and what remains legible around it. Keep the existing viewpoint, framing, light and action.",
+      "New Action: choose one action that makes sense for this same subject, outfit and place. Pick a clear moment within it, with a visible expression or gesture and body mechanics the model can depict. Keep identity, setting, framing and visual style fixed.",
+  },
+  {
+    id: "new-setting",
+    kind: "change",
+    enabled: true,
+    label: "New Setting",
+    description: "Keep the same subject and move the scene somewhere fresh.",
+    instruction:
+      "New Setting: move the same subject in the same outfit to a materially different place where the action still makes sense. Give the new place two specific details and adapt its light and background accordingly. Keep identity, framing and visual style. Avoid inserting habitual locations, props or stock candid details.",
+  },
+  {
+    id: "wardrobe-swap",
+    kind: "change",
+    enabled: true,
+    label: "Wardrobe Swap",
+    description: "Change the outfit while keeping the same person and scene.",
+    instruction:
+      "Wardrobe Swap: replace the outfit with a cohesive alternative suited to the setting. Make the silhouette or layering and the material or colors visibly different. Keep the same identity, pose, action, setting, framing and visual style.",
+  },
+  {
+    id: "new-visual-treatment",
+    kind: "change",
+    enabled: true,
+    label: "New Visual Treatment",
+    description: "Change how the scene looks while retaining its subject and action.",
+    instruction:
+      "New Visual Treatment: keep the subject, identity, wardrobe, place, action and framing fixed. Choose one clearly different visual treatment suited to this scene and model. Describe the lighting, palette, edge detail or texture that would make it visible. Avoid generic quality words and choose candid phone imagery only when it is a genuinely different treatment from the source.",
   },
 ]);
 
