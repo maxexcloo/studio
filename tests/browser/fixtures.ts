@@ -574,11 +574,14 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/comparisons" && method === "GET")
       return respond({
-        comparisons: comparisons.map(({ id, jobIds, itemIds }) => ({
-          id,
-          jobIds,
-          ...(itemIds ? { itemIds } : {}),
-        })),
+        comparisons:
+          url.searchParams.get("members") === "1"
+            ? comparisons.map(({ id, jobIds, itemIds }) => ({
+                id,
+                jobIds,
+                ...(itemIds ? { itemIds } : {}),
+              }))
+            : [...comparisons].reverse().map(showComparison),
       });
     if (path === "/api/comparisons/run") {
       const seed = String(body.variants[0].input.seed || "4242");
@@ -694,11 +697,7 @@ export async function fixtures(page: Page) {
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
           (!url.searchParams.has("chat") ||
             i.chat?.conversationId === url.searchParams.get("chat")) &&
-          (!url.searchParams.has("turn") || i.chat?.turnId === url.searchParams.get("turn")) &&
-          (url.searchParams.get("comparisons") !== "1" ||
-            comparisons.some((entry) =>
-              entry.itemIds ? entry.itemIds.includes(i.id) : entry.jobIds.includes(i.jobId),
-            )),
+          (!url.searchParams.has("turn") || i.chat?.turnId === url.searchParams.get("turn")),
       );
       // Similar ranks the image first.
       if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));

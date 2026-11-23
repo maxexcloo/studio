@@ -65,8 +65,8 @@ const dates: { value: GalleryDate; label: string; chip: string; days: number }[]
 ];
 
 /**
- * Every gallery filter: the facets (any value matches), a date range, Liked or Disliked, Uploads
- * and Comparisons.
+ * Every gallery filter: the facets (any value matches), a date range, Liked or Disliked and
+ * Uploads.
  */
 export interface GalleryFilterValues extends Record<Facet, string[]> {
   date: GalleryDate;
@@ -74,8 +74,6 @@ export interface GalleryFilterValues extends Record<Facet, string[]> {
   rating: Rating | "";
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
   uploads: boolean;
-  /** Only results in one of the account's comparisons: the gallery's Comparisons tab. */
-  comparisons: boolean;
 }
 export const emptyGalleryFilters: GalleryFilterValues = {
   model: [],
@@ -87,7 +85,6 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   date: "",
   rating: "",
   uploads: false,
-  comparisons: false,
 };
 
 /** The gallery request's filter parameters. */
@@ -95,7 +92,6 @@ export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFi
   for (const key of facets) for (const value of filters[key]) params.append(key, value);
   if (filters.rating) params.set("rating", filters.rating);
   params.set("uploads", filters.uploads ? "1" : "0");
-  if (filters.comparisons) params.set("comparisons", "1");
   const date = dates.find((option) => option.value === filters.date);
   if (date?.value) {
     const since = new Date();
@@ -209,8 +205,8 @@ interface FilterProps {
 }
 
 /**
- * The active filters as removable chips, one per value, plus any `extra` view choices. Liked,
- * Uploads and Comparisons have none: their own toggle or tab shows them.
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Liked and
+ * Uploads have none: their own toggle or view shows them.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,

@@ -15,7 +15,6 @@ import { ArrowLeft } from "lucide-react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
-import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
@@ -30,8 +29,8 @@ import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
-import type { GalleryState } from "../gallery/viewerLink";
-import { type Comparison, comparisonQuery } from "./queries";
+import { type GalleryState, galleryViewPath } from "../gallery/viewerLink";
+import { type Comparison, comparisonQuery, comparisonTitle } from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
@@ -116,20 +115,20 @@ export function ComparePage() {
     <Stack gap="md" className={classes.page}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
-          <Tooltip label={set ? "Show in Gallery" : "Back to Images"}>
+          <Tooltip label={set ? "Show in Gallery" : "Back to Comparisons"}>
             <ActionIcon
               component={Link}
-              to="/images"
+              to={set ? "/images" : galleryViewPath("image", "comparisons")}
               state={set ? ({ set } satisfies GalleryState) : undefined}
               variant="subtle"
               color="gray"
-              aria-label={set ? "Show in Gallery" : "Back to Images"}
+              aria-label={set ? "Show in Gallery" : "Back to Comparisons"}
             >
               <ArrowLeft size={18} />
             </ActionIcon>
           </Tooltip>
           <Title order={1} size="h3">
-            {axis ? `Which ${titleCase(axis)}?` : "Compare"}
+            {comparisonTitle({ axis })}
           </Title>
         </Group>
         <Text size="sm" c="dimmed" ta="right">

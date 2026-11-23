@@ -12,7 +12,6 @@ import {
   section,
   selectionMenuItem,
   serveProfiles,
-  showGalleryView,
   stamp,
   viewerAction,
 } from "./fixtures";
@@ -543,15 +542,17 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
   ).toHaveAttribute("aria-pressed", "false");
   expect(state.comparisons[0].winnerItemId).toBeNull();
 
-  // The Comparisons view keeps only compared results.
-  await page.getByRole("link", { name: "Back to Images", exact: true }).click();
-  await showGalleryView(page, "Comparisons");
+  // The Comparisons view lists the new comparison, covered by its first variant.
+  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Comparisons",
+  );
+  await expect(
+    page.getByRole("button", { name: "Open Comparison: Tin Owl", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Open image: Felt Owl", exact: true })).toHaveCount(
     0,
   );
-  await expect(
-    page.getByRole("button", { name: "Open image: Tin Owl", exact: true }),
-  ).toBeVisible();
 });
 
 test("Variants of a result show their numbers, the axis they vary and propose a pick for the brief", async ({

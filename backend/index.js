@@ -625,16 +625,8 @@ const assistantEngine = registerAssistantRoutes(app, {
   liked: assistant.liked,
 });
 
-const readComparisons = () => readRuntimeDocument(dataDir, "comparisons") ?? [];
 registerGalleryReadRoutes(app, {
   store,
-  compared: (ownerId) => {
-    const records = readComparisons().filter((record) => record.ownerId === ownerId);
-    // Compare Selected names its images; other comparisons hold their jobs' results.
-    const items = new Set(records.flatMap((record) => record.itemIds || []));
-    const jobs = new Set(records.flatMap((record) => (record.itemIds ? [] : record.jobIds)));
-    return (item) => items.has(item.id) || jobs.has(item.jobId);
-  },
   near: (text) => imageSearch.near(text),
   similar: (item, strictness) => imageSearch.similar(item, strictness),
 });
@@ -829,7 +821,7 @@ registerCompareRoutes(app, {
   store,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
-  read: readComparisons,
+  read: () => readRuntimeDocument(dataDir, "comparisons") ?? [],
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req, { jobIds = [], itemIds = [], unseenSourceId }) => {
     const items = visibleGallery({ jobIds }).concat(

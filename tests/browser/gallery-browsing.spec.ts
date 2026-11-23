@@ -2373,16 +2373,37 @@ for (const captions of [false, true])
     ).toBeVisible();
   });
 
-test("Comparisons is a gallery view of the results in comparisons", async ({ page }) => {
+test("Comparisons lists each comparison as a card that opens all its variants", async ({
+  page,
+}) => {
   const state = await fixtures(page);
-  state.gallery.push(...results(2));
-  state.comparisons.push({ id: "compare-1", itemIds: ["browse-0"], jobIds: [] });
+  state.gallery.push(...results(3).map((item, index) => ({ ...item, jobId: `job-${index}` })));
+  state.comparisons.push({
+    id: "compare-1",
+    seed: "",
+    requests: [{ input: { prompt: "Browse Result 0" } }, { input: { prompt: "Browse Result 1" } }],
+    jobIds: ["job-0", "job-1"],
+    itemIds: ["browse-0", "browse-1"],
+    labels: ["Variant A", "Variant B"],
+    vote: null,
+  });
   await page.goto("/images");
   await showGalleryView(page, "Comparisons");
-  const compared = page.getByRole("button", { name: "Open image: Browse Result 0" });
-  const single = page.getByRole("button", { name: "Open image: Browse Result 1" });
-  await expect(compared).toBeVisible();
-  await expect(single).toBeHidden();
+  const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
+  await expect(card).toBeVisible();
+  await expect(page.getByText("2 Variants", { exact: true })).toBeVisible();
+  // One card per comparison, without the gallery's tiles.
+  await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(1);
+  await card.click();
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  for (const label of ["Variant A", "Variant B"])
+    await expect(page.getByRole("button", { name: `Open ${label}`, exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Comparisons",
+  );
   await showGalleryView(page, "Gallery");
-  await expect(single).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
+  ).toBeVisible();
 });

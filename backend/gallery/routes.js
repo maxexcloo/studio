@@ -159,10 +159,9 @@ export function galleryJobResponse(store, account, id, settings = false) {
 
 /**
  * `near(q)` resolves to a test for items that look like the search (domain/image-search.ts), or null; `similar(item, strictness)`
- * scores items by how alike they look to it, or is null when it can't. `compared(ownerId)` tests whether an item
- * is in one of the owner's comparisons.
+ * scores items by how alike they look to it, or is null when it can't.
  */
-export function registerGalleryReadRoutes(app, { near, similar, store, compared }) {
+export function registerGalleryReadRoutes(app, { near, similar, store }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`,
    * `aspect`, `origin` and `tag` may repeat (any of them matches); `q` and `workflow` are
@@ -309,12 +308,6 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       ? (source && recordBelongsToAccount(source, account) && similar(source, strictness)) ||
         (() => undefined)
       : null;
-    // Dream pairs and saved comparison records, including comparisons made from gallery picks.
-    const savedComparison = query.comparisons === "1" ? compared?.(account?.userId || "") : null;
-    const inComparison =
-      query.comparisons === "1"
-        ? (item) => Boolean(item.dream?.pair?.id || savedComparison?.(item))
-        : null;
     // `chat` keeps one MCP conversation's results and `turn` one turn of it (an MCP result link).
     const scope = storedChatRecord({ conversationId: query.chat, turnId: query.turn });
     const chat = scope?.conversationId;
@@ -370,10 +363,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
               )
               .sort(([left], [right]) => left.localeCompare(right)),
           ]),
-          filter:
-            inComparison || search
-              ? (item) => (!inComparison || inComparison(item)) && (!search || search(item))
-              : null,
+          filter: search || null,
         })
       : {
           items: [],
@@ -413,7 +403,6 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
                 (!query.set || item.resultSet?.id === query.set) &&
                 (!Number.isFinite(before) || Date.parse(item.createdAt) <= before) &&
                 fromChat(item) &&
-                (!inComparison || inComparison(item)) &&
                 (!search || search(item)),
             );
     // A retry keeps its failed original's place (domain/queue.ts): it joins this page in order,
