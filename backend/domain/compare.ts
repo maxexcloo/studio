@@ -87,7 +87,7 @@ export function registerCompareRoutes(
     cancel(ownerId: string, jobId: string): Promise<unknown>;
     read(): ComparisonRecord[];
     write(records: ComparisonRecord[]): void;
-    /** The caller's visible gallery, or `null` when the account may not use the gallery. */
+    /** The caller's gallery, disliked items included, or `null` when the account may not use it. */
     gallery(req: Request, ids: ComparisonIds): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
     /**

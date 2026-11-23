@@ -824,8 +824,11 @@ registerCompareRoutes(app, {
   read: () => readRuntimeDocument(dataDir, "comparisons") ?? [],
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req, { jobIds = [], itemIds = [], unseenSourceId }) => {
-    const items = visibleGallery({ jobIds }).concat(
-      visibleGallery({ ids: itemIds }).filter((item) => !jobIds.includes(item.jobId)),
+    // A dislike hides a variant from the gallery but not from its comparison.
+    const items = visibleGallery({ jobIds }, { disliked: true }).concat(
+      visibleGallery({ ids: itemIds }, { disliked: true }).filter(
+        (item) => !jobIds.includes(item.jobId),
+      ),
     );
     if (unseenSourceId) {
       const source = unseenDreamItem(ownerIdForRequest(req), unseenSourceId);

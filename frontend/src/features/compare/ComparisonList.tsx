@@ -21,10 +21,13 @@ export function ComparisonList({ view }: { view: ReactNode }) {
   const navigate = useNavigate();
   const { columns } = useGalleryColumns();
   const comparisons = useQuery(comparisonsQuery);
-  // The winner, else the first variant still in the gallery, is the cover.
+  // The winner, else the first variant with media, else the first still in the gallery, is the cover.
   const cards = (comparisons.data?.comparisons || []).flatMap((comparison) => {
     const items = comparison.variants.flatMap(({ item }) => (item ? [item] : []));
-    const cover = items.find((item) => item.id === comparison.winnerItemId) || items[0];
+    const cover =
+      items.find((item) => item.id === comparison.winnerItemId) ||
+      items.find((item) => item.url) ||
+      items[0];
     if (!cover) return [];
     const title =
       comparison.axis || comparison.dream ? comparisonTitle(comparison) : mediaTitle(cover);
