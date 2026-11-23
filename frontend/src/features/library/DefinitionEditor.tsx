@@ -494,7 +494,7 @@ function DefinitionForm({
               )}
               {version.error && <Alert color="red">{version.error.message}</Alert>}
               {versionText && (
-                <ScrollArea.Autosize mah={480} aria-label="Saved Definition">
+                <ScrollArea.Autosize mah={480} role="region" aria-label="Saved Definition">
                   <Code block>{versionText}</Code>
                 </ScrollArea.Autosize>
               )}
