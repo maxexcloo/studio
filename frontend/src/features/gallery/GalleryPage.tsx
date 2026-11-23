@@ -84,6 +84,8 @@ import classes from "./GalleryPage.module.css";
 type PageState = GalleryState &
   OpenComposerState & {
     compose?: boolean;
+    /** Arrived from another mode: the gallery opens on its home view, not Uploads. */
+    home?: boolean;
     reviewQuery?: string;
     viewer?: boolean;
     viewFrom?: string;
@@ -169,6 +171,10 @@ function Gallery() {
   const captions = preferences?.tileCaptions ?? false;
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
+  const home = state?.home;
+  useEffect(() => {
+    if (home) setFilters((current) => (current.uploads ? { ...current, uploads: false } : current));
+  }, [home, location.key, setFilters]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
   const linkedQuery = state?.q;

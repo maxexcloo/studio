@@ -105,7 +105,9 @@ function ModeSwitcher({ mode }: { mode: string }) {
                   component={Link}
                   to={item.to}
                   state={
-                    linkedGallery && galleryKind(item.to) ? { chat, turn, show, set } : undefined
+                    galleryKind(item.to)
+                      ? { ...(linkedGallery && { chat, turn, show, set }), home: !active }
+                      : undefined
                   }
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
