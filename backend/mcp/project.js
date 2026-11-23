@@ -143,7 +143,7 @@ export function projectArgs({ name, constraints }, args) {
  * Refuses prompts that name something the brief avoids, before any queues: an image model draws
  * what a prompt names, even after "no".
  */
-export function assertAvoided({ name, brief }, prompts, list = "that avoid list") {
+export function assertAvoided({ name, brief }, prompts) {
   const terms = brief.avoid
     .split(/[,;\n]+/)
     .map((term) => term.trim().replace(/^(?:no|without)\s+/i, ""))
@@ -157,7 +157,7 @@ export function assertAvoided({ name, brief }, prompts, list = "that avoid list"
     for (const { term, exact, motifs } of terms)
       if (exact.test(prompt) || motifs.some((motif) => mentionsMotif(prompt, motif)))
         throw new Error(
-          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or change ${list} if the user wants it.`,
+          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again; never remove an avoid to get past this.`,
         );
 }
 
@@ -244,11 +244,7 @@ export async function accountTaste(media, owner, signal) {
 export function assertTasteExclusions({ rules, avoid }, prompts) {
   const exclusions = [...new Set([...avoid, ...forbiddenMotifs([], rules)])];
   if (exclusions.length)
-    assertAvoided(
-      { name: "your Taste Profile", brief: { avoid: exclusions.join("\n") } },
-      prompts,
-      "your Taste Profile",
-    );
+    assertAvoided({ name: "your Taste Profile", brief: { avoid: exclusions.join("\n") } }, prompts);
 }
 
 /** Whether the account's recent results are converging on one look (domain/reflection.ts). */
