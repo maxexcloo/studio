@@ -1,7 +1,7 @@
 .counted {
   width: auto;
-  gap: 6px;
-  padding-inline: 4px;
+  gap: 8px;
+  padding-inline: 8px;
 }
 
 .progress {
@@ -9,6 +9,7 @@
   font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
 }
 .content {
