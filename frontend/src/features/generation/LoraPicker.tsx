@@ -777,7 +777,7 @@ function StackEntry({
               });
             }}
           >
-            <Scroller controlSize={28} edgeGradientColor="var(--mantine-color-body)">
+            <Scroller controlSize={28} edgeGradientColor="transparent">
               <Group gap={6} wrap="nowrap" role="group" aria-label={`${title} Trigger Words`}>
                 <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
                   Trigger Words
