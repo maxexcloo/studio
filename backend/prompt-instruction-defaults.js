@@ -686,7 +686,7 @@ Candidates: {{candidates}}`,
 Offer up to {{maxSuggestions}} distinct ideas. Each uses a different visible detail or relationship in this frame and gives it one plausible motion with a clear ending. Use fewer ideas if the frame supports fewer.
 {{contentRule}}
 {{suggestionChoices}}
-Mix subject action, interaction and environmental motion where supported. Include a camera move only when it reveals or follows something specific. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
+Mix subject action, interaction and environmental motion where supported. Include a camera move only when it reveals or follows something specific. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
 {{americanEnglish}}
 {{avoidFiller}}
 Name the distinctive action in a Title Case label of at most four words. Give one short sentence saying what moves and how it ends. Leave prompt syntax, shot timings and technical settings to the video prompt writer.

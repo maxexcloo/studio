@@ -69,8 +69,6 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("living"), /keeps rolling as if the photo were a candid video/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
   assert.match(theme("atmosphere"), /hold the opening composition.*surroundings move/);
-  assert.match(theme("body-bounce"), /impact first, then a small delayed bounce.*quick settle/);
-  assert.match(theme("hip-sway"), /supporting foot take weight.*hips sway/);
   assert.match(theme("dialogue"), /one brief line and leave time for a visible reaction/);
   assert.match(theme("reaction"), /gaze, ears or posture.*readable final pose/);
   assert.match(
@@ -171,7 +169,7 @@ test("Animate is admitted only for known themes, with restricted themes behind U
   assert.equal(issue({}, { theme: "dialogue" }), undefined);
   assert.equal(issue({}, { theme: "dance" }), 400);
   assert.equal(issue({}, { theme: "custom" }), 400);
-  for (const theme of ["uncensored", "body-bounce", "hip-sway"]) {
+  for (const theme of ["uncensored"]) {
     assert.equal(issue({}, { theme }), 403);
     assert.equal(issue({ uncensoredModels: true }, { theme }), undefined);
   }

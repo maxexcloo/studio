@@ -125,7 +125,7 @@ export const seedStyles = Object.freeze([
     label: "Action",
     description: "One energetic physical action and a readable follow-through.",
     instruction:
-      "Action: choose one energetic action that this frame sets up. Begin at the established pose, state how the subject shifts or makes contact, and carry that momentum into one visible follow-through. Keep any secondary motion tied to that action. Use a fixed frame or one follow move that keeps the hands, feet or point of contact readable. Match the action's scale to the available space, clip length and frame rate.",
+      "Action: choose one energetic action that this frame sets up. Begin at the established pose, state how the subject shifts or makes contact, and carry that momentum into one visible follow-through. Let hair, clothing and the body follow through naturally with that action. Use a fixed frame or one follow move that keeps the hands, feet or point of contact readable. Match the action's scale to the available space, clip length and frame rate.",
   },
   {
     id: "atmosphere",
@@ -135,16 +135,6 @@ export const seedStyles = Object.freeze([
     description: "Visible movement in the surroundings, seen from a fixed frame.",
     instruction:
       "Atmosphere: hold the opening composition and make one established part of the surroundings move. Describe where the movement starts, what path it takes and what changes in the frame as it passes or settles. Choose something this setting can already support, such as a shifting reflection, water running off an edge or a draft moving loose fabric. Keep the subject's movement secondary and make the change readable without sound.",
-  },
-  {
-    id: "body-bounce",
-    kind: "animate",
-    enabled: true,
-    label: "Body Bounce",
-    description: "Natural body follow-through after a footfall or landing.",
-    uncensored: true,
-    instruction:
-      "Body Bounce: when the opening frame clearly depicts an adult person, use a step, landing, or rhythmic movement that their pose and surroundings support. Describe the weight transfer or impact first, then a small delayed bounce in the chest or buttocks, followed by a quick settle. Describe only motion visible through the existing clothing. Preserve the person's build, outfit, and proportions. Keep the movement at real-time speed and in readable framing. For other subjects, use ordinary secondary motion such as fabric or hair settling.",
   },
   {
     id: "cinematic",
@@ -165,23 +155,13 @@ export const seedStyles = Object.freeze([
       "Dialogue: when someone in the frame can speak, start with one brief line and leave time for a visible reaction. A second line needs an established listener and enough clip time. Frame the speaker so their mouth is readable. For silent models, show the communication in mouth movement, gaze and gesture. Where there is no plausible speaker, use a visible exchange or response supported by the frame.",
   },
   {
-    id: "hip-sway",
-    kind: "animate",
-    enabled: true,
-    label: "Hip Sway",
-    description: "An unhurried walk or dance beat led by a natural hip sway.",
-    uncensored: true,
-    instruction:
-      "Hip Sway: when the opening frame clearly depicts an adult person, choose a short walk or dance beat that flows from their opening pose. Show the supporting foot take weight and the hips sway as the weight shifts, then show the shoulders and fabric respond before the person settles into a new stance. Keep the sway natural and the same build, outfit, and proportions throughout. Frame the movement so the weight shift reads. For other subjects, continue their ordinary activity without a sensual treatment.",
-  },
-  {
     id: "living",
     kind: "animate",
     enabled: true,
     label: "Living Photo",
     description: "The moment keeps rolling like a candid video.",
     instruction:
-      "Living Photo: the moment keeps rolling as if the photo were a candid video. Carry the activity already under way through its next ordinary step and let it settle. Describe how one visible detail responds to the subject's movement, such as a cup tilting with the wrist. Keep the original shot size, with a steady frame or a slight handheld reframe only if it helps keep the activity visible.",
+      "Living Photo: the moment keeps rolling as if the photo were a candid video. Carry the activity already under way through its next ordinary step and let it settle. Describe how one visible detail responds to the subject's movement, such as a cup tilting with the wrist. Let hair, clothing and the body move naturally with it. Keep the original shot size, with a steady frame or a slight handheld reframe only if it helps keep the activity visible.",
   },
   {
     id: "reaction",
