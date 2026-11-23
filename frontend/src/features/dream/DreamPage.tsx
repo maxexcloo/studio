@@ -14,7 +14,7 @@ import {
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown } from "lucide-react";
 import { Fragment, type SetStateAction, useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 import { dreamCardCounts } from "../../../../shared/dream";
 import { post } from "../../api";
@@ -126,7 +126,6 @@ export function DreamPage() {
   const [libraryDecided, setLibraryDecided] = useState<Set<string>>(() => new Set());
   const [returned, setReturned] = useState<DreamItem[]>([]);
   const [histories, setHistories] = useState<Partial<Record<string, Judgement[]>>>({});
-  const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
@@ -134,7 +133,6 @@ export function DreamPage() {
   const param = params.projectId ? "projects" : params.view;
   const [view, label] = views.find(([name]) => name === param) ?? views[0];
   const navigate = useNavigate();
-  const location = useLocation();
   const reviewing = view === "library";
   const imageReview = useLibraryReview(seed, "image", libraryDecided, reviewing);
   const videoReview = useLibraryReview(seed, "video", libraryDecided, reviewing);
@@ -235,42 +233,31 @@ export function DreamPage() {
           </Menu.Dropdown>
         </Menu>
         {selector}
-        <Group gap={4} wrap="nowrap" ml="auto">
-          <div ref={setActionTarget} style={{ display: "contents" }} />
-          {data?.settings.enabled && (
-            <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
-                loading={save.isPending}
-                onClick={() => save.mutate({ paused: !data.settings.paused })}
-              >
-                {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
-              </ActionIcon>
-            </Tooltip>
-          )}
-          {data && <DreamAllocation dream={data} />}
-          <Tooltip label="Dream Settings">
-            <ActionIcon
-              component={Link}
-              to="/settings#dream"
-              state={{ backgroundLocation: location }}
-              variant="subtle"
-              color="gray"
-              aria-label="Dream Settings"
-            >
-              <icons.settings size={18} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+        {view !== "projects" && (
+          <Group gap={4} wrap="nowrap" ml="auto">
+            {data?.settings.enabled && (
+              <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
+                  loading={save.isPending}
+                  onClick={() => save.mutate({ paused: !data.settings.paused })}
+                >
+                  {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {data && <DreamAllocation dream={data} />}
+          </Group>
+        )}
       </Group>
       {view === "discarded" ? (
         <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (
         <DreamHistory media={media} />
       ) : view === "projects" ? (
-        <DreamProjects actionTarget={actionTarget} />
+        <DreamProjects />
       ) : view === "taste" ? (
         phone ? (
           <ScrollArea flex={1} mih={0} w="100%">

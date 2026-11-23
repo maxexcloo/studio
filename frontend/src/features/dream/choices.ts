@@ -46,6 +46,8 @@ export function dreamChoices(card: DeckCard, singleImageComparison = false): Cho
     { choice: "like", id: "like", label: "Like", icon: icons.like, main: true },
     { choice: "keep", id: "keep", label: "Accept", icon: icons.keep, main: true, primary: true },
   ];
+  if (card.kind === "pair")
+    return [[...ratings, { choice: "both", id: "both", label: "Both", icon: icons.compare }]];
   if (card.kind === "set")
     return [ratings.map((choice) => ({ ...choice, label: `${choice.label} Set` }))];
   if (card.kind !== "dream" || card.item.type !== "image") return [ratings];

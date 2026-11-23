@@ -7,6 +7,7 @@ import type { MediaItem, QueueJob } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
 import { mediaTitle } from "./mediaLabels";
+import { mediaSource } from "./mediaSource";
 import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
 
 import classes from "./MediaViewer.module.css";
@@ -282,7 +283,8 @@ function Thumbnail({
   label: string;
   onClick: () => void;
 }) {
-  const thumbnail = result?.thumbnailUrl || (result?.type === "image" ? result.url : "");
+  const thumbnail =
+    result && (mediaSource(result).thumbnailUrl || (result.type === "image" ? result.url : ""));
   const status = job && [jobStatus(job), jobReason(job)].filter(Boolean).join(" · ");
   return (
     <UnstyledButton
@@ -299,7 +301,8 @@ function Thumbnail({
     >
       {thumbnail && result?.status === "done" ? (
         <Image src={thumbnail} alt="" fallbackSrc="" w="100%" h="100%" />
-      ) : result?.status === "failed" || result?.status === "cancelled" ? (
+      ) : result?.status === "done" ? null : result?.status === "failed" ||
+        result?.status === "cancelled" ? (
         <CircleAlert size={16} color="var(--mantine-color-dimmed)" />
       ) : (
         <Loader size="xs" color="gray" />

@@ -6,6 +6,7 @@ import {
   maxCardName,
   maxContextNotes,
 } from "../../shared/characters.ts";
+import { videoPosterUrl } from "../../shared/media.ts";
 import { titleCase } from "../../shared/titles.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
@@ -39,7 +40,7 @@ export function outputsFrom(worker, history) {
       const isVideo = collectionType === "video" || videoPattern.test(filename);
       urls.push({
         url: `/comfy/view?${params}`,
-        thumbnailUrl: isVideo ? undefined : `/comfy/thumb?${params}`,
+        thumbnailUrl: `/comfy/thumb?${params}`,
         filename,
         type: isVideo ? "video" : "image",
       });
@@ -130,6 +131,7 @@ function storedContext(value) {
  * in every list.
  */
 export function listedRecord({ motionIdeas: _motions, nextSteps: _steps, ...item }) {
+  if (item.type === "video" && !item.thumbnailUrl) item.thumbnailUrl = videoPosterUrl(item.url);
   if (!item.writing?.thinking) return item;
   const { thinking: _thinking, ...writing } = item.writing;
   return { ...item, writing };
