@@ -10,6 +10,12 @@ Studio reads process environment variables first, then its settings file on star
 
 On a Linux host, copy [compose.yaml](config/compose.yaml) and [studio.env.example](config/studio.env.example), saved as `.env`, into one folder and run `docker compose up -d`. For the [`docker run` quick start](README.md#run-with-docker), pass `--env-file .env` in place of `-e HOST=127.0.0.1`. Recreate the container with the same data volume after changing the file.
 
+Without host networking (Docker Desktop, or published ports), no browser reaches Studio over loopback, so single-user mode answers nobody. Set `STUDIO_MULTI_USER=1`, then create the recovery administrator inside the container; it asks for the password twice without echoing it:
+
+```sh
+docker exec -it studio node backend/commands/create-admin.mjs --email you@example.com
+```
+
 The environment example points to a ComfyUI server on the same Linux host. Edit the worker URL for your installation, or follow the [Radiance setup](#radiance). Chat integrations and the prompt assistant are optional.
 
 ## Kubernetes
@@ -63,7 +69,7 @@ This path uses Radiance's own media API. Install the [ComfyUI worker](worker/REA
 
 ## Accounts & Single Sign-On
 
-`STUDIO_MULTI_USER=1` turns on accounts. Create the recovery administrator from a browser connected directly over loopback, then add accounts in **Settings › Users** and grant features in **Settings › Groups**. Without it, Studio is single-user and answers only direct loopback connections.
+`STUDIO_MULTI_USER=1` turns on accounts. Create the recovery administrator from a browser connected directly over loopback (or with [`create-admin`](#docker)), then add accounts in **Settings › Users** and grant features in **Settings › Groups**. Without it, Studio is single-user and answers only direct loopback connections.
 
 For the [Docker quick start](README.md#run-with-docker), set `STUDIO_MULTI_USER=1` in `.env` and create the administrator at <http://127.0.0.1:8787> before adding a TLS proxy. Keep the same data volume when recreating the container. `STUDIO_ALLOWED_HOSTS` lists the public hostnames Studio answers to, separated by commas. See [Security](SECURITY.md) for the trust rules.
 

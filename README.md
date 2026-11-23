@@ -12,7 +12,7 @@ On Linux with Docker Engine and an amd64 host, start a local Studio with a named
 docker run -d --name studio --restart unless-stopped --network host -e HOST=127.0.0.1 -v studio-data:/data ghcr.io/maxexcloo/studio:latest
 ```
 
-Open <http://127.0.0.1:8787>. Studio runs on your computer and stores its media and settings in `studio-data`. To generate, [connect a worker](CONFIGURATION.md#workers) or [configure a cloud provider](CONFIGURATION.md#cloud-models). For network access, set up [accounts and HTTPS](CONFIGURATION.md#accounts--single-sign-on).
+Open <http://127.0.0.1:8787>. Studio runs on your computer and stores its media and settings in `studio-data`. To generate, [connect a worker](CONFIGURATION.md#workers) or [configure a cloud provider](CONFIGURATION.md#cloud-models). For network access, set up [accounts and HTTPS](CONFIGURATION.md#accounts--single-sign-on). Without host networking, such as on Docker Desktop, [create an administrator in the container](CONFIGURATION.md#docker).
 
 [Configuration](CONFIGURATION.md) · [Docker Compose](CONFIGURATION.md#docker) · [Kubernetes](CONFIGURATION.md#kubernetes) · [Radiance](CONFIGURATION.md#radiance) · [LibreChat & Open WebUI](CONFIGURATION.md#mcp--chat-gateway) · [Sample Profiles](config/profiles/) · [Releases](https://github.com/maxexcloo/studio/releases)
 
