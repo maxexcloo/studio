@@ -4,6 +4,7 @@ import { promptInstruction, promptInstructionStore } from "../prompt-instruction
 import { type IdleDocument, type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 import type { PromptWriter } from "./taste.ts";
+import { plainWords } from "./writing-standard.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
 export interface Caption {
@@ -36,7 +37,11 @@ let cachedPrompt: { hash: string; instructions: string; version: string } | unde
 function captionPrompt() {
   const { hash } = promptInstructionStore().get("caption-gallery");
   if (cachedPrompt && cachedPrompt.hash === hash) return cachedPrompt;
-  const instructions = promptInstruction("caption-gallery", { captionCharacters, captionTags });
+  const instructions = promptInstruction("caption-gallery", {
+    captionCharacters,
+    captionTags,
+    plainWords,
+  });
   const version = createHash("sha256").update(instructions).digest("hex").slice(0, 12);
   cachedPrompt = { hash, instructions, version };
   return cachedPrompt;
