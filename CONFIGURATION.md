@@ -158,6 +158,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_CHAT_URL`                     | Chat site the navigation's Chat item opens                                                  | none: no Chat item                           |                        |
 | `STUDIO_CLIPROXYAPI_IMAGE_MODEL`      | Image model for a cloud profile that names none ([Cloud Models](#cloud-models))             | the provider's advertised Grok image model   |                        |
 | `STUDIO_CLIPROXYAPI_KEY`              | CLIProxyAPI key                                                                             | required with `STUDIO_CLIPROXYAPI_URL`       |                        |
+| `STUDIO_CLIPROXYAPI_MANAGEMENT_KEY`   | CLIProxyAPI management key, to show Grok's weekly usage in Status                           | none: usage reads Unknown                    |                        |
 | `STUDIO_CLIPROXYAPI_URL`              | CLIProxyAPI base URL                                                                        | none: no cloud models                        |                        |
 | `STUDIO_CLIPROXYAPI_VIDEO_MODEL`      | Video model for a cloud profile that names none                                             | the provider's advertised Grok video model   |                        |
 | `STUDIO_CONTROL_MCP_API_KEY`          | Key for the MCP GPU control tools                                                           | none                                         |                        |
