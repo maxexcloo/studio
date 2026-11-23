@@ -1006,8 +1006,8 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await page.keyboard.press("Escape");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
   await aspect.click();
-  // The preset gives the shape; 1K sets its long edge, rounded to the profile's step.
-  await sizes.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
+  // 1K is this profile's own tier, so its preset keeps the profile's own size.
+  await sizes.getByRole("button", { name: "Landscape 1536 × 1024", exact: true }).click();
   await expect(width).toBeHidden();
   await expect(resolution.getByRole("radio", { name: "1K", exact: true })).toHaveCount(0);
   await expect(resolution.getByRole("radio", { name: "2K", exact: true })).toHaveCount(0);
@@ -1017,8 +1017,8 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
-    width: 1024,
-    height: 704,
+    width: 1536,
+    height: 1024,
     resolutionTier: "1K",
   });
 });
