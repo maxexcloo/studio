@@ -1,7 +1,7 @@
 import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, FolderUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { api, failure, post } from "../../api";
@@ -177,10 +177,10 @@ export function GalleryImport({ upload }: { upload: ReturnType<typeof useGallery
               {...(phone ? iconChipProps : chipProps)}
               aria-label="Import"
               loading={upload.uploading || (upload.link.isPending && !importing)}
-              leftSection={phone ? undefined : <icons.upload size={15} />}
+              leftSection={phone ? undefined : <icons.import size={15} />}
               rightSection={phone ? undefined : <ChevronDown size={14} />}
             >
-              {phone ? <icons.upload size={16} /> : "Import"}
+              {phone ? <icons.import size={16} /> : "Import"}
             </Button>
           </Menu.Target>
         </PopupTooltip>
@@ -218,7 +218,7 @@ export function GalleryImport({ upload }: { upload: ReturnType<typeof useGallery
                 {
                   id: "upload-folder",
                   label: "Upload Folder…",
-                  icon: FolderUp,
+                  icon: icons.uploadFolder,
                   onClick: () => folderInput.current?.click(),
                 },
               ],

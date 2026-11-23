@@ -943,11 +943,6 @@ export function MediaDetails({
           </Stack>
         </DetailSection>
       )}
-      {details.profile && (
-        <DetailSection title="Model">
-          <Text size="sm">{details.profile}</Text>
-        </DetailSection>
-      )}
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
@@ -992,7 +987,8 @@ export function MediaDetails({
           <ContextCards item={item} />
         </DetailSection>
       )}
-      <Section title="Settings" rows={details.settings} />
+      {/* The heading above Details (ViewerMetadata) already names the model and its steps. */}
+      <Section title="Settings" rows={details.settings.filter(([label]) => label !== "Steps")} />
       <Section
         title="Output"
         rows={[

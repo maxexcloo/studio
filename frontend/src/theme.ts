@@ -6,11 +6,13 @@ import {
   Button,
   type CSSProperties,
   type CSSVariablesResolver,
+  Card,
   Checkbox,
   CloseButton,
   Collapse,
   Combobox,
   ComboboxPopover,
+  Divider,
   Drawer,
   DrawerRoot,
   type DrawerRootProps,
@@ -47,6 +49,8 @@ import { PopupRoot } from "./ui/PopupRoot";
 import classes from "./theme.module.css";
 
 const chevron = createElement(ChevronDown, { size: 16 });
+// The keyboard's current option takes the light selection tint, as chosen chips and segments do.
+const option = { option: classes.option };
 
 // Adapted from MantineHub's exported Shadcn theme (MIT, RubixCube Innovations).
 // https://github.com/RubixCube-Innovations/mantine-theme-builder/tree/main/src/themes/shadcn
@@ -104,13 +108,13 @@ export const glass = {
   background: "var(--studio-glass-raised)",
   backdropFilter: "var(--studio-glass-filter)",
   WebkitBackdropFilter: "var(--studio-glass-filter)",
-  borderColor: "var(--studio-glass-border)",
+  borderColor: "var(--mantine-color-default-border)",
 } satisfies CSSProperties;
 // Header and navigation bars sit directly on the page background.
 const chrome = { ...glass, background: "var(--studio-glass-chrome)" } satisfies CSSProperties;
 const dropdown = {
   ...glass,
-  "--popover-border-color": "var(--studio-glass-border)",
+  "--popover-border-color": "var(--mantine-color-default-border)",
   boxShadow: "var(--mantine-shadow-lg)",
 } as CSSProperties;
 // Title rows sit on their surface; dialogs scroll only their body beneath them.
@@ -240,7 +244,7 @@ export function studioTheme({
             ...(props.variant === "default" && {
               "--ai-bg": "var(--studio-glass-raised)",
               "--ai-hover": "var(--studio-glass-raised-hover)",
-              "--ai-bd": "1px solid var(--studio-glass-border)",
+              "--ai-bd": "1px solid var(--mantine-color-default-border)",
             }),
           },
         }),
@@ -248,7 +252,9 @@ export function studioTheme({
       AppShell: AppShell.extend({
         classNames: { header: classes.shellHeader },
         styles: {
-          root: { "--app-shell-border-color": "var(--studio-glass-border)" } as CSSProperties,
+          root: {
+            "--app-shell-border-color": "var(--mantine-color-default-border)",
+          } as CSSProperties,
           aside: chrome,
           footer: chrome,
           navbar: chrome,
@@ -273,6 +279,8 @@ export function studioTheme({
         }),
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
+      // Content cards share one corner, as the panels around them do.
+      Card: Card.extend({ defaultProps: { radius: "md" } }),
       Checkbox: Checkbox.extend({ styles: { input: controlMotion, icon: controlMotion } }),
       // Close buttons of dialogs, drawers and sheets are touch targets on touch screens.
       CloseButton: CloseButton.extend({
@@ -287,9 +295,10 @@ export function studioTheme({
       }),
       // Option rows are touch targets on touch screens: Recent Prompts here, the chips' lists
       // (ComboboxPopover) next, and Select and MultiSelect below.
-      Combobox: Combobox.extend({ styles: { option: target } }),
-      ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
+      Combobox: Combobox.extend({ classNames: option, styles: { option: target } }),
+      ComboboxPopover: ComboboxPopover.extend({ classNames: option, styles: { option: target } }),
       // A drawer's content is its scroller; a full-height one is a full-screen surface.
+      Divider: Divider.extend({ classNames: { root: classes.hairline } }),
       Drawer: Drawer.extend({
         classNames: (_theme, props) => ({
           ...(props.size === "100%" && {
@@ -322,7 +331,7 @@ export function studioTheme({
         styles: { root: { transitionTimingFunction: easing.enter } },
       }),
       Input: Input.extend({
-        classNames: { input: classes.input },
+        classNames: { input: classes.input, wrapper: classes.inputWrapper },
         defaultProps: { size: "md" },
         styles: { input: controlMotion },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
@@ -412,7 +421,9 @@ export function studioTheme({
       }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({
-        styles: { root: { ...glass, "--paper-border-color": "var(--studio-glass-border)" } },
+        styles: {
+          root: { ...glass, "--paper-border-color": "var(--mantine-color-default-border)" },
+        },
       }),
       // Popover also renders Menu and Combobox dropdowns (Select, Autocomplete and similar).
       // Fixed positioning keeps a popup anchored to fixed chrome (header, composer) still while the
@@ -476,12 +487,14 @@ export function studioTheme({
       }),
       // Every control that opens a picker shows ▾, as the chips do (AGENTS.md › UI Patterns).
       MultiSelect: MultiSelect.extend({
+        classNames: option,
         defaultProps: { rightSection: chevron },
         styles: { option: target },
       }),
       // A Select without search is a button in effect: its read-only text takes no selection, so a
       // tap on a phone doesn't raise the selection or autofill bar.
       Select: Select.extend({
+        classNames: option,
         defaultProps: { checkIconPosition: "right", rightSection: chevron, autoComplete: "off" },
         styles: (_theme, props) => ({
           option: target,
@@ -497,20 +510,20 @@ export function studioTheme({
       }),
       Slider: Slider.extend({ styles: { thumb: controlMotion } }),
       Switch: Switch.extend({
+        classNames: { track: classes.switchTrack },
         styles: {
-          thumb: {
-            ...controlMotion,
-            backgroundColor: "var(--mantine-color-default)",
-            borderColor: "var(--mantine-color-default-border)",
-          },
+          thumb: { ...controlMotion, borderColor: "var(--mantine-color-default-border)" },
           track: { ...controlMotion, borderColor: "var(--mantine-color-default-border)" },
           trackLabel: controlMotion,
         },
       }),
       // A sort header is a touch target on touch screens (ui/DataTable.tsx).
-      Table: Table.extend({ classNames: touch ? { th: classes.touchHeader } : {} }),
+      Table: Table.extend({
+        classNames: { table: classes.hairline, ...(touch && { th: classes.touchHeader }) },
+      }),
       // Tabs stay on one row, scrolling sideways where they outgrow it.
       Tabs: Tabs.extend({
+        classNames: { root: classes.hairline },
         styles: {
           list: { flexWrap: "nowrap", overflowX: "auto", overscrollBehaviorX: "contain" },
           tab: { flexShrink: 0 },
@@ -526,7 +539,7 @@ export function studioTheme({
             ...glass,
             "--tooltip-bg": "var(--studio-glass-raised)",
             "--tooltip-color": "var(--mantine-color-text)",
-            border: "1px solid var(--studio-glass-border)",
+            border: "1px solid var(--mantine-color-default-border)",
             boxShadow: "var(--mantine-shadow-md)",
           } as CSSProperties,
         },
@@ -550,7 +563,10 @@ const glassTokens = (scheme: "light" | "dark", transparency: boolean) => {
     "--studio-glass-raised-hover": translucent(
       `color-mix(in srgb, var(--mantine-color-body), ${hover})`,
     ),
-    "--studio-glass-border": scheme === "dark" ? "rgb(255 255 255 / .1)" : "rgb(0 0 0 / .09)",
+    // The one hairline for every edge and divider: translucent, so it takes the tint of the
+    // background and surface beneath it.
+    "--mantine-color-default-border":
+      scheme === "dark" ? "rgb(255 255 255 / .1)" : "rgb(0 0 0 / .09)",
   };
 };
 
@@ -575,7 +591,6 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-body": background.dark,
       "--mantine-color-default": "#18181b",
       "--mantine-color-default-hover": "#27272a",
-      "--mantine-color-default-border": "#27272a",
       "--mantine-color-dimmed":
         "color-mix(in srgb, var(--mantine-color-dark-1), var(--mantine-color-dark-0) 45%)",
       // Mantine's dark light-variant red is near white, so a subtle Delete lost its colour.
@@ -586,10 +601,16 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-body": background.light,
       "--mantine-color-default": "#ffffff",
       "--mantine-color-default-hover": "#f4f4f5",
-      "--mantine-color-default-border": "#e4e4e7",
       "--mantine-color-dimmed": "var(--mantine-color-gray-7)",
-      // Links take the primary's text shade, as its light buttons do; the filled shade is too pale.
+      // Coloured text and links take the text shade of light buttons; the filled shade is too pale
+      // to read on a light surface.
       "--mantine-color-anchor": "var(--mantine-primary-color-light-color)",
+      ...Object.fromEntries(
+        Object.keys(theme.colors).map((name) => [
+          `--mantine-color-${name}-text`,
+          `var(--mantine-color-${name}-light-color)`,
+        ]),
+      ),
       ...glassTokens("light", transparency),
     },
   };

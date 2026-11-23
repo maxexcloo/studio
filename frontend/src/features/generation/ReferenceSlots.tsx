@@ -1,7 +1,8 @@
 import { Badge, Group, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
-import { ArrowLeft, ArrowRight, Replace } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { type DragEvent, useState } from "react";
 
+import { menuWidth } from "../../theme";
 import type { ReferenceAsset } from "../../types";
 import { contextMenuHandlers } from "../../ui/contextMenu";
 import { icons } from "../../ui/icons";
@@ -154,6 +155,7 @@ export function ReferenceSlots({
                   key={key}
                   withinPortal={false}
                   position="bottom-start"
+                  width={menuWidth}
                   opened={menuKey === key}
                   onChange={(open) =>
                     setMenuKey((last) => (open ? key : last === key ? null : last))
@@ -204,7 +206,7 @@ export function ReferenceSlots({
                       </Menu.Item>
                     )}
                     <Menu.Item
-                      leftSection={<Replace size={16} />}
+                      leftSection={<icons.replace size={16} />}
                       onClick={() => onChoose(cellTarget)}
                     >
                       Replace
@@ -227,6 +229,7 @@ export function ReferenceSlots({
                         </Menu.Item>
                       </>
                     )}
+                    <Menu.Divider />
                     <Menu.Item
                       leftSection={<icons.clear size={16} />}
                       onClick={() =>

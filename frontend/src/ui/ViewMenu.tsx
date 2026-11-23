@@ -2,6 +2,7 @@ import { Button, Menu } from "@mantine/core";
 import { Check, ChevronDown } from "lucide-react";
 import { Fragment, type Ref } from "react";
 
+import { menuWidth } from "../theme";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone } from "./usePhone";
 
@@ -23,7 +24,7 @@ export function ViewMenu<T extends string>({
   const phone = usePhone();
   const current = groups.flat().find((choice) => choice.value === value);
   return (
-    <Menu position="bottom-start">
+    <Menu position="bottom-start" width={menuWidth}>
       <PopupTooltip label={label}>
         <Menu.Target>
           <Button

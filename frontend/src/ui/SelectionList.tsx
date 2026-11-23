@@ -65,7 +65,6 @@ export function SelectionList({
         {searchable && choices.length > 1 && (
           <SearchInput
             aria-label={`Search ${label}`}
-            size="sm"
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}
             onClear={() => setSearch("")}

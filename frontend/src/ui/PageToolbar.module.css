@@ -6,7 +6,7 @@
   background: var(--studio-glass-chrome);
   backdrop-filter: var(--studio-glass-filter);
   -webkit-backdrop-filter: var(--studio-glass-filter);
-  border-bottom: 1px solid var(--studio-glass-border);
+  border-bottom: 1px solid var(--mantine-color-default-border);
 }
 
 :root[data-phone] .band {

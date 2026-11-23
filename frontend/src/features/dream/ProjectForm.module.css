@@ -32,7 +32,7 @@
       env(safe-area-inset-bottom),
       calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-xs))
     );
-  border-top: 1px solid var(--studio-glass-border);
+  border-top: 1px solid var(--mantine-color-default-border);
 }
 
 .tools {

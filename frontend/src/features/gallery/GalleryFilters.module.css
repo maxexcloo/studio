@@ -16,9 +16,10 @@
   }
 }
 
-/* The search gives up width first; the toolbar's buttons keep their labels whole. */
+/* The search shares the free width with the chips and gives it up first; the toolbar's buttons keep
+   their labels whole. */
 .search {
-  flex: 0 1 18rem;
+  flex: 1 1 18rem;
   min-width: 6rem;
 }
 

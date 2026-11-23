@@ -365,8 +365,6 @@ export function PickerHeader<Tab extends string>({
             className={classes.search}
             data-autofocus
             aria-label={`Search ${searched}`}
-            size="sm"
-            radius="xl"
             value={query}
             onChange={(event) => onQueryChange(event.currentTarget.value)}
             onClear={() => onQueryChange("")}
@@ -903,7 +901,7 @@ export function SavedName<T extends SavedItem>({
                   >
                     <Group gap="xs" wrap="nowrap" justify="space-between">
                       <Stack gap={0} miw={0}>
-                        <Text size="sm" fw={record === current ? 600 : undefined} truncate>
+                        <Text size="sm" truncate>
                           {record.name}
                         </Text>
                         <Text size="xs" c="dimmed" truncate>
@@ -953,15 +951,16 @@ export function SavedName<T extends SavedItem>({
               disabled={!current}
               onClick={() => naming.name("rename")}
             >
-              Rename {noun}
+              Rename
             </Menu.Item>
+            <Menu.Divider />
             <Menu.Item
               color="red"
               leftSection={<icons.delete size={16} />}
               disabled={!current}
               onClick={() => current && onDelete(current)}
             >
-              Delete {noun}
+              Delete
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

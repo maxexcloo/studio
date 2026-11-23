@@ -1,17 +1,5 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeftRight,
-  Check,
-  ImageDown,
-  ListChecks,
-  Loader,
-  type LucideIcon,
-  Repeat,
-  Rewind,
-  Snail,
-  TextQuote,
-  Waves,
-} from "lucide-react";
+import { Check, Loader, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -156,7 +144,7 @@ function useSaveFrame(item: MediaItem): Action {
   return {
     id: "save-frame",
     label: saved === item.id ? "Saved to Uploads" : "Save Frame as Image",
-    icon: saved === item.id ? Check : ImageDown,
+    icon: saved === item.id ? Check : icons.saveFrame,
     disabled: save.isPending,
     loading: save.isPending,
     keepOpen: true,
@@ -642,10 +630,10 @@ export function useMediaActions(
           : [
               [saveFrame, ...(reference ? [reference] : [])],
               [
-                editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-                editAction("reverse", "Reverse", Rewind, "reverse"),
-                editAction("slow-motion", "Slow Motion", Snail, "slow"),
-                editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+                editAction("back-and-forth", "Back & Forth", icons.backAndForth, "loop"),
+                editAction("reverse", "Reverse", icons.reverse, "reverse"),
+                editAction("slow-motion", "Slow Motion", icons.slowMotion, "slow"),
+                editAction("smooth-motion", "Smooth Motion", icons.smoothMotion, "smooth"),
               ],
             ],
       }),
@@ -676,7 +664,7 @@ export function useMediaActions(
                   {
                     id: "exact-repeat",
                     label: "Run Again, Same Seed",
-                    icon: Repeat,
+                    icon: icons.sameSeed,
                     disabled: changedPrompt === "",
                     onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
@@ -735,13 +723,13 @@ export function useMediaActions(
           {
             id: "copy-details",
             label: "Copy Details",
-            icon: ListChecks,
+            icon: icons.copyDetails,
             onClick: () => void copyText(settingsText(), "Details"),
           },
           {
             id: "copy-prompt",
             label: "Copy Prompt",
-            icon: TextQuote,
+            icon: icons.copyPrompt,
             onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
           // A video also downloads as a GIF, beside it rather than in a submenu.
