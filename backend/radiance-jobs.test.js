@@ -368,15 +368,25 @@ test("a restarted Studio resumes an interrupted Radiance image under the same ID
   const store = new Store(openDatabase(":memory:"));
   t.after(() => store.close());
   const session = store.createSession("").id;
-  const interrupted = (id, cancelRequested) => {
+  const interrupted = (id, cancelRequested, video = false) => {
     const body = bodyFor(id);
     const job = store.enqueue("", session, body, "image", undefined, "worker:radiance", id);
-    store.save({ ...job, status: "running", providerJobId: `radiance-${id}`, cancelRequested });
-    store.saveProviderRecord("", id, { body, video: false, values: { seed: 0 }, outputs: [] });
+    store.save({
+      ...job,
+      status: "running",
+      providerJobId: `radiance-${id}`,
+      cancelRequested,
+      admittedAt: Date.now(),
+    });
+    store.saveProviderRecord("", id, { body, video, values: { seed: 0 }, outputs: [] });
     return job;
   };
   const image = interrupted("interrupted-image");
   const cancelled = interrupted("interrupted-cancellation", true);
+  // A video still loading its model has no video ID yet, so it waits and runs again like an image.
+  const video = interrupted("interrupted-video", false, true);
+  const stale = interrupted("interrupted-long-ago");
+  store.save({ ...store.job("", stale.id), admittedAt: Date.now() - 31 * 60_000 });
   let idle = false;
   const submitted = [];
   const adapter = createGenerationQueueAdapter({
@@ -392,18 +402,22 @@ test("a restarted Studio resumes an interrupted Radiance image under the same ID
   await queue.tick();
   assert.deepEqual(submitted, []);
   assert.equal(store.job("", image.id).status, "starting");
+  assert.equal(store.job("", video.id).status, "starting");
+  // One whose request has long since timed out doesn't wait for a worker that never idles.
+  assert.equal(store.job("", stale.id).retried, true);
   assert.equal(store.job("", cancelled.id).cancelRequested, true);
   idle = true;
   await queue.tick();
-  assert.deepEqual(submitted, [image.id]);
+  assert.ok(submitted.includes(image.id));
+  assert.equal(store.job("", video.id).retried, true);
   assert.equal(store.job("", image.id).retried, true);
   assert.equal(store.job("", image.id).input.seed, "0");
   assert.equal(store.job("", cancelled.id).status, "cancelled");
 
   await new GenerationQueue(store, adapter).tick();
-  assert.deepEqual(submitted, [image.id]);
+  assert.equal(submitted.filter((id) => id === image.id).length, 1);
   assert.equal(store.job("", image.id).status, "failed");
-  assert.equal(store.jobs("").length, 2);
+  assert.equal(store.jobs("").length, 4);
 });
 
 test("a recorded Radiance pinning failure survives process loss and retries once after the old pod leaves", async (t) => {
