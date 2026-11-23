@@ -215,7 +215,12 @@ test("SDK Cancel preserves ownership, stale responses and provider errors with o
   f.requests.length = 0;
   assert.deepEqual(data(await f.call("cancel", { job_id: "pending" })), { ok: true });
   assert.equal(f.store.job(alice.id, "pending").status, "cancelled");
-  assert.deepEqual(data(await f.call("cancel", { job_id: "requested" })), { ok: true });
+  // Accepted work may still finish, and the reply says so.
+  assert.deepEqual(data(await f.call("cancel", { job_id: "requested" })), {
+    ok: true,
+    status: "running",
+    note: "Stop requested, but it was already running: it may still finish and be saved.",
+  });
   assert.equal(f.store.job(alice.id, "requested").status, "running");
   assert.equal(f.store.job(alice.id, "requested").cancelRequested, true);
   const refused = await f.call("cancel", { job_id: "unconfirmed" });

@@ -279,8 +279,8 @@ export function registerResultTools({
         )
         .slice(-12);
       const results = jobs.map(
-        ({ jobId, number, job }) =>
-          `- Result ${number}: job_id ${jobId} (${job.status}) — ${media.pageUrl(owner, jobId)}`,
+        ({ jobId, ref, job }) =>
+          `- ${ref}: job_id ${jobId} (${job.status}) — ${media.pageUrl(owner, jobId)}`,
       );
       const comparisons = await media.comparisons(
         owner,
@@ -458,9 +458,19 @@ export function registerResultTools({
     async ({ job_id }, signal) => {
       const id = await resolve(job_id, signal);
       media.own(owner, id);
-      return mcpJson(
-        await media.request("POST", `/api/jobs/${encodeURIComponent(id)}/cancel`, {}, owner),
+      const answer = await media.request(
+        "POST",
+        `/api/jobs/${encodeURIComponent(id)}/cancel`,
+        {},
+        owner,
       );
+      const note =
+        answer.finished === true
+          ? `It had already ${answer.status === "cancelled" ? "been cancelled" : "finished"}; nothing changed.`
+          : answer.status && answer.status !== "cancelled"
+            ? "Stop requested, but it was already running: it may still finish and be saved."
+            : "";
+      return mcpJson(note ? { ...answer, note } : answer);
     },
     { destructiveHint: true },
   );
