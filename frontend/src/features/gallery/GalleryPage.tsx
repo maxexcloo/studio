@@ -88,7 +88,7 @@ type PageState = GalleryState &
     reviewQuery?: string;
     viewer?: boolean;
   };
-type GalleryView = "gallery" | "uploads" | "review";
+type GalleryView = "gallery" | "uploads" | "comparisons" | "review";
 const GalleryReview = lazy(() =>
   import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
@@ -542,12 +542,12 @@ function Gallery() {
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
-  // Liked or Uploads alone already has its own control in the toolbar.
+  // Liked, Uploads or Comparisons alone already has its own control in the toolbar.
   const toggledOnly =
     !search &&
     !similar &&
-    (filters.uploads || filters.rating === "liked") &&
-    JSON.stringify({ ...filters, uploads: false, rating: "" }) ===
+    (filters.uploads || filters.comparisons || filters.rating === "liked") &&
+    JSON.stringify({ ...filters, uploads: false, comparisons: false, rating: "" }) ===
       JSON.stringify(emptyGalleryFilters);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
@@ -707,20 +707,33 @@ function Gallery() {
       return;
     }
     const uploads = next === "uploads";
-    if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
+    const comparisons = next === "comparisons";
+    if (uploads !== filters.uploads || comparisons !== filters.comparisons)
+      setFilters({ ...filters, uploads, comparisons, rating: "" });
     if (review) closeReview();
   }
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
       ref={viewButton}
-      value={review ? "review" : filters.uploads ? "uploads" : "gallery"}
+      value={
+        review
+          ? "review"
+          : filters.uploads
+            ? "uploads"
+            : filters.comparisons
+              ? "comparisons"
+              : "gallery"
+      }
       groups={[
         [
           { value: "gallery", label: "Gallery" },
           { value: "uploads", label: "Uploads" },
         ],
-        [{ value: "review", label: "Review", disabled: selection.selecting }],
+        [
+          { value: "comparisons", label: "Comparisons" },
+          { value: "review", label: "Review", disabled: selection.selecting },
+        ],
       ]}
       onChange={showView}
     />
@@ -984,7 +997,9 @@ function Gallery() {
             : toggledOnly
               ? filters.uploads
                 ? "No Uploads"
-                : `No Liked ${kind === "video" ? "Videos" : "Images"}`
+                : filters.comparisons
+                  ? "No Comparisons"
+                  : `No Liked ${kind === "video" ? "Videos" : "Images"}`
               : search || hasFilters
                 ? "No Matches"
                 : kind === "video"

@@ -1213,7 +1213,10 @@ export async function withSettings(page: Page, steps: () => Promise<void>) {
 }
 
 /** Opens one of the gallery's views from its toolbar. */
-export async function showGalleryView(page: Page, choice: "Gallery" | "Uploads" | "Review") {
+export async function showGalleryView(
+  page: Page,
+  choice: "Gallery" | "Uploads" | "Comparisons" | "Review",
+) {
   const view = page.getByRole("button", { name: "Gallery View", exact: true });
   if ((await view.innerText()) !== choice) {
     await view.click();

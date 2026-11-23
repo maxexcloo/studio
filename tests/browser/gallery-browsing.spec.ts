@@ -9,6 +9,7 @@ import {
   openReferenceChoices,
   selectionAction,
   serveRetries,
+  showGalleryView,
   showOnly,
   showViewerThumbnails,
   stamp,
@@ -2383,3 +2384,17 @@ for (const captions of [false, true])
         .getByRole("img", { name: "Browse Result 0", exact: true }),
     ).toBeVisible();
   });
+
+test("Comparisons is a gallery view of the results in comparisons", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(2));
+  state.comparisons.push({ id: "compare-1", itemIds: ["browse-0"], jobIds: [] });
+  await page.goto("/images");
+  await showGalleryView(page, "Comparisons");
+  const compared = page.getByRole("button", { name: "Open image: Browse Result 0" });
+  const single = page.getByRole("button", { name: "Open image: Browse Result 1" });
+  await expect(compared).toBeVisible();
+  await expect(single).toBeHidden();
+  await showGalleryView(page, "Gallery");
+  await expect(single).toBeVisible();
+});
