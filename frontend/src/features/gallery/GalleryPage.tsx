@@ -945,11 +945,7 @@ function Gallery() {
                   if (sort === "newest" && !historical) refreshFirst();
                 }}
               >
-                {arrivals
-                  ? "Jump to New Results"
-                  : incoming === 1
-                    ? "1 New Result"
-                    : `${incoming} New Results`}
+                {arrivals ? "Jump to New Results" : "New Results"}
               </Button>
             </div>
           )}
