@@ -27,6 +27,7 @@ import {
   ImageUpscale,
   Import,
   Info,
+  KeyRound,
   Layers,
   LayoutDashboard,
   Link,
@@ -58,6 +59,7 @@ import {
   Settings,
   Share,
   ShieldCheck,
+  ShieldUser,
   Shirt,
   Shuffle,
   SlidersHorizontal,
@@ -69,12 +71,16 @@ import {
   Trash2,
   Trophy,
   Undo2,
+  Unlink,
   Upload,
+  UserCheck,
   UserRound,
+  UserX,
   Volume2,
   VolumeX,
   WandSparkles,
   X,
+  Zap,
 } from "lucide-react";
 import { createElement, forwardRef } from "react";
 
@@ -84,6 +90,8 @@ const filled = (Icon: LucideIcon): LucideIcon =>
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
   account: UserRound,
+  /** Making an account an administrator. */
+  administrator: ShieldUser,
   /** Adding something: a new record, such as New Character, or a reference to an empty slot. */
   add: Plus,
   animate: Play,
@@ -104,6 +112,8 @@ export const icons = {
   compareSideBySide: Columns2,
   /** Two versions one above the other (Compare Upscale on phones). */
   compareStacked: Rows2,
+  /** Converting a profile to another backend (Convert to Radiance…). */
+  convert: Zap,
   copy: Copy,
   /** Custom…: asking in one's own words, such as Custom Animation. */
   custom: PenLine,
@@ -111,11 +121,14 @@ export const icons = {
   details: Info,
   /** Disliking an item hides it from the gallery; again, in its Disliked view, restores it. */
   dislike: ThumbsDown,
+  /** Disabling an account, and `enable` enabling it again. */
+  disable: UserX,
   download: Download,
   dream: Moon,
   /** Duplicating a record into a new one, such as Duplicate Profile…. */
   duplicate: Files,
   edit: Pencil,
+  enable: UserCheck,
   /** A link that opens another site in a new tab. */
   external: ExternalLink,
   /** Continuing a video from its last frame. */
@@ -145,6 +158,8 @@ export const icons = {
   outfit: Shirt,
   /** A Dream project's pacing: its share of turns, pausing it or varying its results. */
   pacing: Activity,
+  /** Setting a password, such as Reset Password. */
+  password: KeyRound,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: filled(Pause),
@@ -195,6 +210,8 @@ export const icons = {
   templates: PanelsTopLeft,
   undo: Undo2,
   unfinished: ListRestart,
+  /** Removing a link between records, such as Unlink Chat Gateway. */
+  unlink: Unlink,
   upload: Upload,
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
   uploads: ImageUp,

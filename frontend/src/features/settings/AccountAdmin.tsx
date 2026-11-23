@@ -1,5 +1,6 @@
 import {
   Alert,
+  Anchor,
   Badge,
   Button,
   Checkbox,
@@ -17,7 +18,6 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImageOff, KeyRound, ShieldCheck, Unlink, UserCheck, UserRound, UserX } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 
 import { isCloudProfile } from "../../../../shared/profiles";
@@ -38,7 +38,7 @@ import { modelsQuery, useGenerationActions } from "../generation/GenerationProvi
 import { profileName } from "../generation/payload";
 import { ChatGateway, type GatewayAccounts, useGatewayChange } from "./ChatGatewayAccounts";
 
-const featureLabels = {
+const featureLabels: Record<string, { label: string; description: string }> = {
   characters: {
     label: "Characters",
     description: "Character cards that add their images and description to a prompt",
@@ -55,6 +55,7 @@ const featureLabels = {
     description: "Profiles marked uncensored and the Extended Themes preset",
   },
 };
+const features = Object.entries(featureLabels);
 /** A group ID from its name, in the form the server takes (backend/account-policy.js validAccountKey). */
 const groupId = (name: string) =>
   name
@@ -244,8 +245,8 @@ function NewAccount({
         </Stack>
         {create.error && <Alert color="red">{create.error.message}</Alert>}
         <DialogFooter pending={create.isPending} onCancel={onCancel}>
-          <Button type="submit" leftSection={<icons.add size={16} />} loading={create.isPending}>
-            Create User
+          <Button type="submit" loading={create.isPending}>
+            Create
           </Button>
         </DialogFooter>
       </Stack>
@@ -266,16 +267,23 @@ function useAdministration() {
   };
   return { admin, refresh };
 }
-const groupFeature = (on: boolean | undefined, label: string) => (
-  <Badge miw="max-content" color={on ? "green" : "gray"}>
-    {label} {on ? "On" : "Off"}
-  </Badge>
-);
 
-/** Settings › Groups: what each access group may use. */
+/** Settings › Groups: what each access group may use, and the group new accounts join. */
 export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const { admin, refresh } = useAdministration();
+  const policy = useMutation({
+    mutationFn: (accessProfileId: string) =>
+      post("/api/accounts/default-profile", { accessProfileId }),
+    onMutate: (accessProfileId) => {
+      void client.cancelQueries({ queryKey: accountAdminQuery.queryKey });
+      client.setQueryData<Administration>(
+        accountAdminQuery.queryKey,
+        (data) => data && { ...data, defaultAccessProfileId: accessProfileId },
+      );
+    },
+    onSettled: refresh,
+  });
   const [editing, setEditing] = useState<AccessGroup | "new" | null>(null);
   const [deleting, setDeleting] = useState<AccessGroup | null>(null);
   const remove = useMutation({
@@ -313,9 +321,24 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
             sortValue: (group) => group.name,
             cell: (group) => (
               <>
-                <Text size="sm" fw={500}>
-                  {group.name}
-                </Text>
+                <Group gap="xs" wrap="nowrap">
+                  <Anchor
+                    component="button"
+                    type="button"
+                    size="sm"
+                    fw={500}
+                    ta="start"
+                    aria-label={`Edit ${group.name}`}
+                    onClick={() => setEditing(group)}
+                  >
+                    {group.name}
+                  </Anchor>
+                  {group.id === data.defaultAccessProfileId && (
+                    <Badge miw="max-content" color="gray">
+                      Default
+                    </Badge>
+                  )}
+                </Group>
                 <Text size="xs" c="dimmed">
                   {group.allModels
                     ? "All local models"
@@ -329,15 +352,22 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
             key: "permissions",
             header: "Permissions",
             hideOnPhone: true,
-            cell: (group) => (
-              <Group gap={4}>
-                {groupFeature(group.features.cloudModels, "Cloud Models")}
-                {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
-                {!group.features.characters && groupFeature(false, "Characters")}
-                {!group.features.dream && groupFeature(false, "Dream")}
-                {!group.features.promptAssistant && groupFeature(false, "Prompt Assistant")}
-              </Group>
-            ),
+            cell: (group) => {
+              const granted = features.filter(([feature]) => group.features[feature]);
+              return granted.length ? (
+                <Group gap={4}>
+                  {granted.map(([feature, { label }]) => (
+                    <Badge key={feature} miw="max-content" color="gray">
+                      {label}
+                    </Badge>
+                  ))}
+                </Group>
+              ) : (
+                <Text size="sm" c="dimmed">
+                  None
+                </Text>
+              );
+            },
           },
         ]}
         rowActions={(group) => (
@@ -368,6 +398,21 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
       >
         Delete {deleting?.name}? Only a group nobody belongs to that isn't the default can go.
       </ConfirmDialog>
+      <SettingGroup title="New Accounts">
+        <SettingRow
+          wide
+          label="Default Group"
+          description="New accounts, including first single sign-on and chat gateway accounts, start in this group."
+        >
+          <Select
+            aria-label="Default Group"
+            data={data.accessProfiles.map((group) => ({ value: group.id, label: group.name }))}
+            value={data.defaultAccessProfileId}
+            allowDeselect={false}
+            onChange={(value) => value && policy.mutate(value)}
+          />
+        </SettingRow>
+      </SettingGroup>
       <Modal
         opened={!!editing}
         onClose={() => setEditing(null)}
@@ -525,7 +570,7 @@ function ResetPassword({
   );
 }
 
-/** Settings › Users: accounts, their roles and groups, linked chat identities and the default group. */
+/** Settings › Users: accounts, their roles and groups, and linked chat identities. */
 export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const self = useAccount().data?.account?.id;
@@ -570,13 +615,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       api(`/api/gallery/owners/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: () => setActing(null),
     onSettled: () => client.invalidateQueries({ queryKey: galleryOwnersQuery.queryKey }),
-  });
-  const policy = useMutation({
-    mutationFn: (accessProfileId: string) =>
-      post("/api/accounts/default-profile", { accessProfileId }),
-    onMutate: (accessProfileId) =>
-      optimistic((data) => ({ ...data, defaultAccessProfileId: accessProfileId })),
-    onSettled: refresh,
   });
   if (admin.isPending) return <LoadingState label="Loading Users" fill />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
@@ -706,7 +744,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             <>
               {account.disabled && (
                 <Menu.Item
-                  leftSection={<UserCheck size={16} />}
+                  leftSection={<icons.enable size={16} />}
                   onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
                 >
                   Enable
@@ -715,7 +753,11 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               {!own && (
                 <Menu.Item
                   leftSection={
-                    account.role === "user" ? <ShieldCheck size={16} /> : <UserRound size={16} />
+                    account.role === "user" ? (
+                      <icons.administrator size={16} />
+                    ) : (
+                      <icons.account size={16} />
+                    )
                   }
                   onClick={act("role")}
                 >
@@ -723,14 +765,14 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                 </Menu.Item>
               )}
               {account.passwordSignIn && (
-                <Menu.Item leftSection={<KeyRound size={16} />} onClick={act("password")}>
+                <Menu.Item leftSection={<icons.password size={16} />} onClick={act("password")}>
                   Reset Password
                 </Menu.Item>
               )}
               {identitiesOf(account).map(({ identity }, _, links) => (
                 <Menu.Item
                   key={identity}
-                  leftSection={<Unlink size={16} />}
+                  leftSection={<icons.unlink size={16} />}
                   disabled={gatewayChange.isPending}
                   onClick={() => gatewayChange.mutate({ kind: "link", identity })}
                 >
@@ -749,7 +791,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   {!account.disabled && (
                     <Menu.Item
                       color="red"
-                      leftSection={<UserX size={16} />}
+                      leftSection={<icons.disable size={16} />}
                       onClick={act("disable")}
                     >
                       Disable
@@ -758,7 +800,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   {galleryOf(account) > 0 && (
                     <Menu.Item
                       color="red"
-                      leftSection={<ImageOff size={16} />}
+                      leftSection={<icons.delete size={16} />}
                       rightSection={
                         <Text size="xs" c="dimmed">
                           {galleryOf(account)}
@@ -783,21 +825,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         }}
       />
       <ChatGateway gateway={data.gateway} accounts={data.accounts} change={gatewayChange} />
-      <SettingGroup title="New Accounts">
-        <SettingRow
-          wide
-          label="Default Group"
-          description="New accounts, including first single sign-on and chat gateway accounts, start in this group."
-        >
-          <Select
-            aria-label="Default Group"
-            data={groups}
-            value={data.defaultAccessProfileId}
-            allowDeselect={false}
-            onChange={(value) => value && policy.mutate(value)}
-          />
-        </SettingRow>
-      </SettingGroup>
       <Modal opened={creating} onClose={() => setCreating(false)} title="New User">
         <FocusTrap.InitialFocus />
         {creating && (
