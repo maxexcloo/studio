@@ -408,7 +408,6 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
   );
   await viewerChangeMenu(page);
   await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
-  await expandAssistantMenu(page, "Suggestions");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await closeTextEditor(page, "Prompt");
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
@@ -468,7 +467,6 @@ test("A delayed automatic change runs on its source without closing the next ima
   });
   try {
     await viewerChangeMenu(page, "Recreate");
-    await expandAssistantMenu(page, "Suggestions");
     const requested = page.waitForRequest(
       (request) =>
         request.url().endsWith("/api/suggestions") && request.postDataJSON()?.surface === "change",
@@ -596,7 +594,7 @@ test("Custom Animation edits and submits in one dialog with its text tools", asy
   }
   await more.click();
   const tools = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
-  await expect(tools.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeVisible();
+  await expect(tools.getByRole("menuitem", { name: "Refresh", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -671,7 +669,6 @@ test("The viewer prompt offers suggestions for review beside the field and in th
   );
   const suggest = async (surface: typeof viewer) => {
     await surface.getByRole("button", { name: "AI", exact: true }).click();
-    await expandAssistantMenu(page, "Suggestions");
     await page.getByRole("menuitem", { name: "At Dusk", exact: true }).click();
     await expect(surface.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
       "An amber bird at dusk",
@@ -1504,7 +1501,6 @@ test("A video's Animate template continues it from its last frame, and Edit make
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
-  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.referenceRequests.at(-1)).toEqual({ galleryItemId: "clip", frame: "last" });

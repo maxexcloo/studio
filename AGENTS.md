@@ -144,7 +144,7 @@ recur across features.
   The context menu shows Discover and Share options in unlabelled sections.
   Desktop menus open options in side submenus on hover or by keyboard.
   Phone menus move into their options and provide Back. Assistant menus share `assistMenu`:
-  Suggestions and Templates carry icons and list text-only options, with
+  Suggestions and Templates carry icons and list text-only options as submenus only when both are offered, inline when alone, with
   Custom… and Refresh at the top level.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they

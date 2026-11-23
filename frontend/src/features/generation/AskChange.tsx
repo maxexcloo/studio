@@ -235,7 +235,8 @@ export function useChangeSuggestions<K extends QueryKey>({
 }
 
 /**
- * An assistant menu's settings, Suggestions and Templates, then their actions and the run.
+ * An assistant menu's settings, Suggestions and Templates, then their actions and the run. Either
+ * alone lists its options inline; both together open as submenus.
  */
 export const assistMenu = ({
   loading,
@@ -256,19 +257,29 @@ export const assistMenu = ({
 }): ActionGroups => {
   if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
   const choices = [...templates].sort((a, b) => compareNames(a.label, b.label));
-  const sections: Action[] = [
-    ...(suggestions ? [suggestions.action] : []),
-    ...(choices.length
-      ? [{ id: "templates", label: "Templates", icon: icons.templates, menu: [choices] }]
-      : []),
-  ];
-  return [
-    settings,
-    [...sections, ...custom, ...(suggestions ? [suggestions.refresh] : [])],
-    ...others,
-    last,
-  ];
+  const tail = [...custom, ...(suggestions ? [suggestions.refresh] : [])];
+  if (suggestions && choices.length) {
+    const nested = { id: "templates", label: "Templates", icon: icons.templates, menu: [choices] };
+    return [settings, [suggestions.action, nested, ...tail], ...others, last];
+  }
+  const inline = suggestions ? suggestionItems(suggestions.action) : choices;
+  return [settings, inline, tail, ...others, last];
 };
+
+/** Suggestions' options listed in place, or one greyed item saying why there are none yet. */
+export function suggestionItems(action: Action): Action[] {
+  const ideas = action.menu?.[0] ?? [];
+  if (!ideas.length)
+    return [
+      {
+        ...action,
+        menu: undefined,
+        label: action.description ?? action.label,
+        description: undefined,
+      },
+    ];
+  return action.disabled ? ideas.map((idea) => ({ ...idea, disabled: true })) : ideas;
+}
 
 export function changeTemplates(
   options: (AssistantOption & { instruction: string })[],

@@ -279,7 +279,6 @@ test("Custom Animation suggests what could happen from the image, filling the in
     .getByRole("button", { name: "AI Instruction Actions", exact: true })
     .click();
   const menu = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
-  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" }]);
   await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(
@@ -394,9 +393,7 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const reason = "Like a few results so Studio learns your taste.";
   const menu = await viewerChangeMenu(page);
-  const suggestions = menu.getByRole("menuitem", { name: "Suggestions", exact: true });
-  await expect(suggestions).toHaveAccessibleDescription(reason);
-  await expect(suggestions).toBeDisabled();
+  await expect(menu.getByRole("menuitem", { name: reason, exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
   await closeTextEditor(page, "Prompt");
@@ -453,7 +450,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await closeTextEditor(page, "Prompt");
   menu = await viewerChangeMenu(page);
   await expect(review()).toHaveAttribute("aria-checked", "true");
-  await expandAssistantMenu(menu, "Suggestions");
+  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toHaveCount(0);
   await expect(menu.getByRole("menuitem", { name: "Night Version", exact: true })).toBeVisible();
   await expect
     .poll(() => asked.filter((body) => body.surface === "viewer").at(-1))
@@ -484,10 +481,9 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await expect(menu).toBeHidden();
   menu = await viewerChangeMenu(page, "Recreate");
   await expect(review()).toHaveAttribute("aria-checked", "false");
-  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeEnabled();
+  await expect(menu.getByRole("menuitem", { name: "Night Version", exact: true })).toBeEnabled();
   await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Compare in Composer");
   await expect(menu.getByRole("menuitem").last()).toHaveText("Recreate in Composer");
-  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Night Version", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(asked.filter((body) => body.surface === "change").at(-1)).toMatchObject({
