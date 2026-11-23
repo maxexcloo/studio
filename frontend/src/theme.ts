@@ -90,15 +90,21 @@ const controlMotion = {
   transitionDuration: "var(--studio-motion-duration)",
   transitionTimingFunction: "var(--studio-ease-enter)",
 };
-// Phone overlays rise into place. Desktop overlays grow slightly from their trigger.
+// Phone overlays rise into place. Desktop overlays grow slightly from their trigger. Entrances end
+// at `none`: a lasting identity matrix on a full-screen scroller with sticky children flickers on
+// iOS.
+const rise = "translateY(var(--studio-overlay-rise, 0px))";
 const raise = {
-  in: { opacity: 1, transform: "translateY(0) scale(1)" },
-  out: {
-    opacity: 0,
-    transform:
-      "translateY(var(--studio-overlay-rise, 0px)) scale(var(--studio-overlay-scale, 0.98))",
-  },
+  in: { opacity: 1, transform: "none" },
+  out: { opacity: 0, transform: `${rise} scale(var(--studio-overlay-scale, 0.98))` },
   transitionProperty: "transform, opacity",
+};
+// A full-screen drawer rises a little like a full-screen dialog, rather than sliding its whole height
+// over a backdrop that doesn't fade (theme.module.css).
+export const fullScreenRise = {
+  in: { transform: "none" },
+  out: { transform: rise },
+  transitionProperty: "transform",
 };
 export type Rounding = Appearance["rounding"];
 
@@ -371,7 +377,12 @@ export function studioTheme({
           ]
             .filter(Boolean)
             .join(" "),
-          ...(props.fullScreen && { overlay: classes.fullScreenOverlay }),
+          // The viewer draws its own see-through backdrop and fades in over the page.
+          ...(props.fullScreen &&
+            props.variant !== "viewer" && {
+              content: `${classes.dialogContent} ${classes.fullScreen}`,
+              overlay: classes.fullScreenOverlay,
+            }),
         }),
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
         // under the title, as they would with Mantine's sticky header over a scrolling content.

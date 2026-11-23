@@ -489,6 +489,7 @@ export function MediaViewer({
         returnFocus={false}
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
+        variant="viewer"
         classNames={{
           content: classes.content,
           body: classes.body,
