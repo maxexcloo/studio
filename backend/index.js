@@ -653,8 +653,8 @@ const taste = createTaste({
   promptWriter: textWriter,
   online: textOnline,
   updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
-  galleryLikes: (ownerId, count) =>
-    galleryItems({ ownerId, rating: "liked", status: "done", notDream: true, sample: count }),
+  galleryLikes: (ownerId, query) =>
+    galleryItems({ ownerId, rating: "liked", status: "done", notDream: true, ...query }),
 });
 /**
  * Hears which of an account's items were rated, by hand or by animating a photo: each with its

@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 import type { PairAnswer } from "../../shared/dream.ts";
 import {
   type TasteFields,
@@ -18,6 +20,7 @@ import {
 } from "../persistence/runtime.ts";
 import { promptInstruction } from "./../prompt-instructions.js";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
+import { agePools, likeLedger } from "./like-spread.ts";
 
 /**
  * What a person did with a result; "like" and "dislike" rate it ("unlike" and "undislike" take a
@@ -105,6 +108,7 @@ type ChoiceValues = Record<string, unknown>;
 /** A gallery item, as far as a signal reads it. */
 interface TasteItem {
   id?: unknown;
+  createdAt?: string;
   type?: unknown;
   title?: unknown;
   prompt?: unknown;
@@ -653,8 +657,11 @@ export function createTaste({
 }: {
   dataDir: string;
   writer?: (ownerId: string) => TasteWriter | null;
-  /** `count` of the owner's liked gallery items outside Dream, at random. */
-  galleryLikes?: (ownerId: string, count: number) => TasteItem[];
+  /** `sample` of the owner's liked gallery items outside Dream made in the range (ms), at random. */
+  galleryLikes?: (
+    ownerId: string,
+    query: { since?: number; before?: number; sample: number },
+  ) => TasteItem[];
   /** The owner's text writer (account-policy.js `promptWriter`). */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
   updates?: () => boolean;
@@ -662,6 +669,7 @@ export function createTaste({
   now?: () => number;
 }) {
   const name = (ownerId: string) => `taste:${ownerId}`;
+  const likeUses = likeLedger(dataDir, now);
   function load(ownerId: string): StoredTaste {
     const saved = readRuntimeDocument(dataDir, name(ownerId)) as Partial<StoredTaste> | undefined;
     if (!saved) return empty();
@@ -722,7 +730,17 @@ export function createTaste({
     if (!(await online()))
       throw failure("The text model is offline. Try again once it is back.", 503);
     const before = load(ownerId);
-    const liked = galleryLikes(ownerId, galleryLikeSample).map(
+    const drawn = likeUses
+      .order(
+        ownerId,
+        "summary",
+        await agePools(now(), (range) =>
+          galleryLikes(ownerId, { ...range, sample: galleryLikeSample }),
+        ),
+        randomInt,
+      )
+      .slice(0, galleryLikeSample);
+    const liked = drawn.map(
       (item) =>
         `- gallery like; ${details(tasteChoice(undefined, itemValues(item)))
           .filter(Boolean)
@@ -794,6 +812,11 @@ export function createTaste({
       updatedAt: stamp(),
       since: current.since - before.since,
     });
+    likeUses.used(
+      ownerId,
+      "summary",
+      drawn.map((item) => item.id),
+    );
     return read(ownerId);
   }
   /** Summarises the signals now; one summary runs per account at a time. */
