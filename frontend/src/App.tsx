@@ -1,5 +1,5 @@
 import { AppShell, FocusTrap, Modal } from "@mantine/core";
-import { type ReactNode, Suspense, lazy, useEffect } from "react";
+import { type ComponentType, type ReactNode, Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 
 import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
@@ -15,15 +15,31 @@ import { closeWhenTop } from "./ui/popupClicks";
 import { DialogKeyboard } from "./ui/useKeyboard";
 import { useLastWhileClosing } from "./ui/useLastWhileClosing";
 import { usePhone } from "./ui/usePhone";
-const loadCompare = () => import("./features/compare/ComparePage");
-const ComparePage = lazy(() => loadCompare().then((module) => ({ default: module.ComparePage })));
-const loadDream = () => import("./features/dream/DreamPage");
-const DreamPage = lazy(() => loadDream().then((module) => ({ default: module.DreamPage })));
-const loadLibrary = () => import("./features/library/LibraryPage");
-const loadSettings = () => import("./features/settings/SettingsPage");
-const LibraryPage = lazy(() => loadLibrary().then((module) => ({ default: module.LibraryPage })));
-const SettingsPage = lazy(() =>
-  loadSettings().then((module) => ({ default: module.SettingsPage })),
+/**
+ * A page loaded on demand. Once `load` has run it renders at once, where `lazy` alone would still
+ * suspend on its first render, showing its loader for a moment after preloading.
+ */
+function lazyPage(load: () => Promise<ComponentType>) {
+  let loaded: ComponentType | undefined;
+  const preload = () => load().then((page) => (loaded = page));
+  const Lazy = lazy(() => preload().then((page) => ({ default: page })));
+  function Page() {
+    const [Shown] = useState(() => loaded || Lazy);
+    return <Shown />;
+  }
+  return [Page, preload] as const;
+}
+const [ComparePage, loadCompare] = lazyPage(() =>
+  import("./features/compare/ComparePage").then((module) => module.ComparePage),
+);
+const [DreamPage, loadDream] = lazyPage(() =>
+  import("./features/dream/DreamPage").then((module) => module.DreamPage),
+);
+const [LibraryPage, loadLibrary] = lazyPage(() =>
+  import("./features/library/LibraryPage").then((module) => module.LibraryPage),
+);
+const [SettingsPage, loadSettings] = lazyPage(() =>
+  import("./features/settings/SettingsPage").then((module) => module.SettingsPage),
 );
 const noSections: Partial<Record<"library" | "settings", string>> = {};
 function Workspace() {

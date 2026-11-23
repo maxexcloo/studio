@@ -9,6 +9,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
+import { type FetchQueryOptions, useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
   type ReactNode,
@@ -115,18 +116,29 @@ export function WorkspaceSectionSelect({
 
 /**
  * Desktop navigation and mounted panes share the route-backed workspace modal. A section given as
- * a function places its heading itself, so its toolbar can sit beside it.
+ * a function places its heading itself, so its toolbar can sit beside it. Each visible section's
+ * `queries` load as the workspace opens, so a first visit shows its contents rather than a loader.
  */
 export function WorkspaceSections({
   label,
   sections,
   content,
+  queries = {},
 }: {
   label: string;
   sections: WorkspaceSection[];
   content: Record<string, ReactNode | ((heading: ReactNode) => ReactNode)>;
+  // Each query has its own data type.
+  queries?: Record<string, FetchQueryOptions<any, any, any, any>[]>;
 }) {
   const phone = usePhone();
+  const client = useQueryClient();
+  useEffect(() => {
+    // Only what isn't loaded yet; a section refreshes its own as it opens.
+    for (const { value } of sections)
+      for (const query of queries[value] ?? [])
+        void client.prefetchQuery({ ...query, staleTime: Infinity });
+  }, []);
   const { location, active } = useWorkspaceSection(sections);
   const [visited, setVisited] = useState(() => new Set([active]));
   if (!visited.has(active)) setVisited(new Set([...visited, active]));

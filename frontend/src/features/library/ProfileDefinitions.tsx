@@ -1,6 +1,6 @@
 import { Alert, Badge, Button, Group, Menu, Popover, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -45,6 +45,10 @@ interface GuideBindings {
   families: Record<string, Record<string, string>>;
   profiles: Record<string, { pack?: string }>;
 }
+export const guidesQuery = queryOptions({
+  queryKey: [...definitionsKey, "guide"],
+  queryFn: () => api<{ packs: GuideRow[] }>("/api/profiles/guides"),
+});
 const kindLabels = { image: "Image", video: "Video" };
 
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
@@ -87,10 +91,7 @@ function useDefinitions() {
   // Family names come with the models list; following it re-labels once they arrive.
   useQuery(modelsQuery);
   const profileList = useQuery(editableProfilesQuery);
-  const guideList = useQuery({
-    queryKey: [...definitionsKey, "guide"],
-    queryFn: () => api<{ packs: GuideRow[] }>("/api/profiles/guides"),
-  });
+  const guideList = useQuery(guidesQuery);
   const bindings = useQuery({
     queryKey: [...definitionsKey, "guide-bindings"],
     queryFn: () => api<{ bindings: GuideBindings }>("/api/profiles/guide-bindings"),
