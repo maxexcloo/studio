@@ -223,6 +223,15 @@ export function createProjects({
       if (!owned?.[kind].some((card) => card.id === patch.cards?.[kind]))
         throw failure(`That ${cardKinds[kind].name} no longer exists in your Library.`, 400);
   }
+  /** Refuses a name another of the account's projects has, in any case. */
+  function checkName(record: ProjectsRecord, name: string | undefined, id?: string) {
+    const key = (text: string) => text.normalize("NFKC").toLowerCase();
+    if (
+      name &&
+      record.projects.some((project) => project.id !== id && key(project.name) === key(name))
+    )
+      throw failure(`You already have a project named ${name}.`, 409);
+  }
   /** A chat's attached project, or null; a missing project detaches it. */
   const attached = (record: ProjectsRecord, chat: string) => {
     const projectId = record.chats[chat]?.projectId;
@@ -245,6 +254,7 @@ export function createProjects({
       if (!patch.name) throw failure("Name the project.", 400);
       checkCards(ownerId, patch);
       const record = read(ownerId);
+      checkName(record, patch.name);
       if (record.projects.length >= maxProjects)
         throw failure(`Keep to ${maxProjects} projects; delete one first.`, 409);
       const at = stamp();
@@ -277,6 +287,7 @@ export function createProjects({
       const record = read(ownerId);
       const project = find(record, id);
       const before = content(project);
+      checkName(record, patch.name, id);
       checkCards(ownerId, patch, before.cards);
       const after = merged(project, patch);
       const fields = changed(before, after);
