@@ -40,7 +40,8 @@ function linkedTo(value, id) {
 }
 
 function omitReference(graph, loader) {
-  if (!loader || !graph[loader]) return;
+  // A slot that is an input of the generating node itself (Radiance) stays at its empty default.
+  if (!loader || !/Load/.test(graph[loader]?.class_type)) return;
   const removed = [loader];
   delete graph[loader];
   while (removed.length) {
