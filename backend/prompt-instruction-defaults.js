@@ -508,6 +508,11 @@ Return only JSON: {"issue":"one brief observation, or an empty string"}.`,
     area: "Gallery",
     text: `This model makes no sound: describe only what is seen, with no quoted dialogue, sound or music; show anyone talking by their lips and gestures.`,
   },
+  "name-clip": {
+    label: "Name Dream Clip",
+    area: "Dream",
+    text: `After the prompt, end with two lines for the clip's card, in Australian English: "Title: " and a two-to-five-word Title Case name for what happens, then "Why: " and one short phrase naming its action, camera and mood.`,
+  },
   "name-each-variation": {
     label: "Name Each Variation",
     area: "Gallery",

@@ -18,6 +18,8 @@ export type DreamItem = MediaItem & {
     at: string;
     state: "unseen" | "kept" | "discarded";
     decidedAt?: string;
+    /** How Dream made it; a clip animates a still or extends a video. */
+    arm?: string;
     uncensored?: true;
     /** One side of a comparison: alike but for what `question` asks about. */
     pair?: { id: string; side: 0 | 1 | 2; size?: 3; question: string; label: string };

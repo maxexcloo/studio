@@ -161,13 +161,24 @@ export function animateIssue(writing, { allowed }) {
   return null;
 }
 
+/** A named clip's reply: the prompt, then its closing Title and Why lines (name-clip). */
+export function clipName(reply) {
+  const match = /\n\s*Title:\s*(.+?)\s*\n\s*Why:\s*(.+?)\s*$/i.exec(String(reply || ""));
+  if (!match) return { text: reply };
+  return {
+    text: reply.slice(0, match.index),
+    title: match[1].slice(0, 80),
+    why: match[2].slice(0, 200),
+  };
+}
+
 /**
  * Writes the motion prompt for `profile` and a `clip` ({ seconds, fps }), streaming through
  * `onThinking` and `onDelta`. `frame()` loads the frame the clip starts from ({ mime, data },
  * downscaled) and is asked only when the text model reads images; otherwise `caption()` says what
  * it shows in words. `explicit`: the account holds Uncensored Models. `story`: the chat's story
  * (writing-standard.ts storyContext), if any. `writer`: its prompt writer
- * (assistant.js `writerModel`).
+ * (assistant.js `writerModel`). `named` also asks for the clip's title and why (Dream's cards).
  */
 export async function writeAnimatePrompt({
   engine,
@@ -180,21 +191,24 @@ export async function writeAnimatePrompt({
   writer,
   frame = async () => null,
   caption = () => "",
+  named = false,
   signal,
   onThinking,
   onDelta,
 }) {
   const model = await engine.model("animate", false, writer);
+
   const image = (await engine.supportsVision(writer)) ? await frame() : null;
   const description = image ? "" : String((await caption()) || "").trim();
   const known = image ? "seen" : description ? "described" : "unknown";
+  const system = animateInstructions({ profile, guide, writing, clip, known, explicit });
   const reply = await engine.chat({
     call: "animate",
     model,
     messages: [
       {
         role: "system",
-        content: animateInstructions({ profile, guide, writing, clip, known, explicit }),
+        content: named ? `${system}\n${promptInstruction("name-clip")}` : system,
       },
       {
         role: "user",
@@ -219,7 +233,14 @@ export async function writeAnimatePrompt({
     onThinking,
     onDelta,
   });
-  const prompt = cleanPrompt(reply.text);
+  const { text, title, why } = named ? clipName(reply.text) : { text: reply.text };
+  const prompt = cleanPrompt(text);
   if (!prompt) throw new AssistantError("unusable reply");
-  return { prompt, thinking: reply.thinking, model };
+  return {
+    prompt,
+    thinking: reply.thinking,
+    model,
+    ...(title ? { title } : {}),
+    ...(why ? { why } : {}),
+  };
 }

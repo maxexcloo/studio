@@ -52,7 +52,14 @@ const ZoomImage = lazy(() =>
 /** Why Dream made a result and the LoRAs it tried, each rated here. */
 function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?: string }) {
   const info = useQuery(loraInfoQuery);
-  const why = item.dream?.why || "";
+  // Clips written before Dream named them say how they were made, over their gallery title.
+  const why =
+    item.dream?.why ||
+    (item.type === "video"
+      ? [item.dream?.arm === "extend" ? "Extended" : "Animated", item.title]
+          .filter(Boolean)
+          .join(" · ")
+      : "");
   const [direction, ...details] = why.split(" · ");
   const heading = title || direction || item.resultSet?.variation || item.title;
   const reason = title ? why : details.join(" · ");
