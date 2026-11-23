@@ -290,7 +290,11 @@ Choose a different subject or subject role, the person's look and outfit where t
   "dream-motion": {
     label: "Dream Motion",
     area: "Dream",
-    text: `One continuous shot of one simple, coherent action that this frame clearly sets up, carried through from start to finish, as if the picture kept rolling for a few seconds. The same subjects, faces, outfits, place and style throughout: no cuts, scene changes, transitions or new locations, and no people or objects appearing from nowhere or transforming. Use a stable frame or one continuous camera move that follows the action or reveals something specific to this scene. {{expressions}} {{extendedThemes}}`,
+    text: `One continuous shot that tells a small story with this frame's people and place: a setup already moving in the first second, one clear action with real body movement (standing, walking, turning, reaching, handing something over, changing pose) and a visible payoff or reaction that the last frame lands on. The same subjects, faces, outfits, place and style throughout: no cuts, scene changes, transitions or new locations, and no people or objects appearing from nowhere or transforming; someone may enter from out of frame where the scene suggests it.
+This clip's beat: {{beat}}
+Film it with intent: the camera technique above, timed to the action, rather than a slow push-in or zoom toward a still subject. Where the model makes sound, let a person say one short, natural line that fits the moment and the clip's length, with sound from the action and the place; where it is silent, carry the exchange through lips, eyes and gesture.
+{{expressions}} {{extendedThemes}}
+{{context}}`,
   },
   "dream-negative": {
     label: "Dream Negative",
@@ -355,7 +359,7 @@ Reply with only this JSON object, one key per task: {{shape}}`,
   "extended-themes-motion": {
     label: "Uncensored Motion",
     area: "Dream",
-    text: `Make it sensual, at a natural unhurried pace, building only on the people, pose and setting already in the frame.`,
+    text: `Make it sensual, with real movement and touch at a natural pace, building only on the people, pose and setting already in the frame.`,
   },
   "feature-dream-taste": {
     label: "Feature Dream Taste",

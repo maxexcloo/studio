@@ -132,6 +132,9 @@ export function animateInstructions({
   });
 }
 
+/** Room for a Custom instruction, and for Dream's, which brings its still's context and recent clips. */
+const maxInstructionCharacters = 4000;
+
 /** The request as admitted: a known theme, the instruction and the source image's prompt. */
 export function animateRequest(value) {
   return {
@@ -139,7 +142,7 @@ export function animateRequest(value) {
     theme: String(value?.theme || ""),
     instruction: String(value?.instruction || "")
       .trim()
-      .slice(0, 1000),
+      .slice(0, maxInstructionCharacters),
     source: String(value?.source || "")
       .trim()
       .slice(0, maxPromptCharacters),

@@ -27,6 +27,7 @@ import {
   type DreamProfile,
   createDream,
   dreamRequest,
+  motionBeat,
   turnShares,
 } from "./dream.ts";
 import { createInbox, ideasFrom } from "./inbox.ts";
@@ -647,6 +648,13 @@ test("Dream applies shared delays to the owner's manual and MCP generation reque
   assert.equal(live("alice")[0]?.input.kind, "video");
 });
 
+test("Consecutive Dream clips change their action, camera technique and tone", () => {
+  const beats = Array.from({ length: 12 }, (_, turn) => motionBeat(turn).split(", "));
+  for (let turn = 1; turn < beats.length; turn++)
+    for (let part = 0; part < 3; part++)
+      assert.notEqual(beats[turn].at(-3 + part), beats[turn - 1].at(-3 + part));
+});
+
 test("A finished Dream job starts the next at once, without waiting for the next tick", async (t) => {
   const { dream, live, finish } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -686,11 +694,15 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.deepEqual(video?.input.referenceAssets, [
     { assetId: `asset-${second.id}`, source: "gallery", slot: "start" },
   ]);
-  // Animate's writer sees the frame: Dream asks for one coherent shot of it with natural faces.
+  // Animate's writer sees the frame: Dream asks for one shot with a story beat, its first in the
+  // rotation, knowing what the still was made for, with natural faces.
   const writing = video?.input.writing as Record<string, string>;
   assert.deepEqual([writing.kind, writing.theme, writing.source], ["animate", "custom", "dream 2"]);
-  assert.match(writing.instruction, /One continuous shot of one simple, coherent action/);
+  assert.match(writing.instruction, /tells a small story/);
   assert.match(writing.instruction, /no cuts, scene changes/);
+  assert.ok(writing.instruction.includes(`This clip's beat: ${motionBeat(0)}`));
+  assert.match(writing.instruction, /rather than a slow push-in or zoom/);
+  assert.ok(writing.instruction.includes(`Dream made it for: ${second.dream?.why}`));
   assert.match(writing.instruction, /believable expressions that suit the moment/);
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").status, "capped");
