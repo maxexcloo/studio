@@ -160,6 +160,12 @@ export class Store {
     this.db.exec(
       "DROP INDEX IF EXISTS studio_queue_prompted; CREATE INDEX IF NOT EXISTS studio_queue_profile ON studio_queue(owner_id, profile_id, created_at, status)",
     );
+    // Includes any a run still finishing wrote after its job ended (save drops the rest).
+    this.db
+      .prepare(
+        `DELETE FROM studio_provider_jobs WHERE id IN (SELECT id FROM studio_queue WHERE status IN (${placeholders(terminalStatuses)}))`,
+      )
+      .run(...terminalStatuses);
   }
 
   /** A session holds the jobs of one request or run of requests, such as an MCP conversation's. */
@@ -802,6 +808,9 @@ export class Store {
     this.db
       .prepare("UPDATE studio_queue SET record = ?, status = ? WHERE id = ? AND owner_id = ?")
       .run(JSON.stringify(next), next.status, next.id, next.ownerId);
+    // A finished job's provider journal has nothing left to recover.
+    if (terminalStatuses.has(next.status))
+      this.db.prepare("DELETE FROM studio_provider_jobs WHERE id = ?").run(next.id);
     return next;
   }
 

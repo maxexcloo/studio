@@ -2019,6 +2019,9 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
     store.openDreamJobs("alice").map((job) => job.id),
     [dream.id],
   );
+  store.saveProviderRecord("alice", own.id, { outputs: [] });
   store.save({ ...own, status: "completed" });
   assert.equal(store.hasOpenOwnWork(), false);
+  // A finished job's provider journal goes with it.
+  assert.equal(store.providerRecord("alice", own.id), undefined);
 });
