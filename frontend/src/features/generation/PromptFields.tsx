@@ -18,9 +18,8 @@ import {
 import {
   ChangeSuggestions,
   ProposalLabel,
-  UndoButton,
   assistMenu,
-  proposedClass,
+  proposalUndo,
   useAskChange,
   useChangeSuggestions,
 } from "./AskChange";
@@ -209,9 +208,10 @@ export function PromptFields({
       })
     : [];
   const cover = pictures[0];
+  const undo = proposal ? ask.undo : offerIdeas && ideas.undo;
   const assistantTool =
     assistant.stop ??
-    (assistant.templates || suggestions
+    (assistant.templates || suggestions || undo
       ? {
           id: "assistant",
           label: "Improve Prompt",
@@ -219,14 +219,17 @@ export function PromptFields({
           icon: icons.assistant,
           disabled: ask?.pending,
           onOpen: suggestions?.load,
-          menu: assistMenu({
-            suggestions,
-            ideasFirst: Boolean(ideas.suggestions),
-            templates: assistant.templates ?? [],
-            custom: assistant.custom,
-            others: [assistant.more ?? []],
-            last: [],
-          }),
+          menu: [
+            ...proposalUndo(undo),
+            ...assistMenu({
+              suggestions,
+              ideasFirst: Boolean(ideas.suggestions),
+              templates: assistant.templates ?? [],
+              custom: assistant.custom,
+              others: [assistant.more ?? []],
+              last: [],
+            }),
+          ],
         }
       : undefined);
   return (
@@ -236,13 +239,11 @@ export function PromptFields({
           ref={textareaRef}
           tools={[assistantTool, history.action].filter((tool) => !!tool)}
           copyBefore={history.action.id}
-          send={proposal ? <UndoButton onClick={ask.undo} /> : offerIdeas && ideas.undo}
           busy={assistant.working}
           popups={history.popup}
           data-composer-prompt={compact || undefined}
           data-expanded-prompt={!compact || undefined}
           classNames={compact ? undefined : { input: classes.input }}
-          className={proposal ? proposedClass : undefined}
           variant="unstyled"
           aria-label="Prompt"
           data-autofocus={autoFocus || undefined}

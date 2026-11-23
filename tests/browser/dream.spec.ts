@@ -1489,7 +1489,8 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
       brief: { subjects: "", styles: "", avoid: "" },
     },
   ]);
-  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await editor.getByRole("button", { name: "AI Styles Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(editor.getByRole("status")).toHaveCount(0);
 });
 

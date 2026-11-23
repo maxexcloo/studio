@@ -245,14 +245,16 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
       profileId: "image:fast",
     },
   ]);
-  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await surface.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("An amber bird");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
   await askForChange("Recreate");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Recreate");
   expect(asked.at(-1)).toMatchObject({ actions: ["recreate"], request: "make it night" });
   expect(asked.at(-1)).not.toHaveProperty("profileId");
-  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await surface.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await askForChange("Edit");
   await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
@@ -427,7 +429,8 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
     },
   ]);
   // Undo restores the prompt before the suggestion.
-  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await viewer.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("An amber bird");
 });
 
@@ -679,7 +682,8 @@ test("The viewer prompt offers suggestions for review beside the field and in th
   const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await suggest(viewer);
   expect(state.jobs).toHaveLength(1);
-  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await viewer.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("An amber bird");
   let editor = viewer;
   if (isMobile) {

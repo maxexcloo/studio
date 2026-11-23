@@ -10,6 +10,7 @@ import {
   image,
   promptMenu,
   stamp,
+  undoProposal,
   viewerAction,
   viewerChangeButton,
   viewerChangeMenu,
@@ -143,7 +144,7 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
   await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1].prompt);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("");
   await prompt.fill("A fox");
   menu = await promptMenu(page, "Prompt");
@@ -163,7 +164,7 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(prompt).toHaveValue(steps[0].prompt);
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
   expect(state.jobs).toHaveLength(0);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("A fox");
 });
 
@@ -465,7 +466,8 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
     request: steps[2].request,
   });
   expect(state.jobs).toHaveLength(1);
-  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await viewer.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(edited);
   menu = await viewerChangeMenu(page);
   await review().click();

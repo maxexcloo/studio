@@ -1085,6 +1085,12 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu").first();
 }
 
+/** Takes back an assistant proposal from its box's AI menu. */
+export async function undoProposal(scope: Page | Locator, box: string) {
+  const menu = await promptMenu(scope, box);
+  await menu.getByRole("menuitem", { name: "Undo", exact: true }).click();
+}
+
 /** Edit or Recreate in the viewer's action bar. */
 export function viewerChangeButton(page: Page, action: "Edit" | "Recreate" = "Edit") {
   return page

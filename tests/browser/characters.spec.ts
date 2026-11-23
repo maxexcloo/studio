@@ -468,7 +468,8 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   ]);
   await page.getByRole("menuitem", { name: "Wren", exact: true }).click();
   await expect(name).toHaveValue("Wren");
-  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await suggestName();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(name).toHaveValue("");
   await suggestName();
   await page.getByRole("menuitem", { name: "Mara", exact: true }).click();

@@ -258,8 +258,9 @@ recur across features.
   itself; there is no worker choice. Trigger words apply when submitting,
   without altering the typed prompt.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
-  text in place with Undo and show the action and changed words below the field.
-  Suggestions never act on their own, and nothing floats over the text.
+  text in place, leaving the box's look unchanged, with Undo first in its AI
+  menu, and show the action and changed words below the field. Suggestions
+  never act on their own, and nothing floats over the text.
 - Report actual endpoint health: configuration alone does not prove readiness.
   A deliberately parked worker reads Stopped, not failing; an unexpectedly
   unavailable one remains a failure. Runtime controls belong in

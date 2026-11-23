@@ -35,9 +35,6 @@ const actionLabels: Record<ChangeAction, string> = {
   upscale: "Upscale",
 };
 
-/** The tint of a field holding a proposed change. */
-export const proposedClass = classes.proposed;
-
 /** What a proposal puts in the field: an upscale keeps the prompt, so it names the change. */
 export const proposalText = (proposal: Change) =>
   proposal.action === "upscale" ? proposal.label : proposal.prompt;
@@ -87,36 +84,9 @@ export function useAskChange<T>({
   };
 }
 
-function FieldAction({
-  label,
-  icon,
-  ...props
-}: {
-  label: string;
-  icon: ReactNode;
-  disabled?: boolean;
-  loading?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Tooltip label={label}>
-      <ActionIcon
-        variant="subtle"
-        color="gray"
-        aria-label={label}
-        onPointerDown={keepFocus}
-        {...props}
-      >
-        {icon}
-      </ActionIcon>
-    </Tooltip>
-  );
-}
-
-/** Undo: restores what the proposal replaced. */
-export function UndoButton({ onClick }: { onClick: () => void }) {
-  return <FieldAction label="Undo" icon={<icons.undo size={16} />} onClick={onClick} />;
-}
+/** While a proposal stands, Undo leads its box's AI menu in a group of its own. */
+export const proposalUndo = (undo: (() => void) | false | null | undefined): ActionGroups =>
+  undo ? [[{ id: "undo", label: "Undo", icon: icons.undo, onClick: undo }]] : [];
 
 /** The field's send (Generate, or Run for a proposal), last in its actions. */
 export function SendButton({

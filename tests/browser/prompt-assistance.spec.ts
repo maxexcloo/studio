@@ -17,6 +17,7 @@ import {
   saveCurrent,
   showLoraStack,
   stamp,
+  undoProposal,
   withSettings,
 } from "./fixtures";
 // A single style is named Improve Prompt too.
@@ -423,7 +424,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   };
   expect(asked).toEqual([suggestionsAsked, night]);
   // Undo restores the draft; Custom… keeps the request for the next time.
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("A castle at noon");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toBeHidden();
   await assist(page, "Custom…");

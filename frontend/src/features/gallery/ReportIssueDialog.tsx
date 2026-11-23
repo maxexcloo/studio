@@ -8,6 +8,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { proposalUndo } from "../generation/AskChange";
 import { changeSummary } from "../generation/changeSummary";
 import { inspectImage } from "../taste/suggestions";
 import { mediaSource } from "./mediaSource";
@@ -144,26 +145,29 @@ export function ReportIssueDialog({
               canInspect
                 ? [
                     {
-                      id: "inspect",
+                      id: "assistant",
                       label: "Inspect Image",
                       icon: icons.assistant,
-                      disabled: inspect.isPending || fix.isPending,
-                      onClick: inspectImageIssue,
-                    },
-                    // An inspection that filled the box can be taken back from the same menu.
-                    ...(current
-                      ? [
-                          {
-                            id: "undo",
-                            label: "Undo",
-                            icon: icons.undo,
-                            onClick: () => {
+                      heading: false,
+                      menu: [
+                        ...proposalUndo(
+                          current &&
+                            (() => {
                               setDetails(current.before);
                               setProposal(null);
-                            },
+                            }),
+                        ),
+                        [
+                          {
+                            id: "inspect",
+                            label: "Inspect Image",
+                            icon: icons.assistant,
+                            disabled: inspect.isPending || fix.isPending,
+                            onClick: inspectImageIssue,
                           },
-                        ]
-                      : []),
+                        ],
+                      ],
+                    },
                   ]
                 : []
             }
