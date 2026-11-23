@@ -1,5 +1,5 @@
 import { AppShell, FocusTrap, Modal } from "@mantine/core";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { type ReactNode, Suspense, lazy, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 
 import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
@@ -13,6 +13,7 @@ import { useAppearance } from "./ui/Appearance";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { DialogKeyboard } from "./ui/useKeyboard";
+import { useLastWhileClosing } from "./ui/useLastWhileClosing";
 import { usePhone } from "./ui/usePhone";
 const loadCompare = () => import("./features/compare/ComparePage");
 const ComparePage = lazy(() => loadCompare().then((module) => ({ default: module.ComparePage })));
@@ -37,10 +38,14 @@ function Workspace() {
       : location.pathname === "/settings"
         ? "settings"
         : null;
-  const [lastPanel, setLastPanel] = useState<"library" | "settings">(overlay || "settings");
-  useEffect(() => {
-    if (overlay) setLastPanel(overlay);
-  }, [overlay]);
+  // Library or Settings keeps showing where it was while it fades out.
+  const panelLocation = useLastWhileClosing(overlay ? location : null) ?? location;
+  const panel = panelLocation.pathname === "/library" ? "library" : "settings";
+  const atPanel = (element: ReactNode) => (
+    <Routes location={panelLocation}>
+      <Route path="*" element={element} />
+    </Routes>
+  );
   // Opening Library or Settings returns to the section last shown there.
   const [sections, setSections] = useRemembered("sections", noSections);
   useEffect(() => {
@@ -60,7 +65,6 @@ function Workspace() {
     search: "",
     hash: "",
   };
-  const panel = overlay || lastPanel;
   const mode = (overlay ? background : location).pathname;
   if (mode.startsWith("/dream") && !dream) return <Navigate to="/images" replace />;
   return (
@@ -115,13 +119,11 @@ function Workspace() {
             : navigate("/images", { replace: true }),
         )}
         title={
-          phone ? (
-            <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>
-          ) : panel === "library" ? (
-            "Library"
-          ) : (
-            "Settings"
-          )
+          phone
+            ? atPanel(panel === "library" ? <LibraryTitle /> : <SettingsTitle />)
+            : panel === "library"
+              ? "Library"
+              : "Settings"
         }
         closeButtonProps={{
           "aria-label": `Close ${panel === "library" ? "Library" : "Settings"}`,
@@ -149,14 +151,18 @@ function Workspace() {
             replace
             state={location.state}
           />
-        ) : panel === "library" ? (
-          <Suspense fallback={<LoadingState label="Loading Library" fill />}>
-            <LibraryPage />
-          </Suspense>
         ) : (
-          <Suspense fallback={<LoadingState label="Loading Settings" fill />}>
-            <SettingsPage />
-          </Suspense>
+          atPanel(
+            panel === "library" ? (
+              <Suspense fallback={<LoadingState label="Loading Library" fill />}>
+                <LibraryPage />
+              </Suspense>
+            ) : (
+              <Suspense fallback={<LoadingState label="Loading Settings" fill />}>
+                <SettingsPage />
+              </Suspense>
+            ),
+          )
         )}
       </Modal>
     </AppShell>
