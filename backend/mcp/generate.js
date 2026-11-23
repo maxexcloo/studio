@@ -25,7 +25,7 @@ import {
 } from "../../shared/characters.ts";
 import { compareVariants } from "../../shared/compare.ts";
 import { isCloudProfile, loraStrengthSweep, profileBackendLabels } from "../../shared/profiles.ts";
-import { resolutions } from "../../shared/resolution.ts";
+import { availableResolutions, profileStartingSize, resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 import { maxResultCaption } from "../gallery/records.js";
@@ -100,6 +100,26 @@ const theme = z
       context.addIssue({ code: "custom", message: `Use one of ${themeIds().join(", ")}` });
   })
   .describe(`One of ${themeIds().join(", ")}.`);
+/**
+ * A run's size: the shape the chat named as the profile's preset, else the account's Settings
+ * aspect as the composer starts (profileStartingSize), else the profile's own canvas. The account's
+ * resolution applies where the chat named none and the profile draws it.
+ */
+function runSize(profile, aspect, resolution) {
+  const { width, height } =
+    aspect || !profile.imageSizePreference?.imageAspect
+      ? profileAspectSize(profile, aspect ? { aspect } : {})
+      : profileStartingSize(profile);
+  const preferred = profile.imageSizePreference?.imageResolution;
+  const native = profile.options?.resolutions;
+  const takes =
+    preferred &&
+    !resolution &&
+    (native?.length
+      ? native.some((value) => value.toUpperCase() === preferred)
+      : availableResolutions(profile, { kind: profile.kind, width, height }).includes(preferred));
+  return { width, height, ...(takes ? { resolution: preferred } : {}) };
+}
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 const outputCount = (jobs) => jobs.reduce((total, job) => total + (job.images || 1), 0);
 const setTitle = z.string().trim().min(1).max(80);
@@ -538,8 +558,8 @@ export function registerGenerateTools({
       aspect: z
         .string()
         .optional()
-        .describe("Only if asked: Profile preset (e.g. 16:9), landscape, portrait or square."),
-      resolution: z.enum(resolutions).optional().describe("Native sizes only."),
+        .describe("Only if the user asks: their word (portrait, landscape, square) or ratio."),
+      resolution: z.enum(resolutions).optional().describe("Only if the user asks for a size."),
       steps: z.number().int().positive().max(10000).optional(),
       seed: z
         .number()
@@ -1015,7 +1035,7 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              const sized = profileAspectSize(profile, aspect ? { aspect } : {});
+              const sized = runSize(profile, aspect, args.resolution);
               // A character sends its first image (characterImages; the run adds its others where
               // there is room) only to a model that keeps its face: into its Identity slot, the
               // named references filling the others in order, or after them on a model that edits

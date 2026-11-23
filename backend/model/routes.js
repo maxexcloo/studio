@@ -11,11 +11,15 @@ export function registerModelRoutes(app, { catalogue }) {
   directRoute(app, "GET", "/api/models", async (account, { query }) => {
     const req = { studioAccount: account };
     // The account's catalogue, its defaults on the side its Images and Videos preferences choose.
-    const forAccount = (models) =>
-      withPreferredDefaults(
+    // MCP (preferences=0) picks its own models but starts images at the account's size, as the composer does.
+    const forAccount = (models) => {
+      const preferences = accountPreferences(ownerIdForRequest(req));
+      const { imageAspect, imageResolution } = preferences;
+      return withPreferredDefaults(
         modelsForAccount(models, req),
-        query.preferences === "0" ? {} : accountPreferences(ownerIdForRequest(req)),
+        query.preferences === "0" ? { imageAspect, imageResolution } : preferences,
       );
+    };
     try {
       // MCP submissions reuse backend metadata; the studio's rescan stays fresh.
       const { models } = await step("models: workers", () =>
