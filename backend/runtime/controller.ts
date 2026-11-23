@@ -305,6 +305,23 @@ export class RuntimeController {
     return result;
   }
 
+  private admissionStates = new Map<string, { until: number; state: Promise<DeploymentState> }>();
+  /**
+   * A workload's state as admission reads it, shared for two seconds by the jobs that wait on it
+   * each queue tick; a change forgets it (begin).
+   */
+  private admissionState(workload: Workload) {
+    const kept = this.admissionStates.get(workload.id);
+    if (kept && kept.until > this.now()) return kept.state;
+    const state = this.engine.state(workload);
+    const entry = { until: this.now() + 2000, state };
+    this.admissionStates.set(workload.id, entry);
+    state.catch(() => {
+      if (this.admissionStates.get(workload.id) === entry) this.admissionStates.delete(workload.id);
+    });
+    return state;
+  }
+
   private async states() {
     const states = new Map<string, DeploymentState>();
     await Promise.all(
@@ -523,6 +540,7 @@ export class RuntimeController {
     if (type === "apply") this.record.desired = plan.target;
     this.save();
     this.current = operation;
+    this.admissionStates.clear();
     for (const id of plan.stop) this.stopping.add(id);
     this.settled = this.run(operation, plan);
     return structuredClone(operation);
@@ -632,6 +650,7 @@ export class RuntimeController {
     } finally {
       this.stopping.clear();
       this.forced.clear();
+      this.admissionStates.clear();
       this.draining = false;
       operation.finishedAt = this.timestamp();
       operation.after = await this.states().then(
@@ -662,7 +681,7 @@ export class RuntimeController {
   async acquire(candidates: string | string[], priority?: number): Promise<RuntimeLease> {
     const choices = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!choices.length) throw new RuntimeUnavailable("The selected workload is not configured.");
-    const states = await Promise.all(choices.map((workload) => this.engine.state(workload)));
+    const states = await Promise.all(choices.map((workload) => this.admissionState(workload)));
     // Checked after reading state, so an operation that began meanwhile still blocks admission.
     const swapTier = this.swapTier();
     const ready = choices.find(
