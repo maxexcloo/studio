@@ -314,7 +314,7 @@ export class McpMedia {
         : this.rows.jobOwner(id) === owner)
     )
       throw new Error(
-        `Choose ${kind === "jobs" ? "a job" : "a reference"} submitted by this account to this studio.`,
+        `No ${kind === "jobs" ? "job" : "reference"} "${id}" was found for this account in this studio.`,
       );
   }
   /**

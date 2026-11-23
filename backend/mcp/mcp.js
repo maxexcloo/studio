@@ -76,7 +76,7 @@ const conciseError = (message) => {
   const split = issues.some((issue) => /^(?:count|prompts): (?:Too big|Invalid input)/.test(issue))
     ? ` count is at most ${maxJobsPerCall} per prompt, and one call queues at most ${maxSplitJobs} images (prompts × count); split a bigger set into calls made one after another.`
     : "";
-  return `Fix the ${match[1]} arguments: ${issues.join("; ")}.${split}`;
+  return `Fix the ${match[1]} arguments: ${issues.join("; ").replace(/\.$/, "")}.${split}`;
 };
 const equal = (left, right) =>
   Boolean(

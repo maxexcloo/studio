@@ -230,7 +230,7 @@ test("SDK Cancel preserves ownership, stale responses and provider errors with o
   const count = f.requests.length;
   const foreign = await f.call("cancel", { job_id: "foreign" });
   assert.equal(foreign.isError, true);
-  assert.match(foreign.content[0].text, /submitted by this account/);
+  assert.match(foreign.content[0].text, /No job "foreign" was found for this account/);
   assert.equal(f.requests.length, count);
   // Even stale MCP ownership cannot bypass the mutation route's account check.
   f.rows.setJobOwner("foreign", alice.id);
