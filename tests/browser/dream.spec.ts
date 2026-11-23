@@ -1269,8 +1269,10 @@ test("Dream fullscreen closes from the letterbox and taps cycle its chrome, text
   const why = preview.getByText("Because you like wide.", { exact: true });
   await expect(why).toBeHidden();
   const tap = () => (isMobile ? picture.tap() : picture.click());
+  await expect(header).toBeVisible();
   await tap();
   await expect(why).toBeVisible();
+  await expect(header).toBeVisible();
   await expect(actions).toBeVisible();
   await tap();
   await expect(why).toBeHidden();
@@ -1279,6 +1281,14 @@ test("Dream fullscreen closes from the letterbox and taps cycle its chrome, text
   await page.keyboard.press("c");
   await expect(header).toBeVisible();
   await expect(actions).toBeVisible();
+  // Hiding the chrome from one of its own controls keeps the shortcut working.
+  await header.getByRole("button", { name: "Close Preview", exact: true }).focus();
+  await page.keyboard.press("c");
+  await expect(why).toBeVisible();
+  await page.keyboard.press("c");
+  await expect(header).toBeHidden();
+  await page.keyboard.press("c");
+  await expect(header).toBeVisible();
   expect(verdicts(dream)).toEqual([]);
 });
 

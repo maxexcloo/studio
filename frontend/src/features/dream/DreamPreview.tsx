@@ -242,9 +242,12 @@ export function DreamPreview({
   // Taps cycle the chrome, then the chrome with the card's text, then the media alone.
   const [chrome, setChrome] = useState<"standard" | "text" | "bare">("standard");
   const bare = chrome === "bare";
-  const cycleChrome = () =>
-    setChrome((shown) => (shown === "standard" ? "text" : shown === "text" ? "bare" : "standard"));
   const stage = useRef<HTMLDivElement>(null);
+  const cycleChrome = () => {
+    // Hiding the chrome removes any focused control in it; the stage keeps the shortcuts working.
+    if (chrome === "text") stage.current?.focus({ preventScroll: true });
+    setChrome(chrome === "standard" ? "text" : chrome === "text" ? "bare" : "standard");
+  };
   const [playbackRoot, setPlaybackRoot] = useState<HTMLDivElement | null>(null);
   const stageRef = useMergedRef(stage, setPlaybackRoot);
   const items = card.kind === "pair" || card.kind === "set" ? card.items : undefined;
@@ -308,6 +311,7 @@ export function DreamPreview({
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
           <div
             ref={stageRef}
+            tabIndex={-1}
             className={`${classes.previewStage} ${viewerClasses.viewerStage}`}
             onClick={(event) => {
               if (
