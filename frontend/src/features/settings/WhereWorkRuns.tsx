@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
 import { imageAspects, maxImageCount, resolutions } from "../../../../shared/resolution";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useGroupFeature } from "../auth/AccountGate";
 import { lockedByAdministrator, useDreamSettings } from "../dream/DreamSettings";
@@ -148,7 +149,7 @@ export function WhereWorkRuns() {
             {cloud && (
               <SettingRow wide label="Run On" description={description}>
                 <SegmentedControl
-                  aria-label="Run On"
+                  aria-label={`${label} Run On`}
                   fullWidth
                   data={sides}
                   value={
@@ -190,9 +191,9 @@ export function WhereWorkRuns() {
                     aria-label="Default Count"
                     data={Array.from({ length: maxImageCount }, (_, index) => ({
                       value: String(index + 1),
-                      label: `${index + 1} Image${index ? "s" : ""}`,
+                      label: plural(index + 1, "Image"),
                     }))}
-                    placeholder="1 Image"
+                    placeholder="Profile Default"
                     value={preferences.imageCount ? String(preferences.imageCount) : null}
                     clearable
                     onChange={(choice) =>

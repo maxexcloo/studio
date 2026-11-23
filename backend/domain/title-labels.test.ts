@@ -8,6 +8,7 @@ test("Title Case lowers minor words except first and last and keeps a word's own
   assert.equal(titleCase("the lighthouse to look at"), "The Lighthouse to Look At");
   assert.equal(titleCase("NASA crew with an iPhone"), "NASA Crew with an iPhone");
   assert.equal(titleCase("red-tailed hawk"), "Red-Tailed Hawk");
+  assert.equal(titleCase("realism v2.0"), "Realism v2.0");
 });
 
 test("titles shorten by whole phrases, never mid-phrase", () => {

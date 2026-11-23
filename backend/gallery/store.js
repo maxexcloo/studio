@@ -641,9 +641,15 @@ export async function visibleGenerationItems(query) {
   return result;
 }
 
-/** The visible items (filterVisibleGallery) the query matches, in gallery order. */
+/** The visible items (filterVisibleGallery, so `disliked` too) the query matches, in gallery order. */
 export const visibleGallery = (query = {}, options = {}) =>
-  filterVisibleGallery(galleryItems({ ...query, unlisted: false }, options));
+  filterVisibleGallery(
+    galleryItems(
+      options.disliked ? { ...query, includeDisliked: true } : { ...query, unlisted: false },
+      options,
+    ),
+    options,
+  );
 
 /**
  * The finished and failed runs made from `since` (ms) that the gallery lists,

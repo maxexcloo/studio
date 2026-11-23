@@ -59,9 +59,9 @@ interface TasteSettings {
   duration?: number;
 }
 /**
- * The result a signal is about: its job and gallery item, prompt and negative cut to 300 characters,
- * profile, enabled LoRAs, settings, seed, title and caption tags. Older signals keep only the job,
- * the prompt, the profile and LoRA names.
+ * The result a signal is about (`tasteChoice`): its prompt, negative and caption cut to 300
+ * characters and up to eight enabled LoRAs. Older signals keep only the job, the prompt, the
+ * profile and LoRA names.
  */
 export interface TasteChoice {
   jobId?: string;
@@ -69,7 +69,7 @@ export interface TasteChoice {
   /** Image or video; older signals leave it out, and those with a duration were videos. */
   media?: "image" | "video";
   title?: string;
-  /** The gallery caption, cut to 300 characters. */
+  /** The gallery caption. */
   caption?: string;
   prompt?: string;
   negative?: string;

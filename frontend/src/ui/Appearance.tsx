@@ -35,6 +35,7 @@ import {
   motionSpeeds,
   studioTheme,
 } from "../theme";
+import { PopupHeading } from "./ChipPopup";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
@@ -150,7 +151,7 @@ function AppearanceControls() {
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();
   return (
-    <ScrollArea.Autosize mah="calc(100dvh - 105px)">
+    <ScrollArea.Autosize mah="calc(100dvh - 145px)">
       <Stack gap="sm">
         <Stack gap={6}>
           <Text size="sm" fw={500}>
@@ -299,8 +300,11 @@ export function AppearanceMenu() {
           </ActionIcon>
         </Popover.Target>
       </PopupTooltip>
-      <Popover.Dropdown data-composer-layer>
-        <AppearanceControls />
+      <Popover.Dropdown data-composer-layer aria-label="Appearance">
+        <Stack gap="sm">
+          <PopupHeading title="Appearance" />
+          <AppearanceControls />
+        </Stack>
       </Popover.Dropdown>
     </Popover>
   );

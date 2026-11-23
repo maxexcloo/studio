@@ -1531,12 +1531,12 @@ test("The viewer's set strip shows only its own set", async ({ page }) => {
     })),
   );
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: Prompt A-1", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Prompt a-1", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Set: Set A", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
-  await strip.getByRole("listitem", { name: "Show Prompt A-0 (2 of 2)", exact: true }).click();
+  await strip.getByRole("listitem", { name: "Show Prompt a-0 (2 of 2)", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "Prompt a-0", exact: true })).toBeVisible();
 });
 

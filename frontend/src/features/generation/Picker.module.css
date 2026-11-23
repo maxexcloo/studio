@@ -56,14 +56,8 @@
 }
 
 .reveal {
-  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
+  --studio-enter-from: translateY(-4px);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .grid,
@@ -290,7 +284,8 @@
   outline: 2px solid var(--mantine-color-body);
   background: var(--mantine-color-default-hover);
   color: var(--mantine-color-dimmed);
-  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
+  --studio-enter-from: translateY(-4px);
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .thumb[data-off] {
@@ -318,15 +313,4 @@
   font-weight: 600;
   line-height: 14px;
   text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reveal,
-  .thumb {
-    animation: none;
-  }
-
-  .check {
-    transition: none;
-  }
 }

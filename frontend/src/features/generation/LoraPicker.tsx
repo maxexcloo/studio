@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   Group,
-  type PopoverProps,
   ScrollArea,
   Scroller,
   Select,
@@ -140,8 +139,6 @@ interface LoraPickerProps {
   value?: GenerationInput;
   onChange?: (input: GenerationInput) => void;
   picker: LoraPickerState;
-  /** Where the desktop popup opens: above the composer's rail by default. */
-  position?: PopoverProps["position"];
 }
 export interface LoraSuggestions {
   disabled?: boolean;
@@ -154,7 +151,6 @@ export function LoraPicker({
   value,
   onChange,
   picker,
-  position = "top-end",
   suggestions,
 }: LoraPickerProps & { suggestions?: LoraSuggestions }) {
   const context = useGeneration();
@@ -257,7 +253,6 @@ export function LoraPicker({
   return (
     <ChipPopup
       title="LoRAs"
-      position={position}
       wide
       opened={picker.opened}
       onOpenedChange={picker.setOpened}

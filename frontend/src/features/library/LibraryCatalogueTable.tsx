@@ -124,7 +124,7 @@ const unique = (values: string[]) => [...new Set(values)].sort(compareNames);
 const views = [
   { value: "installed", label: "Installed" },
   { value: "available", label: "Available" },
-  { value: "updates", label: "Updates" },
+  { value: "outdated", label: "Outdated" },
 ];
 
 /** Models and LoRAs share one compact catalogue: views, search, filters and row actions. */
@@ -178,7 +178,7 @@ export function LibraryCatalogueTable({
   const typeLabel = (item: LibraryItem) =>
     [resourceType(item), item.modelType && modelTypes[item.modelType]].filter(Boolean).join(" · ");
   const inView = items.filter((item) =>
-    view === "updates" ? updating(item) : item.installed === (view === "installed"),
+    view === "outdated" ? updating(item) : item.installed === (view === "installed"),
   );
   const rows = inView.filter(
     (item) =>
@@ -287,7 +287,7 @@ export function LibraryCatalogueTable({
         empty={
           inView.length
             ? "No Matches"
-            : view === "updates"
+            : view === "outdated"
               ? "Everything Is Up to Date"
               : view === "installed"
                 ? `No ${label} Installed`
@@ -319,8 +319,8 @@ export function LibraryCatalogueTable({
                 )}
                 {canUpdate(item) && (
                   <Text size="xs">
-                    Update Available: {item.update?.latest?.name}
-                    {item.update?.note ? ` · ${item.update.note}` : ""}
+                    {/* The note names the update, as "v2 is newer than v1." */}
+                    Update Available: {item.update?.note || item.update?.latest?.name}
                   </Text>
                 )}
                 {item.update?.state === "error" && item.update.note && (

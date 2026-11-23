@@ -3,7 +3,15 @@ import { compareNames } from "../../ui/DataTable";
 import { ChipOption, ChipSelect } from "./ChipSelect";
 
 const brands: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", mimo: "MiMo" };
-const titled = (word: string) => brands[word] ?? titleCase(word);
+// Parameter counts read 31B; other tokens with a letter after a digit (quantisations such as iq4r)
+// keep their own casing.
+const titled = (word: string) =>
+  brands[word] ??
+  (/^\d+(\.\d+)?[bm]$/i.test(word)
+    ? word.toUpperCase()
+    : /\d\p{L}/u.test(word)
+      ? word
+      : titleCase(word));
 const modelTitle = (id: string) => id.split("/")[1]?.split("-").map(titled).join(" ") || id;
 /** A gateway alias by its side and readable model name. */
 export const textModelName = (id: string) => `${titled(id.split("/")[0])} · ${modelTitle(id)}`;

@@ -13,6 +13,7 @@ const {
   setGalleryRatings,
   unseenDreamItem,
   updateGalleryJob,
+  visibleGallery,
 } = await import("./gallery/store.js");
 const { setGallery } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
@@ -73,6 +74,12 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
     ),
     ["mine"],
   );
+  // Comparisons still read their disliked variants, by job or item.
+  for (const query of [{ jobIds: ["job-mine"] }, { ids: ["mine"] }])
+    assert.deepEqual(
+      visibleGallery(query, { disliked: true }).map((entry) => entry.id),
+      ["mine"],
+    );
 });
 
 test("An explicit Dream source is finished, unseen and owned by the caller", () => {

@@ -114,7 +114,6 @@ function Workspace() {
             ? navigate(-1)
             : navigate("/images", { replace: true }),
         )}
-        aria-label={panel === "library" ? "Library" : "Settings"}
         title={
           phone ? (
             <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>
@@ -135,7 +134,8 @@ function Workspace() {
             flexDirection: "column",
           },
           header: { flexShrink: 0 },
-          title: { fontSize: "var(--mantine-font-size-xl)" },
+          // A step above its sections' headings.
+          title: { fontSize: "var(--mantine-h3-font-size)" },
           // The size container WorkspaceSections' navigation fills.
           body: { flex: 1, minHeight: 0, overflowY: "auto", containerType: "size" },
         }}

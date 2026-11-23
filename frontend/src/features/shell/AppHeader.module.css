@@ -38,7 +38,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.home :is(h2, h3) {
+.home h2 {
   line-height: 1;
 }
 
@@ -56,13 +56,13 @@
   min-height: 44px;
 }
 
-:where(:root[data-phone]) .home h3 {
+:where(:root[data-phone]) .home h2 {
   font-size: var(--mantine-font-size-lg);
 }
 
-/* Every header control keeps a 44 px touch height; the modes are wider targets than the status,
-   sized so four modes fit between the side controls on a 375 px phone. The end's icons keep their
-   theme size, in line with the page toolbars' icons below them. */
+/* Every header control keeps a 44 px touch height; the modes are sized so four fit between the side
+   controls on a 375 px phone. The end's icons keep their theme size, in line with the page
+   toolbars' icons below them. */
 :where(:root[data-phone]) .header :is(button, a):not(.home, .end *) {
   width: 32px;
   height: 44px;
@@ -74,43 +74,28 @@
   padding: 2px;
 }
 
-:where(:root[data-phone]) .header .modes .mode {
-  width: 42px;
-  max-width: 100%;
-}
-
 :where(:root[data-phone]) .modes > :has(> .mode) {
   min-width: 0;
 }
 
+:where(:root[data-phone]) .header .modes .mode {
+  flex-shrink: 1;
+  width: min(42px, 9vw);
+}
+
+/* The status keeps room for a count up to 99/99 whether or not one shows, and the modes sit in the
+   row beside it, so they keep one placement as work comes and goes. */
 :where(:root[data-phone]) .header button[data-queue-count] {
+  justify-content: flex-start;
+  gap: 4px;
+  width: calc(19px + 4px + 2.25rem + 8px);
   padding-inline: 4px;
 }
 
-:where(:root[data-phone]) .header:has([data-queue-count]) .modes {
+:where(:root[data-phone]) .header .modes {
   position: relative;
   inset: auto;
   flex-shrink: 1;
   min-width: 0;
   transform: none;
-}
-
-:where(:root[data-phone]) .header:has([data-queue-count]) .modes .mode {
-  flex-shrink: 1;
-  width: min(42px, 9vw);
-}
-
-@media (width <= 25em) {
-  :where(:root[data-phone]) .header .modes .mode {
-    width: min(42px, 9vw);
-  }
-}
-
-@media (width < 375px) {
-  :where(:root[data-phone]) .header .modes {
-    position: relative;
-    inset: auto;
-    min-width: 0;
-    transform: none;
-  }
 }

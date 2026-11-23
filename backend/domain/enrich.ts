@@ -65,6 +65,8 @@ export function createEnricher<Item extends EnrichItem>(options: {
   /** A small (≤512 px) copy of the image, or null when there is none. */
   image(item: Item): Promise<ModelImage | null>;
   save(item: Item, enriched: Enriched): void;
+  /** Why a new result's read failed; its tasks' own work still runs. */
+  failed(reason: string): void;
   now?: () => number;
 }) {
   const { writer, now = Date.now } = options;
@@ -124,7 +126,13 @@ export function createEnricher<Item extends EnrichItem>(options: {
       const signal = new AbortController().signal;
       const done = new Map<Item, Enriched>();
       for (const item of items)
-        done.set(item, await read(item, signal, false).catch((): Enriched => ({})));
+        done.set(
+          item,
+          await read(item, signal, false).catch((error: Error): Enriched => {
+            options.failed(error.message);
+            return {};
+          }),
+        );
       return done;
     },
     /** The caption work's run (domain/captions.ts enrich): it throws when no caption came back. */

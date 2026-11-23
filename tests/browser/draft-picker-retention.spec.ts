@@ -57,7 +57,7 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   await expect.poll(() => listing.evaluate((element) => element.scrollTop)).toBe(120);
   await (await referenceSearch(page)).fill("Copper");
   await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filter Gallery", exact: true });
   const square = filters.getByRole("button", { name: "Square", exact: true });
   await square.click();
   await square.press("Escape");

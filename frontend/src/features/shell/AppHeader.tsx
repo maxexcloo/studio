@@ -148,7 +148,7 @@ export function AppHeader({ mode }: { mode: string }) {
       <FinishedAway />
       <Group gap={phone ? 4 : "sm"} wrap="nowrap">
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
-          <StudioLogo order={phone ? 3 : 2} />
+          <StudioLogo order={2} />
         </Link>
         <StatusAction />
       </Group>

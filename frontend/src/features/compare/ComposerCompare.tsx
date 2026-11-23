@@ -186,7 +186,6 @@ export function CompareMenu({ labels }: { labels: string[] }) {
       opened={opened}
       onOpenedChange={setOpened}
       floating={!!draft.compare}
-      spacious
       target={
         <Button
           {...chipProps}

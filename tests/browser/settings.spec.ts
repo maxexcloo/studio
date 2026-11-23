@@ -35,7 +35,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Dream",
     "Preferences",
     "Where Work Runs",
-    "Dream",
+    "Dream Defaults",
     "Groups",
     "Studio",
     "Users",
@@ -325,7 +325,7 @@ test("Where Work Runs saves each group’s processing and default models", async
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
   await expect(textCloud).toHaveText("Studio's Default");
   const area = (kind: string) =>
-    group(kind).getByRole("radiogroup", { name: "Run On", exact: true });
+    group(kind).getByRole("radiogroup", { name: `${kind} Run On`, exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
   await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
@@ -857,7 +857,10 @@ test("Workers select local text models to benchmark and list each run's figures"
   // One benchmark at a time.
   await expect(await menu("Gemma")).toBeDisabled();
   await closeMenu();
-  await results.getByRole("button", { name: "Actions for Gemma", exact: true }).first().click();
+  await results
+    .getByRole("button", { name: /^Actions for Gemma · / })
+    .first()
+    .click();
   await page.getByRole("menuitem", { name: "Stop", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Stop Benchmark", exact: true });
   await confirm.getByRole("button", { name: "Stop", exact: true }).click();
@@ -967,7 +970,7 @@ test("Settings › Studio switches follow at once and settle back after a failed
   await expect(toggle).toBeChecked();
 });
 
-test("Administration Dream saves shared queue delays and hands an override back to each account", async ({
+test("Dream Defaults saves shared queue delays and hands an override back to each account", async ({
   page,
 }) => {
   await fixtures(page);

@@ -12,7 +12,6 @@ import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout"
 import { comparisonTitle, comparisonsQuery } from "./queries";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
-import filterClasses from "../gallery/GalleryFilters.module.css";
 
 /**
  * The gallery's Comparisons view: a card per comparison or kept Dream comparison, newest first,
@@ -22,13 +21,21 @@ export function ComparisonList({ view }: { view: ReactNode }) {
   const navigate = useNavigate();
   const { columns } = useGalleryColumns();
   const comparisons = useQuery(comparisonsQuery);
-  // The winner, else the first variant still in the gallery, is the cover.
+  // The winner, else the first variant with media, else the first still in the gallery, is the cover.
   const cards = (comparisons.data?.comparisons || []).flatMap((comparison) => {
     const items = comparison.variants.flatMap(({ item }) => (item ? [item] : []));
-    const cover = items.find((item) => item.id === comparison.winnerItemId) || items[0];
+    const cover =
+      items.find((item) => item.id === comparison.winnerItemId) ||
+      items.find((item) => item.url) ||
+      items[0];
     if (!cover) return [];
+    // A run's variants are named by their labels as given, which their set titles title-case.
     const title =
-      comparison.axis || comparison.dream ? comparisonTitle(comparison) : mediaTitle(cover);
+      comparison.axis || comparison.dream
+        ? comparisonTitle(comparison)
+        : cover.resultSet?.id === comparison.id
+          ? comparison.variants.find(({ item }) => item === cover)!.label
+          : mediaTitle(cover);
     return [{ comparison, cover, title }];
   });
   const hold = useHoldToSelect(
@@ -39,7 +46,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
     <Stack gap="sm">
       <VisuallyHidden component="h1">Comparisons</VisuallyHidden>
       <div className={toolbarClasses.band}>
-        <Group gap="xs" mih={44} wrap="nowrap" className={filterClasses.mode}>
+        <Group gap="xs" mih={44} wrap="nowrap">
           {view}
         </Group>
       </div>
@@ -55,7 +62,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
           </Stack>
         </Alert>
       ) : cards.length ? (
-        <SimpleGrid cols={columns} spacing="sm">
+        <SimpleGrid cols={columns} spacing="sm" style={{ alignItems: "start" }}>
           {cards.map(({ comparison, cover, title }) => (
             <Stack key={comparison.id} gap={4} miw={0}>
               <MediaTile
@@ -63,7 +70,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
                 hold={hold}
                 caption="none"
                 label={`Open Comparison: ${title}`}
-                style={{ aspectRatio: "1" }}
+                style={{ aspectRatio: `${cover.width || 1} / ${cover.height || 1}` }}
                 onOpen={() => void navigate(`/compare/${encodeURIComponent(comparison.id)}`)}
               />
               <Text size="sm" fw={500} truncate title={title}>

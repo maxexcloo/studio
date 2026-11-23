@@ -85,8 +85,12 @@ const dreamPriority = `${jobPriority} = ${queuePriority.dream}`;
 const pendingMemoryRecovery = `status = 'failed'
   AND json_extract(record, '$.memoryRecovery') IS NOT NULL
   AND json_extract(record, '$.cleared') IS NULL`;
-/** How many of an account's finished jobs its queue lists, newest first; older ones are read one at a time (`job`). */
-export const listedFinishedJobs = 200;
+/**
+ * How many of an account's finished jobs its queue lists, newest first, of those made in the last
+ * `listedFinishedHours`; older ones are read one at a time (`job`).
+ */
+export const listedFinishedJobs = 100;
+const listedFinishedHours = 24;
 const placeholders = (values: Iterable<unknown>) => [...values].map(() => "?").join(", ");
 const queueListing = `FROM studio_queue WHERE rowid IN (
   SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
@@ -97,7 +101,7 @@ const queueListing = `FROM studio_queue WHERE rowid IN (
   UNION ALL
   SELECT rowid FROM (
     SELECT rowid FROM studio_queue INDEXED BY studio_queue_owner
-      WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
+      WHERE owner_id = ? AND created_at >= ? AND status IN (${placeholders(terminalStatuses)})
       ORDER BY created_at DESC, rowid DESC LIMIT ?
   )
 )`;
@@ -106,6 +110,7 @@ const queueListingArgs = (ownerId: string) => [
   ownerId,
   ownerId,
   ownerId,
+  new Date(Date.now() - listedFinishedHours * 3_600_000).toISOString(),
   ...terminalStatuses,
   listedFinishedJobs,
 ];
@@ -537,8 +542,8 @@ export class Store {
 
   /**
    * The owner's queue as it lists, in queue order: every unfinished job, every failed one not
-   * cleared, and the newest `listedFinishedJobs` of the rest. Nothing is deleted: an older job
-   * stays readable by its ID. With `results` false, records leave out their `items` and
+   * cleared, and the newest `listedFinishedJobs` of the rest made lately. Nothing is deleted: an
+   * older job stays readable by its ID. With `results` false, records leave out their `items` and
    * `outputs`, which copy each result's gallery record twice over.
    */
   queueJobs(ownerId: string, { results = true } = {}): OwnedJob[] {

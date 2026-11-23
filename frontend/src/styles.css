@@ -33,6 +33,18 @@ select {
     font-size: max(16px, 1em);
   }
 }
+/* A small control that keeps its look on touch screens spreads its hit area to a 44 px touch
+   target around it (`data-touch-target`), as linked badges do. */
+@media (pointer: coarse) {
+  [data-touch-target] {
+    overflow: visible;
+  }
+  [data-touch-target]::after {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2));
+  }
+}
 .studio-page {
   margin-inline: auto;
 }
@@ -56,6 +68,7 @@ select {
    media behind it, so it takes the solid raised colour to stay readable. */
 :not([data-portal]) > [data-popup] {
   background: var(--studio-glass-solid) !important;
+  backdrop-filter: none !important;
 }
 /* The installed app draws under the status bar and, held sideways, beside the notch; full-screen
    dialogs and sheets keep their content clear of both (their footers clear the home indicator). */
@@ -82,6 +95,19 @@ select {
 }
 :root[data-phone] {
   --studio-composer-gap: 0.5rem;
+}
+
+/* The shared entrance (`animation: global(studio-enter)` in a CSS module): a fade, moving from any
+   --studio-enter-from transform the element sets. */
+@property --studio-enter-from {
+  syntax: "*";
+  inherits: false;
+}
+@keyframes studio-enter {
+  from {
+    opacity: 0;
+    transform: var(--studio-enter-from, none);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -537,9 +537,5 @@ export function createUpdateChecker({
     apply,
     applyAll,
     settle,
-    reload: () => {
-      state = null;
-      return load();
-    },
   };
 }

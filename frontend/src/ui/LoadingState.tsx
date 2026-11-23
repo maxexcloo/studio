@@ -4,8 +4,9 @@ import classes from "./LoadingState.module.css";
 
 export function LoadingState({ label, fill = false }: { label: string; fill?: boolean }) {
   return (
-    // Grows to centre in any flex or sized container; the minimum keeps it clear of the top elsewhere.
-    <Center flex={1} h="100%" mih={fill ? 0 : { base: "12rem", sm: "24rem" }} px="md">
+    // Grows to centre in any flex or sized container; elsewhere a panel's small minimum keeps it
+    // clear of the top without leaving a gap for the content that replaces it.
+    <Center flex={1} h="100%" mih={fill ? 0 : "var(--studio-panel-min-height)"} px="md">
       <Stack className={classes.indicator} align="center" gap="sm" role="status">
         <Loader size="sm" color="gray" aria-hidden />
         <Text size="sm" c="dimmed">

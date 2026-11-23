@@ -1,14 +1,4 @@
 .indicator {
-  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter)
+  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter)
     min(150ms, var(--studio-motion-duration)) both;
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
 }

@@ -132,6 +132,7 @@ export function SwipeCard({
     const x = vertical ? (from?.dx ?? 0) : (direction === "right" ? 1 : -1) * window.innerWidth;
     const y = vertical ? (direction === "up" ? -1 : 1) * window.innerHeight : (from?.dy ?? 0) + 40;
     element.style.transition = `transform ${duration}ms ${easing.exit}, opacity ${duration}ms ${easing.exit}`;
+    delete element.dataset.dragging;
     place(x, y);
     element.style.opacity = "0";
     return new Promise<void>((resolve) => {
@@ -158,6 +159,7 @@ export function SwipeCard({
   const settle = () => {
     const element = card.current!;
     element.style.transition = `transform ${duration}ms ${easing.enter}`;
+    delete element.dataset.dragging;
     place(0, 0);
     element.style.transform = "";
   };
@@ -193,6 +195,7 @@ export function SwipeCard({
         // Captured where pressed, so the media beneath (its zoom) still sees the press through.
         pressed.setPointerCapture(event.pointerId);
         event.currentTarget.style.transition = "none";
+        event.currentTarget.dataset.dragging = "";
         drag.current = {
           id: event.pointerId,
           target: event.target as HTMLElement,

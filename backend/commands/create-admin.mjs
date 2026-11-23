@@ -26,7 +26,8 @@ function hidden(prompt) {
     const typed = (chunk) => {
       for (const character of chunk) {
         if (character === "\r" || character === "\n") return done();
-        if (character === "\u0003") return done(new Error("Cancelled."));
+        // Ctrl-C or Ctrl-D.
+        if (character === "\u0003" || character === "\u0004") return done(new Error("Cancelled."));
         if (character === "\u007f" || character === "\b") line = line.slice(0, -1);
         else line += character;
       }
@@ -46,5 +47,9 @@ const response = await fetch(`http://127.0.0.1:${port}/api/accounts/bootstrap`, 
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ username: values.email, password }),
 });
-if (!response.ok) throw new Error((await response.json()).error);
+if (!response.ok)
+  throw new Error(
+    (await response.json().catch(() => null))?.error ||
+      `Studio answered ${response.status} ${response.statusText}.`,
+  );
 console.log(`Created the administrator ${values.email}. Sign in with that email and password.`);

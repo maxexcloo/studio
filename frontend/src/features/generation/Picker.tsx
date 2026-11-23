@@ -136,6 +136,7 @@ export function PickerHeader<Tab extends string>({
   actions?: ReactNode;
 }) {
   const [filtering, setFiltering] = useState(false);
+  const phone = usePhone();
   return (
     <Box className={classes.header}>
       <div className={classes.headerRow}>
@@ -143,6 +144,7 @@ export function PickerHeader<Tab extends string>({
           <ScrollingSegments
             className={classes.tabs}
             aria-label={`${label} View`}
+            size={phone ? "xs" : undefined}
             classNames={{ control: classes.tab }}
             value={tab}
             onChange={(value) => onTabChange?.(value as Tab)}
@@ -165,7 +167,7 @@ export function PickerHeader<Tab extends string>({
           />
           {filters && (
             <ChipPopup
-              title="Filters"
+              title={`Filter ${searched}`}
               spacious={false}
               opened={filtering}
               onOpenedChange={setFiltering}
@@ -300,7 +302,12 @@ export function PickerTile({
   /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
-  preview?: { label: string; open: () => void; image?: { src: string; alt: string } };
+  /** The image's `aspect` reserves its size while it loads. */
+  preview?: {
+    label: string;
+    open: () => void;
+    image?: { src: string; alt: string; aspect?: string };
+  };
   row?: boolean;
 }) {
   // Mantine omits target IDs withRoles=false; outside presses still need the preview's target.
@@ -437,7 +444,12 @@ export function PickerTile({
       </Popover.Target>
       {preview?.image && (
         <Popover.Dropdown p={4} className={classes.peek}>
-          <Image src={preview.image.src} alt={preview.image.alt} radius="sm" />
+          <Image
+            src={preview.image.src}
+            alt={preview.image.alt}
+            radius="sm"
+            style={{ aspectRatio: preview.image.aspect }}
+          />
         </Popover.Dropdown>
       )}
     </Popover>
@@ -681,7 +693,7 @@ export function SavedName<T extends SavedItem>({
           </Combobox.Target>
           <Combobox.Dropdown>
             <Combobox.Options aria-label={`Saved ${noun}s`}>
-              <ScrollArea.Autosize mah={240} type="scroll">
+              <ScrollArea.Autosize mah={240}>
                 {matches.map((record) => (
                   <Combobox.Option
                     key={record.id}

@@ -48,7 +48,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
-Administrators set the default profiles in **Settings › Studio** and Dream's delays and account overrides in **Settings › Dream** under Administration; accounts choose Cloud or Local for Dream in **Settings › Where Work Runs**. [Settings](#settings) lists the matching variables.
+Administrators set the default profiles in **Settings › Studio** and Dream's delays and account overrides in **Settings › Dream Defaults** under Administration; accounts choose Cloud or Local for Dream in **Settings › Where Work Runs**. [Settings](#settings) lists the matching variables.
 
 ### Radiance
 

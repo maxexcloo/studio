@@ -104,7 +104,7 @@ export function ViewerDetails({
         aria-label="Generation Details"
         onClick={(event) => event.stopPropagation()}
       >
-        <ScrollArea h="100%" type="hover" offsetScrollbars overscrollBehavior="none">
+        <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
             <Stack gap={2} miw={0}>
               <Text fw={600} lineClamp={2} lh={1.2}>
