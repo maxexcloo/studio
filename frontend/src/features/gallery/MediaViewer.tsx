@@ -24,7 +24,7 @@ import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaJobStatus } from "./MediaJobStatus";
 import { mediaTitle } from "./mediaLabels";
-import { isTallMedia, mediaSource, playbackUrl } from "./mediaSource";
+import { mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
 import { setMembers, setPosition } from "./resultSets";
@@ -594,7 +594,6 @@ export function MediaViewer({
               ref={containStage}
               className={`${classes.stage} ${classes.viewerStage}`}
               data-viewer-stage
-              data-tall={isTallMedia(source) || undefined}
               tabIndex={-1}
               onPointerDown={(event) => {
                 // The zoom library cancels mouse down to pan, so the prompt won't blur on its own.

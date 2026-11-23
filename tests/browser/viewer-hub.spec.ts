@@ -2203,7 +2203,7 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
         !!bounds &&
         !!top &&
         !!bottom &&
-        bounds.y < top.y + top.height &&
+        bounds.y >= top.y + top.height - 1 &&
         bounds.y + bounds.height <= bottom.y + 1
       );
     })

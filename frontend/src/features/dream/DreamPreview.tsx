@@ -26,7 +26,7 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
-import { isTallMedia, mediaSource } from "../gallery/mediaSource";
+import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome } from "../gallery/ViewerChrome";
@@ -285,7 +285,6 @@ export function DreamPreview({
           <div
             ref={stageRef}
             className={`${classes.previewStage} ${viewerClasses.viewerStage}`}
-            data-tall={isTallMedia(mediaSource(item)) || undefined}
             onClick={(event) => {
               if (
                 event.detail &&
