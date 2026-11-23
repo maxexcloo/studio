@@ -45,9 +45,10 @@ import { findCard } from "./manage.js";
 import { aboutTime, assertJobCount, mcpJson, readyIn, scopeMarkdown, setItems } from "./media.js";
 import { namedInTier, referenceCount, registerModelTool, tier } from "./models.js";
 import {
-  accountRules,
+  accountTaste,
   assertAvoided,
   assertProjectReuse,
+  assertTasteExclusions,
   briefLine,
   converging,
   keptChoices,
@@ -661,11 +662,12 @@ export function registerGenerateTools({
     );
   };
   const generateOnce = async (input, signal, accepted) => {
-    const [project, rules, alike] = await Promise.all([
+    const [project, taste, alike] = await Promise.all([
       attachedProject(signal),
-      accountRules(media, owner, signal),
+      accountTaste(media, owner, signal),
       converging(media, owner, signal),
     ]);
+    const { rules } = taste;
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -783,7 +785,6 @@ export function registerGenerateTools({
           : `${base.replace(/[\s,.;]+$/, "")}, ${delta}`,
       );
     }
-    if (project) assertAvoided(project, args.prompts);
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
@@ -1098,6 +1099,22 @@ export function registerGenerateTools({
               };
             }),
           );
+    for (const { plan } of plans) {
+      if (project) assertAvoided(project, plan.prompts);
+      assertTasteExclusions(taste, plan.prompts);
+      if (
+        !plan.reference_asset_ids?.length &&
+        !plan.prompt_references?.some((refs) => refs.length)
+      ) {
+        const relative = plan.prompts.findIndex((prompt) =>
+          /^(?:the )?same as (?:above|before|the previous (?:prompt|image))\b/i.test(prompt),
+        );
+        if (relative >= 0)
+          throw new Error(
+            `Prompt ${relative + 1} depends on an earlier prompt or image. Describe the complete scene, or attach the image if the user wants to edit it.`,
+          );
+      }
+    }
     let strengthOptions;
     if (strengthChoice) {
       const [{ profile, plan }] = plans;
@@ -1324,8 +1341,12 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const project = await attachedProject(signal);
+    const [project, taste] = await Promise.all([
+      attachedProject(signal),
+      accountTaste(media, owner, signal),
+    ]);
     if (project) assertAvoided(project, checked);
+    assertTasteExclusions(taste, checked);
     // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
     const all = await media.profiles("all", owner);
     const seed = crypto.randomInt(2 ** 31);
@@ -1667,8 +1688,12 @@ export function registerGenerateTools({
       }
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
-      const project = await attachedProject(signal);
+      const [project, taste] = await Promise.all([
+        attachedProject(signal),
+        accountTaste(media, owner, signal),
+      ]);
       if (project) assertAvoided(project, plan.args.prompts);
+      assertTasteExclusions(taste, plan.args.prompts);
       const known = project?.constraints.profiles.length
         ? (await media.catalogue(owner)).profiles
         : [];

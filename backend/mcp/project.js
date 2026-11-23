@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { briefSummary } from "../../shared/projects.ts";
 import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
+import { forbiddenMotifs, mentionsMotif } from "../domain/dream-concepts.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -119,10 +120,15 @@ export function assertAvoided({ name, brief }, prompts, list = "that avoid list"
   const terms = brief.avoid
     .split(/[,;\n]+/)
     .map((term) => term.trim().replace(/^(?:no|without)\s+/i, ""))
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((term) => ({
+      term,
+      exact: new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu"),
+      motifs: forbiddenMotifs([term], []),
+    }));
   for (const [index, prompt] of prompts.entries())
-    for (const term of terms)
-      if (new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu").test(prompt))
+    for (const { term, exact, motifs } of terms)
+      if (exact.test(prompt) || motifs.some((motif) => mentionsMotif(prompt, motif)))
         throw new Error(
           `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or change ${list} if the user wants it.`,
         );
@@ -201,11 +207,21 @@ export function assertProjectReuse(project, profile, input, known) {
  * The account's rules (Dream › Taste): limits every prompt keeps. Learnt taste stays out of MCP;
  * an account without taste has none.
  */
-export async function accountRules(media, owner, signal) {
+export async function accountTaste(media, owner, signal) {
   const taste = await media
     .request("GET", "/api/taste", undefined, owner, { signal })
     .catch(() => null);
-  return taste?.rules || [];
+  return { rules: taste?.rules || [], avoid: taste?.preferences?.avoid || [] };
+}
+
+export function assertTasteExclusions({ rules, avoid }, prompts) {
+  const exclusions = [...new Set([...avoid, ...forbiddenMotifs([], rules)])];
+  if (exclusions.length)
+    assertAvoided(
+      { name: "your Taste Profile", brief: { avoid: exclusions.join("\n") } },
+      prompts,
+      "your Taste Profile",
+    );
 }
 
 /** Whether the account's recent results are converging on one look (domain/reflection.ts). */

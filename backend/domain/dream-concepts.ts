@@ -182,7 +182,7 @@ const shownMotifs = (clauses: string[]) => [...new Set(clauses.flatMap(aliasMoti
 const promptMotifs = (prompt: string) =>
   shownMotifs(motifClauses(prompt).map(({ shown }) => shown));
 
-function mentionsMotif(text: string, motif: string) {
+export function mentionsMotif(text: string, motif: string) {
   const alias = motifAliases.find(([name]) => name === motif)?.[1];
   return alias?.test(text) || ` ${phraseWords(text)} `.includes(` ${motif} `);
 }
