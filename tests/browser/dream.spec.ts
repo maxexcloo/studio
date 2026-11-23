@@ -1041,7 +1041,9 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
   await page.goto("/dream");
   await page.getByRole("button", { name: "View A · Quiet", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
-  await preview.getByRole("radio", { name: "B · Bright", exact: true }).press("Space");
+  const bright = preview.getByRole("radio", { name: "B · Bright", exact: true });
+  await bright.press("Space");
+  await expect(bright).toBeChecked();
   const request = page.waitForRequest(
     (req) => req.url().endsWith("/api/suggestions") && req.method() === "POST",
   );
