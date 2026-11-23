@@ -18,7 +18,7 @@ import { PromptCardChoices } from "../characters/PromptCardChoices";
 import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { chipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
-import { draftForProfile, useGeneration } from "./GenerationProvider";
+import { draftForProfile, useDraft, useGeneration } from "./GenerationProvider";
 import {
   controlRange,
   referenceDetails,
@@ -64,7 +64,6 @@ export function ReferencePicker({
   opened: controlled,
   onOpenedChange,
   browser: controlledBrowser,
-  prompt: ownPrompt,
   onCharacterProfile,
 }: {
   /**
@@ -80,8 +79,6 @@ export function ReferencePicker({
     },
   ) => void;
   browser?: ReferenceBrowser;
-  /** The text a character's description joins: the editor's prompt. */
-  prompt?: { value: string; onChange: (value: string) => void };
   value?: ReferenceAsset[];
   onChange?: (references: ReferenceAsset[]) => void;
   profile?: Profile;
@@ -98,12 +95,10 @@ export function ReferencePicker({
     onOpenedChange?.(opened);
   };
   const phone = usePhone();
-  const { draft, setDraft } = useGeneration();
-  const prompt = ownPrompt || {
-    value: String(draft.input.prompt || ""),
-    onChange: (prompt: string) =>
-      setDraft((previous) => ({ ...previous, input: { ...previous.input, prompt } })),
-  };
+  const { setDraft } = useGeneration();
+  // The open sheet follows the prompt its characters, outfits and scenes join.
+  const draft = useDraft(opened);
+  const prompt = String(draft.input.prompt || "");
   const charactersOn = useGroupFeature("characters");
   const [cardQuery, setCardQuery] = useState("");
   // A dialog over the sheet, such as a preview or a card's editor, holds its focus and clicks.
@@ -372,7 +367,7 @@ export function ReferencePicker({
           kind={tab}
           query={cardQuery}
           sort={cardOrder.sort}
-          prompt={prompt.value}
+          prompt={prompt}
           parts={input.cardParts}
           onChange={(prompt, cardParts) => {
             if (onInputChange) onInputChange({ prompt, cardParts });
@@ -389,10 +384,10 @@ export function ReferencePicker({
           query={cardQuery}
           sort={cardOrder.sort}
           references={references}
-          prompt={prompt.value}
+          prompt={prompt}
           parts={input.cardParts}
           profile={profile}
-          switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile && !ownPrompt)}
+          switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile)}
           onChange={(next) => {
             const editor = next.profile;
             // The composer's draft moves to the character's model, its images and prompt with it.

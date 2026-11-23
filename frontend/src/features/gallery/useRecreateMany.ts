@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useDraft, useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 import { galleryKey } from "./queries";
@@ -14,11 +14,14 @@ import { galleryKey } from "./queries";
  * (backend/gallery/recreate.js). The notice counts those still without a prompt.
  */
 export function useRecreateMany() {
-  const { input, profile } = useGeneration();
+  const { input } = useDraft();
+  const { profile } = useGeneration();
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (items: MediaItem[]) => {
       if (!profile) throw new Error("Choose an available model first.");
+      // The draft's negative prompt is read live; one copy keeps every recreation on the same draft.
+      const base = { ...input };
       const ready = items.filter((item) => item.status === "done" && item.suggestedPrompt);
       let queued = 0;
       const failed: { id: string; reason: string }[] = [];
@@ -31,7 +34,7 @@ export function useRecreateMany() {
           await post(`/api/sessions/${sessionId}/generations`, {
             ...generationInput(
               {
-                ...input,
+                ...base,
                 prompt: item.suggestedPrompt || "",
                 seed: "",
                 referenceAssets: [],
