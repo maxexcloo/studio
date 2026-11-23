@@ -17,6 +17,7 @@ import { Link, useLocation } from "react-router";
 
 import { activeStatuses, pausedReason, terminalStatuses } from "../../../../shared/queue";
 import type { QueueJob } from "../../types";
+import { PopupHeading } from "../../ui/ChipPopup";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -185,10 +186,7 @@ export function StatusAction() {
             className={classes.dropdown}
           >
             <Stack gap={2}>
-              <Group justify="space-between" wrap="nowrap" mih={28}>
-                <Text fw={500}>{heading}</Text>
-                <QueueActions />
-              </Group>
+              <PopupHeading title={heading} actions={<QueueActions />} />
               {overall}
             </Stack>
             <div className={classes.list}>
