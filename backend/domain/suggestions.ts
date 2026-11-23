@@ -237,8 +237,11 @@ function referenceNotes(references: DraftReference[]) {
 const referenceImages = (references: DraftReference[]) =>
   references.flatMap(({ image }) => (image ? [image] : []));
 
-/** What the item was made with and what it shows, for the model's next steps and changes. */
-function describeItem(item: SuggestionItem) {
+/**
+ * What the item was made with and what it shows, for the model's next steps and changes; without
+ * its prompt where the model already has it.
+ */
+function describeItem(item: SuggestionItem, withPrompt = true) {
   const settings = item.settings || {};
   const loras = (Array.isArray(settings.loras) ? settings.loras : [])
     .filter((lora) => lora && (typeof lora === "string" || lora.enabled !== false))
@@ -248,11 +251,54 @@ function describeItem(item: SuggestionItem) {
     `Model: ${clean(settings.profileName || settings.profileId, 120) || "unknown"}`,
     item.width && item.height ? `Size: ${item.width} × ${item.height}` : "",
     loras.length ? `LoRAs: ${loras.join(", ")}` : "",
-    `Prompt: ${promptText(item.prompt || item.suggestedPrompt)}`,
+    withPrompt ? `Prompt: ${promptText(item.prompt || item.suggestedPrompt)}` : "",
     item.caption?.text ? `What it shows: ${clean(item.caption.text, 600)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+/** The viewer's next steps instruction, from the picture where the model reads it. */
+const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensored: boolean) =>
+  promptInstruction("suggest-viewer", {
+    kind,
+    availableImages: pictured ? "what the attached image shows, " : "",
+    directions:
+      kind === "video"
+        ? promptInstruction("video-change-directions", {
+            maxSuggestions,
+            angles: angles(motionAngles, maxSuggestions),
+          })
+        : promptInstruction("image-change-directions", {
+            maxSuggestions,
+            areas: angles(stepAreas, stepAreas.length),
+          }),
+    contentRule: contentRule(uncensored),
+    suggestionChoices: suggestionChoices(kind, uncensored),
+    variety: variety(),
+    americanEnglish,
+    avoidFiller: avoidFiller(),
+    data,
+  });
+/** A reply's distinct steps, except the menu's `offered` ones; a motion request is its prompt. */
+function readSteps(reply: { steps?: unknown } | null, offered: string[], motion = false) {
+  const labels = new Set<string>();
+  const requests = new Set<string>();
+  return (Array.isArray(reply?.steps) ? reply.steps : [])
+    .map((step: Record<string, unknown>): NextStep => {
+      const request = clean(step?.request, 160);
+      const prompt = motion ? request : promptText(step?.prompt);
+      return { label: shortTitle(clean(step?.label, 40), 4), request, ...(prompt && { prompt }) };
+    })
+    .filter((step: NextStep) => {
+      const label = sameLabel(step.label);
+      const request = sameLabel(step.request);
+      if (!label || !request || labels.has(label) || requests.has(request)) return false;
+      labels.add(label);
+      requests.add(request);
+      return true;
+    })
+    .filter(unlike(offered))
+    .slice(0, maxSuggestions) as NextStep[];
 }
 
 /**
@@ -263,8 +309,8 @@ function describeItem(item: SuggestionItem) {
  * composer's draft (`draft`), never cached or saved; a `draft` without a request gets change ideas
  * for its prompt, as an image gets next steps. Answers are
  * cached per owner and input for ten minutes, and an image's next steps are saved with it (most
- * written ahead of time by `createNextStepWork`), so the viewer shows them at once; `fresh` asks
- * for different ones. An account without the prompt assistant, or while text is offline, gets
+ * written ahead of time by the read that enriches a new image or by `createNextStepWork`), so the
+ * viewer shows them at once; `fresh` asks for different ones. An account without the prompt assistant, or while text is offline, gets
  * none (never fallback text or cloud).
  */
 export function createSuggestions({
@@ -344,19 +390,24 @@ export function createSuggestions({
     );
   }
 
+  const savedSteps = (
+    field: "nextSteps" | "motionIdeas",
+    steps: (PromptIdea | NextStep)[],
+    uncensored: boolean,
+  ): SavedSteps => ({
+    steps: steps as NextStep[],
+    at: new Date(now()).toISOString(),
+    count: maxSuggestions,
+    revision: field === "motionIdeas" ? motionRevision : suggestionRevision,
+    ...(uncensored ? { uncensored } : {}),
+  });
   function saveSteps(
     source: SuggestionItem,
     field: "nextSteps" | "motionIdeas",
     steps: (PromptIdea | NextStep)[],
     uncensored: boolean,
   ) {
-    save(source, field, {
-      steps: steps as NextStep[],
-      at: new Date(now()).toISOString(),
-      count: maxSuggestions,
-      revision: field === "motionIdeas" ? motionRevision : suggestionRevision,
-      ...(uncensored ? { uncensored } : {}),
-    });
+    save(source, field, savedSteps(field, steps, uncensored));
   }
 
   async function write(
@@ -440,27 +491,7 @@ export function createSuggestions({
           avoidFiller: avoidFiller(),
           data,
         }),
-      viewer: () =>
-        promptInstruction("suggest-viewer", {
-          kind,
-          availableImages: images.length ? "what the attached image shows, " : "",
-          directions:
-            kind === "video"
-              ? promptInstruction("video-change-directions", {
-                  maxSuggestions,
-                  angles: angles(motionAngles, maxSuggestions),
-                })
-              : promptInstruction("image-change-directions", {
-                  maxSuggestions,
-                  areas: angles(stepAreas, stepAreas.length),
-                }),
-          contentRule: contentRule(uncensored),
-          suggestionChoices: suggestionChoices(kind, uncensored),
-          variety: variety(),
-          americanEnglish,
-          avoidFiller: avoidFiller(),
-          data,
-        }),
+      viewer: () => viewerInstruction(kind, images.length > 0, uncensored),
     }[surface]();
     let text: string;
     try {
@@ -511,24 +542,7 @@ export function createSuggestions({
         .slice(0, maxSuggestions) as PromptIdea[];
       return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
-    const labels = new Set<string>();
-    const requests = new Set<string>();
-    const steps = (Array.isArray(reply?.steps) ? reply.steps : [])
-      .map((step: Record<string, unknown>): NextStep => {
-        const request = clean(step?.request, 160);
-        const prompt = surface === "animate" ? request : promptText(step?.prompt);
-        return { label: shortTitle(clean(step?.label, 40), 4), request, ...(prompt && { prompt }) };
-      })
-      .filter((step: NextStep) => {
-        const label = sameLabel(step.label);
-        const request = sameLabel(step.request);
-        if (!label || !request || labels.has(label) || requests.has(request)) return false;
-        labels.add(label);
-        requests.add(request);
-        return true;
-      })
-      .filter(unlike(offered))
-      .slice(0, maxSuggestions) as NextStep[];
+    const steps = readSteps(reply, offered, surface === "animate");
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
@@ -764,6 +778,31 @@ export function createSuggestions({
   }
 
   const service = {
+    /**
+     * A new image's next steps as one task of the read that enriches it (domain/enrich.ts), from
+     * the same rules and taste as the viewer's own ask, which the read's image and prompt complete.
+     * `keep` answers the record to save from the task's reply, if it is usable.
+     */
+    enrichTask(source: SuggestionItem) {
+      const ownerId = source.ownerId || "";
+      const uncensored = explicit(ownerId);
+      const offered = fixed(fixedKinds.viewer);
+      return {
+        instructions: viewerInstruction("image", true, uncensored),
+        context: [
+          ...tasteContext(ownerId).lines,
+          "",
+          describeItem(source, false),
+          ...(offered.length
+            ? [`The menu already offers (suggest different ideas): ${offered.join(", ")}`]
+            : []),
+        ].join("\n"),
+        keep(reply: unknown) {
+          const steps = readSteps(reply as { steps?: unknown } | null, offered);
+          return steps.length ? savedSteps("nextSteps", steps, uncensored) : undefined;
+        },
+      };
+    },
     /**
      * Prepares the viewer's next steps the owner can request when viewing the result; Animate's
      * ideas are written when its menu opens. Throws when none could be written so idle work can
