@@ -24,9 +24,9 @@ const distilled = (profile: Profile) =>
   fast.test(`${profile.displayName || profile.label} ${profile.variantLabel || ""}`);
 
 /**
- * The ready editor for an item: the source's family first where its LoRAs can carry over, then a
- * full model before a distilled one, the source's family, Radiance before ComfyUI before Cloud,
- * and the source's own profile.
+ * The ready editor for an item: any local editor before Cloud, then the source's family where its
+ * LoRAs can carry over, a full model before a distilled one, the source's family, Radiance before
+ * ComfyUI, and the source's own profile.
  */
 export function automaticEditProfile(profiles: Profile[], item: MediaItem) {
   const priorId = item.settings?.profileId;
@@ -37,6 +37,7 @@ export function automaticEditProfile(profiles: Profile[], item: MediaItem) {
   const rank = (profile: Profile) => {
     const other = Number(!family || profile.family !== family);
     return [
+      Number(isCloudProfile(profile)),
       loras ? other : 0,
       Number(distilled(profile)),
       other,

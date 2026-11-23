@@ -34,6 +34,10 @@ test("edits prefer a full editor, keeping LoRAs within the source's family", () 
   assert.equal(automaticEditProfile(profiles, item("krea"))?.id, "klein-base");
   // With LoRAs the source's family wins, so they carry over.
   assert.equal(automaticEditProfile(profiles, item("krea", ["curvy"]))?.id, "krea-turbo");
+  // A ready local editor, even a distilled one, wins over Cloud.
+  const grok = editor("grok", "Grok Imagine", "grok", "cloud");
+  assert.equal(automaticEditProfile([grok, kreaTurbo], item("krea"))?.id, "krea-turbo");
+  assert.equal(automaticEditProfile([grok], item("krea"))?.id, "grok");
   // An unready editor is passed over.
   const parked = { ...kleinBase, availability: "parked" as const };
   assert.equal(automaticEditProfile([kleinFast, parked], item("klein"))?.id, "klein");
