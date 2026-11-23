@@ -12,17 +12,17 @@ import {
   Table,
   Text,
 } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId } from "react";
 
 import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
-import { SettingGroup } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
@@ -192,12 +192,6 @@ export function LibraryImportReview({
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
         void client.invalidateQueries({ queryKey: editableProfilesQuery.queryKey });
       }
-      if (result.failures?.length)
-        notifications.show({
-          color: "yellow",
-          title: "Download Needs Attention",
-          message: result.failures.join(" "),
-        });
       if (result.import.id !== id) onOpen(result.import.id);
     },
   });
@@ -280,6 +274,9 @@ export function LibraryImportReview({
               </Button>
             </Group>
             {record.error && <Alert color="red">{record.error}</Alert>}
+            {!!action.data?.failures?.length && (
+              <Alert color="yellow">{action.data.failures.join(" ")}</Alert>
+            )}
             {canDraft && (
               <Button
                 variant="default"
@@ -400,38 +397,51 @@ export function LibraryImportReview({
                 }
               >
                 {resources.map((resource, index) => (
-                  <Stack
+                  <SettingRow
                     key={`${index}:${resource.name}`}
-                    gap="xs"
-                    py="sm"
-                    style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
-                  >
-                    <Group justify="space-between">
-                      <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
+                    label={
+                      <span style={{ overflowWrap: "anywhere" }}>
                         {resource.want?.file || resource.name}
-                      </Text>
-                      <Badge color={resource.status === "installed" ? "green" : "gray"}>
-                        {stateLabel(resource.status)}
-                      </Badge>
-                    </Group>
-                    {resource.note && <Text size="sm">{resource.note}</Text>}
-                    {resource.downloadError && (
-                      <Text size="sm" c="red">
-                        {resource.downloadError}
-                      </Text>
-                    )}
-                    {resource.unavailable && (
-                      <Text size="sm">
-                        {resource.unavailable.note || resource.unavailable.reason}
-                      </Text>
-                    )}
-                    {resource.substitute && (
-                      <Text size="sm">
-                        Using {resource.substitute.file}: {resource.substitute.reason}
-                      </Text>
-                    )}
+                      </span>
+                    }
+                    description={
+                      <Stack gap={4} component="span">
+                        {[
+                          resource.note,
+                          resource.unavailable &&
+                            (resource.unavailable.note || resource.unavailable.reason),
+                          resource.substitute &&
+                            `Using ${resource.substitute.file}: ${resource.substitute.reason}`,
+                        ].map(
+                          (line) =>
+                            line && (
+                              <Text key={line} span size="xs">
+                                {line}
+                              </Text>
+                            ),
+                        )}
+                        {resource.downloadError && (
+                          <Text span size="xs" c="red">
+                            {resource.downloadError}
+                          </Text>
+                        )}
+                        {resource.want?.source?.url && (
+                          <Anchor
+                            size="xs"
+                            href={resource.want.source.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            File Source
+                          </Anchor>
+                        )}
+                      </Stack>
+                    }
+                  >
                     {resource.progress && (
                       <Progress
+                        size="sm"
+                        w={96}
                         aria-label={`Downloading ${resource.name}`}
                         value={
                           resource.progress.totalBytes > 0
@@ -440,45 +450,40 @@ export function LibraryImportReview({
                         }
                       />
                     )}
-                    <Group>
-                      {resource.want?.source?.url && (
-                        <Anchor
-                          size="sm"
-                          href={resource.want.source.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          File Source
-                        </Anchor>
-                      )}
-                      {resource.folderGuessed && resource.status !== "installed" && (
-                        <Select
-                          label={`Destination for ${resource.name}`}
-                          value={resource.want?.folder || null}
-                          data={folders}
-                          disabled={action.isPending}
-                          onChange={(folder) => folder && run("folder", { index, folder })}
-                        />
-                      )}
-                      {resource.status === "substitute" && (
-                        <SubstituteChoice
-                          accepted={resource.accepted}
-                          disabled={action.isPending}
-                          onChoose={(accept) => run("substitute", { index, accept })}
-                        />
-                      )}
-                      {resource.downloadable && (
-                        <Button
-                          size="compact-sm"
-                          variant="default"
-                          disabled={action.isPending}
-                          onClick={() => run("download", { indices: [index] })}
-                        >
-                          Download Exact File
-                        </Button>
-                      )}
-                    </Group>
-                  </Stack>
+                    <Badge
+                      miw="max-content"
+                      color={resource.status === "installed" ? "green" : "gray"}
+                    >
+                      {stateLabel(resource.status)}
+                    </Badge>
+                    {resource.folderGuessed && resource.status !== "installed" && (
+                      <Select
+                        aria-label={`Destination for ${resource.name}`}
+                        size="xs"
+                        value={resource.want?.folder || null}
+                        data={folders}
+                        disabled={action.isPending}
+                        onChange={(folder) => folder && run("folder", { index, folder })}
+                      />
+                    )}
+                    {resource.status === "substitute" && (
+                      <SubstituteChoice
+                        accepted={resource.accepted}
+                        disabled={action.isPending}
+                        onChoose={(accept) => run("substitute", { index, accept })}
+                      />
+                    )}
+                    {resource.downloadable && (
+                      <Button
+                        size="compact-sm"
+                        variant="default"
+                        disabled={action.isPending}
+                        onClick={() => run("download", { indices: [index] })}
+                      >
+                        Download
+                      </Button>
+                    )}
+                  </SettingRow>
                 ))}
               </SettingGroup>
             )}
@@ -489,57 +494,65 @@ export function LibraryImportReview({
                   downloads until you choose one.
                 </Text>
                 {record.offers.map((offer, index) => (
-                  <Stack
+                  <SettingRow
                     key={offer.key}
-                    gap="xs"
-                    py="sm"
-                    style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
+                    label={<span style={{ overflowWrap: "anywhere" }}>{offer.file}</span>}
+                    description={
+                      <Stack gap={4} component="span">
+                        <Text span size="xs">
+                          {[offer.label, offer.relation, offer.variant].filter(Boolean).join(" · ")}
+                        </Text>
+                        {[
+                          offer.unavailable && (offer.unavailable.note || offer.unavailable.reason),
+                          offer.note,
+                        ].map(
+                          (line) =>
+                            line && (
+                              <Text key={line} span size="xs">
+                                {line}
+                              </Text>
+                            ),
+                        )}
+                        {offer.url && (
+                          <Anchor size="xs" href={offer.url} target="_blank" rel="noreferrer">
+                            Version Source
+                          </Anchor>
+                        )}
+                        {offer.unavailable?.freeAlternative?.url && (
+                          <Anchor
+                            size="xs"
+                            href={offer.unavailable.freeAlternative.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Free Version: {offer.unavailable.freeAlternative.name}
+                          </Anchor>
+                        )}
+                      </Stack>
+                    }
                   >
-                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                      {offer.file}
-                    </Text>
-                    <Text size="sm" c="dimmed">
-                      {[offer.label, offer.relation, offer.variant].filter(Boolean).join(" · ")}
-                    </Text>
-                    {offer.unavailable && (
-                      <Text size="sm">{offer.unavailable.note || offer.unavailable.reason}</Text>
-                    )}
-                    {offer.note && <Text size="sm">{offer.note}</Text>}
-                    <Group>
-                      {offer.url && (
-                        <Anchor href={offer.url} target="_blank" rel="noreferrer">
-                          Version Source
-                        </Anchor>
-                      )}
-                      {offer.unavailable?.freeAlternative?.url && (
-                        <Anchor
-                          href={offer.unavailable.freeAlternative.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Free Version: {offer.unavailable.freeAlternative.name}
-                        </Anchor>
-                      )}
-                      <Button
-                        size="compact-sm"
-                        variant="default"
-                        disabled={
-                          !!offer.unavailable ||
-                          !offer.downloadable ||
-                          offer.taken ||
-                          action.isPending
-                        }
-                        onClick={() => run("offers", { index })}
-                      >
-                        {offer.taken ? "Chosen" : "Download Version"}
-                      </Button>
-                    </Group>
-                  </Stack>
+                    <Button
+                      size="compact-sm"
+                      variant="default"
+                      disabled={
+                        !!offer.unavailable ||
+                        !offer.downloadable ||
+                        offer.taken ||
+                        action.isPending
+                      }
+                      onClick={() => run("offers", { index })}
+                    >
+                      {offer.taken ? "Chosen" : "Download"}
+                    </Button>
+                  </SettingRow>
                 ))}
               </SettingGroup>
             )}
           </>
         ) : null}
+        <DialogFooter>
+          <Button onClick={onClose}>Done</Button>
+        </DialogFooter>
       </Stack>
     </Modal>
   );

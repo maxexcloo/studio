@@ -88,7 +88,7 @@ type PageState = GalleryState &
     reviewQuery?: string;
     viewer?: boolean;
   };
-type GalleryView = "gallery" | "uploads" | "review";
+type GalleryView = "gallery" | "uploads" | "comparisons" | "review";
 const GalleryReview = lazy(() =>
   import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
@@ -258,8 +258,10 @@ function Gallery() {
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
-    // Returning to the tab reads only the first page (below), not every loaded page.
+    // A refetch rereads every loaded page in turn. Returning to the tab or the listing, and queue
+    // changes, read only the first page (below).
     refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
   // The tiles only need one page. Let it arrive before requesting summaries of the listing.
   const listingReady =
@@ -371,6 +373,8 @@ function Gallery() {
     },
     [listingKey],
   );
+  // Cached results show at once, then their first page is read again.
+  useEffect(() => refreshFirst(), [listingKey]);
   // A return or final completion during a read still needs a fresh head once that read settles.
   useEffect(() => {
     if (!gallery.isFetching && !refresh.isFetching && pendingFirst.current === listingKey)
@@ -385,14 +389,15 @@ function Gallery() {
     refresh.errorUpdatedAt,
     refreshFirst,
   ]);
-  // Pending tiles need polling for live previews only while the listing can show them.
+  // Pending tiles need polling for live previews only while the listing can show them. Other
+  // sorts would reread every loaded page, so their tiles change only as the queue does.
   useEffect(() => {
-    if (review || !showWork || !jobs?.active) return;
+    if (review || !showWork || !jobs?.active || sort !== "newest") return;
     const timer = setInterval(() => {
       if (!document.hidden) void refreshFirst();
     }, 3000);
     return () => clearInterval(timer);
-  }, [review, showWork, jobs?.active, refreshFirst]);
+  }, [review, showWork, jobs?.active, refreshFirst, sort]);
   useEffect(
     () =>
       focusManager.subscribe((focused) => {
@@ -500,35 +505,36 @@ function Gallery() {
     retained: Map<string, MediaItem>;
     total?: number;
   } | null>(null);
-  const viewerScope = JSON.stringify(listingKey);
-  if (!itemId) viewerOrder.current = null;
-  else {
+  const listingScope = useMemo(() => JSON.stringify(listingKey), [listingKey]);
+  const total = gallery.data?.pages.at(-1)?.totalApprox;
+  // Reconciled only when the listing or the shown item changes, not on every gallery render.
+  const order = useMemo(() => {
+    if (!itemId) return (viewerOrder.current = null);
     const previous = viewerOrder.current;
-    const retained = new Map(previous?.scope === viewerScope ? previous.retained : []);
+    const retained = new Map(previous?.scope === listingScope ? previous.retained : []);
     // Dislike hides the current tile, but it remains a neighbour until this viewer closes.
     if (shown) retained.set(mediaIdentity(shown), shown);
     for (const candidate of loaded) retained.delete(mediaIdentity(candidate));
     const next =
-      previous?.scope === viewerScope
+      previous?.scope === listingScope
         ? reconcileViewerItems(previous.items, loaded, [...retained.values()])
         : loaded;
     const reset =
-      previous?.scope !== viewerScope ||
+      previous?.scope !== listingScope ||
       !previous.items.length ||
       (shown && !next.some((item) => mediaIdentity(item) === mediaIdentity(shown)));
-    viewerOrder.current = {
-      scope: viewerScope,
+    return (viewerOrder.current = {
+      scope: listingScope,
       items: reset ? loaded : next,
       retained,
-      total: gallery.data?.pages.at(-1)?.totalApprox ?? (reset ? undefined : previous.total),
-    };
-  }
-  const viewerItems = viewerOrder.current?.items || loaded;
+      total: total ?? (reset ? undefined : previous.total),
+    });
+  }, [itemId, listingScope, loaded, shown, total]);
+  const viewerItems = order?.items || loaded;
   // The query the shown results answer: placeholder results still answer the previous one.
-  const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
-  if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
-    setResultsKey(JSON.stringify(listingKey));
-  const selection = useGallerySelection(loaded, JSON.stringify([scope, query]), {
+  const [resultsKey, setResultsKey] = useState(listingScope);
+  if (!gallery.isPlaceholderData && resultsKey !== listingScope) setResultsKey(listingScope);
+  const selection = useGallerySelection(loaded, scope, {
     complete: !gallery.hasNextPage && !gallery.hasPreviousPage,
     ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
     load: async (match, signal) =>
@@ -536,12 +542,12 @@ function Gallery() {
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
-  // Liked or Uploads alone already has its own control in the toolbar.
+  // Liked, Uploads or Comparisons alone already has its own control in the toolbar.
   const toggledOnly =
     !search &&
     !similar &&
-    (filters.uploads || filters.rating === "liked") &&
-    JSON.stringify({ ...filters, uploads: false, rating: "" }) ===
+    (filters.uploads || filters.comparisons || filters.rating === "liked") &&
+    JSON.stringify({ ...filters, uploads: false, comparisons: false, rating: "" }) ===
       JSON.stringify(emptyGalleryFilters);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
@@ -598,17 +604,18 @@ function Gallery() {
   const detail = useCallback((item: MediaItem) => mediaDetail(item, profiles), [profiles]);
   // Phones without captions hold a tile for its menu instead of showing More.
   const hideMore = phone && !captions;
+  const { toggle } = selection;
   const renderTileActions = useCallback(
     (item: MediaItem, opened: boolean, onOpenedChange: (opened: boolean) => void) => (
       <MediaTileActions
         item={item}
         opened={opened}
         onOpenedChange={onOpenedChange}
-        onSelect={() => selection.toggle([item])}
+        onSelect={() => toggle([item])}
         hideMore={hideMore}
       />
     ),
-    [hideMore, selection],
+    [hideMore, toggle],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(
@@ -700,20 +707,33 @@ function Gallery() {
       return;
     }
     const uploads = next === "uploads";
-    if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
+    const comparisons = next === "comparisons";
+    if (uploads !== filters.uploads || comparisons !== filters.comparisons)
+      setFilters({ ...filters, uploads, comparisons, rating: "" });
     if (review) closeReview();
   }
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
       ref={viewButton}
-      value={review ? "review" : filters.uploads ? "uploads" : "gallery"}
+      value={
+        review
+          ? "review"
+          : filters.uploads
+            ? "uploads"
+            : filters.comparisons
+              ? "comparisons"
+              : "gallery"
+      }
       groups={[
         [
           { value: "gallery", label: "Gallery" },
           { value: "uploads", label: "Uploads" },
         ],
-        [{ value: "review", label: "Review", disabled: selection.selecting }],
+        [
+          { value: "comparisons", label: "Comparisons" },
+          { value: "review", label: "Review", disabled: selection.selecting },
+        ],
       ]}
       onChange={showView}
     />
@@ -725,7 +745,7 @@ function Gallery() {
           key={kind}
           listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
           leftAt={leftAt}
-          back={closeReview}
+          close={closeReview}
           view={view}
         />
       </Suspense>
@@ -925,11 +945,7 @@ function Gallery() {
                   if (sort === "newest" && !historical) refreshFirst();
                 }}
               >
-                {arrivals
-                  ? "Jump to New Results"
-                  : incoming === 1
-                    ? "1 New Result"
-                    : `${incoming} New Results`}
+                {arrivals ? "Jump to New Results" : "New Results"}
               </Button>
             </div>
           )}
@@ -977,7 +993,9 @@ function Gallery() {
             : toggledOnly
               ? filters.uploads
                 ? "No Uploads"
-                : `No Liked ${kind === "video" ? "Videos" : "Images"}`
+                : filters.comparisons
+                  ? "No Comparisons"
+                  : `No Liked ${kind === "video" ? "Videos" : "Images"}`
               : search || hasFilters
                 ? "No Matches"
                 : kind === "video"
@@ -995,11 +1013,7 @@ function Gallery() {
           </Stack>
         </Alert>
       )}
-      <MorePages
-        listing={gallery}
-        results={JSON.stringify(listingKey)}
-        paused={!!itemId || !!review}
-      />
+      <MorePages listing={gallery} results={listingScope} paused={!!itemId || !!review} />
       {!selection.selecting && (
         <ComposerDock
           compose={!!state?.compose}
@@ -1016,7 +1030,7 @@ function Gallery() {
           item={shown || selected}
           items={viewerItems}
           related={loaded}
-          total={viewerOrder.current?.total}
+          total={order?.total}
           navigate={showItem}
           follow={openItem}
           onReturnFocus={(item) => {

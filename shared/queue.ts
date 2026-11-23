@@ -133,7 +133,7 @@ export interface QueueRetryResponse {
   outcomes: ({ id: string; replacement: string } | { id: string; error: string })[];
 }
 
-/** Settings › Generation › Unfinished Items: any account's job that has not finished. */
+/** Settings › Workers › Unfinished Items: any account's job that has not finished. */
 export interface UnfinishedJob extends QueueJob {
   ownerId: string;
 }

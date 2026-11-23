@@ -68,7 +68,7 @@ function InstructionEditor({
               placeholder="Choose a saved version"
               data={versions.map(({ version }) => ({
                 value: String(version),
-                label: `Version ${version}`,
+                label: `v${version}`,
               }))}
               onChange={(version) => {
                 const previous = versions.find((entry) => String(entry.version) === version);
@@ -156,13 +156,22 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
               header: "Name",
               main: true,
               sortValue: ({ label }) => label,
-              cell: ({ label, area }) => <TableRecord name={label} detail={area} />,
+              cell: (instruction) => (
+                <TableRecord
+                  name={instruction.label}
+                  detail={instruction.area}
+                  openLabel={`Edit ${instruction.label}`}
+                  onOpen={() => setEditing(instruction)}
+                />
+              ),
             },
             {
               key: "version",
               header: "Version",
               sortValue: ({ version }) => version ?? 0,
-              cell: ({ version }) => <Text size="sm">{version ?? "Default"}</Text>,
+              cell: ({ version }) => (
+                <Text size="sm">{version === null ? "Default" : `v${version}`}</Text>
+              ),
             },
           ]}
           rowActions={(instruction) => (

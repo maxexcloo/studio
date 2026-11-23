@@ -196,11 +196,11 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     await editor.getByRole("button", { name: "Actions for Version 1", exact: true }).click();
     await page.getByRole("menuitem", { name: action, exact: true }).click();
   };
-  await versionActions("View Version");
-  await expect(editor.getByRole("textbox", { name: "Saved Definition", exact: true })).toHaveValue(
-    /Original guidance\./,
+  await versionActions("View");
+  await expect(editor.getByRole("region", { name: "Saved Definition", exact: true })).toContainText(
+    "Original guidance.",
   );
-  await versionActions("Restore Version");
+  await versionActions("Restore");
   await expect(editor).toBeHidden();
   expect(saved).toEqual([original, { ...original, summary: "Updated guidance." }, original]);
   await editDefinition(page, "Guide");
@@ -489,7 +489,7 @@ test("Prompt Styles sort by type and then name, and can be filtered and edited",
   });
   let styles = [
     style("candid", "improve", "Candid"),
-    style("spicy", "improve", "Extended Themes", { uncensored: true }),
+    style("spicy", "improve", "Uncensored", { uncensored: true }),
     style("cinematic", "animate", "Cinematic Camera"),
   ];
   let hash = "h1";
@@ -510,14 +510,14 @@ test("Prompt Styles sort by type and then name, and can be filtered and edited",
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
   const names = table.getByRole("row").locator("td:first-child > p:first-child");
-  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Extended Themes Uncensored"]);
+  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Uncensored Uncensored"]);
   await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
-  await expect(names).toHaveText(["Candid", "Cinematic Camera", "Extended Themes Uncensored"]);
+  await expect(names).toHaveText(["Candid", "Cinematic Camera", "Uncensored Uncensored"]);
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   const type = page.getByRole("radiogroup", { name: "Type", exact: true });
   await type.getByText("Improve Prompt", { exact: true }).click();
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  await expect(table.getByText("Extended Themes line.")).toBeVisible();
+  await expect(table.getByText("Uncensored line.")).toBeVisible();
   await expect(table.getByText("Cinematic Camera", { exact: true })).toBeHidden();
   // A switch applies at once, over the list's hash. Its track takes the pointer, as it has no
   // visible label, so the click goes to the switch directly.

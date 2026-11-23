@@ -1,6 +1,6 @@
 import path from "node:path";
 
-/** A resolved native path for comparisons on Studio's Linux and macOS hosts. */
+/** A resolved native path for comparisons. */
 export const pathKey = (value) => path.resolve(String(value || ""));
 
 /** Whether a native path is inside a folder, optionally including the folder itself. */

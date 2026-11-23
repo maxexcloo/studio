@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
+import {
+  exactPromptInstructions,
+  fullBodyPerson,
+  promptListProblem,
+  repeatedSetProblem,
+  requestedCount,
+  turnCountProblem,
+} from "./prompt-checks.js";
 
 test("a full-body or wide shot of a person counts; portraits and empty scenes do not", () => {
   for (const prompt of [
@@ -99,4 +106,26 @@ test("a prompt list must hold distinct prompts and must not be broken JSON", () 
   );
   // A list whose JSON broke (a stray token before the closing bracket) would run as one prompt.
   assert.match(promptListProblem(['["A tree", "A flower"先后]']), /isn't valid JSON/);
+});
+
+test("prompts repeating an earlier set are refused with the set they repeat", () => {
+  const earlier = [{ number: 2, prompts: ["A red fox naps in fresh snow beside a pine tree"] }];
+  assert.match(
+    repeatedSetProblem(
+      ["A lighthouse at dusk", "A red fox naps in the fresh snow by a pine tree"],
+      earlier,
+    ),
+    /^prompt 2 repeats set 2\./,
+  );
+  assert.equal(repeatedSetProblem(["A heron wades through reeds at dawn"], earlier), "");
+});
+
+test("a turn queues no more images than its request asks for", () => {
+  assert.equal(requestedCount("make 200 more"), 200);
+  assert.equal(requestedCount("five photos of my dog"), 5);
+  assert.equal(requestedCount("a cat on a sofa"), 0);
+  assert.equal(turnCountProblem("give me twelve images", 10, 2), "");
+  assert.match(turnCountProblem("give me twelve images", 10, 4), /queue at most 2 more/);
+  assert.match(turnCountProblem("give me twelve images", 12, 1), /queued them all/);
+  assert.equal(turnCountProblem("a cat", 50, 10), "");
 });

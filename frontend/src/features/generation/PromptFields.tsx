@@ -186,16 +186,11 @@ export function PromptFields({
     enabled: offerIdeas && !proposal && !ask?.pending,
     onChange: (prompt) => onChange({ prompt }),
   });
+  // Suggestions load as the AI menu opens, so they are ready to open.
   const suggestions =
     ideas.suggestions ??
     (ask?.available && base.trim()
-      ? {
-          ...draftSuggestions,
-          action: {
-            ...draftSuggestions.action,
-            onOpen: () => void client.fetchQuery(steps).catch(() => {}),
-          },
-        }
+      ? { ...draftSuggestions, load: () => void client.fetchQuery(steps).catch(() => {}) }
       : undefined);
   const preview = useMediaPreview();
   const pictures = compact
@@ -223,6 +218,7 @@ export function PromptFields({
           heading: false,
           icon: icons.assistant,
           disabled: ask?.pending,
+          onOpen: suggestions?.load,
           menu: assistMenu({
             suggestions,
             templates: assistant.templates ?? [],

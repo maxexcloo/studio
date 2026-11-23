@@ -268,11 +268,7 @@ export function FilterChips({
   children?: ReactNode;
 }) {
   return (
-    <Scroller
-      className={classes.chips}
-      edgeGradientColor="var(--mantine-color-body)"
-      controlSize={28}
-    >
+    <Scroller className={classes.chips} edgeGradientColor="transparent" controlSize={28}>
       <Group gap={6} wrap="nowrap" py={4} role="group" aria-label="Active Filters">
         {chips.map((chip) =>
           chip.choice ? (

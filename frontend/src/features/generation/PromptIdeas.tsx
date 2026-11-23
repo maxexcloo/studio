@@ -5,7 +5,6 @@ import { maxSuggestions } from "../../../../shared/suggestions";
 import type { GenerationInput, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
-import { icons } from "../../ui/icons";
 import { useGroupFeature } from "../auth/AccountGate";
 import { appliedCardIds } from "../characters/cardParts";
 import { draftSuggestionContext, promptIdeasQuery } from "../taste/suggestions";
@@ -42,42 +41,32 @@ export function usePromptIdeas({
   const query = promptIdeasQuery(context, cards);
   const ideas = useQuery({ ...query, enabled: false });
   function load(fresh = false) {
-    const options = promptIdeasQuery(context, cards, fresh);
-    void client.fetchQuery({ ...options, ...(fresh && { staleTime: 0 }) }).catch(() => {});
+    const next = promptIdeasQuery(context, cards, fresh);
+    void client.fetchQuery({ ...next, ...(fresh && { staleTime: 0 }) }).catch(() => {});
   }
-  const list = [...(ideas.data?.suggestions ?? [])]
+  const options = [...(ideas.data?.suggestions ?? [])]
     .slice(0, maxSuggestions)
-    .sort((a, b) => compareNames(a.label, b.label));
-  const { options, again } = suggested(
-    ideas.isFetching,
-    list.map((idea) => ({
+    .sort((a, b) => compareNames(a.label, b.label))
+    .map((idea): Action => ({
       id: `idea:${idea.label}`,
       label: idea.label,
       onClick: () => {
         setPicked({ before: base, after: idea.prompt, label: idea.label });
         onChange(idea.prompt);
       },
-    })),
-    { onClick: () => load(true) },
-    ideas.error?.message || ideas.data?.reason,
-  );
+    }));
   const offered =
     enabled && mayUseAssistant && assistant.data?.available && (cards || !prompt.trim());
   return {
     suggestions: offered
       ? {
-          action: {
-            id: "suggestions",
-            label: "Suggestions",
-            icon: icons.assistant,
-            menu: [
-              ideas.isPending && !ideas.isFetching
-                ? [{ id: "loading-suggestions", label: "Loading…", disabled: true }]
-                : options,
-            ],
-            onOpen: () => load(),
-          } satisfies Action,
-          refresh: again,
+          ...suggested(options, {
+            loading: ideas.isFetching,
+            answered: Boolean(ideas.data || ideas.error),
+            failure: ideas.error?.message || ideas.data?.reason,
+            onRefresh: () => load(true),
+          }),
+          load: () => load(),
         }
       : undefined,
     label: current?.label,

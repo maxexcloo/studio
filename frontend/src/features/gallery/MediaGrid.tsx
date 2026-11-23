@@ -22,7 +22,7 @@ import { mediaIdentity } from "./mediaSource";
 import { MediaTile } from "./MediaTile";
 import type { GalleryDate } from "./queries";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
-import type { GallerySelection } from "./useGallerySelection";
+import type { GallerySelection, SelectionActions } from "./useGallerySelection";
 import { useRatings } from "./useMediaRating";
 
 import classes from "./MediaGrid.module.css";
@@ -254,23 +254,26 @@ export function MediaGrid({
   );
   useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`, leadingPage);
   const tileIndex = (id: string) => items.findIndex((item) => item.id === id);
+  // Arrow keys read the latest layout, so the tiles keep one handler as pages arrive.
+  const latest = useRef({ items, layout });
+  latest.current = { items, layout };
   /** Scrolls a tile into view only as far as it must, as a focus move does. */
   const scrollToTile = useCallback(
     (index: number) => {
-      const tile = layout?.tiles[index];
+      const tile = latest.current.layout?.tiles[index];
       if (!tile || !host.current) return;
       const top = gridTop(host.current) + tile.top;
       if (top < window.scrollY) window.scrollTo({ top });
       else if (top + tile.height > window.scrollY + window.innerHeight)
         window.scrollTo({ top: top + tile.height - window.innerHeight });
     },
-    [layout, host],
+    [host],
   );
   const onArrow = useCallback(
     (index: number, event: KeyboardEvent<HTMLButtonElement>) => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       const direction = arrows[event.key];
-      const next = direction && items[index + direction];
+      const next = direction && latest.current.items[index + direction];
       if (!next) return;
       event.preventDefault();
       pendingFocus.current = next.id;
@@ -278,7 +281,7 @@ export function MediaGrid({
       // Mounted neighbours can receive focus without waiting for a scroll render.
       if (focusTile(host.current, next.id)) pendingFocus.current = null;
     },
-    [items, scrollToTile, host],
+    [scrollToTile, host],
   );
   useLayoutEffect(() => {
     if (!layout) return;
@@ -357,12 +360,14 @@ export function MediaGrid({
               width={cell}
               height={tile.height}
               eager={tile.top < visibleBottom && tile.top + tile.height > visibleTop}
-              menuItem={menuItem}
+              menuOpen={menuItem === item.id}
               setMenuItem={setMenuItem}
               onArrow={onArrow}
               open={open}
               onTap={phone && item.status === "done" && !selection.selecting ? onTap : undefined}
-              selection={selection}
+              selecting={selection.selecting}
+              selected={selection.selected.has(item.id)}
+              select={selection.actions}
               hold={hold}
               caption={caption}
               detail={detail}
@@ -401,7 +406,7 @@ const GridCell = memo(function GridCell({
   top,
   width,
   height,
-  menuItem,
+  menuOpen,
   setMenuItem,
   onArrow,
   open,
@@ -411,7 +416,7 @@ const GridCell = memo(function GridCell({
   ...tile
 }: Pick<
   GalleryViewProps,
-  "open" | "selection" | "caption" | "detail" | "renderActions" | "onSelectionMenu" | "onTryAgain"
+  "open" | "caption" | "detail" | "renderActions" | "onSelectionMenu" | "onTryAgain"
 > & {
   item: MediaItem;
   index: number;
@@ -419,12 +424,15 @@ const GridCell = memo(function GridCell({
   top: number;
   width: number;
   height: number;
-  menuItem: string | null;
+  menuOpen: boolean;
   setMenuItem: (id: string | null) => void;
   onArrow: (index: number, event: KeyboardEvent<HTMLButtonElement>) => void;
   onTap?: (item: MediaItem, target: HTMLButtonElement) => void;
   hold: ReturnType<typeof useHoldToSelect>;
   eager: boolean;
+  selecting: boolean;
+  selected: boolean;
+  select: SelectionActions;
 }) {
   return (
     <MediaTile
@@ -443,9 +451,7 @@ const GridCell = memo(function GridCell({
       onOpen={() => open(item)}
       onTap={onTap && ((target) => onTap(item, target))}
       onMenu={() => setMenuItem(item.id)}
-      actions={renderActions(item, menuItem === item.id, (opened) =>
-        setMenuItem(opened ? item.id : null),
-      )}
+      actions={renderActions(item, menuOpen, (opened) => setMenuItem(opened ? item.id : null))}
       onKeyDown={(event) => onArrow(index, event)}
     />
   );

@@ -40,8 +40,8 @@ function ProjectEditor({
       typing={typing}
       pending={save.isPending}
       error={save.error?.message}
-      onSubmit={({ name, brief, constraints }) =>
-        save.mutate({ name, brief, constraints }, { onSuccess: onClose })
+      onSubmit={({ name, brief, constraints, cards }) =>
+        save.mutate({ name, brief, constraints, cards }, { onSuccess: onClose })
       }
       onClose={project ? onClose : undefined}
     />

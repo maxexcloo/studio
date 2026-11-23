@@ -14,7 +14,6 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
-import { Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
@@ -379,7 +378,7 @@ export default function MaskEditor({
               disabled={loading}
               onClick={() => zoomBy(-1)}
             >
-              <Minus size={14} />
+              <icons.zoomOut size={14} />
             </ActionIcon>
             <Button
               size="compact-xs"
@@ -402,7 +401,7 @@ export default function MaskEditor({
               disabled={loading}
               onClick={() => zoomBy(1)}
             >
-              <Plus size={14} />
+              <icons.zoomIn size={14} />
             </ActionIcon>
           </Group>
         </Box>

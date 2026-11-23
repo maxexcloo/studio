@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 import { cardKinds } from "../shared/characters.ts";
 import { runBackend } from "../shared/profiles.ts";
 import { maxProjectBrief, projectBriefTextFields } from "../shared/projects.ts";
@@ -6,7 +8,7 @@ import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { accountPreferences, defaultTextSide } from "./account-preferences.js";
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
- * access-profile feature, works only with profiles the account may use, and an uncensored style (Extended Themes) needs Uncensored Models.
+ * access-profile feature, works only with profiles the account may use, and an uncensored style needs Uncensored Models.
  * LoRA suggestions need the LoRAs feature.
  *
  *   GET  /api/assistant                 what this account may use: presets (Improve Prompt's styles),
@@ -29,7 +31,6 @@ import { americanEnglish, contentRule } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
-import { loadSharp } from "./sharp-loader.js";
 import { runProfile } from "./workflow-modes.js";
 
 const maxReferences = 4;
@@ -61,14 +62,12 @@ export function imageFromDataUrl(value) {
   return { mime: match[1], data };
 }
 
-/** References downscaled (longest edge 1024 px, JPEG) so a vision call stays small; unresized without sharp. */
+/** References downscaled (longest edge 1024 px, JPEG) so a vision call stays small. */
 export async function downscaleReferences(values) {
   const images = (Array.isArray(values) ? values : [])
     .slice(0, maxReferences)
     .map(imageFromDataUrl)
     .filter(Boolean);
-  const sharp = images.length ? await loadSharp() : null;
-  if (!sharp) return images;
   return Promise.all(
     images.map(async (image) => {
       try {

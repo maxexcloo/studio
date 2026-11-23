@@ -91,6 +91,7 @@ export interface WrittenPrompt {
   model: string;
   why?: string;
   title?: string;
+  motifs?: string[];
   cardContext?: ResultContext;
 }
 /**
@@ -135,6 +136,7 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
             ...job.dream,
             prompt: written.prompt,
             ...(written.why ? { why: written.why } : {}),
+            ...(written.motifs ? { motifs: written.motifs } : {}),
             ...(written.cardContext ? { cardContext: written.cardContext } : {}),
           },
         }
@@ -1002,7 +1004,7 @@ export class GenerationQueue {
   }
 
   /**
-   * Settings › Maintenance: ends an unfinished job for good. It is cancelled as usual; one whose
+   * Settings › Studio: ends an unfinished job for good. It is cancelled as usual; one whose
    * provider never confirms (a lost worker, a recording nothing can recover) is marked cancelled
    * anyway, so it stops holding its place.
    */

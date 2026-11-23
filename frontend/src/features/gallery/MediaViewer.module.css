@@ -289,7 +289,7 @@
   overflow: hidden;
   border-radius: var(--mantine-radius-md);
   background: var(--studio-glass-raised);
-  outline: 1px solid var(--studio-glass-border);
+  outline: 1px solid var(--mantine-color-default-border);
   outline-offset: -1px;
   opacity: 0.7;
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
@@ -357,7 +357,7 @@
   flex-shrink: 0;
   width: var(--studio-viewer-aside-width);
   height: 100%;
-  border-left: 1px solid var(--studio-glass-border);
+  border-left: 1px solid var(--mantine-color-default-border);
   background: var(--studio-glass-chrome);
   -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);

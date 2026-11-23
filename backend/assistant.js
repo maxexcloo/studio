@@ -95,8 +95,8 @@ const cardIdeaInstructions = {
       cardKind: cardKinds[kind].name,
       media:
         kind === "characters"
-          ? "a given name or nickname, never a real person's name or identity"
-          : "two to four words naming it",
+          ? "a proper first name that suits them, never a real person's name or identity or a description of their looks"
+          : "two to four words naming it, fitting how it looks",
       maxCardName,
     }),
   description: (kind, count) =>

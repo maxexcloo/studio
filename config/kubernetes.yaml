@@ -1,0 +1,137 @@
+# Studio on Kubernetes: one replica on a persistent volume, listening on port 8787.
+# kubectl create namespace studio && kubectl apply -n studio -f kubernetes.yaml
+# Settings: CONFIGURATION.md#settings. Pin the image to a release tag.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: studio-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studio
+spec:
+  replicas: 1
+  # Two Studios must never share the data folder, even during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: studio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: studio
+    spec:
+      # Runtime control (below) needs these.
+      # automountServiceAccountToken: true
+      # serviceAccountName: studio
+      # Studio drains requests for up to 30 seconds on shutdown.
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: studio
+          image: ghcr.io/maxexcloo/studio:latest
+          env:
+            - name: STUDIO_ALLOWED_HOSTS
+              value: studio.example.com
+            - name: STUDIO_MULTI_USER
+              value: "1"
+            - name: STUDIO_WORKERS
+              value: '[{"id":"comfyui","name":"ComfyUI","url":"http://comfyui.comfyui.svc.cluster.local:8188","capabilities":["image","upscale"]}]'
+          # Credentials such as STUDIO_MCP_API_KEY and STUDIO_WORKER_TOKEN.
+          # envFrom:
+          #   - secretRef:
+          #       name: studio
+          ports:
+            - name: http
+              containerPort: 8787
+          livenessProbe:
+            httpGet:
+              path: /api/ping
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /api/ready
+              port: http
+          startupProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /api/ready
+              port: http
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: studio-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: studio
+spec:
+  selector:
+    app.kubernetes.io/name: studio
+  ports:
+    - name: http
+      port: 8787
+      targetPort: http
+# Runtime control (CONFIGURATION.md#runtime-control): set STUDIO_KUBERNETES_GPUS and
+# STUDIO_KUBERNETES_NAMESPACES, uncomment the service account lines above, and apply
+# the Role and RoleBinding in each namespace Studio manages.
+# ---
+# apiVersion: v1
+# kind: ServiceAccount
+# metadata:
+#   name: studio
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: Role
+# metadata:
+#   name: studio-runtime
+#   namespace: comfyui
+# rules:
+#   - apiGroups: [apps]
+#     resources: [deployments]
+#     verbs: [get, list, watch]
+#   - apiGroups: [apps]
+#     resources: [deployments/scale]
+#     verbs: [get, patch, update]
+#   - apiGroups: [""]
+#     resources: [pods]
+#     verbs: [get, list, watch]
+#   - apiGroups: [""]
+#     resources: [pods/log]
+#     verbs: [get]
+#   - apiGroups: [""]
+#     resources: [services]
+#     verbs: [list]
+#   - apiGroups: [resource.k8s.io]
+#     resources: [resourceclaimtemplates]
+#     verbs: [list]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: studio-runtime
+#   namespace: comfyui
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: Role
+#   name: studio-runtime
+# subjects:
+#   - kind: ServiceAccount
+#     name: studio
+#     namespace: studio

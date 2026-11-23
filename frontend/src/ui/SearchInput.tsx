@@ -10,7 +10,10 @@ interface SearchInputProps extends Omit<TextInputProps, "rightSection"> {
   onClose?: () => void;
 }
 
-/** Search fields share explicit query clearing without altering selected values. */
+/**
+ * Search fields share one compact pill and explicit query clearing without altering selected
+ * values.
+ */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
   { value, onClear, onClose, leftSection, ...props },
   forwardedRef,
@@ -21,6 +24,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
   return (
     <TextInput
       placeholder="Search"
+      size="sm"
+      radius="xl"
       {...props}
       value={value}
       ref={ref}

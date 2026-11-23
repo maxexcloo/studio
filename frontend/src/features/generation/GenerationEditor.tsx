@@ -8,12 +8,13 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useIsMutating } from "@tanstack/react-query";
-import { ArrowUp, Image as ImageIcon, Video } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
 
 import { maxLoras, slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { ClearButton } from "../../ui/ClearButton";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextToolsBar } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -369,8 +370,8 @@ export function GenerationEditor({
               }}
               // Phones show the mode tabs' icons so the actions fit one row.
               data={[
-                { value: "image", label: "Image", icon: ImageIcon },
-                { value: "video", label: "Video", icon: Video },
+                { value: "image", label: "Image", icon: icons.image },
+                { value: "video", label: "Video", icon: icons.video },
               ].map(({ value, label, icon: Icon }) => ({
                 value,
                 label: phone ? (

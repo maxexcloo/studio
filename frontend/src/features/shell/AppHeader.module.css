@@ -14,7 +14,7 @@
   border: 1px solid var(--mantine-color-default-border);
   padding: 0.25rem;
   border-radius: var(--mantine-radius-xl);
-  background: var(--mantine-color-default);
+  background: var(--studio-glass-solid);
 }
 /* The selected mode's pill slides between items; the buttons stay transparent above it. */
 .indicator {

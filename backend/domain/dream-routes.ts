@@ -92,7 +92,7 @@ export function registerDreamRoutes(
     if (patch.spicy && !dream.access(owner(account))?.uncensored)
       return {
         status: 403,
-        payload: { ok: false, error: "Extended Themes needs Uncensored Models for this account." },
+        payload: { ok: false, error: "Uncensored themes need Uncensored Models for this account." },
       };
     try {
       await dream.save(owner(account), patch);

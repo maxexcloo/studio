@@ -32,7 +32,7 @@ export function useDreamSettings() {
   });
 }
 
-/** Settings › Dream: the account's own Dream settings, each media kind in its own group. */
+/** Settings › Dream: the account's own Dream settings, in one group. */
 export function DreamPreferences() {
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
@@ -75,30 +75,26 @@ export function DreamPreferences() {
   );
   return (
     <>
-      <SettingGroup title="Dream">
+      <SettingGroup>
         {dream.data.reason && (
           <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
             {dream.data.reason}
           </Text>
         )}
-        {toggle("enabled", "Enable", "Make new images from your taste in idle time.")}
-        {dream.data.spicyAvailable && toggle("spicy", "Extended Themes", "Allow explicit themes.")}
-      </SettingGroup>
-      <SettingGroup title="Images">
-        {toggle("images", "Enable", "Make new images.")}
+        {toggle("enabled", "Dream", "Make new media from your taste while Studio is idle.")}
+        {dream.data.spicyAvailable && toggle("spicy", "Uncensored", "Allow explicit themes.")}
+        {toggle("images", "Images", "Make new images.")}
         {number(
           "dailyImages",
-          "Daily Amount",
+          "Daily Images",
           "The most images Dream makes a day.",
           !settings.images,
           500,
         )}
-      </SettingGroup>
-      <SettingGroup title="Videos">
-        {toggle("videos", "Enable", "Animate kept or liked images too.")}
+        {toggle("videos", "Videos", "Animate kept or liked images.")}
         {number(
           "dailyVideos",
-          "Daily Amount",
+          "Daily Videos",
           "The most videos Dream makes a day.",
           !settings.videos,
           100,

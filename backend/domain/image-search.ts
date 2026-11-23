@@ -81,11 +81,11 @@ type ImageVectors = ReturnType<typeof createImageVectors>;
 
 /**
  * Image search: SigLIP 2 vectors of finished gallery images, made on the CPU while Studio is idle
- * (domain/idle-work.ts), as a trickle of new images or an administrator's Index Gallery pass, and
+ * (domain/idle-work.ts), as a trickle of new images or an administrator's Image Search catch-up, and
  * `near`, which matches a search against them. Images never leave Studio, so every owner's are read.
  */
 export function createImageSearch(options: {
-  /** The Settings › Maintenance switch (STUDIO_IMAGE_SEARCH). */
+  /** The Settings › Studio switch (STUDIO_IMAGE_SEARCH). */
   enabled(): boolean;
   encoder: ImageEncoder;
   vectors: ImageVectors;
@@ -104,7 +104,7 @@ export function createImageSearch(options: {
   const work = createIdleWork<IdleItem>({
     ...options,
     name: "Image search",
-    off: "Image Search is off in Settings › Maintenance.",
+    off: "Image Search is off in Settings › Studio.",
     allowed: () => true,
     unavailable: async () => encoder.unavailable(),
     wanted: (item) => pictured(item) && !vectors.has(item),

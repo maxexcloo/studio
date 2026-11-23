@@ -13,7 +13,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { Check, ChevronDown, type LucideIcon, Search } from "lucide-react";
+import { ChevronDown, type LucideIcon, Search } from "lucide-react";
 import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { menuWidth } from "../theme";
@@ -24,6 +24,7 @@ import { PopupTooltip } from "./PopupTooltip";
 import { ScrollingSegments } from "./ScrollingSegments";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
+import { ViewMenu } from "./ViewMenu";
 
 import classes from "./SectionToolbar.module.css";
 
@@ -85,46 +86,6 @@ export function ToolbarAction({
     >
       {label}
     </Button>
-  );
-}
-
-/** On phones a toolbar's views are a menu named by the current one (Installed ▾). */
-function ViewMenu({
-  label,
-  views,
-  view,
-  onViewChange,
-}: {
-  label: string;
-  views: { value: string; label: string }[];
-  view?: string;
-  onViewChange?: (value: string) => void;
-}) {
-  return (
-    <Menu position="bottom-end" width={menuWidth}>
-      <Menu.Target>
-        <Button
-          size="compact-sm"
-          variant="subtle"
-          color="gray"
-          aria-label={`${label} View`}
-          rightSection={<ChevronDown size={12} />}
-        >
-          {views.find((item) => item.value === view)?.label}
-        </Button>
-      </Menu.Target>
-      <Menu.Dropdown>
-        {views.map((item) => (
-          <Menu.Item
-            key={item.value}
-            rightSection={item.value === view ? <Check size={14} /> : undefined}
-            onClick={() => onViewChange?.(item.value)}
-          >
-            {item.label}
-          </Menu.Item>
-        ))}
-      </Menu.Dropdown>
-    </Menu>
   );
 }
 
@@ -238,15 +199,18 @@ export function SectionToolbar({
           if (expanded) close();
           else event.currentTarget.blur();
         }}
-        size="sm"
-        radius="xl"
         className={expanded ? classes.expandedSearch : classes.inlineSearch}
       />
     );
   const segments =
     views &&
     (phone ? (
-      <ViewMenu label={label} views={views} view={view} onViewChange={onViewChange} />
+      <ViewMenu
+        label={`${label} View`}
+        value={view ?? ""}
+        groups={[views]}
+        onChange={(value) => onViewChange?.(value)}
+      />
     ) : (
       <ScrollingSegments
         aria-label={`${label} View`}
@@ -327,7 +291,6 @@ export function SectionToolbar({
             <Popover.Dropdown
               aria-label={`${label} Filters`}
               role="dialog"
-              p="sm"
               onFocusCapture={(event) =>
                 event.target.setAttribute("data-mantine-stop-propagation", "true")
               }
@@ -335,7 +298,7 @@ export function SectionToolbar({
               <ScrollArea.Autosize mah="min(60dvh, 420px)">
                 {/* Titled and ended with ✕ and Done, as the gallery's and the pickers' Filters are. */}
                 <Stack gap="sm">
-                  <Text fw={500} mih={28}>
+                  <Text fw={600} mih={28}>
                     Filters
                   </Text>
                   {filters}

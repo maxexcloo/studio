@@ -90,9 +90,16 @@ export function useRatings() {
       return restores;
     },
     onMutate: async ({ ids, rating }) => {
-      await cache.cancelQueries({ predicate: holdsMedia });
-      const previous = cache.getQueriesData({ predicate: holdsMedia });
       const wanted = new Set(ids);
+      // Only reads that hold these items, or the gallery's first-page reads that merge into its
+      // listing, could undo the change; other reads and page loads carry on.
+      await cache.cancelQueries({
+        predicate: (query) =>
+          holdsMedia(query) &&
+          (query.queryKey[1] === "refresh" ||
+            withRating(query.state.data, wanted, rating) !== query.state.data),
+      });
+      const previous = cache.getQueriesData({ predicate: holdsMedia });
       cache.setQueriesData({ predicate: holdsMedia }, (data) => withRating(data, wanted, rating));
       cache.setQueriesData<Pages>(
         {

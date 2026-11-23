@@ -30,6 +30,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import sharp from "sharp";
+
 import { withCatalogueSources } from "../catalogue-downloads.js";
 import { civitaiJson } from "../civitai/access.js";
 import { versionResource } from "../civitai/import.js";
@@ -43,7 +45,6 @@ import { writeBytesFileAsync } from "../json-store.js";
 import { forgetLora } from "../lora/stacks.js";
 import { downloadState } from "../model/downloads.js";
 import { fromChat, localRefusal } from "../route-access.js";
-import { loadSharp } from "../sharp-loader.js";
 import {
   modelLibraryUrl,
   refreshWorkerModels,
@@ -202,7 +203,7 @@ async function removeInstalled(want) {
 }
 
 /** Each import's own picture (longest edge 1280 px, WebP); `recorded(id)`: its import is kept. */
-function importPictures({ dataDir = currentDataDir(), sharp = loadSharp, recorded }) {
+function importPictures({ dataDir = currentDataDir(), recorded }) {
   const dir = path.join(dataDir, "library", "import-pictures");
   const fileFor = (id) =>
     /^imp-[a-z0-9]{6,40}$/.test(String(id)) ? path.join(dir, `${id}.webp`) : "";
@@ -210,9 +211,8 @@ function importPictures({ dataDir = currentDataDir(), sharp = loadSharp, recorde
     file: fileFor,
     async save(id, buffer) {
       const target = fileFor(id);
-      const library = await sharp();
-      if (!target || !library) return false;
-      const data = await library(buffer, { limitInputPixels: 80_000_000 })
+      if (!target) return false;
+      const data = await sharp(buffer, { limitInputPixels: 80_000_000 })
         .rotate()
         .resize({
           width: pictureEdge,

@@ -12,8 +12,9 @@ import {
 } from "./domain/writing-standard.ts";
 import { promptInstruction } from "./prompt-instructions.js";
 
-// The newest prompts are enough to steer away from; older ones only lengthen the request.
+// The newest prompts show whole; older ones show their opening, enough to steer away from.
 const shownPrompts = 12;
+const olderPromptCharacters = 120;
 
 /**
  * Resolves to `{ prompt, title, thinking, model }` for one new variation of the set, written by the
@@ -73,8 +74,12 @@ export async function writeSetPrompt({
             intent ? `Typed source prompt (user intent): ${intent}` : "",
             story,
             `Previous variations (avoid repetition, not subject guidance):\n${prompts
-              .slice(-shownPrompts)
-              .map((prompt) => `- ${prompt.replace(/\s+/g, " ").slice(0, 1000)}`)
+              .map((prompt, index) =>
+                prompt
+                  .replace(/\s+/g, " ")
+                  .slice(0, index < prompts.length - shownPrompts ? olderPromptCharacters : 1000),
+              )
+              .map((prompt) => `- ${prompt}`)
               .join("\n")}`,
           ]
             .filter(Boolean)

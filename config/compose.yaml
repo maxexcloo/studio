@@ -1,0 +1,16 @@
+# Studio with Docker Compose on a Linux host. Copy this file and studio.env.example,
+# saved as .env, into one folder, then run `docker compose up -d`.
+# Settings: CONFIGURATION.md#settings. Pin the image to a release tag.
+services:
+  studio:
+    image: ghcr.io/maxexcloo/studio:latest
+    env_file: .env
+    # Host networking lets Studio see browsers on this computer as local, which
+    # single-user mode and creating the first administrator need.
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - studio-data:/data
+
+volumes:
+  studio-data:

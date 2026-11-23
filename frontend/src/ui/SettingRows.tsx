@@ -6,7 +6,8 @@ import { usePhone } from "./usePhone";
 import classes from "./SettingRows.module.css";
 
 /**
- * A titled run of setting rows, divided like the rest of Settings. `danger` titles a section's last
+ * A run of setting rows, titled unless it is a section's only group, divided like the rest of
+ * Settings. `danger` titles a section's last
  * group, Danger Zone, whose actions always confirm first. A group holding a list puts its
  * `toolbar` (`SectionToolbar`) beside the title, wrapping below it when narrow. A `fill` group takes
  * its column's remaining height, its content filling the room under the title.
@@ -18,13 +19,13 @@ export function SettingGroup({
   toolbar,
   children,
 }: {
-  title: string;
+  title?: string;
   danger?: boolean;
   fill?: boolean;
   toolbar?: ReactNode;
   children: ReactNode;
 }) {
-  const heading = (
+  const heading = title && (
     <Text component="h4" size="sm" fw={600} c={danger ? "red" : "dimmed"}>
       {title}
     </Text>

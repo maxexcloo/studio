@@ -173,7 +173,7 @@ test("Animate is admitted only for known themes, with restricted themes behind U
     assert.equal(issue({ uncensoredModels: true }, { theme }), undefined);
   }
   assert.equal(issue({ promptAssistant: false }, { theme: "cinematic" }), 403);
-  // Dream's Extended Themes needs it too.
+  // Dream's Uncensored needs it too.
   const dream = (features) =>
     writingIssue(writingRequest({ kind: "dream", spicy: true }), {
       engine,

@@ -1,8 +1,8 @@
 # Sample Profiles
 
-These sample profiles seed a data folder that has never held a profile ([startup seeding](../../backend/profile/seed.js)); Studio owns them in its data directory from then on. They also show the profile format.
+These sample profiles seed a data folder that has never held a profile ([startup seeding](../../backend/profile/seed.js)); Studio owns them in its data directory from then on. To add one later, import its JSON in **Library › Profiles**. Each worker still needs the model files and custom nodes its profile uses.
 
-Use ComfyUI's API workflow JSON format, then add a `studio` block that tells the simple UI which node inputs map to common controls.
+This page describes the profile format. Use ComfyUI's API workflow JSON format, then add a `studio` block that maps node inputs to the composer's controls.
 
 ```json
 {
@@ -29,7 +29,7 @@ Use ComfyUI's API workflow JSON format, then add a `studio` block that tells the
 }
 ```
 
-Mark a workflow that makes uncensored content with `"uncensored": true` in its `studio` block. Access profiles without the Uncensored Models feature (such as the built-in User profile) never offer it; administrators always can.
+Mark a workflow that makes uncensored content with `"uncensored": true` in its `studio` block. Groups without the Uncensored Models feature (such as the built-in User group) never offer it; administrators always can.
 
 Only mapped controls are changed by Studio. Everything else stays exactly as it was in the exported ComfyUI API workflow.
 
@@ -43,6 +43,26 @@ definitions require approval.
 Smart upscale supports imported workflows too. Inpainting is available to image
 profiles that accept a reference or start image and save with `SaveImage`. Set
 `"inpaint": false` in `capabilities` to hide the brush.
+
+## Radiance & ComfyUI
+
+A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the shared fields, the backend it runs on and each backend's own block, whose fields replace the shared ones of the same name:
+
+```json
+{
+  "studio": {
+    "id": "image-krea2-turbo-fast",
+    "name": "Krea 2 Turbo · Fast · 8 Steps",
+    "kind": "image",
+    "family": "krea2",
+    "backend": "radiance",
+    "backends": {
+      "comfyui": { "graph": {}, "controls": {}, "mediaInputs": [], "defaults": {} },
+      "radiance": { "graph": {}, "controls": {}, "loraStack": {}, "defaults": {} }
+    }
+  }
+}
+```
 
 ## Image-to-Image Inputs
 
@@ -102,7 +122,7 @@ offers a Strength for it, and MCP `generate` takes `reference_strengths`:
 ```
 
 The graph's saved value is the default; `min` and `max` default to 0 and 2.
-Slots without a role or strength run as before. On an image profile that doesn't
+Slots without a role or strength are plain references. On an image profile that doesn't
 edit with its references, the start slot (else the first) is an img2img start
 image unless it guides, and the References sheet says so; its Strength there is
 the profile's mapped `denoise`. A character's image goes into an `identity` slot

@@ -9,6 +9,7 @@ import {
   openReferenceChoices,
   selectionAction,
   serveRetries,
+  showGalleryView,
   showOnly,
   showViewerThumbnails,
   stamp,
@@ -858,7 +859,7 @@ test("New results wait behind a pill while the gallery is scrolled, keeping the 
   await page.evaluate(() =>
     document.dispatchEvent(new Event("visibilitychange", { bubbles: true })),
   );
-  const pill = page.getByRole("button", { name: "1 New Result", exact: true });
+  const pill = page.getByRole("button", { name: "New Results", exact: true });
   await expect(pill).toBeVisible();
   const fresh = page.getByRole("button", { name: "Open image: Fresh Result", exact: true });
   await expect(fresh).toHaveCount(0);
@@ -1788,7 +1789,7 @@ test("Incoming results wait behind New Results while scrolled, keeping loaded pa
     updatedAt: stamp,
   });
   await expect.poll(() => requests.length).toBeGreaterThan(previousReads);
-  const pill = page.getByRole("button", { name: "5 New Results", exact: true });
+  const pill = page.getByRole("button", { name: "New Results", exact: true });
   const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
   await expect(pill).toBeInViewport();
   await expect
@@ -2383,3 +2384,17 @@ for (const captions of [false, true])
         .getByRole("img", { name: "Browse Result 0", exact: true }),
     ).toBeVisible();
   });
+
+test("Comparisons is a gallery view of the results in comparisons", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(2));
+  state.comparisons.push({ id: "compare-1", itemIds: ["browse-0"], jobIds: [] });
+  await page.goto("/images");
+  await showGalleryView(page, "Comparisons");
+  const compared = page.getByRole("button", { name: "Open image: Browse Result 0" });
+  const single = page.getByRole("button", { name: "Open image: Browse Result 1" });
+  await expect(compared).toBeVisible();
+  await expect(single).toBeHidden();
+  await showGalleryView(page, "Gallery");
+  await expect(single).toBeVisible();
+});

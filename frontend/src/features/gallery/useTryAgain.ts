@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import type { QueueRetryResponse } from "../../../../shared/queue";
 import { failure, post } from "../../api";
@@ -19,8 +19,11 @@ export function useTryAgain(items: MediaItem[]) {
     },
   });
 
+  // Reads the latest items, so tiles keep one Retry handler as pages arrive.
+  const latest = useRef(items);
+  latest.current = items;
   return useCallback(
-    async (jobIds: string[], selected: MediaItem[] = items) => {
+    async (jobIds: string[], selected: MediaItem[] = latest.current) => {
       const ids = [...new Set(jobIds)];
       const accepted = new Map<string, string>();
       if (!ids.length) return accepted;
@@ -38,6 +41,6 @@ export function useTryAgain(items: MediaItem[]) {
       }
       return accepted;
     },
-    [items, mutateAsync],
+    [mutateAsync],
   );
 }
