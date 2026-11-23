@@ -694,7 +694,7 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.equal(live().length, 0);
 });
 
-test("Dream draws a ready profile by its taste, explores concepts alongside profiles and LoRAs and keeps Spicy to accounts with Uncensored Models", async (t) => {
+test("Dream draws a ready profile by its taste, explores concepts alongside profiles and LoRAs and keeps Extended Themes to accounts with Uncensored Models", async (t) => {
   const { dream, state, taste, dreamOnce, generated } = fixture(t);
   const liked = (id: string, profileId: string) => {
     generated({
@@ -718,13 +718,13 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.match(state.calls[0].user, /- liked [ab]/);
   // An exploited idea features something they like.
   assert.match(state.calls[0].system, /Keep this taste they like: fox\./);
-  // No uncensored grant: Spicy never applies, whatever the setting says.
+  // No uncensored grant: Extended Themes never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
   state.access.alice!.uncensored = true;
   const spicy = await dreamOnce();
   assert.equal(state.calls[1].model, "writer");
-  assert.match(state.calls[1].system, /Spicy/);
+  assert.match(state.calls[1].system, /Extended Themes/);
   assert.equal(spicy?.dream?.spicy, true);
   // Losing the grant after queueing: the job is written safe for work.
   state.access.alice!.uncensored = false;

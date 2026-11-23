@@ -6,7 +6,7 @@ import { isCloudProfile } from "../shared/profiles.ts";
  * always knows the frame: it sees it when the running text model reads images, and otherwise reads
  * the frame's gallery caption; the prompt that made the frame is guidance on top. It also gets the
  * video profile's prompting guide, the clip's length and frame rate, and whether the model makes
- * sound. Its themes are Library › Prompt Styles' Animate records; an uncensored theme (Spicy), and
+ * sound. Its themes are Library › Prompt Styles' Animate records; an uncensored theme (Extended Themes), and
  * explicit wording in a Custom instruction, need Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }
@@ -136,7 +136,7 @@ export function animateInstructions({
     `Unless the guide sets a length, write about ${words} words.`,
     "Reply with the prompt only, as plain text: no preamble, Markdown or notes, and no quotation marks around the whole prompt.",
     `Theme: ${theme.instruction}`,
-    // An uncensored theme (Spicy) is admitted only with Uncensored Models (animateIssue).
+    // An uncensored theme (Extended Themes) is admitted only with Uncensored Models (animateIssue).
     contentRule(explicit || Boolean(theme.uncensored)),
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
   ]

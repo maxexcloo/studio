@@ -45,6 +45,16 @@ export const seedStyles = Object.freeze([
       "Enhance: keep the prompt's own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
   },
   {
+    id: "spicy",
+    kind: "improve",
+    enabled: true,
+    label: "Extended Themes",
+    description: "Runtime-provided description.",
+    uncensored: true,
+    instruction:
+      "Extended Themes: make the scene sensual and explicit, building on the request's own subjects and setting.",
+  },
+  {
     id: "fix",
     kind: "improve",
     enabled: true,
@@ -90,16 +100,6 @@ export const seedStyles = Object.freeze([
       "Portrait: make the person the clear focus of a portrait photograph. Describe the face, expression, hair and clothing specifically, the pose and where they look, flattering light and its direction, a portrait lens with shallow depth of field and a simple background that suits them. Keep real skin texture.",
   },
   {
-    id: "spicy",
-    kind: "improve",
-    enabled: true,
-    label: "Spicy",
-    description: "Runtime-provided description.",
-    uncensored: true,
-    instruction:
-      "Spicy: make the scene sensual and explicit, building on the request's own subjects and setting.",
-  },
-  {
     id: "action",
     kind: "animate",
     enabled: true,
@@ -127,6 +127,16 @@ export const seedStyles = Object.freeze([
       "Dialogue: the people in the frame talk. Give one or two short spoken lines, or a quick exchange between two people in the frame, that fit who they are, where they are and what they are doing, each with who says it and how. Speech comes with the body language of talking: lips in sync, a nod, a shrug, a hand lifting to make a point, eyes meeting, and the listener reacting. The camera covers the conversation: a push-in on the speaker, a handheld over-the-shoulder reframe, or a small arc from one speaker to the other. The first line starts within the first couple of seconds, and the clip ends on a reaction: the listener's answer, a laugh or a look. Where no one in the frame can speak, a short voiceover that fits the scene speaks instead.",
   },
   {
+    id: "spicy",
+    kind: "animate",
+    enabled: true,
+    label: "Extended Themes",
+    description: "Runtime-provided description.",
+    uncensored: true,
+    instruction:
+      "Extended Themes: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
+  },
+  {
     id: "living",
     kind: "animate",
     enabled: true,
@@ -134,16 +144,6 @@ export const seedStyles = Object.freeze([
     description: "The moment keeps rolling like a candid video.",
     instruction:
       "Living Photo: the moment keeps rolling as if the photo were a candid video. Each person carries on with what they are doing in real time, with natural, unposed movement that goes somewhere (a laugh that breaks into a glance away, a sip, brushing hair back, turning to someone, a few steps), and the surroundings keep moving: passers-by, traffic, wind, water, steam, flickering light. Something small but clearly visible changes early (a laugh breaking, a turn, a sip) and the moment settles into a new beat by the end. The camera is handheld with a light natural sway or makes a small reframe as someone moves. No big action or new events.",
-  },
-  {
-    id: "spicy",
-    kind: "animate",
-    enabled: true,
-    label: "Spicy",
-    description: "Runtime-provided description.",
-    uncensored: true,
-    instruction:
-      "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
   },
   {
     id: "closer",

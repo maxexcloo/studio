@@ -44,7 +44,7 @@ before(async () => {
   const sample = JSON.parse(
     fs.readFileSync(new URL("../config/profiles/sdxl-base-refiner.json", import.meta.url), "utf8"),
   );
-  sample.studio = { ...sample.studio, id: "spicy", name: "Spicy", uncensored: true };
+  sample.studio = { ...sample.studio, id: "spicy", name: "Extended Themes", uncensored: true };
   fs.mkdirSync(path.join(directory, "workflows"));
   fs.writeFileSync(path.join(directory, "workflows", "spicy.json"), JSON.stringify(sample));
   child = fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
