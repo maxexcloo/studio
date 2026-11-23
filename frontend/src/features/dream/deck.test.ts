@@ -108,7 +108,7 @@ test("Undo restores the exact comparison ahead of arrivals without repeating or 
   assert.deepEqual(deckCards([...original, ...arrivals], { current, media: "video" }), []);
 });
 
-test("the deck loads the next cards' pictures ahead and only the next two videos' metadata", () => {
+test("the deck loads the next cards' pictures ahead and the next two videos", () => {
   const image = (id: string) =>
     ({ id, type: "image", url: `/${id}.png`, thumbnailUrl: `/${id}.jpg` }) as DreamItem;
   const video = (id: string) =>

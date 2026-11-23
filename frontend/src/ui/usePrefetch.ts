@@ -38,36 +38,41 @@ export function usePrefetchImages(urls: string[], cap: number) {
   }, [key, cap]);
 }
 
-/** Loads only the metadata of videos about to play; one that drops out stops loading. */
-export function usePrefetchVideoMetadata(urls: string[]) {
+type Connection = { effectiveType?: string; saveData?: boolean };
+
+/** Whether the connection asks to save data or is too slow to download videos ahead. */
+export function savingData(connection?: Connection) {
+  return !!connection?.saveData || /2g/.test(connection?.effectiveType || "");
+}
+
+const release = (video: HTMLVideoElement) => {
+  video.removeAttribute("src");
+  video.load();
+};
+
+/**
+ * Downloads videos before they show so they start at once, in order, holding up to `cap` of them;
+ * one that drops out stops loading. Skipped when the connection is saving data or slow.
+ */
+export function usePrefetchVideos(urls: string[], cap: number) {
   const held = useRef(new Map<string, HTMLVideoElement>());
   const key = urls.join("\n");
   useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: Connection }).connection;
     const keep = new Map<string, HTMLVideoElement>();
-    for (const url of urls) {
+    for (const url of savingData(connection) ? [] : retained([...held.current.keys()], urls, cap)) {
       let video = held.current.get(url);
       if (!video) {
         video = document.createElement("video");
         video.muted = true;
-        video.preload = "metadata";
+        video.playsInline = true;
+        video.preload = "auto";
         video.src = url;
       }
       keep.set(url, video);
     }
-    for (const [url, video] of held.current)
-      if (!keep.has(url)) {
-        video.removeAttribute("src");
-        video.load();
-      }
+    for (const [url, video] of held.current) if (!keep.has(url)) release(video);
     held.current = keep;
-  }, [key]);
-  useEffect(
-    () => () => {
-      for (const video of held.current.values()) {
-        video.removeAttribute("src");
-        video.load();
-      }
-    },
-    [],
-  );
+  }, [key, cap]);
+  useEffect(() => () => held.current.forEach(release), []);
 }

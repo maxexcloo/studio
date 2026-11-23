@@ -19,7 +19,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
-import { usePrefetchImages, usePrefetchVideoMetadata } from "../../ui/usePrefetch";
+import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -297,7 +297,7 @@ export function DreamDeck({
     top?.kind === "set" || top?.kind === "pair" ? Math.min(requestedSide, top.items.length - 1) : 0;
   const prefetch = deckPrefetch(coming);
   usePrefetchImages(prefetch.images, 10);
-  usePrefetchVideoMetadata(prefetch.videos);
+  usePrefetchVideos(prefetch.videos, 3);
   const fly = useRef<Fly | null>(null);
   const previewFly = useRef<Fly | null>(null);
   const busy = useRef(false);

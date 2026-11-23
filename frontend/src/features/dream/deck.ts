@@ -140,7 +140,7 @@ const cardItems = (card: DeckCard): MediaItem[] =>
 /**
  * What to load ahead of the deck, the next card first: the pictures of the cards under the top one
  * (a video's still, every side of a comparison or set), the top set's members its full-screen
- * preview shows, and the metadata of the next two videos.
+ * preview shows, and the next two videos.
  */
 export function deckPrefetch([top, ...next]: DeckCard[]) {
   const picture = (item: MediaItem) =>

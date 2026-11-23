@@ -28,7 +28,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
-import { usePrefetchImages } from "../../ui/usePrefetch";
+import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { useRemembered } from "../auth/useRemembered";
 import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
@@ -204,20 +204,30 @@ function ViewerVideo({
 
 /**
  * Decodes the display copies (a video's still) two either side of the current one, so navigation
- * lands on a picture.
+ * lands on a picture, and downloads the videos either side so they start at once.
  */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
-  const urls =
+  const neighbours =
     index < 0 || items.length < 2
       ? []
       : [1, -1, 2, -2]
           .map((offset) => items[index + offset])
-          .filter((item) => item?.url && item.status === "done")
-          .map((item) =>
-            item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
-          )
-          .filter((url) => url !== undefined);
-  usePrefetchImages(urls, 4);
+          .filter((item) => item?.url && item.status === "done");
+  usePrefetchImages(
+    neighbours
+      .map((item) =>
+        item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
+      )
+      .filter((url) => url !== undefined),
+    4,
+  );
+  usePrefetchVideos(
+    neighbours
+      .slice(0, 2)
+      .filter((item) => item.type === "video")
+      .map((item) => playbackUrl(mediaSource(item).url)),
+    3,
+  );
 }
 
 export function MediaViewer({
