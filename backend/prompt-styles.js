@@ -47,6 +47,8 @@ function cleanStyles(value) {
     };
     if (!style.label || !style.instruction)
       throw fail(`Style ${index + 1} needs a name and an instruction.`);
+    if (style.uncensored && style.censored)
+      throw fail(`Style ${index + 1} cannot be both for and without Uncensored Models.`);
     return style;
   });
 }

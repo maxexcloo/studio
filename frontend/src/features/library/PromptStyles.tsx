@@ -2,7 +2,7 @@ import {
   Alert,
   Badge,
   Button,
-  Checkbox,
+  Input,
   Menu,
   Modal,
   SegmentedControl,
@@ -30,6 +30,11 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { type PromptStyle, type PromptStyleList, promptStylesQuery } from "./queries";
 
 const path = "/api/profiles/prompt-styles";
+const audiences = [
+  { value: "everyone", label: "Everyone" },
+  { value: "uncensored", label: "Uncensored Only" },
+  { value: "censored", label: "Without Uncensored" },
+];
 
 /** Saves the whole list over the hash it was read at, then refreshes the list and the menus. */
 function useSaveStyles() {
@@ -163,18 +168,23 @@ function StyleEditor({
             value={draft.instruction}
             onChange={(instruction) => change({ instruction })}
           />
-          <Checkbox
-            label="Uncensored Models Only"
-            description="Offered only to accounts with Uncensored Models, and may write explicit prompts."
-            checked={draft.uncensored === true}
-            onChange={(event) => change({ uncensored: event.currentTarget.checked || undefined })}
-          />
-          <Checkbox
-            label="Hidden With Uncensored Models"
-            description="Left out for accounts with Uncensored Models, so an uncensored style can take its place."
-            checked={draft.censored === true}
-            onChange={(event) => change({ censored: event.currentTarget.checked || undefined })}
-          />
+          <Input.Wrapper
+            label="Offered To"
+            description="Accounts with or without Uncensored Models. Uncensored Only styles may write explicit prompts."
+          >
+            <SegmentedControl
+              aria-label="Offered To"
+              fullWidth
+              data={audiences}
+              value={draft.uncensored ? "uncensored" : draft.censored ? "censored" : "everyone"}
+              onChange={(value) =>
+                change({
+                  uncensored: value === "uncensored" || undefined,
+                  censored: value === "censored" || undefined,
+                })
+              }
+            />
+          </Input.Wrapper>
           <DialogFooter pending={mutation.isPending} onCancel={close}>
             <Button
               type="submit"

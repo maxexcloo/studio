@@ -94,7 +94,7 @@ test("a chat draft stays AI-Drafted until approved", () => {
   assert.equal(styles.approve({ by: "admin" }).meta.aiDrafted, false);
 });
 
-test("styles need a kind, their own IDs, a name and an instruction", () => {
+test("styles need a kind, their own IDs, a name, an instruction and one audience", () => {
   const styles = store();
   const style = { id: "noir", kind: "change", label: "Noir", instruction: "Noir: shadows." };
   for (const bad of [
@@ -104,6 +104,7 @@ test("styles need a kind, their own IDs, a name and an instruction", () => {
     [{ ...style, id: "Noir!" }],
     [{ ...style, instruction: " " }],
     [{ ...style, label: "" }],
+    [{ ...style, uncensored: true, censored: true }],
     {},
   ])
     assert.throws(() => styles.save(bad), { status: 400 });
