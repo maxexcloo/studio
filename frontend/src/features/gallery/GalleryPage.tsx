@@ -37,6 +37,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
+import { comparisonMembersQuery } from "../compare/queries";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -64,6 +65,7 @@ import {
   galleryPage,
   galleryQuery,
   galleryTimelineQuery,
+  galleryViewCountsQuery,
   viewerItemQuery,
 } from "./queries";
 import {
@@ -692,6 +694,7 @@ function Gallery() {
   const page = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
   const viewButton = useRef<HTMLButtonElement>(null);
+  const [countsWanted, setCountsWanted] = useState(false);
   const viewScroll = useRef<{ key: string; top: number } | null>(null);
   useLayoutEffect(() => {
     const host = page.current;
@@ -752,19 +755,28 @@ function Gallery() {
     if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
     if (routeView) leaveView();
   }
+  const counts = useQuery({ ...galleryViewCountsQuery(kind), enabled: countsWanted }).data;
+  const comparisons = useQuery({ ...comparisonMembersQuery, enabled: countsWanted }).data
+    ?.comparisons.length;
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
       ref={viewButton}
+      onOpen={() => setCountsWanted(true)}
       value={routeView ?? (filters.uploads ? "uploads" : "gallery")}
       groups={[
         [
-          { value: "gallery", label: "Gallery" },
-          { value: "uploads", label: "Uploads" },
+          { value: "gallery", label: "Gallery", count: counts?.gallery },
+          { value: "uploads", label: "Uploads", count: counts?.uploads },
         ],
         [
-          { value: "comparisons", label: "Comparisons" },
-          { value: "review", label: "Review", disabled: selection.selecting },
+          { value: "comparisons", label: "Comparisons", count: comparisons },
+          {
+            value: "review",
+            label: "Review",
+            disabled: selection.selecting,
+            count: counts?.review,
+          },
         ],
       ]}
       onChange={showView}

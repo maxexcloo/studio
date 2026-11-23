@@ -1,4 +1,4 @@
-import { Button, Menu } from "@mantine/core";
+import { Button, Group, Menu, Text } from "@mantine/core";
 import { Check, ChevronDown } from "lucide-react";
 import { Fragment, type Ref } from "react";
 
@@ -13,20 +13,29 @@ export function ViewMenu<T extends string>({
   value,
   groups,
   onChange,
+  onOpen,
   describedBy,
   ref,
 }: {
   label: string;
   value: T;
-  groups: readonly (readonly { value: T; label: string; disabled?: boolean }[])[];
+  groups: readonly (readonly {
+    value: T;
+    label: string;
+    disabled?: boolean;
+    /** How many items the view holds, once known. */
+    count?: number;
+  }[])[];
   onChange: (value: T) => void;
   describedBy?: string;
+  /** Runs as the menu opens, so counts load only once wanted. */
+  onOpen?: () => void;
   ref?: Ref<HTMLButtonElement>;
 }) {
   const phone = usePhone();
   const current = groups.flat().find((choice) => choice.value === value);
   return (
-    <Menu position="bottom-start" width={menuWidth}>
+    <Menu position="bottom-start" width={menuWidth} onOpen={onOpen}>
       <PopupTooltip label={label}>
         <Menu.Target>
           <Button
@@ -54,8 +63,18 @@ export function ViewMenu<T extends string>({
             {choices.map((choice) => (
               <Menu.Item
                 key={choice.value}
+                aria-label={choice.label}
                 disabled={choice.disabled}
-                rightSection={choice.value === value ? <Check size={14} /> : undefined}
+                rightSection={
+                  <Group gap="xs" wrap="nowrap">
+                    {choice.count !== undefined && (
+                      <Text size="xs" c="dimmed" className={classes.count}>
+                        {choice.count.toLocaleString()}
+                      </Text>
+                    )}
+                    <Check size={14} visibility={choice.value === value ? undefined : "hidden"} />
+                  </Group>
+                }
                 onClick={() => onChange(choice.value)}
               >
                 {choice.label}
