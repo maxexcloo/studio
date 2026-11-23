@@ -582,6 +582,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [acting, setActing] = useState<{ action: UserAction; account: Account } | null>(null);
+  const resetting = useLastWhileClosing(acting?.action === "password" ? acting.account : null);
   // Changes show at once; the saved list (or, after a failure, the refetched one) settles them.
   const optimistic = (apply: (data: Administration) => Administration) => {
     void client.cancelQueries({ queryKey: accountAdminQuery.queryKey });
@@ -651,7 +652,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
     );
   const target = acting?.account;
   const promote = target?.role === "user";
-  const resetting = useLastWhileClosing(acting?.action === "password" ? target : null);
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
