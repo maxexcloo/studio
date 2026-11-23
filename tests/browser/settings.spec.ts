@@ -309,7 +309,7 @@ test("Where Work Runs saves each group’s processing and default models", async
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
     .toEqual(["Images", "Videos", "Dream", "Text"]);
   const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
-  await expect(textCloud).toHaveText("Studio's Default");
+  await expect(textCloud).toHaveText("Studio Default");
   await textCloud.click();
   const options = page
     .getByRole("listbox")
@@ -323,7 +323,7 @@ test("Where Work Runs saves each group’s processing and default models", async
   await expect(textCloud).toHaveText("Cloud · Uncensored");
   await group("Text").getByRole("button", { name: "Clear Cloud Model", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
-  await expect(textCloud).toHaveText("Studio's Default");
+  await expect(textCloud).toHaveText("Studio Default");
   const area = (kind: string) =>
     group(kind).getByRole("radiogroup", { name: `${kind} Run On`, exact: true });
   const choose = (name: string, choice: string) =>

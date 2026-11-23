@@ -14,6 +14,7 @@ import {
   initialInput,
   inputForProfile,
   modelsQuery,
+  useDraft,
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
@@ -91,7 +92,8 @@ export const modelInputs = (input: GenerationInput, profiles: Profile[]) => [
 
 /** The composer's comparison: its variants, their labels and why it can't run yet, if it can't. */
 export function useDraftComparison() {
-  const { draft, profiles, models } = useGeneration();
+  const { profiles, models } = useGeneration();
+  const draft = useDraft(true);
   const lora = useQuery(loraInfoQuery).data?.loras;
   const variants = draftVariants(draft);
   const profileOf = (input: GenerationInput) =>
@@ -132,7 +134,7 @@ export function useDraftComparison() {
 
 /** Queues the composer's variants as one comparison, sharing a seed unless they set their own. */
 export function useCompareRun(onQueued: (comparisonId: string) => void) {
-  const { draft } = useGeneration();
+  const draft = useDraft(true);
   const { variants, labels, profileOf } = useDraftComparison();
   const client = useQueryClient();
   return useMutation({
