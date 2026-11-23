@@ -729,7 +729,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   state.access.alice!.uncensored = true;
   const spicy = await dreamOnce();
   assert.equal(state.calls[1].model, "writer");
-  assert.match(state.calls[1].system, /Extended Themes/);
+  assert.match(state.calls[1].system, /Uncensored: sensual/);
   assert.equal(spicy?.dream?.spicy, true);
   // Losing the grant after queueing: the job is written safe for work.
   state.access.alice!.uncensored = false;
