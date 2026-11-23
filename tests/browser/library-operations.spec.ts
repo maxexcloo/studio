@@ -26,7 +26,7 @@ test("The Library opens on Presets and groups Personal, Models and Prompting", a
   const groups = {
     Personal: ["Presets", "Characters", "Outfits", "Scenes"],
     Models: ["Files", "Imports", "LoRAs", "Profiles"],
-    Prompting: ["Guides", "Prompt Instructions", "Prompt Styles"],
+    Prompting: ["Guides", "Prompt Instructions", "Prompt Styles", "Suggestion Instructions"],
   };
   const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {

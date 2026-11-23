@@ -9,6 +9,7 @@ import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { librarySections } from "./LibraryNavigation";
 import { type PromptInstruction, promptInstructionsPath, promptInstructionsQuery } from "./queries";
 
 function InstructionEditor({
@@ -111,18 +112,27 @@ function InstructionEditor({
   );
 }
 
-export function PromptInstructions({ heading }: { heading: ReactNode }) {
+export function PromptInstructions({
+  section,
+  heading,
+}: {
+  section: "promptInstructions" | "suggestionInstructions";
+  heading: ReactNode;
+}) {
+  const { label } = librarySections[section];
   const list = useQuery(promptInstructionsQuery);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState<string | null>(null);
   const [editing, setEditing] = useState<PromptInstruction | null>(null);
-  const instructions = list.data?.instructions ?? [];
+  const instructions = (list.data?.instructions ?? []).filter(
+    ({ suggestions }) => Boolean(suggestions) === (section === "suggestionInstructions"),
+  );
   const areas = [...new Set(instructions.map(({ area }) => area))].sort();
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
         <SectionToolbar
-          label="Prompt Instructions"
+          label={label}
           query={query}
           onQueryChange={setQuery}
           filters={
@@ -141,14 +151,14 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
         <Alert color="red">{list.error.message}</Alert>
       ) : (
         <DataTable
-          label="Prompt Instructions"
+          label={label}
           rows={instructions.filter((instruction) => !area || instruction.area === area)}
           rowKey={({ id }) => id}
           rowName={({ label }) => label}
-          loading={list.isPending && "Loading Prompt Instructions"}
+          loading={list.isPending && `Loading ${label}`}
           query={query}
           searchText={({ label, area, text }) => [label, area, text]}
-          empty="No Prompt Instructions"
+          empty={`No ${label}`}
           initialSort={{ key: "name", descending: false }}
           columns={[
             {

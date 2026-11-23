@@ -176,8 +176,13 @@ export function LibraryPage() {
           loras: catalogueSection("loras"),
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
-          promptInstructions: (heading) => <PromptInstructions heading={heading} />,
+          promptInstructions: (heading) => (
+            <PromptInstructions section="promptInstructions" heading={heading} />
+          ),
           promptStyles: (heading) => <PromptStyles heading={heading} />,
+          suggestionInstructions: (heading) => (
+            <PromptInstructions section="suggestionInstructions" heading={heading} />
+          ),
           files: catalogueSection("files"),
         }}
       />

@@ -107,6 +107,7 @@ export interface PromptInstruction {
   id: string;
   label: string;
   area: string;
+  suggestions?: true;
   text: string;
   initial: string;
   hash: string;
