@@ -22,7 +22,7 @@ import {
 } from "./GenerationProvider";
 import { generationInput, isProfile, profileForBackend, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
-import { PromptFields, useDraftChange } from "./PromptFields";
+import { CompactPromptFields, useDraftChange } from "./PromptFields";
 import { queueQuery } from "./Queue";
 import { ReferencePicker } from "./ReferencePicker";
 
@@ -174,15 +174,13 @@ export function GenerationForm({
         {/* Bottom aligned, so the actions stay at the bottom as the prompt grows. */}
         <Group wrap="nowrap" gap="xs" align="flex-end">
           <div className={classes.compactPrompt}>
-            <PromptFields
-              compact
+            <CompactPromptFields
               ideas
               input={input}
               profile={profile}
               references={draft.references}
               onChange={update}
               assistantScope={assistantScope}
-              negative={false}
               ask={ask}
             />
           </div>

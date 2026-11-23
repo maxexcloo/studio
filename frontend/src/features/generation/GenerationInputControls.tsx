@@ -8,7 +8,7 @@ import { icons } from "../../ui/icons";
 import { chipProps, iconChipProps } from "./chip";
 import { GenerationSettings } from "./GenerationSettings";
 import { lengthChoices } from "./length";
-import { LoraPicker, type LoraPickerState } from "./LoraPicker";
+import { LoraPicker, type LoraPickerState, type LoraSuggestions } from "./LoraPicker";
 import { backendInputPatch, backendLabel, generationCountLimit, profileForLoras } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
@@ -126,6 +126,7 @@ export function GenerationInputControls({
   presets,
   compare,
   loraPicker,
+  loraSuggestions,
   settings,
 }: {
   input: GenerationInput;
@@ -141,6 +142,7 @@ export function GenerationInputControls({
   /** The gallery composer's Compare menu. */
   compare?: ReactNode;
   loraPicker: LoraPickerState;
+  loraSuggestions?: LoraSuggestions;
   settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
 }) {
   const countMax = generationCountLimit(profile, input.kind);
@@ -167,7 +169,12 @@ export function GenerationInputControls({
       )}
       {(input.loras.length > 0 ||
         profileForLoras(profile, input.profileBackend, hasReferences)?.capabilities.lora) && (
-        <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
+        <LoraPicker
+          value={input}
+          onChange={onChange}
+          picker={loraPicker}
+          suggestions={loraSuggestions}
+        />
       )}
       <SizePicker input={input} profile={profile} onChange={onChange} />
       {countMax > 1 && (

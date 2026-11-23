@@ -403,7 +403,12 @@ export function DreamPreview({
               singleImageComparison={card.kind === "pair" && item.type === "image"}
               trailing={
                 quickRating ? undefined : (
-                  <DreamSuggestions card={card} side={side} onMore={() => act("more")} />
+                  <DreamSuggestions
+                    card={card}
+                    side={side}
+                    onMore={() => act("more")}
+                    onApplied={close}
+                  />
                 )
               }
               leading={<DeckUndo disabled={!canUndo} onClick={undo} />}

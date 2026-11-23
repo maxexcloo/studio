@@ -164,9 +164,14 @@ function useGenerationState() {
   const drafts = useRef(restored);
   const form = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
   const draft = form.values;
-  useEffect(() => {
+  const saveDrafts = useCallback(() => {
     localStorage.setItem(storageKey, JSON.stringify(drafts.current));
-  }, [draft, storageKey]);
+  }, [storageKey]);
+  useEffect(() => saveDrafts(), [draft, saveDrafts]);
+  useEffect(() => {
+    window.addEventListener("pagehide", saveDrafts);
+    return () => window.removeEventListener("pagehide", saveDrafts);
+  }, [saveDrafts]);
   const formRef = useRef(form);
   formRef.current = form;
   const setDraft = useCallback((value: Draft | ((previous: Draft) => Draft)) => {

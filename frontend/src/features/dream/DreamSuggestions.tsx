@@ -2,37 +2,53 @@ import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
+import type { VariationDirection } from "../../../../shared/suggestions";
 import { menuWidth } from "../../theme";
-import { ActionMenuItems } from "../../ui/ActionBar";
+import type { MediaItem } from "../../types";
+import { type Action, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
 import { useItemChange } from "../gallery/useItemChange";
 import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
-import { useChangeSuggestions } from "../generation/AskChange";
+import { VariationDialog, keepAndVaryAction } from "../gallery/VariationDialog";
+import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
+import { CustomDialog } from "../generation/CustomDialog";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
 import { sideLabel } from "./PairCard";
 
-export function DreamSuggestions({
-  card,
-  side,
-  onMore,
-}: {
+interface DreamSuggestionsProps {
   card: DeckCard;
   side: number;
   onMore: () => void;
-}) {
+  onApplied?: () => void;
+}
+
+export function DreamSuggestions(props: DreamSuggestionsProps) {
+  const { card, side } = props;
   const item = card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item;
+  return <ItemSuggestions key={item.id} item={item} {...props} />;
+}
+
+function ItemSuggestions({
+  card,
+  item,
+  side,
+  onMore,
+  onApplied,
+}: DreamSuggestionsProps & { item: MediaItem }) {
   const stage = useStageComparison();
   const pair = card.kind === "pair" ? card.items : undefined;
   const canEditPair = pair?.every(
     (entry) => entry.type === "image" && entry.jobId && entry.settings?.profileId,
   );
-  const compare = useMutation({ mutationFn: () => stage.again(pair!) });
+  const compare = useMutation({ mutationFn: () => stage.again(pair!), onSuccess: onApplied });
   const [opened, setOpened] = useState(false);
+  const [custom, setCustom] = useState(false);
+  const [varying, setVarying] = useState<VariationDirection | "explore">();
   const iteration = useMediaIteration(item);
-  const prepare = useMediaAction(item);
+  const prepare = useMediaAction(item, onApplied);
   const canExtend = item.type === "video" && item.status === "done" && Boolean(item.url);
   const change = useItemChange(item, {
     iterate: (next) => iteration.mutate(next),
@@ -43,21 +59,51 @@ export function DreamSuggestions({
   const prompt = typedPrompt(item);
   const available = change.available && Boolean(prompt.trim());
   const canAskForMore = card.kind === "dream" && item.type === "image" && Boolean(prompt.trim());
+  const canVary = available && item.type === "image" && !item.uploaded;
+  const send = (request: string) => change.send(request, prompt);
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item.jobId!, undefined, item.id),
     fresh: () => askNextSteps(item.jobId!, true, undefined, item.id),
     enabled: opened && available,
     disabled: change.pending || iteration.isPending,
     limit: 3,
-    onPick: (request) => change.send(request, prompt),
+    onPick: send,
   });
+  const more: Action[] = [
+    ...(canVary ? [keepAndVaryAction(setVarying)] : []),
+    ...(canAskForMore
+      ? [
+          {
+            id: "more-like-this",
+            label: "More Like This",
+            icon: icons.moreLikeThis,
+            onClick: onMore,
+          },
+        ]
+      : []),
+    ...(canEditPair
+      ? [
+          {
+            id: "edit-comparison",
+            label: "Edit Comparison",
+            icon: icons.compare,
+            onClick: () => compare.mutate(),
+          },
+        ]
+      : []),
+    ...(canExtend
+      ? [
+          {
+            id: "extend",
+            label: "Extend in Composer",
+            icon: icons.extend,
+            onClick: () => prepare.mutate({ operation: "extend" }),
+          },
+        ]
+      : []),
+  ];
   const loading = change.pending || iteration.isPending || compare.isPending || prepare.isPending;
-  const unavailable =
-    !available &&
-    !canEditPair &&
-    !canAskForMore &&
-    !canExtend &&
-    "Suggestions are unavailable for this result.";
+  const unavailable = !available && !more.length && "Suggestions are unavailable for this result.";
   const trigger = (
     <ActionIcon
       variant="default"
@@ -74,45 +120,51 @@ export function DreamSuggestions({
   );
   if (unavailable) return <Tooltip label={unavailable}>{trigger}</Tooltip>;
   return (
-    <Menu position="top-end" width={menuWidth} onChange={setOpened}>
-      <PopupTooltip label="Suggestions">
-        <Menu.Target>{trigger}</Menu.Target>
-      </PopupTooltip>
-      <Menu.Dropdown style={{ overscrollBehavior: "none" }}>
-        {available && (
-          <>
-            {card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>}
-            <ActionMenuItems groups={[...suggestions.action.menu, [suggestions.refresh]]} />
-          </>
-        )}
-        {canEditPair && (
-          <>
-            {available && <Menu.Divider />}
-            <Menu.Item leftSection={<icons.compare size={16} />} onClick={() => compare.mutate()}>
-              Edit Comparison
-            </Menu.Item>
-          </>
-        )}
-        {canAskForMore && (
-          <>
-            {available && <Menu.Divider />}
-            <Menu.Item leftSection={<icons.moreLikeThis size={16} />} onClick={onMore}>
-              More Like This
-            </Menu.Item>
-          </>
-        )}
-        {canExtend && (
-          <>
-            {available && <Menu.Divider />}
-            <Menu.Item
-              leftSection={<icons.extend size={16} />}
-              onClick={() => prepare.mutate({ operation: "extend" })}
-            >
-              Extend in Composer
-            </Menu.Item>
-          </>
-        )}
-      </Menu.Dropdown>
-    </Menu>
+    <>
+      <Menu position="top-end" width={menuWidth} onChange={setOpened}>
+        <PopupTooltip label="Suggestions">
+          <Menu.Target>{trigger}</Menu.Target>
+        </PopupTooltip>
+        <Menu.Dropdown>
+          <ActionMenuItems
+            leading={
+              available && card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>
+            }
+            groups={assistMenu({
+              separateSections: true,
+              suggestions: available ? suggestions : undefined,
+              templates: [],
+              custom: available
+                ? [
+                    {
+                      id: "custom",
+                      label: "Custom…",
+                      icon: icons.custom,
+                      onClick: () => setCustom(true),
+                    },
+                  ]
+                : [],
+              last: more,
+            })}
+          />
+        </Menu.Dropdown>
+      </Menu>
+      <CustomDialog
+        opened={custom}
+        title="Custom Change"
+        action="Run"
+        onClose={() => setCustom(false)}
+        onSend={send}
+      />
+      {varying && (
+        <VariationDialog
+          item={item}
+          direction={varying}
+          prompt={prompt}
+          onClose={() => setVarying(undefined)}
+          onApplied={onApplied}
+        />
+      )}
+    </>
   );
 }

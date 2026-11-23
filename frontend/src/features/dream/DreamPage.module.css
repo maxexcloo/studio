@@ -18,12 +18,10 @@
   flex-shrink: 0;
   min-height: 36px;
 }
-/* Cards grow to a comfortable height, so they and the buttons never move with the content. */
 .stage {
   position: relative;
   flex: 1;
   min-height: 0;
-  max-height: 52rem;
   margin-bottom: var(--mantine-spacing-xs);
 }
 /* The phone deck uses the shell's bottom padding for its own safe-area action row. */
@@ -32,7 +30,6 @@
   margin-bottom: calc(-1 * var(--app-shell-padding, 1rem));
 }
 :where(:root[data-phone]:not([data-phone="sideways"])) .stage {
-  max-height: none;
   margin-bottom: 0;
 }
 .card {
@@ -63,6 +60,12 @@
 /* Comparisons use the width wide screens give them, side by side. */
 .card[data-pair] {
   max-width: 1200px;
+}
+:where(:root:not([data-phone])) .card:not([data-full]) {
+  max-width: 64rem;
+}
+:where(:root:not([data-phone])) .card[data-pair]:not([data-full]) {
+  max-width: 96rem;
 }
 .card[data-depth="1"] {
   transform: translateY(var(--mantine-spacing-sm)) scale(0.975);

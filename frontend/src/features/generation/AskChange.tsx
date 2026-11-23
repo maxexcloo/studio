@@ -211,7 +211,8 @@ export function useChangeSuggestions<K extends QueryKey>({
     id: "suggestions",
     label: "Suggestions",
     icon: icons.assistant,
-    disabled,
+    disabled: disabled || loading,
+    loading,
     menu: [options],
   } satisfies Action;
   return { action, refresh: again };
@@ -228,6 +229,7 @@ export const assistMenu = ({
   custom = [],
   others = [],
   last,
+  separateSections = false,
 }: {
   loading?: boolean;
   settings?: Action[];
@@ -236,6 +238,7 @@ export const assistMenu = ({
   custom?: Action[];
   others?: ActionGroups;
   last: Action[];
+  separateSections?: boolean;
 }): ActionGroups => {
   if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
   const choices = [...templates].sort((a, b) => compareNames(a.label, b.label));
@@ -245,9 +248,10 @@ export const assistMenu = ({
       ? [{ id: "templates", label: "Templates", icon: icons.templates, menu: [choices] }]
       : []),
   ];
+  const tools = [...custom, ...(suggestions ? [suggestions.refresh] : [])];
   return [
     settings,
-    [...sections, ...custom, ...(suggestions ? [suggestions.refresh] : [])],
+    ...(separateSections ? [sections, tools] : [[...sections, ...tools]]),
     ...others,
     last,
   ];

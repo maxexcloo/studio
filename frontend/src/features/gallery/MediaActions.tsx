@@ -16,7 +16,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { CardKind } from "../../../../shared/characters";
-import { type VariationDirection, variationDirections } from "../../../../shared/suggestions";
+import type { VariationDirection } from "../../../../shared/suggestions";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
@@ -72,8 +72,7 @@ import {
 import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
-import { VariationDialog } from "./VariationDialog";
-import { directionLabels } from "./variationDraft";
+import { VariationDialog, keepAndVaryAction } from "./VariationDialog";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
 import { type GalleryState, galleryKind, viewerPath } from "./viewerLink";
 import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt";
@@ -550,28 +549,7 @@ export function useMediaActions(
   // (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
     ...(image && assistedChanges && variationPrompt.trim()
-      ? [
-          {
-            id: "keep-and-vary",
-            label: "Keep & Vary",
-            icon: icons.assistant,
-            menu: [
-              variationDirections.map((direction) => ({
-                id: `vary-${direction}`,
-                label: `Vary ${directionLabels[direction]}`,
-                onClick: () => onVary(direction, variationPrompt, onApplied),
-              })),
-              [
-                {
-                  id: "explore-three-directions",
-                  label: "Explore Three Directions",
-                  icon: icons.compare,
-                  onClick: () => onVary("explore", variationPrompt, onApplied),
-                },
-              ],
-            ],
-          },
-        ]
+      ? [keepAndVaryAction((direction) => onVary(direction, variationPrompt, onApplied))]
       : []),
     ...moreLike,
     ...(image

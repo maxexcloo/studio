@@ -1039,8 +1039,11 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
     (req) => req.url().endsWith("/api/suggestions") && req.method() === "POST",
   );
   await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Keep & Vary", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Edit Comparison", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Suggestions", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
   expect((await request).postDataJSON()).toMatchObject({
     surface: "viewer",
     jobId: "job-Bright",
