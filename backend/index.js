@@ -196,6 +196,7 @@ import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
 import { createPromptStage } from "./prompt-stage.js";
 import { promptStyleStore } from "./prompt-styles.js";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
+import { configuredCloudUsage } from "./providers/cloud-usage.ts";
 import { createFaces } from "./providers/faces.ts";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
@@ -762,7 +763,11 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   runtime,
   store,
 });
-registerStatusRoutes(app, { observeServices, queue: generationQueue });
+registerStatusRoutes(app, {
+  cloudUsage: configuredCloudUsage(),
+  observeServices,
+  queue: generationQueue,
+});
 const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
