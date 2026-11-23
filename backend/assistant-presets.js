@@ -52,7 +52,7 @@ export const seedStyles = Object.freeze([
     description: "Sensual and explicit, for uncensored models.",
     uncensored: true,
     instruction:
-      "Spicy: make the scene sensual and explicit, building on the request's own subjects and setting.",
+      "Extended Themes: make the scene sensual and explicit, building on the request's own subjects and setting.",
   },
   {
     id: "fix",
@@ -134,7 +134,7 @@ export const seedStyles = Object.freeze([
     description: "Slow, sensual and explicit, for uncensored models.",
     uncensored: true,
     instruction:
-      "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
+      "Extended Themes: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
   },
   {
     id: "living",
