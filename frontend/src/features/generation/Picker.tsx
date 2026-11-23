@@ -300,7 +300,12 @@ export function PickerTile({
   /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
-  preview?: { label: string; open: () => void; image?: { src: string; alt: string } };
+  /** The image's `aspect` reserves its size while it loads. */
+  preview?: {
+    label: string;
+    open: () => void;
+    image?: { src: string; alt: string; aspect?: string };
+  };
   row?: boolean;
 }) {
   // Mantine omits target IDs withRoles=false; outside presses still need the preview's target.
@@ -437,7 +442,12 @@ export function PickerTile({
       </Popover.Target>
       {preview?.image && (
         <Popover.Dropdown p={4} className={classes.peek}>
-          <Image src={preview.image.src} alt={preview.image.alt} radius="sm" />
+          <Image
+            src={preview.image.src}
+            alt={preview.image.alt}
+            radius="sm"
+            style={{ aspectRatio: preview.image.aspect }}
+          />
         </Popover.Dropdown>
       )}
     </Popover>
