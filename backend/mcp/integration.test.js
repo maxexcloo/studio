@@ -7551,7 +7551,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
           status: "waiting",
           settings: { enabled: true },
           today: { images: 1 },
-          spicyAvailable: false,
+          uncensoredAvailable: false,
           unseen: [
             {
               id: "dream-item",

@@ -19,9 +19,6 @@ import { isObject } from "./values.js";
 
 const origins = ["seed", "studio", "ai", "chat"];
 const styleKinds = ["improve", "animate", "change"];
-const themeLabels = new Map(
-  seedStyles.filter((style) => style.id === "spicy").map((style) => [style.kind, style.label]),
-);
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
@@ -67,15 +64,7 @@ export function createPromptStyleStore({ dataDir = currentDataDir() } = {}) {
   /** Every style in order, with the list's hash (an edit's base) and meta. */
   function list() {
     const stored = read();
-    // Show the current label for an old built-in entry without writing a new version on read.
-    const styles = stored
-      ? stored.styles.map((style) => {
-          const label = themeLabels.get(style.kind);
-          return label && style.id === "spicy" && style.label === "Spicy"
-            ? { ...style, label }
-            : style;
-        })
-      : structuredClone(seedStyles);
+    const styles = stored ? stored.styles : structuredClone(seedStyles);
     return { styles, hash: hashOf(styles), meta: stored?.meta ?? null };
   }
 

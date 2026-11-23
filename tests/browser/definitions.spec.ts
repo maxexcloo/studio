@@ -487,7 +487,7 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
   });
   let styles = [
     style("candid", "improve", "Candid"),
-    style("spicy", "improve", "Bold", { uncensored: true }),
+    style("uncensored", "improve", "Bold", { uncensored: true }),
     style("cinematic", "animate", "Cinematic Camera"),
   ];
   let hash = "h1";

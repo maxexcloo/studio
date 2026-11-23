@@ -100,7 +100,7 @@ export interface DreamOrigin {
   prompt: string;
   why: string;
   at: string;
-  spicy?: true;
+  uncensored?: true;
   /** Named card details quoted from the written prompt. */
   cardContext?: ResultContext;
   /** A new idea's optional motifs, paused for later ideas once it is passed as too similar. */
@@ -283,7 +283,7 @@ interface DreamWriter {
 /** What a Dream job asks its writing stage for (`input.writing`). */
 interface DreamWriting {
   kind: "dream";
-  spicy?: boolean;
+  uncensored?: boolean;
   loras?: string[];
   /** A comparison's other wording: the same idea as this prompt, worded differently. */
   reword?: string;
@@ -344,7 +344,7 @@ export function dreamRequest(value: Record<string, unknown>): DreamWriting {
   );
   return {
     kind: "dream",
-    ...(value.spicy === true ? { spicy: true } : {}),
+    ...(value.uncensored === true ? { uncensored: true } : {}),
     ...(value.explore === true ? { explore: true as const } : {}),
     ...strings,
     ...(Object.keys(pins).length ? { pins } : {}),
@@ -415,12 +415,12 @@ type Kind = "image" | "video";
  *   adapted, never copied; prompt-only exploration uses its ready profile and LoRAs, while
  *   equipment experiments retain their chosen profile and LoRAs
  * - lora: of exploited ideas, those that load one LoRA
- * - spicy: spicy, where the setting and Uncensored Models allow
+ * - uncensored: of ideas, those written uncensored, where the setting and Uncensored Models allow
  */
 const shares = {
   inspiration: 75,
   lora: 40,
-  spicy: 40,
+  uncensored: 40,
 };
 /** Percent of Dream's images that start a series, where the account has a liked or kept image. */
 const seriesShare = 2;
@@ -575,7 +575,7 @@ const steerCount = 2;
 /** Dream page views this close together are one visit. */
 const visitGapMs = 30 * 60_000;
 const roundTo = (value: number, step: number) => Math.round(value / step) * step;
-const spicyTheme = () => promptInstruction("dream-extended");
+const uncensoredTheme = () => promptInstruction("dream-extended");
 /** Image and video models overdo expressions; Dream asks for natural ones unless taste says otherwise. */
 const naturalFaces = () => promptInstruction("dream-expressions");
 /** Added to a recommended negative prompt, where the profile uses one. */
@@ -584,10 +584,10 @@ const faceNegative = () => promptInstruction("dream-negative");
  * Animate's Custom instruction for Dream's clips (prompt-animate.js): one coherent shot that
  * matches its frame.
  */
-const motionInstruction = (spicy: boolean) =>
+const motionInstruction = (uncensored: boolean) =>
   promptInstruction("dream-motion", {
     expressions: naturalFaces(),
-    extendedThemes: spicy ? promptInstruction("extended-themes-motion") : "",
+    extendedThemes: uncensored ? promptInstruction("extended-themes-motion") : "",
   });
 
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
@@ -1741,7 +1741,11 @@ export function createDream(options: {
       (item) => item.id === job.input.profileId,
     );
     if (!profile) throw new Error("The model is no longer ready.");
-    const refusal = dreamProfileIssue(job, profile, record.settings.spicy && access.uncensored);
+    const refusal = dreamProfileIssue(
+      job,
+      profile,
+      record.settings.uncensored && access.uncensored,
+    );
     if (refusal) throw new Error(refusal);
     const {
       loras = [],
@@ -1801,8 +1805,10 @@ export function createDream(options: {
           ["Pinned Scene", scene && `${scene.name}: ${scene.description}`],
         ].filter(([, value]) => value)
       : [];
-    const spicy =
-      (job.input.writing as DreamWriting).spicy && record.settings.spicy && access.uncensored;
+    const uncensored =
+      (job.input.writing as DreamWriting).uncensored &&
+      record.settings.uncensored &&
+      access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
     const { summary, rules, likes, styles, preferences, learnt } = options.taste.read(ownerId);
     // Their own avoids and those Studio learnt both steer the idea; only their own are enforced.
@@ -1872,8 +1878,8 @@ export function createDream(options: {
             writingRules: writingRules.join("\n"),
             userRules: rulesRule.join("\n"),
             expressions: naturalFaces(),
-            extendedThemes: spicy ? `Theme: ${spicyTheme()}` : "Keep it safe for work.",
-            contentRule: contentRule(Boolean(spicy)),
+            extendedThemes: uncensored ? `Theme: ${uncensoredTheme()}` : "Keep it safe for work.",
+            contentRule: contentRule(Boolean(uncensored)),
             americanEnglish,
             reply,
             guide,
@@ -1904,8 +1910,8 @@ export function createDream(options: {
             brief: (brief.length ? [promptInstruction("continue-project-brief")] : []).join("\n"),
             userRules: rulesRule.join("\n"),
             expressions: naturalFaces(),
-            extendedThemes: spicy ? `Theme: ${spicyTheme()}` : "Keep it safe for work.",
-            contentRule: contentRule(Boolean(spicy)),
+            extendedThemes: uncensored ? `Theme: ${uncensoredTheme()}` : "Keep it safe for work.",
+            contentRule: contentRule(Boolean(uncensored)),
             americanEnglish,
             reply,
             guide,
@@ -2006,8 +2012,8 @@ export function createDream(options: {
               : []
             ).join("\n"),
             expressions: naturalFaces(),
-            extendedThemes: spicy ? `Theme: ${spicyTheme()}` : "Keep it safe for work.",
-            contentRule: contentRule(Boolean(spicy)),
+            extendedThemes: uncensored ? `Theme: ${uncensoredTheme()}` : "Keep it safe for work.",
+            contentRule: contentRule(Boolean(uncensored)),
             americanEnglish,
             replyFormat: newConcept ? conceptReply : reply,
             guide,
@@ -2202,7 +2208,7 @@ export function createDream(options: {
     const judged =
       (record.judged?.length || 0) + options.count(ownerId, { dreamState: ["kept", "discarded"] });
     const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
-    const allowUncensored = record.settings.spicy && access.uncensored;
+    const allowUncensored = record.settings.uncensored && access.uncensored;
     let checkText = !allowUncensored;
     let reason = "";
     let idle = "";
@@ -2476,7 +2482,7 @@ export function createDream(options: {
           },
         ];
       // Uncensored goes to a share of ideas, so the rest stay plain.
-      const spicy = spicyShare(record, access);
+      const uncensored = uncensoredShare(record, access);
       const explore = Boolean(axis);
       const feature =
         steer || seed || axis === "prompt"
@@ -2485,7 +2491,7 @@ export function createDream(options: {
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
       const writing: DreamWriting = {
         kind: "dream",
-        ...(spicy ? { spicy } : {}),
+        ...(uncensored ? { uncensored } : {}),
         ...(steer ? { like: steer.prompt } : {}),
         ...(inspiration ? { inspiration: clean(inspiration.prompt, 1000) } : {}),
         ...(note ? { note } : {}),
@@ -2549,7 +2555,7 @@ export function createDream(options: {
             prompt: "",
             why: "",
             at: stamp(),
-            ...(spicy ? { spicy: true as const } : {}),
+            ...(uncensored ? { uncensored: true as const } : {}),
             arm: axis ? `explore:${axis}` : seed ? `continue:${vary}` : "exploit",
             ...(project ? { projectId: project.id } : {}),
             ...(draft ? { draft: draft.id, state: "draft" as const } : {}),
@@ -2857,11 +2863,11 @@ export function createDream(options: {
   }
 
   /** Whether a job is Uncensored: a share of them, where the setting and Uncensored Models allow. */
-  function spicyShare(record: DreamRecord, access: DreamAccess) {
-    return record.settings.spicy && access.uncensored && chance(shares.spicy);
+  function uncensoredShare(record: DreamRecord, access: DreamAccess) {
+    return record.settings.uncensored && access.uncensored && chance(shares.uncensored);
   }
   function allowsUncensored(ownerId: string) {
-    return read(ownerId).settings.spicy && options.access(ownerId)?.uncensored === true;
+    return read(ownerId).settings.uncensored && options.access(ownerId)?.uncensored === true;
   }
   function text(ownerId: string): TextWriter {
     const writer = options.text(ownerId);
@@ -2954,7 +2960,7 @@ export function createDream(options: {
     try {
       choice = await options.videoProfile(ownerId, access.account, {
         backend: record.settings.videoBackend,
-        allowUncensored: record.settings.spicy && access.uncensored,
+        allowUncensored: record.settings.uncensored && access.uncensored,
         width: Number(item.width) || 0,
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
@@ -2975,13 +2981,13 @@ export function createDream(options: {
       return miss("No video model is ready.");
     const slot = dreamVideoSlot(profile);
     if (!slot) return miss("No video model is ready for this source frame.");
-    const spicy = spicyShare(record, access);
+    const uncensored = uncensoredShare(record, access);
     // Written as the viewer's Animate writes it (prompt-animate.js): seeing the frame and knowing
     // the clip's length, sound and the profile's prompt format.
     const writing = {
       kind: "animate",
       theme: "custom",
-      instruction: motionInstruction(Boolean(spicy)),
+      instruction: motionInstruction(Boolean(uncensored)),
       source: clean(item.prompt || item.dream?.prompt, maxPromptCharacters),
       ...(extend ? { extend: true } : {}),
     };
@@ -3014,7 +3020,7 @@ export function createDream(options: {
           prompt: "",
           why: "",
           at: stamp(),
-          ...(spicy ? { spicy: true as const } : {}),
+          ...(uncensored ? { uncensored: true as const } : {}),
           arm: extend ? "extend" : "animate",
           ...(item.dream?.projectId ? { projectId: item.dream.projectId } : {}),
         },
@@ -3033,7 +3039,7 @@ export function createDream(options: {
     access: DreamAccess,
     { series, seed }: NonNullable<Awaited<ReturnType<typeof seriesNext>>>,
   ) {
-    const spicy = spicyShare(record, access);
+    const uncensored = uncensoredShare(record, access);
     const { id, title, index, length } = series;
     const { profile, input: source } = seed;
     const stop = series.stops[index];
@@ -3051,7 +3057,7 @@ export function createDream(options: {
         prompt: "",
         writing: {
           kind: "dream",
-          ...(spicy ? { spicy } : {}),
+          ...(uncensored ? { uncensored } : {}),
           note: `${title} (${index + 1} of ${length}): ${stop.title}`,
           seed: seed.prompt,
           series: { id, place: stop.place, night: stop.night, index, length },
@@ -3069,7 +3075,7 @@ export function createDream(options: {
           prompt: "",
           why: "",
           at: stamp(),
-          ...(spicy ? { spicy: true as const } : {}),
+          ...(uncensored ? { uncensored: true as const } : {}),
           arm: "series",
         },
       },

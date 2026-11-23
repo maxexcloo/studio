@@ -1435,7 +1435,7 @@ export async function serveDream(
     unseen?: any[];
     discarded?: any[];
     history?: import("../../shared/taste").DreamActivity[];
-    spicyAvailable?: boolean;
+    uncensoredAvailable?: boolean;
     /** The settings an administrator forces, which the account can't change. */
     locked?: (keyof typeof dreamDefaults)[];
     /** Older gallery images offered for calibration until judged. */
@@ -1462,7 +1462,7 @@ export async function serveDream(
     },
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],
-    spicyAvailable: options.spicyAvailable ?? false,
+    uncensoredAvailable: options.uncensoredAvailable ?? false,
     calibration: options.calibration ?? [],
     library: options.library ?? [],
     today: { images: 12, videos: 1 },
@@ -1481,7 +1481,7 @@ export async function serveDream(
     since: options.since ?? null,
     today: state.today,
     usage: state.usage,
-    spicyAvailable: state.spicyAvailable,
+    uncensoredAvailable: state.uncensoredAvailable,
     locked: options.locked ?? [],
     status: !state.settings.enabled
       ? "off"

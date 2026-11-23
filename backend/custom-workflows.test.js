@@ -273,8 +273,10 @@ test("start and end frames and differently named slots stay separate", () => {
 
 test("the uncensored marker reaches the profile only when it is true", () => {
   assert.equal(
-    metadataFromJson({ studio: { id: "spicy", uncensored: true }, graph: {} }, "spicy.json")
-      .uncensored,
+    metadataFromJson(
+      { studio: { id: "uncensored", uncensored: true }, graph: {} },
+      "uncensored.json",
+    ).uncensored,
     true,
   );
   assert.equal(

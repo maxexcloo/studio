@@ -165,7 +165,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `2`                                          | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_ENABLED`       | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` | `local` or `cloud` for every account's Dream images                                         | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_SPICY`         | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_UNCENSORED`    | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND` | `local` or `cloud` for every account's Dream videos                                         | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_VIDEO_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its videos          | `5`                                          | Dream (Administration) |
 | `STUDIO_ENV_FILE`                     | Settings file read on startup                                                               | `/data/.env` in the image, else `.env`       |                        |

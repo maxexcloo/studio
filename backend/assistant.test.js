@@ -484,7 +484,7 @@ test("Uncensored runs on the assistant model", async () => {
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
-  const result = await live.rewrite({ profile, prompt: "a couple", preset: "spicy" });
+  const result = await live.rewrite({ profile, prompt: "a couple", preset: "uncensored" });
   assert.equal(result.model, "cloud/vision", "a changed setting applies at once");
   assert.equal(seen.calls.at(-1).body.model, "cloud/vision");
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);

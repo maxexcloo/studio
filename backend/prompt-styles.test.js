@@ -34,38 +34,6 @@ test("a folder without styles has the seed until the first save records it", () 
   assert.equal(styles.list().styles.find((style) => style.id === "concise").label, "Short");
 });
 
-test("saved theme labels follow the built-in names and preserve custom labels and restrictions", () => {
-  const styles = store();
-  const previous = seedStyles
-    .filter((style) => style.id === "spicy")
-    .map((style) => ({
-      ...style,
-      label: style.kind === "animate" ? "Spicy" : "My Rewrite",
-    }));
-  const editable = styles.save(previous, { origin: "chat", aiDrafted: true });
-  assert.equal(styles.style("animate", "spicy").label, "Uncensored");
-  assert.equal(styles.style("improve", "spicy").label, "My Rewrite");
-  assert.deepEqual(
-    editable.styles.find((style) => style.kind === "animate"),
-    {
-      ...previous.find((style) => style.kind === "animate"),
-      label: "Uncensored",
-    },
-  );
-  const before = fs.readFileSync(styles.file, "utf8");
-  assert.deepEqual(styles.list(), editable);
-  assert.equal(fs.readFileSync(styles.file, "utf8"), before);
-  assert.equal(
-    styles.version(editable.meta.version).styles.find((style) => style.kind === "animate").label,
-    "Spicy",
-  );
-  assert.equal(editable.meta.aiDrafted, true);
-  assert.equal(
-    styles.save(editable.styles, { baseHash: editable.hash, aiDrafted: true }).meta.version,
-    editable.meta.version,
-  );
-});
-
 test("a stale edit is refused, and revert restores an earlier version as a new one", () => {
   const styles = store();
   const { styles: seed, hash } = styles.list();
@@ -96,7 +64,7 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
     "hip-sway",
     "living",
     "reaction",
-    "spicy",
+    "uncensored",
     "custom",
   ]);
   assert.deepEqual(ids("change"), [

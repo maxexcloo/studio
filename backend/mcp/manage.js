@@ -262,7 +262,7 @@ export function registerManageTools({
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos, except those an administrator locked. discarded lists discards.",
+    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings sets enabled, paused, images, videos, uncensored, dailyImages, dailyVideos, except those an administrator locked. discarded lists discards.",
     {
       action: z.enum([
         "status",
@@ -288,7 +288,7 @@ export function registerManageTools({
         settings: dream.settings,
         ...(dream.locked?.length ? { locked: dream.locked } : {}),
         today: dream.today,
-        spicy_available: Boolean(dream.spicyAvailable),
+        uncensored_available: Boolean(dream.uncensoredAvailable),
         unseen: (dream.unseen || []).length,
         items: dreamItems(dream.unseen || []),
       });

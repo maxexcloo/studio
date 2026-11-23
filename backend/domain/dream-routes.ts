@@ -48,7 +48,7 @@ export function registerDreamRoutes(
       since: record.visit?.since || null,
       today,
       ...(usage.images !== today.images || usage.videos !== today.videos ? { usage } : {}),
-      spicyAvailable: Boolean(access?.uncensored),
+      uncensoredAvailable: Boolean(access?.uncensored),
       locked: dream.locked(),
       ...dream.status(ownerId, daily),
     };
@@ -89,7 +89,7 @@ export function registerDreamRoutes(
       if (error) return { status: 400, payload: { ok: false, error } };
       Object.assign(patch, { [key]: body[key] });
     }
-    if (patch.spicy && !dream.access(owner(account))?.uncensored)
+    if (patch.uncensored && !dream.access(owner(account))?.uncensored)
       return {
         status: 403,
         payload: { ok: false, error: "Uncensored themes need Uncensored Models for this account." },

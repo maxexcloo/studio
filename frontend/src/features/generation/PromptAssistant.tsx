@@ -30,7 +30,7 @@ interface AssistantStatus {
   loras?: boolean;
   noNegative?: string[];
   /** The account holds Uncensored Models. */
-  spicy?: boolean;
+  uncensored?: boolean;
   /** The text models it may pick and the one its writing asks for. */
   models?: string[];
   writingModel?: string;

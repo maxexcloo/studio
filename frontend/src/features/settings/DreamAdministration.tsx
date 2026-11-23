@@ -91,7 +91,7 @@ export function DreamAdministration() {
       <SettingGroup title="Account Overrides">
         {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
         {row(
-          "spicy",
+          "uncensored",
           "Uncensored",
           "Allow explicit themes, only for accounts with Uncensored Models access.",
           onOff,

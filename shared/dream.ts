@@ -6,7 +6,7 @@ export const dreamDefaults = {
   dailyVideos: 4,
   images: true,
   videos: false,
-  spicy: false,
+  uncensored: false,
   imageBackend: "local" as "local" | "cloud",
   videoBackend: "local" as "local" | "cloud",
 };
@@ -76,7 +76,7 @@ export function dreamCardCounts(
  */
 export const dreamOverrideKeys = {
   enabled: "STUDIO_DREAM_OVERRIDE_ENABLED",
-  spicy: "STUDIO_DREAM_OVERRIDE_SPICY",
+  uncensored: "STUDIO_DREAM_OVERRIDE_UNCENSORED",
   imageBackend: "STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND",
   videoBackend: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
 };

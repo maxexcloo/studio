@@ -2,6 +2,7 @@ import { reloadAccountPreferences } from "./account-preferences.js";
 import { cloudModelsPreference } from "./cloud-models-preference.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
+import { uncensoredNames } from "./uncensored-names.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -19,6 +20,13 @@ const steps = [
     changes: (plan) => plan.accounts,
     online: true,
     reload: reloadAccountPreferences,
+  },
+  {
+    name: "uncensoredNames",
+    run: uncensoredNames,
+    changes: (plan) =>
+      Object.values(plan.rows).reduce((total, count) => total + count, plan.styleFiles),
+    online: true,
   },
 ];
 
