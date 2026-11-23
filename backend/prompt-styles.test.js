@@ -89,17 +89,22 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
   ]);
   assert.deepEqual(ids("animate"), [
     "action",
+    "atmosphere",
     "cinematic",
     "dialogue",
     "spicy",
     "living",
+    "reaction",
     "custom",
   ]);
   assert.deepEqual(ids("change"), [
     "detail",
     "closer",
+    "colour-accent",
     "cooler",
+    "new-angle",
     "night",
+    "shift-focus",
     "simple-background",
     "warmer",
     "wider",
