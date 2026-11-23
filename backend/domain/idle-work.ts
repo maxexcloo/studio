@@ -128,6 +128,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
    * records, and the whole gallery is walked again only after `recheckMs`.
    */
   changes?(): number;
+  /** Changes to the rules that make an existing result outdated. */
+  revision?(): string;
   /** Whether the work takes the record: one in the gallery, or also Dream's pool, with its file present. */
   visible(item: Item): boolean;
   /** Whether the item still needs the work; `all` and the pass's `target` during a pass. */
@@ -205,7 +207,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   let counted = { state: "", at: -Infinity, counts: { all: 0, outdated: 0, missing: 0 } };
   async function scopeCounts() {
     // Work done outside the gallery (an image's search vector) moves the pass and trickle counts.
-    const state = `${options.changes?.()}|${pass?.state}|${pass?.startedAt}|${pass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
+    const state = `${options.changes?.()}|${options.revision?.()}|${pass?.state}|${pass?.startedAt}|${pass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
     if (options.changes && state === counted.state && now() - counted.at <= recheckMs)
       return counted.counts;
     counted = { state, at: now(), counts: await walkScopeCounts() };
@@ -290,12 +292,13 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     let item: Item | null = null;
     const changes = options.changes?.();
-    const state = `${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
+    const revision = all && pass?.scope === "outdated" ? options.revision?.() : "";
+    const passState = `${all}|${pass?.scope}|${pass?.startedAt}|${revision}`;
+    const state = `${passState}|${failed.size}|${direct.size}`;
     const whole = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
     const recent = !whole && changes !== nothing.changes;
     const walk = whole || recent;
     const finishedBefore = finished;
-    const passState = `${all}|${pass?.scope}|${pass?.startedAt}`;
     if (whole && (!options.changes || resume.state !== passState || now() - resume.at > recheckMs))
       resume = { state: passState, at: now(), after: undefined };
     let passed: Item | undefined;
