@@ -793,11 +793,12 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(3);
   const names = table.getByRole("button", { name: /^Edit / });
   await expect(names).toHaveText(["Flux Base", "XL Base"]);
-  // Files sort by type, then family and name, until a header chooses otherwise.
-  await expect(table.getByRole("columnheader", { name: "Type", exact: true })).toHaveAttribute(
-    "aria-sort",
-    "ascending",
-  );
+  // Files sort by type, then family and name, until a header chooses otherwise; phones fold Type.
+  if (!test.info().project.use.isMobile)
+    await expect(table.getByRole("columnheader", { name: "Type", exact: true })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
   const name = table.getByRole("columnheader", { name: "Name", exact: true });
   await name.getByRole("button").click();
   await expect(name).toHaveAttribute("aria-sort", "ascending");
