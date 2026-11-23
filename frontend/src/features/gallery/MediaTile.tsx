@@ -14,7 +14,7 @@ import { mediaTimestamp, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { upscaling, useStopUpscale } from "./UpscaleControls";
 import type { useHoldToSelect } from "./useGalleryLayout";
-import type { GallerySelection } from "./useGallerySelection";
+import type { SelectionActions } from "./useGallerySelection";
 
 import classes from "./MediaTile.module.css";
 
@@ -171,7 +171,9 @@ function TileUpscale({ item }: { item: MediaItem }) {
 export function MediaTile({
   item,
   label,
-  selection,
+  selecting = false,
+  selected = false,
+  select,
   hold,
   caption,
   galleryTile,
@@ -189,7 +191,10 @@ export function MediaTile({
 }: {
   item: MediaItem;
   label?: string;
-  selection?: GallerySelection;
+  selecting?: boolean;
+  selected?: boolean;
+  /** The gallery selection's actions. */
+  select?: SelectionActions;
   hold: ReturnType<typeof useHoldToSelect>;
   /** Hover captions, captions always shown, or none (phones without Tile Captions). */
   caption: "hover" | "pinned" | "none";
@@ -206,13 +211,11 @@ export function MediaTile({
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
   eager?: boolean;
 }) {
-  const selecting = Boolean(selection?.selecting);
   // Touch holds use Studio's menu or selection instead of a native drag lift.
   const touch = useTouch();
   const tapped = useRef(false);
   // Its Stop takes the caption's place at the foot of the tile.
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
-  const selected = selection?.selected.has(item.id) ?? false;
   const media = mediaSource(item);
   const video = item.type === "video";
   const source = media.thumbnailUrl || item.preview || (video ? undefined : media.url);
@@ -233,7 +236,7 @@ export function MediaTile({
   function openMenu(x: number, y: number) {
     if (selecting) {
       if (!onSelectionMenu) return false;
-      if (!selected) selection!.toggle([item]);
+      if (!selected) select!.toggle([item]);
       onSelectionMenu(x, y);
       return true;
     }
@@ -294,7 +297,7 @@ export function MediaTile({
             event.preventDefault();
             return;
           }
-          if (selection?.click([item], event)) return;
+          if (select?.click([item], event)) return;
           if (onTap && tapped.current && event.detail > 0) {
             onTap(event.currentTarget);
             return;
@@ -397,7 +400,7 @@ export function MediaTile({
           className={classes.check}
           checked={selected}
           aria-label={`Select ${title}`}
-          onChange={() => selection!.toggle([item])}
+          onChange={() => select!.toggle([item])}
         />
       )}
     </div>

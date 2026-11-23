@@ -528,7 +528,7 @@ function Gallery() {
   const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
   if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
     setResultsKey(JSON.stringify(listingKey));
-  const selection = useGallerySelection(loaded, JSON.stringify([scope, query]), {
+  const selection = useGallerySelection(loaded, scope, {
     complete: !gallery.hasNextPage && !gallery.hasPreviousPage,
     ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
     load: async (match, signal) =>
@@ -598,17 +598,18 @@ function Gallery() {
   const detail = useCallback((item: MediaItem) => mediaDetail(item, profiles), [profiles]);
   // Phones without captions hold a tile for its menu instead of showing More.
   const hideMore = phone && !captions;
+  const { toggle } = selection;
   const renderTileActions = useCallback(
     (item: MediaItem, opened: boolean, onOpenedChange: (opened: boolean) => void) => (
       <MediaTileActions
         item={item}
         opened={opened}
         onOpenedChange={onOpenedChange}
-        onSelect={() => selection.toggle([item])}
+        onSelect={() => toggle([item])}
         hideMore={hideMore}
       />
     ),
-    [hideMore, selection],
+    [hideMore, toggle],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(
