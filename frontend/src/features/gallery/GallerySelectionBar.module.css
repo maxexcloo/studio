@@ -1,11 +1,23 @@
-/* The toolbar holding the bar sticks it and draws its rule. The actions end the count's row, or
-   take one of their own, still at its end, where they don't fit beside it; phones keep one row
-   that scrolls sideways from the count. */
+/* The toolbar holding the bar sticks it; the bar is its own section under the toolbar's row, ruled
+   off across the band's full width. The actions end the count's row, or take one of their own,
+   still at its end, where they don't fit beside it; phones keep one row that scrolls sideways from
+   the count. */
 .header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 8px;
+  margin: var(--mantine-spacing-xs) calc(-1 * var(--app-shell-padding)) 0;
+  padding: var(--mantine-spacing-xs) var(--app-shell-padding) 0;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+/* The band's own inline padding on phones. */
+:root[data-phone] .header {
+  margin-inline: calc(-1 * max(var(--app-shell-padding), env(safe-area-inset-left)))
+    calc(-1 * max(var(--app-shell-padding), env(safe-area-inset-right)));
+  padding-inline: max(var(--app-shell-padding), env(safe-area-inset-left))
+    max(var(--app-shell-padding), env(safe-area-inset-right));
 }
 
 .count {

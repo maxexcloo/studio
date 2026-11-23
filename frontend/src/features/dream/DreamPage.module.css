@@ -403,13 +403,17 @@
   inset-inline-end: calc(env(safe-area-inset-right) + var(--mantine-spacing-sm));
   z-index: 1;
 }
-/* A media count keeps its width as it changes or loads, so the segments stay put. */
+/* A segment keeps the width of its name with a two-digit count, so it stays put as the count loads
+   or changes; the name and count stay centred together. */
 .count {
-  display: inline-block;
-  min-width: 4ch;
+  display: inline-grid;
   font-variant-numeric: tabular-nums;
-  text-align: start;
 }
-.count[data-hidden] {
+.count > *,
+.count::before {
+  grid-area: 1 / 1;
+}
+.count::before {
+  content: attr(data-label);
   visibility: hidden;
 }

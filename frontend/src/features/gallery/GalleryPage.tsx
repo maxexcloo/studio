@@ -1,4 +1,4 @@
-import { Alert, Button, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
+import { Alert, Button, Group, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
 import { useDebouncedCallback } from "@mantine/hooks";
 import {
   type InfiniteData,
@@ -37,6 +37,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
+import { comparisonMembersQuery } from "../compare/queries";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -64,6 +65,7 @@ import {
   galleryPage,
   galleryQuery,
   galleryTimelineQuery,
+  galleryViewCountsQuery,
   viewerItemQuery,
 } from "./queries";
 import {
@@ -87,6 +89,7 @@ import {
   viewerPathId,
 } from "./viewerLink";
 
+import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "./GalleryPage.module.css";
 
 type PageState = GalleryState &
@@ -692,6 +695,7 @@ function Gallery() {
   const page = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
   const viewButton = useRef<HTMLButtonElement>(null);
+  const [countsWanted, setCountsWanted] = useState(false);
   const viewScroll = useRef<{ key: string; top: number } | null>(null);
   useLayoutEffect(() => {
     const host = page.current;
@@ -752,27 +756,47 @@ function Gallery() {
     if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
     if (routeView) leaveView();
   }
+  const counts = useQuery({ ...galleryViewCountsQuery(kind), enabled: countsWanted }).data;
+  const comparisons = useQuery({ ...comparisonMembersQuery, enabled: countsWanted }).data
+    ?.comparisons.length;
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
       ref={viewButton}
+      onOpen={() => setCountsWanted(true)}
       value={routeView ?? (filters.uploads ? "uploads" : "gallery")}
       groups={[
         [
-          { value: "gallery", label: "Gallery" },
-          { value: "uploads", label: "Uploads" },
+          { value: "gallery", label: "Gallery", count: counts?.gallery },
+          { value: "uploads", label: "Uploads", count: counts?.uploads },
         ],
         [
-          { value: "comparisons", label: "Comparisons" },
-          { value: "review", label: "Review", disabled: selection.selecting },
+          { value: "comparisons", label: "Comparisons", count: comparisons },
+          {
+            value: "review",
+            label: "Review",
+            disabled: selection.selecting,
+            count: counts?.review,
+          },
         ],
       ]}
       onChange={showView}
     />
   );
+  // While a view's code loads, its toolbar and loading state already sit where the view puts them.
+  const loadingView = (label: string) => (
+    <Stack gap="sm" className={classes.page}>
+      <div className={toolbarClasses.band}>
+        <Group gap="xs" mih={44} wrap="nowrap">
+          {view}
+        </Group>
+      </div>
+      <LoadingState fill label={label} />
+    </Stack>
+  );
   if (review) {
     return (
-      <Suspense fallback={<LoadingState fill label="Loading Review" />}>
+      <Suspense fallback={loadingView("Loading Review")}>
         <GalleryReview
           key={kind}
           listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
@@ -785,7 +809,7 @@ function Gallery() {
   }
   if (routeView === "comparisons") {
     return (
-      <Suspense fallback={<LoadingState fill label="Loading Comparisons" />}>
+      <Suspense fallback={loadingView("Loading Comparisons")}>
         <ComparisonList view={view} />
       </Suspense>
     );
