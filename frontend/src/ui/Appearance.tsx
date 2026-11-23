@@ -130,7 +130,7 @@ function ColourScheme({
   value: Appearance["colourScheme"];
   background: Background;
 }) {
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const { colorScheme, setColorScheme } = useMantineColorScheme({ keepTransitions: true });
   const scheme = useComputedColorScheme("light", { getInitialValueInEffect: false });
   const themeColour = backgrounds[background][scheme];
   useEffect(() => {
