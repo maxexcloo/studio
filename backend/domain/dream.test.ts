@@ -2190,6 +2190,18 @@ test("Krea 2 runs at no fewer than 8 steps, however few its taste scores", async
   assert.equal((await dreamOnce())?.input.steps, 12);
 });
 
+test("Dream sizes a Qwen or Noct image to fit one card rather than its two-GPU twin", async (t) => {
+  const noct = {
+    ...profiles[0],
+    defaults: { width: 1024, height: 1344, model: "noctq-4-iq8r" },
+  };
+  const { dream, taste, dreamOnce } = fixture(t, [noct]);
+  taste.record("alice", [tasteSignal("like", "a", { profileId: "flux", width: 832, height: 1248 })]);
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  assert.deepEqual([job.input.width, job.input.height], [896, 1344]);
+});
+
 test("Dream stops exploring a profile that keeps poorly", async (t) => {
   const { dream, state, taste, dreamOnce, generated } = fixture(t);
   taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen" })]);

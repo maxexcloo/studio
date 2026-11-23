@@ -50,6 +50,7 @@ import {
   runtimeTransaction,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
+import { radianceImageFits } from "../providers/radiance.ts";
 import { validateReferenceSlots } from "../validation.js";
 import { resolveImageMode, runProfile } from "../workflow-modes.js";
 import { promptInstruction } from "./../prompt-instructions.js";
@@ -1768,7 +1769,8 @@ export function createDream(options: {
   /**
    * The steps (where the profile has a steps control, at least its family's `leastSteps`) and
    * guidance drawn by their taste scores on the profile, and for an image a size of the profile's
-   * default area in the drawn aspect ratio.
+   * default area in the drawn aspect ratio, made smaller where one card of the model's worker can't
+   * draw it (`radianceImageFits`), so the run never moves to a lossier two-GPU twin.
    */
   function exploitSettings(kind: Kind, profile: DreamProfile, taste: TasteRecord): GenerationInput {
     const least = leastSteps[profile.workflow ?? ""] ?? 0;
@@ -1789,12 +1791,24 @@ export function createDream(options: {
     const area = Number(profile.defaults?.width) * Number(profile.defaults?.height);
     // Sizes keep to multiples of 64, as the models' trained buckets do.
     const side = (length: number) => Math.max(64, Math.round(length / 64) * 64);
+    let width = side(Math.sqrt(area * aspect));
+    let height = side(Math.sqrt(area / aspect));
+    const model = String(profile.defaults?.model ?? "");
+    while (
+      aspect &&
+      area &&
+      model &&
+      !radianceImageFits(model, width, height, 0) &&
+      Math.min(width, height) > 64
+    ) {
+      const scale = (Math.max(width, height) - 64) / Math.max(width, height);
+      width = side(width * scale);
+      height = side(height * scale);
+    }
     return {
       ...(steps ? { steps: Number(steps) } : {}),
       ...(cfg ? { cfg: Number(cfg) } : {}),
-      ...(aspect && area
-        ? { width: side(Math.sqrt(area * aspect)), height: side(Math.sqrt(area / aspect)) }
-        : {}),
+      ...(aspect && area ? { width, height } : {}),
     };
   }
   /**
