@@ -1,4 +1,4 @@
-import { videoPosterUrl } from "../../../../shared/media";
+import { videoPosterUrl } from "../../../../shared/media.ts";
 import type { MediaItem } from "../../types";
 
 /**
