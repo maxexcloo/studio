@@ -1761,8 +1761,19 @@ export function registerGenerateTools({
         owner,
         { signal },
       );
-      const nameKey = (name) => name.trim().normalize("NFKC").toLowerCase();
-      const taken = new Set(existing.map(({ name }) => nameKey(name)));
+      const comparable = (text) => text.trim().normalize("NFKC").toLowerCase();
+      const words = (name) =>
+        comparable(name)
+          .split(/[^\p{L}\p{N}]+/u)
+          .filter(Boolean);
+      // One name's words within another's ("Ben", "Him Ben"), or the same looks, is the same character.
+      const within = (a, b) => a.words.length && a.words.every((word) => b.words.includes(word));
+      const sameAs = (a, b) => within(a, b) || within(b, a) || a.description === b.description;
+      const known = existing.map(({ name, description }) => ({
+        name,
+        words: words(name),
+        description: comparable(description),
+      }));
       for (const { portrait, ...card } of characters) {
         const { name, description, age } = card;
         if (!name.trim() || name.trim().length > maxCardName)
@@ -1777,12 +1788,13 @@ export function registerGenerateTools({
         const trait = characterTraits.find((key) => card[key]?.trim().length > maxCharacterTrait);
         if (trait)
           throw new Error(`Keep ${name}'s ${trait} within ${maxCharacterTrait} characters.`);
-        const key = nameKey(name);
-        if (taken.has(key))
+        const entry = { name, words: words(name), description: comparable(description) };
+        const same = known.find((other) => sameAs(entry, other));
+        if (same)
           throw new Error(
-            `${name} is already named in this request or Library. Pick a different name or update the existing card.`,
+            `${name} looks like ${same.name}, already in this request or Library (${same.description}). Use or update ${same.name}, or give a clearly different name and looks.`,
           );
-        taken.add(key);
+        known.push(entry);
         const refusal = minorAgeRefusal(Object.values(card).join("\n"));
         if (refusal) throw new Error(refusal);
       }

@@ -1930,6 +1930,18 @@ test("create_characters saves each card with its story and queues its portrait, 
   await failure(client, "create_characters", {
     characters: [{ name: "mara", description: "Ranger", portrait: "A ranger" }],
   });
+  // So is the same name with a word added, or the same looks under another name.
+  const renamed = await call(client, "create_characters", {
+    characters: [{ name: "Her Mara", description: "Ranger", portrait: "A ranger" }],
+  });
+  assert.equal(renamed.isError, true);
+  assert.match(texts(renamed), /Her Mara looks like Mara/);
+  await failure(client, "create_characters", {
+    characters: [
+      { name: "Cora", description: "Ranger", portrait: "A ranger" },
+      { name: "Wren", description: " ranger", portrait: "A smith" },
+    ],
+  });
   await failure(client, "create_characters", {
     characters: [
       { name: "Cora", description: "Ranger", portrait: "A ranger" },
