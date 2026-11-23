@@ -459,10 +459,9 @@ test("viewer next steps vary across relevant areas, specific, and spicy only whe
     "Red Satin Dress",
     "Neon Rim Light",
   ]);
-  assert.match(
-    calls[0][0].content,
-    /distinct area \([^)]*interaction[^)]*color palette[^)]*framing/,
-  );
+  // The areas come in a different order each time.
+  for (const area of ["interaction", "color palette", "framing"])
+    assert.match(calls[0][0].content, new RegExp(`distinct area \\([^)]*${area}`));
   assert.match(calls[0][0].content, /Name the actual visible change/);
   assert.match(calls[0][0].content, /Keep the subject's identity/);
   assert.doesNotMatch(calls[0][0].content, /body-shape, proportion or build alternative/);
@@ -700,13 +699,13 @@ test("opening a menu joins its initial preparation and reuses the saved choices"
   release();
   const first = await opening;
   await preparing;
-  assert.equal(calls.length, 2, "one write for next steps, one for motion ideas");
+  assert.equal(calls.length, 1, "one write for next steps; Animate's ideas wait for its menu");
   assert.equal(first.suggestions.length, 2);
   advance(11 * 60_000);
   assert.deepEqual(await suggestions.suggest("alice", { ...body, surface: "viewer" }), first);
   const motion = await suggestions.suggest("alice", { ...body, surface: "animate" });
   assert.equal(motion.suggestions.length, 3);
-  assert.equal(calls.length, 2, "both saved menus outlive the request cache");
+  assert.equal(calls.length, 2, "the saved next steps outlive the request cache");
 });
 
 test("turning explicit wording on or off writes an image's kept next steps and cached drafts again", async () => {
@@ -737,7 +736,7 @@ test("turning explicit wording on or off writes an image's kept next steps and c
   assert.doesNotMatch(calls[4][0].content, /Explicit content is allowed/);
 });
 
-test("background work saves exact result changes and separate image motion ideas", async () => {
+test("background work saves exact result changes, leaving motion ideas to Animate's menu", async () => {
   let vision = true;
   const { calls, pictures, suggestions } = fixture({ image: () => vision });
   const items = [
@@ -761,22 +760,20 @@ test("background work saves exact result changes and separate image motion ideas
   assert.equal(calls[0][1].images, 1);
   assert.match(calls[0][0].content, /what the attached image shows/);
   assert.equal((items[0] as { nextSteps?: { steps: unknown[] } }).nextSteps?.steps.length, 2);
-  assert.match(calls[1][0].content, /becomes a short video/);
-  assert.equal(calls[1][1].images, 1);
-  assert.deepEqual(pictures, [items[0]], "both menus share the decoded picture");
-  assert.equal((items[0] as { motionIdeas?: { steps: unknown[] } }).motionIdeas?.steps.length, 3);
+  assert.deepEqual(pictures, [items[0]]);
+  assert.equal((items[0] as { motionIdeas?: unknown }).motionIdeas, undefined);
   vision = false;
   clock += 10_000;
   assert.equal(await work.tick(), "done");
-  assert.equal(calls[2][1].images, 0);
-  assert.match(calls[2][1].content, /Prompt: B/);
+  assert.equal(calls[1][1].images, 0);
+  assert.match(calls[1][1].content, /Prompt: B/);
   clock += 10_000;
   assert.equal(await work.tick(), "done");
-  assert.match(calls[4][0].content, /changes to the clip/);
-  assert.match(calls[4][1].content, /Prompt: V/);
+  assert.match(calls[2][0].content, /changes to the clip/);
+  assert.match(calls[2][1].content, /Prompt: V/);
   clock += 10_000;
   assert.equal(await work.tick(), "none");
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 3);
 });
 
 test("switched off, prompt ideas and next steps are never written, while asked-for changes still are", async () => {
