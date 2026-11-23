@@ -123,14 +123,15 @@ export function ViewerPrompt({
     query: nextStepsQuery(item.jobId ?? "", base, item.id),
     fresh: () => askNextSteps(item.jobId!, true, base, item.id),
     enabled: ask.available && Boolean(queried),
-    disabled: ask.pending,
+    disabled: ask.pending || !queried,
     onPick: pick,
   });
   const tools = ask.available
     ? [
         {
           id: "viewer-changes",
-          label: "Suggestions & Templates",
+          label: "AI",
+          heading: false,
           icon: icons.assistant,
           menu: assistMenu({
             suggestions,
@@ -197,6 +198,7 @@ export function ViewerPrompt({
       <TextBox
         ref={field}
         aria-label="Prompt"
+        menuLabel="AI"
         placeholder="Prompt…"
         variant="unstyled"
         autosize

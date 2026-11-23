@@ -54,6 +54,7 @@ export function TextBox({
   value,
   onChange,
   tools,
+  menuLabel,
   copyBefore,
   send,
   busy,
@@ -73,6 +74,7 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
+  menuLabel?: string;
   /** Also offers Copy in the menu before this tool. */
   copyBefore?: string;
   /** The send, and a proposal's Undo, which stay beside the text. */
@@ -320,7 +322,7 @@ export function TextBox({
               onMouseDown={focusTool}
               variant="subtle"
               color="gray"
-              aria-label={`${ai ? "AI" : "More"} ${title} Actions`}
+              aria-label={menuLabel || `${ai ? "AI" : "More"} ${title} Actions`}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
             >

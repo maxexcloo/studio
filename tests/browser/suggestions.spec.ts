@@ -234,7 +234,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
     "An amber bird",
   );
   expect(asked.filter((body) => body.surface === "change")).toEqual([]);
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Viewer Actions");
   await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText([
     "Keep & Vary",
     "More Like This",

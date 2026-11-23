@@ -35,4 +35,5 @@
 
 :where(:root[data-phone]) .ratings .control {
   opacity: 1;
+  box-shadow: none;
 }

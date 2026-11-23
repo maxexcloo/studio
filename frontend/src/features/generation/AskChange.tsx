@@ -197,7 +197,8 @@ export function useChangeSuggestions<K extends QueryKey>({
   const list = [...(steps.data?.suggestions ?? [])]
     .slice(0, limit)
     .sort((a, b) => compareNames(a.label, b.label));
-  const loading = refresh.isPending || (steps.isFetching && !list.length);
+  const loading =
+    refresh.isPending || (!list.length && (steps.isFetching || (enabled && steps.isPending)));
   const { options, again } = suggested(
     loading,
     list.map((step) => ({

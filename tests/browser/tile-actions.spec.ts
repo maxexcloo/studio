@@ -514,7 +514,7 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
 
   await page.getByRole("button", { name: "Open image: Paper Moth", exact: true }).click();
   // The chip's choice holds for the next Similar.
-  await viewerAction(page, "AI", "Similar");
+  await viewerAction(page, "Viewer Actions", "Similar");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(chip("Close to Paper Moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(
