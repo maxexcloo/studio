@@ -132,7 +132,7 @@ export function resolutionSize(
 }
 
 export const imageAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"] as const;
-/** Most images one composer run makes, and so the most an account's Default Image Count may be. */
+/** Most images one composer run makes, and so the most an account's Default Count may be. */
 export const maxImageCount = 8;
 /** The account's starting values for new image drafts (backend/account-preferences.js). */
 export type ImagePreference = {

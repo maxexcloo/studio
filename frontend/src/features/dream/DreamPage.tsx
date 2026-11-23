@@ -19,6 +19,7 @@ import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
@@ -189,7 +190,6 @@ export function DreamPage() {
       [deckKey]: typeof update === "function" ? update(previous[deckKey] ?? []) : update,
     }));
   const waitingId = useId();
-  const plural = (number: number, noun: string) => `${number} ${noun}${number === 1 ? "" : "s"}`;
   const waiting =
     count && `${plural(count.images, "image")} and ${plural(count.videos, "video")} waiting`;
   const selector = view !== "projects" && view !== "taste" && (

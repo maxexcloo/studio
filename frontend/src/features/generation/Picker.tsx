@@ -165,7 +165,7 @@ export function PickerHeader<Tab extends string>({
           />
           {filters && (
             <ChipPopup
-              title="Filters"
+              title={`Filter ${searched}`}
               spacious={false}
               opened={filtering}
               onOpenedChange={setFiltering}

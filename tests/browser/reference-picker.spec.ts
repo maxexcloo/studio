@@ -141,7 +141,7 @@ test("Escape closes only the innermost reference layer; selection applies at onc
   await expect(picker).toBeVisible();
   // Each Escape closes the topmost layer: the filters, then the picker.
   await models.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Filters", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Filter Gallery", exact: true })).toBeHidden();
   await expect(picker).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(popup).toBeHidden();
@@ -698,7 +698,7 @@ test("Liked narrows the reference choices, and Uploads leaves the Show filters o
     picker.getByRole("button", { name: `Use reference: ${name}`, exact: true });
   await expect(choice("Beta")).toBeVisible();
   await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filter Gallery", exact: true });
   const liked = filters
     .getByRole("group", { name: "Show", exact: true })
     .getByRole("button", { name: "Liked", exact: true });
