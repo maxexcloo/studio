@@ -57,12 +57,8 @@ test("Returning to Gallery offers a jump only after an image arrives while away"
   await showGalleryView(page, "Review");
   await expect(page).toHaveURL(/\/images\/review$/);
   const deck = page.getByRole("region", { name: "Review", exact: true });
-  await deck.getByRole("button", { name: "Review Filters" }).click();
-  await page
-    .getByRole("radiogroup", { name: "Time", exact: true })
-    .getByText("New Since Last Gallery Visit", { exact: true })
-    .click();
-  await page.keyboard.press("Escape");
+  await deck.getByRole("button", { name: "Time", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New Since Last Visit", exact: true }).click();
   await expect(deck.getByText("New Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Old Bird", { exact: true })).toBeHidden();
 });
@@ -92,16 +88,10 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await expect(deck.getByText("No Unrated Results")).toBeVisible();
   await deck.getByRole("button", { name: "Undo" }).click();
   await expect(deck.getByText("Bird at Sea", { exact: true })).toBeVisible();
-  await deck.getByRole("button", { name: "Review Filters" }).click();
-  await page
-    .getByRole("radiogroup", { name: "Rating", exact: true })
-    .getByText("Liked", { exact: true })
-    .click();
-  await page
-    .getByRole("radiogroup", { name: "Time", exact: true })
-    .getByText("Last 24 Hours", { exact: true })
-    .click();
-  await page.keyboard.press("Escape");
+  await deck.getByRole("button", { name: "Rating", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Liked", exact: true }).click();
+  await deck.getByRole("button", { name: "Time", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Last 24 Hours", exact: true }).click();
   await expect(deck.getByText("Common Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeHidden();
   await showGalleryView(page, "Gallery");

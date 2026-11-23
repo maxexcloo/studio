@@ -1,13 +1,11 @@
-import { Alert, Button, Group, Stack, VisuallyHidden } from "@mantine/core";
+import { Alert, Button, Group, VisuallyHidden } from "@mantine/core";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useState } from "react";
 
 import type { MediaItem } from "../../types";
-import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
-import { FilterChoices } from "../../ui/SectionToolbar";
+import { ViewMenu } from "../../ui/ViewMenu";
 import { DreamDeck, type Judgement } from "../dream/DreamDeck";
-import { FilterButton } from "../generation/Picker";
 import { type GalleryListing, type GalleryReviewRating, galleryReviewQuery } from "./queries";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
@@ -15,7 +13,8 @@ import classes from "../dream/DreamPage.module.css";
 import filterClasses from "./GalleryFilters.module.css";
 
 const day = 24 * 60 * 60 * 1000;
-const ratings = [
+const ratings: { value: GalleryReviewRating; label: string }[] = [
+  { value: "all", label: "All Ratings" },
   { value: "unrated", label: "Unrated" },
   { value: "liked", label: "Liked" },
   { value: "disliked", label: "Disliked" },
@@ -37,12 +36,11 @@ export function GalleryReview({
   const [openedAt] = useState(Date.now);
   const [cutoff, setCutoff] = useState("0");
   const [rating, setRating] = useState<GalleryReviewRating>(listing.filters.rating || "unrated");
-  const [filtering, setFiltering] = useState(false);
-  const filterCount = Number(cutoff !== "0") + Number(rating !== "unrated");
   const times = [
+    { value: "0", label: "All Time" },
     { value: String(openedAt - day), label: "Last 24 Hours" },
     { value: String(openedAt - 7 * day), label: "Last 7 Days" },
-    ...(leftAt ? [{ value: String(leftAt + 1), label: "New Since Last Gallery Visit" }] : []),
+    ...(leftAt ? [{ value: String(leftAt + 1), label: "New Since Last Visit" }] : []),
   ];
   return (
     <section className={classes.page} aria-labelledby={id}>
@@ -52,41 +50,9 @@ export function GalleryReview({
       <div className={toolbarClasses.band}>
         <Group gap="xs" mih={44} wrap="nowrap" className={filterClasses.mode}>
           {view}
-          <ChipPopup
-            title="Filters"
-            spacious={false}
-            opened={filtering}
-            onOpenedChange={setFiltering}
-            position="bottom-start"
-            clearDisabled={!filterCount}
-            onClear={() => {
-              setCutoff("0");
-              setRating("unrated");
-            }}
-            target={
-              <FilterButton
-                label="Review Filters"
-                count={filterCount}
-                opened={filtering}
-                onClick={() => setFiltering(!filtering)}
-              />
-            }
-          >
-            <Stack gap="sm">
-              <FilterChoices
-                label="Time"
-                data={times}
-                value={cutoff === "0" ? null : cutoff}
-                onChange={(value) => setCutoff(value ?? "0")}
-              />
-              <FilterChoices
-                label="Rating"
-                data={ratings}
-                value={rating === "all" ? null : rating}
-                onChange={(value) => setRating((value ?? "all") as GalleryReviewRating)}
-              />
-            </Stack>
-          </ChipPopup>
+          <div className={filterClasses.chips} />
+          <ViewMenu label="Time" value={cutoff} groups={[times]} onChange={setCutoff} />
+          <ViewMenu label="Rating" value={rating} groups={[ratings]} onChange={setRating} />
         </Group>
       </div>
       <GalleryReviewDeck
