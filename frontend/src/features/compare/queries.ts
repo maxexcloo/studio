@@ -25,6 +25,8 @@ export interface Comparison {
   axis?: string;
   /** The project whose brief a vote just proposed a change to, in Dream's Inbox. */
   proposal?: { projectId: string; name: string };
+  /** A Dream comparison the account kept a side of, with its question; it is read-only. */
+  dream?: { question: string };
 }
 
 /** One compare set; it polls only while a variant is still generating. */
@@ -44,9 +46,9 @@ export const comparisonsQuery = queryOptions({
   queryFn: () => api<{ comparisons: Comparison[] }>("/api/comparisons"),
 });
 
-/** A comparison's heading: the question its axis asks, else Compare. */
-export const comparisonTitle = ({ axis }: Pick<Comparison, "axis">) =>
-  axis ? `Which ${titleCase(axis)}?` : "Compare";
+/** A comparison's heading: Dream's question or the one its axis asks, else Compare. */
+export const comparisonTitle = ({ axis, dream }: Pick<Comparison, "axis" | "dream">) =>
+  dream?.question || (axis ? `Which ${titleCase(axis)}?` : "Compare");
 
 /** Which results each of the account's comparisons holds, to find an item's comparison. */
 export const comparisonMembersQuery = queryOptions({

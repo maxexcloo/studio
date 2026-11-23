@@ -135,6 +135,7 @@ export async function fixtures(page: Page) {
     seed: comparison.seed,
     vote: comparison.vote,
     winnerItemId: comparison.winnerItemId || null,
+    ...(comparison.dream ? { dream: comparison.dream } : {}),
     ...(new Set(comparison.requests.map((variant: any) => variant.input.prompt)).size === 1
       ? { prompt: comparison.requests[0].input.prompt }
       : {}),

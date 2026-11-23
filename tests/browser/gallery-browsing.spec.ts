@@ -2373,27 +2373,52 @@ for (const captions of [false, true])
     ).toBeVisible();
   });
 
-test("Comparisons lists each comparison as a card that opens all its variants", async ({
+test("Comparisons lists each comparison and kept Dream comparison as a card that opens all its variants", async ({
   page,
 }) => {
   const state = await fixtures(page);
-  state.gallery.push(...results(3).map((item, index) => ({ ...item, jobId: `job-${index}` })));
-  state.comparisons.push({
-    id: "compare-1",
-    seed: "",
-    requests: [{ input: { prompt: "Browse Result 0" } }, { input: { prompt: "Browse Result 1" } }],
-    jobIds: ["job-0", "job-1"],
-    itemIds: ["browse-0", "browse-1"],
-    labels: ["Variant A", "Variant B"],
-    vote: null,
-  });
+  state.gallery.push(...results(4).map((item, index) => ({ ...item, jobId: `job-${index}` })));
+  state.comparisons.push(
+    {
+      id: "dream-pair",
+      seed: "5",
+      requests: [
+        { input: { prompt: "Browse Result 2" } },
+        { input: { prompt: "Browse Result 3" } },
+      ],
+      jobIds: ["job-2", "job-3"],
+      itemIds: ["browse-2", "browse-3"],
+      labels: ["20 Steps", "30 Steps"],
+      vote: "job-3",
+      winnerItemId: "browse-3",
+      dream: { question: "Which Steps?" },
+    },
+    {
+      id: "compare-1",
+      seed: "",
+      requests: [
+        { input: { prompt: "Browse Result 0" } },
+        { input: { prompt: "Browse Result 1" } },
+      ],
+      jobIds: ["job-0", "job-1"],
+      itemIds: ["browse-0", "browse-1"],
+      labels: ["Variant A", "Variant B"],
+      vote: null,
+    },
+  );
   await page.goto("/images");
   await showGalleryView(page, "Comparisons");
+  // A kept Dream comparison opens read-only, its kept side as the winner.
+  await page.getByRole("button", { name: "Open Comparison: Which Steps?", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/dream-pair$/);
+  await expect(page.getByRole("button", { name: "Open 30 Steps", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Pick|Clear Winner)/ })).toHaveCount(0);
+  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
   const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
   await expect(card).toBeVisible();
-  await expect(page.getByText("2 Variants", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 Variants", { exact: true })).toHaveCount(2);
   // One card per comparison, without the gallery's tiles.
-  await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(2);
   await card.click();
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   for (const label of ["Variant A", "Variant B"])

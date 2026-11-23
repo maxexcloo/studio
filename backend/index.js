@@ -833,6 +833,13 @@ registerCompareRoutes(app, {
     }
     return recordsForRequest(items, req);
   },
+  dreamSides: (req) =>
+    galleryItems({
+      ownerId: ownerIdForRequest(req),
+      type: "image",
+      dreamState: ["kept", "discarded"],
+      dreamPair: true,
+    }).filter(hasGalleryMedia),
   pendingItems: makePendingItems,
   numbered: (items) => resultNumbers.numbered(items),
   voted: (ownerId, image, others) => {

@@ -14,7 +14,10 @@ import { comparisonTitle, comparisonsQuery } from "./queries";
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import filterClasses from "../gallery/GalleryFilters.module.css";
 
-/** The gallery's Comparisons view: a card per comparison, newest first, opening all its variants. */
+/**
+ * The gallery's Comparisons view: a card per comparison or kept Dream comparison, newest first,
+ * opening all its variants.
+ */
 export function ComparisonList({ view }: { view: ReactNode }) {
   const navigate = useNavigate();
   const { columns } = useGalleryColumns();
@@ -24,7 +27,8 @@ export function ComparisonList({ view }: { view: ReactNode }) {
     const items = comparison.variants.flatMap(({ item }) => (item ? [item] : []));
     const cover = items.find((item) => item.id === comparison.winnerItemId) || items[0];
     if (!cover) return [];
-    const title = comparison.axis ? comparisonTitle(comparison) : mediaTitle(cover);
+    const title =
+      comparison.axis || comparison.dream ? comparisonTitle(comparison) : mediaTitle(cover);
     return [{ comparison, cover, title }];
   });
   const hold = useHoldToSelect(

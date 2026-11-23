@@ -78,7 +78,8 @@ export function ComparePage() {
   const pick = useRef<(index: number) => void>(undefined);
   pick.current = (index) => {
     const item = comparison.data?.variants[index]?.item;
-    if (item?.status === "done" && !choose.isPending) choose.mutate(item);
+    if (item?.status === "done" && !comparison.data?.dream && !choose.isPending)
+      choose.mutate(item);
   };
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -100,7 +101,7 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, seed, prompt, negative, set, axis } = comparison.data;
+  const { variants, seed, prompt, negative, set, axis, dream } = comparison.data;
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   // Compare Again brings back every finished variant, the winner first.
   const again = items
@@ -128,7 +129,7 @@ export function ComparePage() {
             </ActionIcon>
           </Tooltip>
           <Title order={1} size="h3">
-            {comparisonTitle({ axis })}
+            {comparisonTitle({ axis, dream })}
           </Title>
         </Group>
         <Text size="sm" c="dimmed" ta="right">
@@ -184,7 +185,9 @@ export function ComparePage() {
                   onOpen={() => item.status === "done" && setOpen(item)}
                   onTryAgain={(failed) => tryAgain([failed.jobId || ""]).then(() => undefined)}
                   actions={
-                    item.status === "done" && (
+                    // Dream's answer stands: its kept side is the winner.
+                    item.status === "done" &&
+                    !dream && (
                       <Tooltip label={won ? "Clear Winner" : "Pick as Winner"}>
                         <ActionIcon
                           className={classes.winner}

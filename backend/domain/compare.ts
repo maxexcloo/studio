@@ -36,6 +36,8 @@ type GalleryItem = QueueMedia & {
   type?: string;
   status?: string;
   resultSet?: { id: string };
+  settings?: { seed?: unknown };
+  dream?: { state?: string; pair?: { id: string; side: number; label: string; question: string } };
 };
 interface Request {
   studioAccount?: GenerationAccount;
@@ -88,6 +90,8 @@ export function registerCompareRoutes(
     /** The caller's visible gallery, or `null` when the account may not use the gallery. */
     gallery(req: Request, ids: ComparisonIds): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
+    /** The sides of the caller's answered Dream comparisons. */
+    dreamSides(req: Request): GalleryItem[];
     /** The variants' items with their result numbers. */
     numbered(items: GalleryItem[]): GalleryItem[];
     /** Hears the winning image and other finished variants, for the taste profile; must not throw. */
@@ -163,6 +167,33 @@ export function registerCompareRoutes(
       winnerItemId: winner?.item?.id ?? null,
       variants,
     };
+  }
+  /**
+   * The Dream comparisons the owner kept a side of, read-only as `dream-` and the pair's ID, with the
+   * one side kept as the winner.
+   */
+  function dreamComparisons(ownerId: string, sides: GalleryItem[]) {
+    const pairs = new Map<string, GalleryItem[]>();
+    for (const item of [...sides].sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side))
+      pairs.set(item.dream!.pair!.id, [...(pairs.get(item.dream!.pair!.id) || []), item]);
+    return [...pairs].flatMap(([pairId, items]) => {
+      const kept = items.filter((item) => item.dream!.state === "kept");
+      if (!kept.length) return [];
+      const winner = kept.length === 1 ? kept[0] : undefined;
+      const seeds = new Set(items.map((item) => String(item.settings?.seed ?? "")));
+      const record: ComparisonRecord = {
+        id: `dream-${pairId}`,
+        ownerId,
+        createdAt: String(items[0].createdAt),
+        seed: seeds.size === 1 ? [...seeds][0] : "",
+        jobIds: items.map((item) => String(item.jobId)),
+        itemIds: items.map((item) => String(item.id)),
+        labels: items.map((item) => item.dream!.pair!.label),
+        vote: winner ? String(winner.jobId) : null,
+        ...(winner ? { winnerItemId: String(winner.id) } : {}),
+      };
+      return [{ ...show(record, items), dream: { question: items[0].dream!.pair!.question } }];
+    });
   }
   function save(record: ComparisonRecord) {
     const records = options.read();
@@ -253,7 +284,16 @@ export function registerCompareRoutes(
                 jobIds,
                 ...(itemIds ? { itemIds } : {}),
               }))
-            : records.map((record) => show(record, items)),
+            : jobs
+              ? records.map((record) => show(record, items))
+              : // The whole list also holds the kept Dream comparisons, newest first.
+                [
+                  ...records.map((record) => show(record, items)),
+                  ...dreamComparisons(
+                    account?.userId || "",
+                    options.dreamSides({ studioAccount: account ?? undefined, params: {} }),
+                  ),
+                ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       },
     };
   });
@@ -263,8 +303,14 @@ export function registerCompareRoutes(
       .find((item) => item.id === req.params.id && item.ownerId === owner(req));
     const items = gallery(req, res, idsOf(record));
     if (!items) return;
-    return record
-      ? res.json(show(record, items))
+    const comparison = record
+      ? show(record, items)
+      : req.params.id.startsWith("dream-") &&
+        dreamComparisons(owner(req), options.dreamSides(req)).find(
+          ({ id }) => id === req.params.id,
+        );
+    return comparison
+      ? res.json(comparison)
       : res.status(404).json({ ok: false, error: "That comparison is unavailable." });
   });
   // MCP records its multi-model and one-thing runs through this one (with the `axis` they vary
