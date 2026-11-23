@@ -48,11 +48,6 @@ export function applyLoraOps(ops, ownerId = "") {
   return { ratings };
 }
 
-/** Forgets the account's LoRA ratings. */
-export function clearLoraState(ownerId = "") {
-  writeRuntimeDocument(dataDir, stacksDocument(ownerId), { library: null });
-}
-
 /**
  * Takes a removed LoRA file out of every account's ratings and every saved preset
  * (library/routes.js, Remove).

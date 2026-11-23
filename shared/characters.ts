@@ -225,10 +225,6 @@ export function withCharacter(prompt: string, description: string, fromImage = t
   return rest ? `${lead} ${rest}` : lead;
 }
 
-/** The prompt without a card's lead and the space that joined it. */
-export const withoutCharacter = (prompt: string, description: string) =>
-  withoutPart(prompt, characterLead(description));
-
 const sentence = (text = "") => {
   const words = text.trim().replace(/[\s.,;:]+$/, "");
   return words && `${words[0].toUpperCase()}${words.slice(1)}.`;
