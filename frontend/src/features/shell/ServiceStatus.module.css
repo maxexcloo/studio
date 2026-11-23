@@ -46,7 +46,7 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  min-height: var(--studio-panel-min-height);
+  min-height: min(calc(4 * var(--studio-panel-min-height)), 60dvh);
   max-height: min(60dvh, 32rem);
 }
 /* An administrator's summary opens Settings › Workers. */

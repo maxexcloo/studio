@@ -577,7 +577,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
     variables: {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "820px",
-      "--studio-panel-min-height": "min(12rem, 35dvh)",
+      "--studio-panel-min-height": "min(6rem, 18dvh)",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,
