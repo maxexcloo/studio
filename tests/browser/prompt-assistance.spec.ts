@@ -15,6 +15,7 @@ import {
   promptMenu,
   promptTool,
   saveCurrent,
+  showLoraStack,
   stamp,
   withSettings,
 } from "./fixtures";
@@ -140,8 +141,21 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
     await negativeReply;
     await route.fulfill({ json: { negative: "poor quality", source: "model" } });
   });
-  await page.route("**/api/assistant/loras", (route) =>
-    route.fulfill({
+  const noMatch = "None of the available LoRAs fits this prompt.";
+  const failure = "LoRA suggestions are temporarily unavailable.";
+  let loraRequests = 0;
+  let releaseLoras!: () => void;
+  const loraReply = new Promise<void>((resolve) => {
+    releaseLoras = resolve;
+  });
+  await page.route("**/api/assistant/loras", async (route) => {
+    loraRequests++;
+    if (loraRequests === 1) {
+      await loraReply;
+      return route.fulfill({ json: { loras: [], reason: noMatch } });
+    }
+    if (loraRequests === 2) return route.fulfill({ status: 503, json: { error: failure } });
+    return route.fulfill({
       json: {
         loras: [
           {
@@ -153,8 +167,8 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
           },
         ],
       },
-    }),
-  );
+    });
+  });
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("My original copper bird");
@@ -206,13 +220,30 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await expect(prompt).toHaveValue("My later direction in warm light");
   await finishTyping(page);
   await openLoraChoices(page);
-  await page.getByRole("button", { name: "Suggest LoRAs", exact: true }).click();
+  const suggest = page.getByRole("button", { name: "Suggest LoRAs", exact: true });
+  const picker = page.locator("[data-chip-popup]").filter({ has: suggest });
+  await suggest.click();
+  try {
+    await expect(suggest).toBeDisabled();
+    await expect(picker.getByRole("status").filter({ hasText: "Finding LoRAs…" })).toBeVisible();
+  } finally {
+    releaseLoras();
+  }
+  await expect(picker.getByRole("status").filter({ hasText: noMatch })).toBeVisible();
+  await suggest.click();
+  await expect(picker.getByRole("alert").filter({ hasText: failure })).toBeVisible();
+  await expect(page.getByText(failure, { exact: true })).toHaveCount(1);
+  await showLoraStack(page);
+  await expect(picker.getByRole("alert").filter({ hasText: failure })).toBeVisible();
+  await suggest.click();
   await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();
   // The backend adds trigger words when it runs; the prompt stays as written.
   await expect(
     page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
   ).toBeDisabled();
   await expect(prompt).toHaveValue("My later direction in warm light");
+  if (testInfo.project.use.isMobile)
+    await page.getByRole("button", { name: "Add LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await closeLoras(page);
   await undoAssistance(page, "LoRA applied");

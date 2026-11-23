@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { copyText } from "../../ui/clipboard";
-import { DataTable, compareNames } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import {
   FilterChoices,
@@ -308,16 +308,15 @@ export function LibraryCatalogueTable({
             sortValue: resourceName,
             cell: (item) => (
               <>
-                <Text size="sm" fw={500} truncate>
-                  {resourceName(item)}
-                </Text>
-                {phone && (
-                  <Text size="xs" c="dimmed" truncate>
-                    {[familySummary(item), typeLabel(item)]
+                <TableRecord
+                  name={resourceName(item)}
+                  detail={
+                    phone &&
+                    [familySummary(item), typeLabel(item)]
                       .filter((part) => part !== "Unclassified")
-                      .join(" · ")}
-                  </Text>
-                )}
+                      .join(" · ")
+                  }
+                />
                 {(item.description || item.note) && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {item.description || item.note}

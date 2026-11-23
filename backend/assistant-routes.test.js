@@ -312,6 +312,59 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
   );
 });
 
+test("LoRA suggestions read the selected backend's catalogue and reference mode", async (t) => {
+  const app = express();
+  app.use(express.json());
+  const referenceBase = { model: "reference.safetensors", family: "krea2", accepts: true };
+  let requested;
+  let available;
+  registerAssistantRoutes(app, {
+    engine: {
+      matchLoras(options) {
+        requested = options;
+        return { loras: [] };
+      },
+    },
+    profiles: async () => [
+      {
+        ...plain,
+        backend: "radiance",
+        backendOptions: [
+          {
+            id: "comfyui",
+            references: 1,
+            profile: {
+              ...plain,
+              options: { loras: ["cabin.safetensors"] },
+              imageModes: { reference: { loraBase: referenceBase } },
+            },
+          },
+          { id: "radiance", references: 0, profile: plain },
+        ],
+      },
+    ],
+    loras: async (_req, names) => {
+      available = names;
+      return loras;
+    },
+  });
+  const url = await listen(t, app);
+  const response = await fetch(url + "/api/assistant/loras", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      profileId: plain.id,
+      profileBackend: "comfyui",
+      hasReferences: true,
+      prompt: "a snowy cabin",
+    }),
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(available, ["cabin.safetensors"]);
+  assert.deepEqual(requested.profile.loraBase, referenceBase);
+  assert.equal(requested.writer.side, "cloud");
+});
+
 test("Settings shows the model Studio's own text calls use", async () => {
   assert.equal(await deploymentTextModel({ environment, engine }), "cloud/auto");
   assert.equal(await deploymentTextModel({ environment: {}, engine: null }), "");

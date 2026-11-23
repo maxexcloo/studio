@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -9,7 +8,6 @@ import {
   Stack,
   Text,
   TextInput,
-  Tooltip,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,12 +16,12 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { DataTable, filterTableRows } from "../../ui/DataTable";
+import { DataTable, TableRecord, filterTableRows } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
 import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
@@ -303,9 +301,7 @@ export function LibraryImports({
           sortValue: nameOf,
           cell: (record) => (
             <>
-              <Text size="sm" fw={500} truncate>
-                {nameOf(record)}
-              </Text>
+              <TableRecord name={nameOf(record)} />
               {(record.audit === "failed" && record.error
                 ? [record.error]
                 : record.audit === "needs-files"
@@ -344,33 +340,27 @@ export function LibraryImports({
           actions={
             <>
               {stale > 0 && (
-                <Tooltip label="Clear Stale">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label="Clear Stale"
-                    onClick={() => setConfirming(true)}
-                  >
-                    <icons.clear size={18} />
-                  </ActionIcon>
-                </Tooltip>
+                <ToolbarAction
+                  label="Clear Stale"
+                  icon={icons.clear}
+                  variant="subtle"
+                  color="gray"
+                  onClick={() => setConfirming(true)}
+                />
               )}
               <FileButton
                 onChange={(file) => file && uploading.mutate(file)}
                 accept="image/png,image/jpeg,image/webp"
               >
                 {(props) => (
-                  <Tooltip label="Import Recipe Image">
-                    <ActionIcon
-                      {...props}
-                      variant="subtle"
-                      color="gray"
-                      aria-label="Import Recipe Image"
-                      loading={uploading.isPending}
-                    >
-                      <icons.upload size={18} />
-                    </ActionIcon>
-                  </Tooltip>
+                  <ToolbarAction
+                    {...props}
+                    label="Import Recipe Image"
+                    icon={icons.upload}
+                    variant="subtle"
+                    color="gray"
+                    loading={uploading.isPending}
+                  />
                 )}
               </FileButton>
             </>
@@ -448,14 +438,7 @@ export function LibraryImports({
                       main: true,
                       sortValue: (row) => fileName(row.resource),
                       cell: (row) => (
-                        <>
-                          <Text size="sm" fw={500} truncate>
-                            {fileName(row.resource)}
-                          </Text>
-                          <Text size="xs" c="dimmed" truncate>
-                            {nameOf(row.record)}
-                          </Text>
-                        </>
+                        <TableRecord name={fileName(row.resource)} detail={nameOf(row.record)} />
                       ),
                     },
                     {
@@ -464,9 +447,7 @@ export function LibraryImports({
                       sortValue: (row) => row.resource.substitute?.file,
                       cell: (row) => (
                         <>
-                          <Text size="sm" truncate>
-                            {row.resource.substitute?.file}
-                          </Text>
+                          <Text size="sm">{row.resource.substitute?.file}</Text>
                           <Text size="xs" c="dimmed">
                             {row.resource.substitute?.reason}
                           </Text>

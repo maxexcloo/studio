@@ -18,7 +18,7 @@ import type { Account } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
+import { accountQuery, ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
 import { accountAdminQuery } from "./AccountAdmin";
 import { PersonalMcpToken } from "./PersonalMcpToken";
 
@@ -55,7 +55,12 @@ function AccountForm({
         }),
       });
     },
-    onSuccess: () => {
+    onSuccess: ({ account }) => {
+      client.setQueryData(accountQuery.queryKey, (current) =>
+        current?.account
+          ? { ...current, account: { ...current.account, username: account.username } }
+          : current,
+      );
       void client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
       void client.invalidateQueries({ queryKey: accountAdminQuery.queryKey });
       saved();
@@ -139,13 +144,13 @@ export function OwnAccount() {
           label="Role"
           description={
             admin
-              ? "Administrators can use and change everything."
-              : "Your access group decides which models, cloud models and uncensored content you can use."
+              ? "Administrators manage Studio settings and accounts."
+              : "Your access group controls the models and features you can use."
           }
         >
           <Badge miw="max-content">{admin ? "Administrator" : "User"}</Badge>
         </SettingRow>
-        <SettingRow label="Sign-In Method" description="The ways you can sign in to Studio.">
+        <SettingRow label="Sign-In Method">
           <Text size="sm">
             {[
               own.canChangePassword && "Password",

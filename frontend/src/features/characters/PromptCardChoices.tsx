@@ -60,7 +60,6 @@ export function PromptCardChoices({
           <PickerTile
             label={`New ${noun}`}
             title={`New ${noun}`}
-            selected={false}
             placeholder={icons.add}
             onToggle={() => dialogs.edit()}
           />

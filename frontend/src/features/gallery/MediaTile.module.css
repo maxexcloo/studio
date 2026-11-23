@@ -212,6 +212,15 @@
   white-space: nowrap;
 }
 
+:where(:root[data-phone]) .timestamp {
+  padding: 1px 4px;
+  background: rgb(0 0 0 / 0.62);
+}
+
+:where(:root[data-phone]) :global([data-by-day]) .timestampDate {
+  display: none;
+}
+
 @media (hover: hover) {
   :where(:root:not([data-phone])) .tile:not(:hover):not(:focus-within) .timestamp {
     opacity: 0;

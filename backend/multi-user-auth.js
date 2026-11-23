@@ -283,6 +283,7 @@ function publicStatus(req) {
           role: account.role,
           generationProfiles: account.generationProfiles,
           features: account.features,
+          username: account.credential ? undefined : ownAccount(account.userId)?.username,
         }
       : null,
     needsRecoveryAdmin: accountStoreSnapshot().accounts.length === 0,

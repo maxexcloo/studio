@@ -616,6 +616,12 @@ test("LoRA matching pre-filters by family, role and words, then ranks with the m
   assert.deepEqual(await engine.matchLoras({ profile, prompt: "a jellyfish", loras: library }), {
     loras: [],
     source: "prefilter",
+    reason: "No LoRA catalogue keywords match this prompt for the selected model.",
+  });
+  assert.deepEqual(await engine.matchLoras({ profile, prompt: "a jellyfish", loras: [] }), {
+    loras: [],
+    source: "prefilter",
+    reason: "No LoRAs are available for the selected model.",
   });
   assert.equal(seen.calls.length, 1);
   // Without a usable reply, the pre-filter's best, at the publisher's default strength.

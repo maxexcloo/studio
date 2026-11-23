@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, expandAssistantMenu, fixtures, section, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string | RegExp) {
@@ -326,7 +326,6 @@ test("Suggest can queue a library item variation at its source", async ({ page }
   const suggest = actions.getByRole("button").last();
   await expect(suggest).toHaveAccessibleName("Suggestions");
   await suggest.click();
-  await expandAssistantMenu(page, "Suggestions");
   const submitted = page.waitForRequest(
     (request) =>
       request.method() === "POST" &&
@@ -1047,7 +1046,6 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
   await expect(page.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Keep & Vary", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Edit Comparison", exact: true })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Suggestions", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
   expect((await request).postDataJSON()).toMatchObject({
     surface: "viewer",

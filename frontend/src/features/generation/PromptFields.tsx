@@ -1,3 +1,4 @@
+import { ActionIcon, Image } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Ref, memo } from "react";
 
@@ -7,6 +8,7 @@ import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { askDraftChange, askDraftSteps, draftStepsQuery } from "../taste/suggestions";
 import {
   ChangeSuggestions,
@@ -21,6 +23,7 @@ import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptHistory } from "./PromptHistory";
 import { usePromptIdeas } from "./PromptIdeas";
+import { referenceKey, referenceLabel } from "./references";
 
 import classes from "./PromptFields.module.css";
 
@@ -106,7 +109,6 @@ export function CompactPromptFields({
   assistantScope,
   ...props
 }: Omit<Parameters<typeof PromptFields>[0], "assistant" | "compact" | "negative"> & {
-  profile?: Profile;
   assistantScope: string;
 }) {
   const assistant = useGenerationPromptAssistant({ ...props, scopeKey: assistantScope });
@@ -119,6 +121,7 @@ export function CompactPromptFields({
 export function PromptFields({
   input,
   references,
+  profile,
   onChange,
   assistant,
   negative,
@@ -131,6 +134,7 @@ export function PromptFields({
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
+  profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   assistant: ReturnType<typeof usePromptAssistant>;
   /** Shows the negative prompt, for profiles that use one. */
@@ -181,6 +185,23 @@ export function PromptFields({
           },
         }
       : undefined);
+  const preview = useMediaPreview();
+  const pictures = compact
+    ? references.flatMap((reference, index) => {
+        const url = reference.url || reference.thumbnailUrl;
+        return url
+          ? [
+              pictureItem({
+                ...reference,
+                id: referenceKey(reference),
+                name: referenceLabel(reference, index, profile),
+                url,
+              }),
+            ]
+          : [];
+      })
+    : [];
+  const cover = pictures[0];
   const assistantTool =
     assistant.stop ??
     (assistant.templates || suggestions
@@ -221,6 +242,26 @@ export function PromptFields({
           minRows={compact ? 1 : negative ? 4 : 3}
           maxRows={compact ? 1 : negative ? 4 : 10}
           wrap={compact ? "off" : undefined}
+          rightSection={
+            cover && (
+              <ActionIcon
+                aria-label="Preview References"
+                variant="transparent"
+                size={44}
+                onClick={() => preview.open(pictures)}
+              >
+                <Image
+                  src={cover.thumbnailUrl || cover.url}
+                  alt={cover.prompt || ""}
+                  w={34}
+                  h={34}
+                  radius="md"
+                />
+              </ActionIcon>
+            )
+          }
+          rightSectionWidth={cover ? 44 : undefined}
+          rightSectionPointerEvents={cover ? "all" : undefined}
           onClick={compact && phone ? (event) => event.preventDefault() : undefined}
           inline={fill}
           value={input.prompt}
@@ -242,6 +283,7 @@ export function PromptFields({
         />
         {assistant.dialog}
       </div>
+      {preview.element}
       {negative && (
         <NegativePrompt
           value={input.negative}

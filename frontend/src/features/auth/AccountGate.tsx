@@ -25,7 +25,7 @@ interface AccountStatus {
   mode: string;
   signedIn: boolean;
   needsRecoveryAdmin?: boolean;
-  account?: Pick<Account, "id" | "role" | "features"> | null;
+  account?: Pick<Account, "id" | "role" | "features" | "username"> | null;
   oidc?: { label: string };
   /** The chat site (STUDIO_CHAT_URL) the navigation links to, if the deployment names one. */
   chatUrl?: string;

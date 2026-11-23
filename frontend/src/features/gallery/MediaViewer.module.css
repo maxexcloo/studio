@@ -240,7 +240,7 @@
   max-width: min(100%, var(--studio-composer-width));
 }
 
-/* The action bar spans the prompt's width: the prompt field over the actions, centred under it. */
+/* The prompt field sits above the centred action row. */
 .dock > .actions {
   flex-direction: column;
   align-items: center;
@@ -253,6 +253,15 @@
 .promptRow {
   align-self: stretch;
   padding-inline: var(--mantine-spacing-xs) 4px;
+}
+
+:where(:root:not([data-phone])) .dock > .actions {
+  width: max-content;
+  max-width: min(100%, var(--studio-composer-width));
+}
+
+:where(:root:not([data-phone])) .promptRow {
+  contain: inline-size;
 }
 
 /* The padding sits outside the text, so a phone summary clips at a whole line. */
@@ -395,6 +404,12 @@
   box-shadow: none;
   padding-inline: max(4px, env(safe-area-inset-left)) max(4px, env(safe-area-inset-right));
   padding-bottom: max(4px, calc(env(safe-area-inset-bottom) - var(--mantine-spacing-xs)));
+}
+
+:where(:root[data-phone]) .promptRow {
+  min-height: 44px;
+  align-content: center;
+  padding-inline: var(--mantine-spacing-xs);
 }
 
 .topActions {

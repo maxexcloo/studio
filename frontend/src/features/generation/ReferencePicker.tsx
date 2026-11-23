@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Image, ScrollArea, Stack, Text } from "@mantine/core";
+import { Button, ScrollArea, Stack, Text } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { type ClipboardEvent, type DragEvent, useState } from "react";
 
@@ -37,7 +37,7 @@ import {
   useReferenceList,
   useReferencePlacement,
 } from "./references";
-import { ReferenceRoles, ReferenceSlots, referenceCellType } from "./ReferenceSlots";
+import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowser";
 
 /** The Library's cards, after the gallery's tabs, with Characters. */
@@ -48,7 +48,6 @@ const cardTabs: typeof galleryTabs = [
 ];
 
 export function ReferencePicker({
-  compact = false,
   value,
   onChange,
   profile: selectedProfile,
@@ -75,7 +74,6 @@ export function ReferencePicker({
   browser?: ReferenceBrowser;
   /** The text a character's description joins: the editor's prompt. */
   prompt?: { value: string; onChange: (value: string) => void };
-  compact?: boolean;
   value?: ReferenceAsset[];
   onChange?: (references: ReferenceAsset[]) => void;
   profile?: Profile;
@@ -239,7 +237,7 @@ export function ReferencePicker({
       {references.length}/{capacity}
     </Text>
   );
-  // The chosen references and their roles; choosing a slot opens the choices on phones.
+  // Choosing a slot opens the choices on phones.
   const stackContent = (
     <Stack component="section" aria-label="Reference Stack" gap="sm" {...fileProps}>
       <ReferenceSlots
@@ -255,12 +253,8 @@ export function ReferencePicker({
           settle();
         }}
         onDrop={dropData}
-      />
-      <ReferenceRoles
-        references={references}
-        profile={profile}
         start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
-        onChange={list.set}
+        onStrengthChange={list.set}
       />
     </Stack>
   );
@@ -390,29 +384,7 @@ export function ReferencePicker({
   const missing = profile?.mediaInputs?.some(
     (slot) => slot.required && !references.some((asset) => asset.slot === slot.id),
   );
-  const trigger = compact ? (
-    <ActionIcon
-      aria-label="Choose References"
-      aria-expanded={opened}
-      variant="subtle"
-      color="gray"
-      size={44}
-      onClick={() => setOpened(!opened)}
-    >
-      {references[0] ? (
-        <Image
-          src={references[0].thumbnailUrl || references[0].url}
-          alt={referenceLabel(references[0], 0, profile)}
-          h={36}
-          w={36}
-          radius="sm"
-          fallbackSrc=""
-        />
-      ) : (
-        <icons.reference size={20} />
-      )}
-    </ActionIcon>
-  ) : (
+  const trigger = (
     <Button
       {...chipProps}
       aria-label="Choose References"

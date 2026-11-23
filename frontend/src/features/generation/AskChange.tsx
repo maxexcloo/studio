@@ -146,10 +146,7 @@ export function SendButton({
   );
 }
 
-/**
- * Suggested options then Refresh, which reads Loading… in their place while they load, and with
- * none one line: why they failed (`failure`), or else No Suggestions.
- */
+/** Suggestions show a status row until choices are ready. */
 export function suggested(
   loading: boolean,
   list: Action[],
@@ -162,10 +159,14 @@ export function suggested(
       : list.length
         ? list
         : [{ id: "none", label: failure || "No Suggestions", disabled: true }],
-    // Never disabled while it works, only inert: a disabled item drops focus out of the open menu.
-    again: loading
-      ? { id: "refresh", label: "Loading…", icon: icons.refresh, loading: true, keepOpen: true }
-      : { id: "refresh", label: "Refresh", icon: icons.refresh, keepOpen: true, ...refresh },
+    again: {
+      id: "refresh",
+      label: "Refresh",
+      icon: icons.refresh,
+      keepOpen: true,
+      ...refresh,
+      disabled: loading || refresh.disabled,
+    },
   };
 }
 
@@ -196,7 +197,8 @@ export function useChangeSuggestions<K extends QueryKey>({
   const list = [...(steps.data?.suggestions ?? [])]
     .slice(0, limit)
     .sort((a, b) => compareNames(a.label, b.label));
-  const loading = refresh.isPending || (steps.isFetching && !list.length);
+  const loading =
+    refresh.isPending || (!list.length && (steps.isFetching || (enabled && steps.isPending)));
   const { options, again } = suggested(
     loading,
     list.map((step) => ({
@@ -216,7 +218,7 @@ export function useChangeSuggestions<K extends QueryKey>({
     loading: preparing,
     menu: [options],
   } satisfies Action;
-  return { action, refresh: again };
+  return { action, options, refresh: again };
 }
 
 /**
@@ -230,7 +232,6 @@ export const assistMenu = ({
   custom = [],
   others = [],
   last,
-  separateSections = false,
 }: {
   loading?: boolean;
   settings?: Action[];
@@ -239,7 +240,6 @@ export const assistMenu = ({
   custom?: Action[];
   others?: ActionGroups;
   last: Action[];
-  separateSections?: boolean;
 }): ActionGroups => {
   if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
   const choices = [...templates].sort((a, b) => compareNames(a.label, b.label));
@@ -249,10 +249,9 @@ export const assistMenu = ({
       ? [{ id: "templates", label: "Templates", icon: icons.templates, menu: [choices] }]
       : []),
   ];
-  const tools = [...custom, ...(suggestions ? [suggestions.refresh] : [])];
   return [
     settings,
-    ...(separateSections ? [sections, tools] : [[...sections, ...tools]]),
+    [...sections, ...custom, ...(suggestions ? [suggestions.refresh] : [])],
     ...others,
     last,
   ];

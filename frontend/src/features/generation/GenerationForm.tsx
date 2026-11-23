@@ -20,11 +20,10 @@ import {
   inputForProfile,
   useGeneration,
 } from "./GenerationProvider";
-import { generationInput, isProfile, profileForBackend, referencePatch } from "./payload";
+import { generationInput, isProfile, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
 import { CompactPromptFields, useDraftChange } from "./PromptFields";
 import { queueQuery } from "./Queue";
-import { ReferencePicker } from "./ReferencePicker";
 
 import classes from "./ComposerDock.module.css";
 
@@ -149,12 +148,6 @@ export function GenerationForm({
     ask.done();
     submit.mutate(undefined);
   };
-  const referenceProfile = profileForBackend(profile, input.profileBackend, true);
-  const supportsReferences = Boolean(
-    referenceProfile?.mediaInputs?.length ||
-    referenceProfile?.capabilities?.img2img ||
-    referenceProfile?.capabilities?.imageInput,
-  );
   // Clear turns into Undo, which restores the whole draft, until the draft next changes.
   const [cleared, setCleared] = useState<typeof draft | null>(null);
   const clearing = useRef(false);
@@ -171,8 +164,7 @@ export function GenerationForm({
           if (!blockedReason && !submit.isPending) generate();
         }}
       >
-        {/* Bottom aligned, so the actions stay at the bottom as the prompt grows. */}
-        <Group wrap="nowrap" gap="xs" align="flex-end">
+        <Group wrap="nowrap" gap="xs" align="center">
           <div className={classes.compactPrompt}>
             <CompactPromptFields
               ideas
@@ -184,8 +176,6 @@ export function GenerationForm({
               ask={ask}
             />
           </div>
-          {/* Shown while profiles load so Submit doesn't move when they arrive. */}
-          {(models.isPending || supportsReferences) && <ReferencePicker compact />}
           <Tooltip label={blockedReason || label}>
             <ActionIcon
               type="submit"

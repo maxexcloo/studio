@@ -41,6 +41,7 @@ test("idle work reads finished images once and search matches those that look al
   const texts: string[] = [];
   let enabled = true;
   let downloaded = true;
+  let failTextOnce = true;
   const encoder: ImageEncoder = {
     unavailable: () => "",
     downloaded: () => downloaded,
@@ -51,6 +52,10 @@ test("idle work reads finished images once and search matches those that look al
     },
     embedText: async (text) => {
       texts.push(text);
+      if (text === "retry" && failTextOnce) {
+        failTextOnce = false;
+        throw new Error("Encoder busy");
+      }
       return along(0, 0.1);
     },
   };
@@ -71,13 +76,19 @@ test("idle work reads finished images once and search matches those that look al
   assert.deepEqual(read.sort(), ["cat", "dog", "kitten"], "images only");
   assert.equal((await search.status()).remaining, 0);
 
-  const near = await search.near("  Ginger Cat ");
+  const [near, concurrent] = await Promise.all([
+    search.near("  Ginger Cat "),
+    search.near("ginger cat"),
+  ]);
   assert.deepEqual(
     items.filter((record) => near!(record)).map((record) => record.id),
     ["cat", "kitten"],
   );
+  assert.ok(concurrent!(items[0]), "both searches use the same embedding");
   await search.near("ginger cat");
-  assert.deepEqual(texts, ["ginger cat"], "a repeated search reuses its vector");
+  assert.deepEqual(texts, ["ginger cat"], "concurrent and repeated searches share one inference");
+  assert.equal(await search.near("retry"), null, "a failed embedding leaves text search available");
+  assert.ok(await search.near("retry"), "a later search retries the failed embedding");
 
   // The kitten is 0.91 alike: in at Similar and Loose, out at Close; the dog is out at every one.
   const scores = (strictness: "close" | "similar" | "loose") =>

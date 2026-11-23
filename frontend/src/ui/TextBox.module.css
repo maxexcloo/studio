@@ -4,6 +4,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding-bottom: 0;
+}
+
+.body:not(:has(.toolbar)) {
   padding-bottom: max(
     calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-md)),
     var(--text-editor-safe-bottom, env(safe-area-inset-bottom))
@@ -24,21 +28,32 @@
   resize: none;
 }
 
-/* Editing tools and form sends stay together above the keyboard. */
-.toolbar {
-  flex-shrink: 0;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0;
-  padding-top: var(--mantine-spacing-xs);
+/* Span the sheet's padding and keep its actions clear of the keyboard and safe area. */
+.footerSurface {
+  --footer-gutter: var(--mb-padding, var(--mantine-spacing-md));
+
+  margin-inline: calc(-1 * var(--footer-gutter));
+  padding-inline: var(--footer-gutter);
+  padding-block: var(--mantine-spacing-sm)
+    max(
+      var(--mantine-spacing-md),
+      var(--text-editor-safe-bottom, env(safe-area-inset-bottom)),
+      calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-xs))
+    );
   border-top: 1px solid var(--studio-glass-border);
 }
 
-.editActions {
+.toolbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+}
+
+.editActions,
+.barTools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -46,20 +61,17 @@
   display: none;
 }
 
-/* Copy and Reset/Undo keep accessible names as icons in the text's corner, or beside sends. */
-.toolbar:has(.sends) .editAction,
+/* Copy and Reset/Undo keep accessible names as icons in the text's corner. */
 .corner .editAction {
   width: 32px;
   min-width: 0 !important;
   padding-inline: 0;
 }
 
-.toolbar:has(.sends) .editText,
 .corner .editText {
   display: none;
 }
 
-.toolbar:has(.sends) .editIcon,
 .corner .editIcon {
   display: block;
 }
@@ -226,11 +238,7 @@
 
 /* While the text has focus, its tools lead its form's action bar, centred on the bar's row. */
 .barTools {
-  display: flex;
   flex: 1;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
 }
 
 /* Clear sits immediately before the bar's primary, as everywhere else. */

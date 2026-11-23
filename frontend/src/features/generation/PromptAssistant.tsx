@@ -9,6 +9,7 @@ import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { CustomDialog } from "./CustomDialog";
+import { profileForLoras } from "./payload";
 
 /** A fixed assistant option from Library › Prompt Styles, in its menu's order. */
 export interface AssistantOption {
@@ -50,11 +51,10 @@ interface Result {
   reason?: string;
   model?: string;
 }
-type Action = "rewrite" | "negative" | "loras";
+type Action = "rewrite" | "negative";
 const workingLabels: Record<Action, string> = {
   rewrite: "Improving Prompt…",
   negative: "Writing Negative…",
-  loras: "Finding LoRAs…",
 };
 
 /** What the prompt assistant offers this account. */
@@ -122,17 +122,30 @@ export function usePromptAssistant({
   // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [loraFeedback, setLoraFeedback] = useState<{ message: string; error?: boolean }>();
   const [negativeIdea, setNegativeIdea] = useState<{ key: string; value: string }>();
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(false);
   const scope = useRef(0);
   const undoNotifications = useRef(new Set<string>());
-  const latest = useRef({ input, profile, onChange, onNegativeWritten });
-  latest.current = { input, profile, onChange, onNegativeWritten };
+  const hasReferences = Boolean(
+    references.length || input.referenceAssets?.length || input.referenceDetails?.length,
+  );
+  const loraProfile = profileForLoras(profile, input.profileBackend, hasReferences);
+  const latest = useRef({
+    input,
+    profile,
+    hasReferences,
+    loraProfile,
+    onChange,
+    onNegativeWritten,
+  });
+  latest.current = { input, profile, hasReferences, loraProfile, onChange, onNegativeWritten };
   useEffect(() => {
     mounted.current = true;
     scope.current++;
     setSuggestions([]);
+    setLoraFeedback(undefined);
     return () => {
       mounted.current = false;
       scope.current++;
@@ -140,7 +153,7 @@ export function usePromptAssistant({
       undoNotifications.current.forEach((id) => notifications.hide(id));
       undoNotifications.current.clear();
     };
-  }, [profile?.id, scopeKey]);
+  }, [profile?.id, input.profileBackend, hasReferences, scopeKey]);
   const info = status.data;
   const preset =
     info?.presets.find((item) => item.id === presetId) ||
@@ -151,7 +164,7 @@ export function usePromptAssistant({
     !info?.noNegative?.includes(profile?.id || "");
   const negativeKey = JSON.stringify([profile?.id, input.prompt, input.cfg, input.loras]);
   const lorasOffered = Boolean(
-    info?.loras && profile?.capabilities.lora && profile.options?.loras?.length,
+    info?.loras && loraProfile?.capabilities.lora && loraProfile.options?.loras?.length,
   );
   function applyChange(message: string, patch: Partial<GenerationInput>) {
     const before = latest.current.input;
@@ -223,9 +236,11 @@ export function usePromptAssistant({
       };
       const abort = new AbortController();
       controller.current = abort;
-      const body: Record<string, unknown> = { profileId: profile.id, prompt: input.prompt };
-      if (action !== "loras")
-        body.loras = input.loras.filter((item) => item.enabled !== false).map((item) => item.name);
+      const body: Record<string, unknown> = {
+        profileId: profile.id,
+        prompt: input.prompt,
+        loras: input.loras.filter((item) => item.enabled !== false).map((item) => item.name),
+      };
       if (action === "rewrite") {
         body.preset = preset;
         if (instruction) body.instruction = instruction;
@@ -242,7 +257,7 @@ export function usePromptAssistant({
         body: JSON.stringify(body),
       });
       abort.signal.throwIfAborted();
-      if (action !== "loras" && result.source === "fallback")
+      if (result.source === "fallback")
         throw new Error(`The prompt assistant is unavailable (${result.reason || "no reply"}).`);
       return { action, result, source, preset, preview, negativeKey };
     },
@@ -278,7 +293,7 @@ export function usePromptAssistant({
             field?.setSelectionRange(field.value.length, field.value.length);
           });
         }
-      } else if (action === "negative") {
+      } else {
         if (preview) {
           setNegativeIdea({ key: negativeKey, value: result.negative?.trim() || "" });
           return;
@@ -289,28 +304,79 @@ export function usePromptAssistant({
         }
         applyChange("Negative prompt written", { negative: result.negative });
         current.onNegativeWritten?.();
-      } else {
-        const offered = new Set(current.profile?.options?.loras || []);
-        const usable = (result.loras || []).filter((item) => offered.has(item.name));
-        setSuggestions(usable);
-        if (!usable.length) notifications.show({ message: "No LoRAs fit this prompt." });
       }
     },
     onSettled: () => {
       controller.current = null;
     },
   });
+  const findLoras = useMutation({
+    mutationKey: ["prompt-assistance", "loras"],
+    meta: { inlineError: true },
+    mutationFn: async ({
+      scope: _scope,
+      ...body
+    }: {
+      scope: number;
+      profileId: string;
+      profileBackend: GenerationInput["profileBackend"];
+      hasReferences: boolean;
+      prompt: string;
+    }) => {
+      const abort = new AbortController();
+      controller.current = abort;
+      const result = await api<Result>("/api/assistant/loras", {
+        method: "POST",
+        signal: abort.signal,
+        body: JSON.stringify(body),
+      });
+      abort.signal.throwIfAborted();
+      return result;
+    },
+    onSuccess: (result, source) => {
+      if (!mounted.current || source.scope !== scope.current) return;
+      const current = latest.current;
+      if (
+        current.profile?.id !== source.profileId ||
+        current.input.profileBackend !== source.profileBackend ||
+        current.hasReferences !== source.hasReferences
+      )
+        return;
+      if (current.input.prompt !== source.prompt) {
+        setLoraFeedback({ message: "Your prompt changed. Try again to use the current text." });
+        return;
+      }
+      const offered = new Set(current.loraProfile?.options?.loras || []);
+      const usable = (result.loras || []).filter((item) => offered.has(item.name));
+      setSuggestions(usable);
+      if (!usable.length)
+        setLoraFeedback({
+          message: result.loras?.length
+            ? "The suggested LoRAs are no longer available for the selected model."
+            : result.reason || "No LoRAs fit this prompt.",
+        });
+    },
+    onError: (error, source) => {
+      if (mounted.current && source.scope === scope.current && error.name !== "AbortError")
+        setLoraFeedback({ message: error.message, error: true });
+    },
+    onSettled: () => {
+      controller.current = null;
+    },
+  });
+  const assisting = assistance.isPending || findLoras.isPending;
   function apply(suggestion: Suggestion) {
     if (input.loras.some((item) => item.name === suggestion.name)) return;
     if (
-      input.loras.filter((item) => item.enabled !== false).length >= (profile?.maxLoras || maxLoras)
+      input.loras.filter((item) => item.enabled !== false).length >=
+      (loraProfile?.maxLoras || maxLoras)
     ) {
-      notifications.show({
-        color: "yellow",
+      setLoraFeedback({
         message: "Disable or remove a LoRA before adding another.",
       });
       return;
     }
+    setLoraFeedback(undefined);
     // Studio adds enabled LoRAs' trigger words when it runs the prompt.
     applyChange("LoRA applied", {
       loras: [
@@ -323,6 +389,7 @@ export function usePromptAssistant({
     return { working: undefined, dialog: null };
   const disabled = !input.prompt.trim();
   const run = (action: Action, style?: string) => {
+    if (assisting) return;
     if (style) setPresetId(style);
     assistance.mutate({ action, preset: style });
   };
@@ -352,11 +419,13 @@ export function usePromptAssistant({
     : [];
   const working = change?.pending
     ? "Asking for a Change…"
-    : assistance.isPending && assistance.variables
-      ? workingLabels[assistance.variables.action]
-      : undefined;
+    : findLoras.isPending
+      ? "Finding LoRAs…"
+      : assistance.isPending && assistance.variables
+        ? workingLabels[assistance.variables.action]
+        : undefined;
   // While it works the box's ⋯ spins and this offers Stop. A change can't be stopped.
-  const stop: ToolAction | undefined = assistance.isPending
+  const stop: ToolAction | undefined = assisting
     ? {
         id: "assistant",
         label: "Stop Assistance",
@@ -367,7 +436,7 @@ export function usePromptAssistant({
   // A change lands in the prompt as a proposal; the Custom style's rewrite, ready to edit.
   function ask(text: string) {
     if (change) change.send(text);
-    else {
+    else if (!assisting) {
       editAfter.current = true;
       // Not remembered as the last style, which runs from one tap.
       assistance.mutate({ action: "rewrite", preset: "custom", instruction: text });
@@ -403,7 +472,7 @@ export function usePromptAssistant({
             <Button
               size="compact-sm"
               variant="default"
-              disabled={added || assistance.isPending}
+              disabled={added || assisting}
               aria-label={`Apply ${item.title || item.name}`}
               onClick={() => apply(item)}
             >
@@ -415,7 +484,9 @@ export function usePromptAssistant({
     </Stack>
   ) : null;
   const preview = negativeIdea?.key === negativeKey ? negativeIdea.value : undefined;
-  const loadNegative = () => assistance.mutate({ action: "negative", preview: true });
+  const loadNegative = () => {
+    if (!assisting) assistance.mutate({ action: "negative", preview: true });
+  };
   const negativeLoading = assistance.isPending && assistance.variables.action === "negative";
   const negativeFailed = assistance.isError && assistance.variables?.action === "negative";
   const negativeTool: ToolAction | undefined = negativeOffered
@@ -424,7 +495,7 @@ export function usePromptAssistant({
         label: "Improve Negative Prompt",
         icon: icons.assistant,
         onOpen: () => {
-          if (!disabled && preview === undefined && !assistance.isPending) loadNegative();
+          if (!disabled && preview === undefined) loadNegative();
         },
         menu: [
           [
@@ -453,8 +524,7 @@ export function usePromptAssistant({
               id: "refresh-negative",
               label: "Refresh",
               icon: icons.refresh,
-              disabled: disabled || assistance.isPending,
-              loading: negativeLoading,
+              disabled: disabled || assisting,
               keepOpen: true,
               onClick: loadNegative,
             },
@@ -471,9 +541,20 @@ export function usePromptAssistant({
     dialog,
     loraSuggestions: lorasOffered
       ? {
-          disabled: disabled || assistance.isPending || change?.pending,
-          loading: assistance.isPending && assistance.variables?.action === "loras",
-          onClick: () => run("loras"),
+          disabled: disabled || assisting || change?.pending,
+          loading: findLoras.isPending,
+          feedback: loraFeedback,
+          onClick: () => {
+            setSuggestions([]);
+            setLoraFeedback(undefined);
+            findLoras.mutate({
+              scope: scope.current,
+              profileId: profile.id,
+              profileBackend: input.profileBackend,
+              hasReferences,
+              prompt: input.prompt,
+            });
+          },
           list,
         }
       : undefined,

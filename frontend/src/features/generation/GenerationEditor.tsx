@@ -25,6 +25,7 @@ import { type DraftChange, PromptFields, useGenerationPromptAssistant } from "./
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
 
+import textClasses from "../../ui/TextBox.module.css";
 import classes from "./GenerationEditor.module.css";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 
@@ -346,7 +347,7 @@ export function GenerationEditor({
             <Alert color="red">{error instanceof Error ? error.message : String(error)}</Alert>
           )}
         </div>
-        <div className={classes.footer}>
+        <div className={fill ? `${classes.footer} ${textClasses.footerSurface}` : classes.footer}>
           {fill && inputs}
           <Group
             role="group"

@@ -25,6 +25,45 @@
 .header > :last-child:has(.searching) {
   flex-basis: 100%;
 }
+:root:not([data-phone]) .header > :last-child:has(.inlineSearch) {
+  flex-grow: 1;
+}
+:root:not([data-phone]) .controls:has(.inlineSearch) {
+  flex: 1;
+}
+:root:not([data-phone]) .inlineSearch {
+  flex: 1 0 13rem;
+}
+.header > :last-child:has([data-adaptive-search]) {
+  flex: 1 0 min(100%, 20rem);
+}
+[data-adaptive-search].enter {
+  container-type: inline-size;
+  width: 100%;
+}
+.inlineSearch {
+  width: 13rem;
+}
+.expandedSearch {
+  width: 100%;
+}
+[data-adaptive-search] .inlineSearch {
+  display: none;
+}
+@container (min-width: 20rem) {
+  [data-adaptive-search] .controls {
+    flex: 1;
+    min-width: 0;
+  }
+  [data-adaptive-search] .inlineSearch {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+  [data-adaptive-search] .searchTrigger {
+    display: none;
+  }
+}
 @keyframes enter {
   from {
     opacity: 0;

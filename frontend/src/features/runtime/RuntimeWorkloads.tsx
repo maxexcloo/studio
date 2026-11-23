@@ -733,10 +733,7 @@ export function RuntimeHistory() {
   const { history } = status;
   const change = changeLine(workloadNames(status.workloads));
   return (
-    <SettingGroup title="History">
-      <Text size="sm" c="dimmed">
-        Recent GPU changes, newest first, and who asked.
-      </Text>
+    <SettingGroup title="History" description="See who requested each GPU change and how it ended.">
       <HistoryTable
         label="Runtime Changes"
         rows={history}

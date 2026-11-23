@@ -118,7 +118,7 @@ recur across features.
 ### Actions & Menus
 
 - Search clears only its query; filters preserve it. Toolbars show search as a
-  field; phones open it from an icon. A Library or Settings list's Filter
+  field when there is room, otherwise open it from an icon. A Library or Settings list's Filter
   popover shows each filter's choices inline as chips (`FilterChoices`), All
   first, never a dropdown.
 - Named controls that open a picker or menu show ▾ (Animate ▾, Copy ▾), small

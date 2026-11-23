@@ -768,7 +768,7 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await page.goto("/library#files");
   const table = page.getByRole("table", { name: "Library Files", exact: true });
   await expect(table.getByRole("row")).toHaveCount(3);
-  const names = table.getByRole("row").locator("td:first-child p:first-child");
+  const names = table.getByRole("row").locator("td:first-child > p:first-child");
   await expect(names).toHaveText(["Flux Base", "XL Base"]);
   const name = table.getByRole("columnheader", { name: "Name", exact: true });
   await expect(name).toHaveAttribute("aria-sort", "ascending");
