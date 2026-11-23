@@ -38,7 +38,10 @@ import { listenForAgentSignIn } from "./agent-sign-in.js";
 import { dreamVideoProfile } from "./animate-profile.js";
 import { createAssistantContext } from "./assistant-context.js";
 import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
+import { registerCardReferenceRoutes } from "./card-references.js";
 import {
+  addPickedReference,
+  cardOf,
   refusal as cardRefusal,
   createCard,
   deleteCard,
@@ -821,7 +824,7 @@ registerMigrationRoutes(app, {
   dataDir,
   adminRefusal,
 });
-registerCompareRoutes(app, {
+const comparisons = registerCompareRoutes(app, {
   store,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
@@ -866,6 +869,21 @@ registerCompareRoutes(app, {
   // A pick proposes the project's new styles in Dream's Inbox; nothing changes until accepted.
   picked: ({ ownerId, projectId, axis }, choice, by) =>
     inbox.picked(ownerId, projectId, axis, choice, by),
+  card: (ownerId, comparisonId) => {
+    const found = cardOf(ownerId, comparisonId);
+    return found ? { kind: found.kind, id: found.card.id, name: found.card.name } : null;
+  },
+  pickedReference: (ownerId, comparisonId, itemId) => {
+    try {
+      addPickedReference(ownerId, comparisonId, itemId);
+    } catch (error) {
+      logWarning(`Generate References: the pick of ${comparisonId} was not kept: ${error.message}`);
+    }
+  },
+});
+registerCardReferenceRoutes(app, {
+  profiles: (account) => assistant.profiles({ studioAccount: account }),
+  queue: comparisons.queue,
 });
 registerTasteRoutes(app, { taste });
 const mcpRecords = mcpOwnership(runtimeDatabase(dataDir));

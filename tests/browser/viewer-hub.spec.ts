@@ -750,6 +750,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
       const request = route.request().postDataJSON();
+      if (request.surface === "composer") return route.fallback();
       expect(request).toMatchObject({
         itemId: "hub",
         directions: directions.map(({ request }) => request),

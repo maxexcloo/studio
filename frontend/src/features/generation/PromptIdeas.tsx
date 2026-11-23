@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { hashKey, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import { maxSuggestions } from "../../../../shared/suggestions";
 import type { GenerationInput, ReferenceAsset } from "../../types";
@@ -44,6 +44,18 @@ export function usePromptIdeas({
     const next = promptIdeasQuery(context, cards, fresh);
     void client.fetchQuery({ ...next, ...(fresh && { staleTime: 0 }) }).catch(() => {});
   }
+  const offered =
+    enabled && mayUseAssistant && assistant.data?.available && (cards || !prompt.trim());
+  // An empty prompt's ideas load once the page is idle, so its menu opens with them ready.
+  const prewarm = offered && !cards && !prompt.trim();
+  const key = hashKey(query.queryKey);
+  useEffect(() => {
+    if (!prewarm) return;
+    const idle = window.requestIdleCallback ?? setTimeout;
+    const cancel = window.cancelIdleCallback ?? clearTimeout;
+    const handle = idle(() => void client.prefetchQuery(query));
+    return () => cancel(handle);
+  }, [prewarm, key, client]);
   const options = [...(ideas.data?.suggestions ?? [])]
     .slice(0, maxSuggestions)
     .sort((a, b) => compareNames(a.label, b.label))
@@ -53,10 +65,10 @@ export function usePromptIdeas({
       onClick: () => {
         setPicked({ before: base, after: idea.prompt, label: idea.label });
         onChange(idea.prompt);
+        // The next empty prompt opens with a new set.
+        if (!cards) (window.requestIdleCallback ?? setTimeout)(() => load(true));
       },
     }));
-  const offered =
-    enabled && mayUseAssistant && assistant.data?.available && (cards || !prompt.trim());
   return {
     suggestions: offered
       ? {
