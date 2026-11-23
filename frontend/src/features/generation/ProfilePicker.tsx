@@ -9,7 +9,13 @@ import { compareNames } from "../../ui/DataTable";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect, type ChipSelectProps } from "./ChipSelect";
-import { defaultProfile, inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
+import {
+  defaultProfile,
+  inputForProfile,
+  modelsQuery,
+  useDraft,
+  useGeneration,
+} from "./GenerationProvider";
 import { modelFamilyLabel } from "./modelFamily";
 import { backendLabel, isProfile, profileName } from "./payload";
 
@@ -167,7 +173,8 @@ export function ProfilePicker({
     notifications.show({ color: "red", message: failure });
     runtime.dismiss();
   }, [failure]);
-  const input = value || context.input;
+  const draft = useDraft();
+  const input = value || draft.input;
   const workers = context.models.data?.workers;
   const available = context.profiles.filter((profile) => profile.kind === input.kind);
   const selected = input.profileId
