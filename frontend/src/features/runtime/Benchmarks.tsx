@@ -264,6 +264,7 @@ export function BenchmarkResults() {
           {
             key: "result",
             header: "Result",
+            width: 120,
             cell: (run) => (
               <Badge
                 color={statusColour(run.status)}
