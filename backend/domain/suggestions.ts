@@ -95,7 +95,7 @@ const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "c
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
 const suggestionRevision = 2;
-const motionRevision = 3;
+const motionRevision = 4;
 /** Ideas avoid this many of the latest shown in the same menu. */
 const shownIdeas = maxSuggestions;
 const maxRequest = 500;

@@ -216,10 +216,7 @@ test("each suggestion picker caps an oversized reply at ten distinct ideas", asy
     });
     assert.equal(result.suggestions.length, 10, surface);
     assert.equal(new Set(result.suggestions.map((idea) => idea.label)).size, 10);
-    assert.match(
-      calls[0][0].content,
-      /(?:Write|Suggest) 10 useful, distinct|Offer up to 10 distinct/,
-    );
+    assert.match(calls[0][0].content, /(?:Write|Suggest) 10 useful, distinct|Offer 10 distinct/);
   }
 });
 

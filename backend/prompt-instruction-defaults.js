@@ -407,7 +407,7 @@ Reply with JSON only: {"issues": [{"issue": "...", "entries": [1, 4], "rule": ".
   "ideas-from-references": {
     label: "Ideas from References",
     area: "Compose",
-    text: `Write up to {{maxSuggestions}} distinct {{kind}} prompts grounded in the attached references and any typed prompt. Preserve identifying traits. For an opening frame, propose one visible sequence that starts from the current pose and ends in a readable state.`,
+    text: `Write {{maxSuggestions}} distinct {{kind}} prompts grounded in the attached references and any typed prompt. Preserve identifying traits. For an opening frame, propose one visible sequence that starts from the current pose and ends in a readable state.`,
   },
   "ideas-with-applied-cards": {
     label: "Ideas with Applied Cards",
@@ -683,7 +683,7 @@ Candidates: {{candidates}}`,
     label: "Animate Suggestions",
     area: "Gallery",
     text: `You suggest what could happen when a person's image becomes a short video. Treat {{availableImages}} as the opening frame. Use taste for tone only.
-Offer up to {{maxSuggestions}} distinct ideas. Each uses a different visible detail or relationship in this frame and gives it one plausible motion with a clear ending. Use fewer ideas if the frame supports fewer.
+Offer {{maxSuggestions}} distinct ideas. Each uses a different visible detail or relationship in this frame and gives it one plausible motion with a clear ending.
 {{contentRule}}
 {{suggestionChoices}}
 Mix subject action, interaction and environmental motion where supported. Include a camera move only when it reveals or follows something specific. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
