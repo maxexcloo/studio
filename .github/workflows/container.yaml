@@ -280,4 +280,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
-        run: gh release create "v$VERSION" --generate-notes --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Studio v$VERSION"
+        run: |
+          # The Actions token cannot tag an older commit whose workflows differ from main.
+          workflows_changed="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...main" \
+            --jq 'any(.files[]?; .filename | startswith(".github/workflows/"))')"
+          if [ "$workflows_changed" = true ]; then
+            echo "::notice::A workflow changed after $GITHUB_SHA. The newer run will publish."
+            exit 0
+          fi
+          gh release create "v$VERSION" --generate-notes --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Studio v$VERSION"
