@@ -23,8 +23,7 @@ import { type RouteAccount, directRoute } from "./direct-route.ts";
  * What a person did with a result; "like" and "dislike" rate it ("unlike" and "undislike" take a
  * rating back), "report" names an issue they asked Studio to fix, "keep" and "discard" are their
  * verdicts on Dream results,
- * "skip" a Dream result passed without a reason, "calibrate-like" and "calibrate-pass" on older
- * gallery images Dream showed them again, "delete"
+ * "calibrate-like" and "calibrate-pass" on older gallery images Dream showed them again, "delete"
  * a finished result they deleted from the gallery, and "preferred" is a compare winner chosen over one other variant, and "pair-both" and "pair-neither"
  * answer a Dream comparison with both or neither.
  */
@@ -41,7 +40,6 @@ type TasteKind =
   | "iterate"
   | "keep"
   | "discard"
-  | "skip"
   | "calibrate-like"
   | "calibrate-pass"
   | "delete";
@@ -267,7 +265,6 @@ const signalWeights: Record<TasteKind, number> = {
   iterate: 0.5,
   keep: 1,
   discard: -0.5,
-  skip: -0.2,
   "calibrate-like": 0.5,
   "calibrate-pass": -0.5,
   delete: -1,

@@ -456,6 +456,11 @@ const exploredProfiles = { least: 20, rate: 0.3 };
 const leastSteps: Record<string, number> = { "family:krea2": 8 };
 /** Learnt shapes weigh this much less where they keep poorly: 2:3 keeps about half as often. */
 const shapeWeights: Record<string, number> = { "0.67": 0.5 };
+/**
+ * A plain Pass (`skip`) and Not My Taste dislike a result, which stays in Discards for reference;
+ * Too Similar and Glitch say nothing about taste.
+ */
+const disliking = (reason: DreamPassReason) => reason === "taste" || reason === "skip";
 /** Dream stops making new results while this many wait unseen, until some are judged. */
 const unseenLimit = 60;
 /** Percent of Dream's images that start a series, where the account has a liked or kept image. */
@@ -1692,7 +1697,7 @@ export function createDream(options: {
     const rate = (explored: boolean) => {
       const side = decided.filter(
         ({ dream }) =>
-          (!dream!.passReason || dream!.passReason === "taste") &&
+          (!dream!.passReason || disliking(dream!.passReason)) &&
           dream!.arm!.startsWith("explore:") === explored,
       );
       return (side.filter((item) => item.dream!.state === "kept").length + 1) / (side.length + 2);
@@ -3678,7 +3683,6 @@ export function createDream(options: {
         "pair-neither": "Chose Neither",
         preferred: "Chose",
         report: "Reported",
-        skip: "Skipped",
         undislike: "Restored",
         unlike: "Unliked",
       };
@@ -3705,7 +3709,6 @@ export function createDream(options: {
               "keep",
               "pair-both",
               "pair-neither",
-              "skip",
             ].includes(signal.kind),
         )
         .map((signal) => ({
@@ -3851,7 +3854,7 @@ export function createDream(options: {
         if (items.length !== ids.length || items.some((item) => !ids.includes(String(item.id))))
           throw failure("That Dream comparison has changed.", 409);
         const decidedAt = stamp();
-        const rating = reason === "taste" ? "disliked" : undefined;
+        const rating = disliking(reason) ? "disliked" : undefined;
         for (const item of items)
           options.mark(
             ownerId,
@@ -3864,10 +3867,7 @@ export function createDream(options: {
             },
             rating,
           );
-        // A plain skip on a single result counts weakly against it.
-        if (reason === "skip" && items.length === 1)
-          options.taste.record(ownerId, [tasteSignal("skip", first.jobId, itemValues(first))]);
-        if (reason === "taste")
+        if (rating)
           options.taste.record(ownerId, [
             items.length > 1
               ? pairSignal(

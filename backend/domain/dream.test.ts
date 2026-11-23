@@ -2196,7 +2196,9 @@ test("Dream sizes a Qwen or Noct image to fit one card rather than its two-GPU t
     defaults: { width: 1024, height: 1344, model: "noctq-4-iq8r" },
   };
   const { dream, taste, dreamOnce } = fixture(t, [noct]);
-  taste.record("alice", [tasteSignal("like", "a", { profileId: "flux", width: 832, height: 1248 })]);
+  taste.record("alice", [
+    tasteSignal("like", "a", { profileId: "flux", width: 832, height: 1248 }),
+  ]);
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
   assert.deepEqual([job.input.width, job.input.height], [896, 1344]);
@@ -2227,12 +2229,20 @@ test("Dream stops exploring a profile that keeps poorly", async (t) => {
   assert.deepEqual([job?.input.profileId, job?.dream?.arm], ["qwen", "explore:prompt"]);
 });
 
-test("A plain skip teaches weakly, and a full backlog pauses Dream without discarding it", async (t) => {
+test("A plain Pass dislikes a result and keeps it for reference, and a full backlog pauses Dream without discarding it", async (t) => {
   const { dream, state, taste, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   const first = (await dreamOnce())!;
-  dream.pass("alice", [`${first.id}-0`], "skip");
-  assert.equal(taste.read("alice").signals[0].kind, "skip");
+  const id = `${first.id}-0`;
+  const item = state.items.find((entry) => entry.id === id)!;
+  item.status = "done";
+  dream.pass("alice", [id], "skip");
+  assert.deepEqual([item.rating, item.dream?.state], ["disliked", "discarded"]);
+  assert.equal(taste.read("alice").signals[0].kind, "discard");
+  dream.undo("alice", [id]);
+  assert.deepEqual([item.rating, item.dream?.state], [undefined, "unseen"]);
+  assert.equal(taste.read("alice").signals.length, 0);
+  dream.pass("alice", [id], "skip");
   for (let index = 0; index < 60; index++)
     state.items.push({
       id: `waiting-${index}`,
