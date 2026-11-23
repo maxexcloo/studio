@@ -56,7 +56,13 @@ import {
   projectTargets,
   rulesLine,
 } from "./project.js";
-import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
+import {
+  exactPromptInstructions,
+  fullBodyPerson,
+  promptListProblem,
+  repeatedSetProblem,
+  turnCountProblem,
+} from "./prompt-checks.js";
 import { compactGuide } from "./prompting.js";
 import { output, shortPrompt } from "./results.js";
 import {
@@ -121,6 +127,11 @@ function runSize(profile, aspect, resolution) {
   return { width, height, ...(takes ? { resolution: preferred } : {}) };
 }
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
+/**
+ * What each chat turn has queued, `{ images, sets }`, so the turn stops at the number its request
+ * asked for and its later calls bring new prompts.
+ */
+const turnRuns = new Map();
 const outputCount = (jobs) => jobs.reduce((total, job) => total + (job.images || 1), 0);
 const setTitle = z.string().trim().min(1).max(80);
 // Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
@@ -206,6 +217,7 @@ export function registerGenerateTools({
   chatChoices,
 }) {
   const { owner, refs, conversation, turn } = actor;
+  const turnKey = JSON.stringify([owner, conversation, turn]);
   // A guide goes to each conversation (each MCP session without a conversation header, else the account).
   const guideKey = (profileId) => JSON.stringify([refs, profileId]);
   const review = (profileId) => reviewedGuides.due(guideKey(profileId));
@@ -598,6 +610,18 @@ export function registerGenerateTools({
       reply.then(
         () => {
           entry.at = Date.now();
+          const images = outputCount(accepted.entries.flatMap(({ queued }) => queued.jobs));
+          if (turn && images) {
+            const run = turnRuns.get(turnKey) || { images: 0, sets: [] };
+            run.images += images;
+            run.sets.push({
+              number: accepted.set,
+              prompts: accepted.entries.flatMap(({ plan }) => plan.prompts || []),
+            });
+            turnRuns.delete(turnKey);
+            if (turnRuns.size >= 1000) turnRuns.delete(turnRuns.keys().next().value);
+            turnRuns.set(turnKey, run);
+          }
         },
         () => {
           if (recentGenerates.get(key) === entry) recentGenerates.delete(key);
@@ -852,7 +876,10 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const listProblem = promptListProblem(args.prompts);
+    // Each call of a turn ("200 more") brings new ideas rather than repeating the turn's earlier sets.
+    const listProblem =
+      promptListProblem(args.prompts) ||
+      repeatedSetProblem(args.prompts, turnRuns.get(turnKey)?.sets || []);
     if (listProblem) throw new Error(listProblem);
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
@@ -1024,6 +1051,8 @@ export function registerGenerateTools({
       throw new Error(
         `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxSplitJobs}. Lower count, pass fewer profile_ids, or name a tier.`,
       );
+    const tooMany = turnCountProblem(request, turnRuns.get(turnKey)?.images || 0, jobs);
+    if (tooMany) throw new Error(tooMany);
     // A preview's prompts run as shown when the same call follows without preview.
     // Keyed by what the call runs, so references a preview named carry into the call that confirms it.
     const previewKey = `${refs || owner}\n${stableJson({ ...remembered.args, preview: undefined })}`;

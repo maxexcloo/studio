@@ -3563,6 +3563,25 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   assert.match(texts(bare), /ambiguous: pass #1/);
 });
 
+test("a chat turn stops at the number of images asked for and its later calls bring new prompts", async (t) => {
+  const f = await fixture(t);
+  const client = await chat(t, f, "alice", "conversation-a", "turn-1");
+  const ask = (prompts) =>
+    call(client, "generate", {
+      profile_id: imageProfile.id,
+      prompts,
+      count: 1,
+      request: "make 3 more images",
+    });
+  assert.notEqual((await ask(["A lake at dawn", "A pier in fog"])).isError, true);
+  const repeated = await ask(["A pier in fog"]);
+  assert.match(texts(repeated), /prompt 1 repeats set 1/);
+  const over = await ask(["A heron in reeds", "A boat at night"]);
+  assert.match(texts(over), /asked for 3 images and this turn has queued 2; queue at most 1 more/);
+  assert.notEqual((await ask(["A heron in reeds"])).isError, true);
+  assert.equal(f.submitted.length, 3);
+});
+
 test("a chat picks a profile that takes its photo when the remembered profile can't", async (t) => {
   const f = await fixture(t);
   const textOnly = { ...imageProfile, id: "text-only", label: "Text Only", mediaInputs: [] };
