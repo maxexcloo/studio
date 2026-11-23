@@ -172,8 +172,8 @@ function SummaryLine({
 }
 /**
  * The status panel's quiet summary, one line per kind: its health dot, then how many workers
- * can serve it and their state. Text without a local worker runs in the cloud. Then each cloud
- * provider account's use of its quota window. Read-only and the same for everyone;
+ * can serve it and their state. Text without a local worker runs in the cloud. Cloud, between
+ * Videos and Text, gives each cloud provider account's use of its quota window. Read-only and the same for everyone;
  * Settings › Workers holds the controls.
  */
 export function ServiceHealthSummary() {
@@ -185,7 +185,51 @@ export function ServiceHealthSummary() {
       </Text>
     );
   const available = services.filter(({ kind }) => status.data?.services[kind]);
-  const cloud = status.data?.cloud;
+  const usage = status.data?.cloud;
+  const summary = ({ kind, label }: (typeof services)[number]) => {
+    const service = status.data!.services[kind]!;
+    const cloudOnly = kind === "text" && !service.endpoints.length;
+    return (
+      <SummaryLine
+        key={kind}
+        label={label}
+        detail={cloudOnly ? "Cloud only" : serviceDetail(kind, service)}
+        colour={cloudOnly ? "gray" : healthColour(service.state)}
+        hollow={cloudOnly}
+        reason={service.reason}
+      />
+    );
+  };
+  const cloud = usage && (
+    <SummaryLine
+      label="Cloud"
+      detail={`${usage
+        .map(
+          (account) =>
+            `${account.label} · ${account.used === undefined ? "Unknown" : `${Math.round(account.used)}% Used`}`,
+        )
+        .join(", ")}${status.data?.cloudHeld ? " · Local Only" : ""}`}
+      colour={
+        usage.some((account) => account.used === undefined)
+          ? healthColour("unknown")
+          : usage.some((account) => account.used! >= 100)
+            ? healthColour("offline")
+            : status.data?.cloudHeld
+              ? healthColour("waiting")
+              : healthColour("healthy")
+      }
+      reason={[
+        ...usage.map((account) =>
+          account.resetsAt
+            ? `${account.reason} Resets ${new Date(account.resetsAt).toLocaleString()}.`
+            : account.reason,
+        ),
+        ...(status.data?.cloudHeld
+          ? ["Near the limit, Dream and chats run new work on local models."]
+          : []),
+      ].join(" ")}
+    />
+  );
   return (
     <Stack gap={4} component="section" aria-label="Service Status">
       {status.isPending && (
@@ -193,50 +237,9 @@ export function ServiceHealthSummary() {
           Checking Services
         </Text>
       )}
-      {available.map(({ kind, label }) => {
-        const service = status.data!.services[kind]!;
-        const cloud = kind === "text" && !service.endpoints.length;
-        return (
-          <SummaryLine
-            key={kind}
-            label={label}
-            detail={cloud ? "Cloud only" : serviceDetail(kind, service)}
-            colour={cloud ? "gray" : healthColour(service.state)}
-            hollow={cloud}
-            reason={service.reason}
-          />
-        );
-      })}
-      {cloud && (
-        <SummaryLine
-          label="Cloud Providers"
-          detail={`${cloud
-            .map(
-              (usage) =>
-                `${usage.label} · ${usage.used === undefined ? "Unknown" : `${Math.round(usage.used)}% Used`}`,
-            )
-            .join(", ")}${status.data?.cloudHeld ? " · Local Only" : ""}`}
-          colour={
-            cloud.some((usage) => usage.used === undefined)
-              ? healthColour("unknown")
-              : cloud.some((usage) => usage.used! >= 100)
-                ? healthColour("offline")
-                : status.data?.cloudHeld
-                  ? healthColour("waiting")
-                  : healthColour("healthy")
-          }
-          reason={[
-            ...cloud.map((usage) =>
-              usage.resetsAt
-                ? `${usage.reason} Resets ${new Date(usage.resetsAt).toLocaleString()}.`
-                : usage.reason,
-            ),
-            ...(status.data?.cloudHeld
-              ? ["Near the limit, Dream and chats run new work on local models."]
-              : []),
-          ].join(" ")}
-        />
-      )}
+      {available.filter(({ kind }) => kind !== "text").map(summary)}
+      {cloud}
+      {available.filter(({ kind }) => kind === "text").map(summary)}
       {status.data && !available.length && <EmptyState fill>No Services</EmptyState>}
     </Stack>
   );

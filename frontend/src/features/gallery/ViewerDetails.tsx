@@ -1,4 +1,4 @@
-import { Drawer, FocusTrap, ScrollArea, Stack, Text } from "@mantine/core";
+import { Drawer, FocusTrap, ScrollArea, Stack } from "@mantine/core";
 import { type ReactNode, useId } from "react";
 
 import type { MediaItem } from "../../types";
@@ -6,7 +6,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
-import { ViewerMetadata } from "./ViewerChrome";
+import { ViewerTitle } from "./ViewerChrome";
 
 import classes from "./MediaViewer.module.css";
 
@@ -66,17 +66,11 @@ export function ViewerDetails({
         }}
       >
         <Drawer.Overlay />
-        <Drawer.Content {...swipe}>
+        {/* Named by its title alone, not the time beside it. */}
+        <Drawer.Content {...swipe} aria-label={title}>
           <FocusTrap.InitialFocus />
           <Drawer.Header>
-            <Stack gap={2} miw={0}>
-              <Drawer.Title>
-                <Text span fw={600} lh={1.2} lineClamp={2}>
-                  {title}
-                </Text>
-              </Drawer.Title>
-              <ViewerMetadata item={item} compact title={title} />
-            </Stack>
+            <ViewerTitle component="h2" item={item} title={title} fw={600} lh={1.2} lineClamp={2} />
             <Drawer.CloseButton aria-label="Close Details" />
           </Drawer.Header>
           <Drawer.Body>
@@ -106,12 +100,7 @@ export function ViewerDetails({
       >
         <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
-            <Stack gap={2} miw={0}>
-              <Text fw={600} lineClamp={2} lh={1.2}>
-                {title}
-              </Text>
-              <ViewerMetadata item={item} />
-            </Stack>
+            <ViewerTitle item={item} title={title} fw={600} lineClamp={2} lh={1.2} />
             {opened && details}
           </Stack>
         </ScrollArea>

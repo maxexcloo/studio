@@ -1493,6 +1493,12 @@ test("Dream's ideas take the account's active projects, and visits record when t
   });
   const city = projects.create("alice", { name: "City" });
   projects.update("alice", city.id, { paused: true }, "you");
+  // An idea showing none of the brief's subjects is written again.
+  state.replies = [
+    { prompt: "a mountain cabin", title: "Cabin" },
+    { prompt: "the sea at dawn", title: "Dawn Sea" },
+    { prompt: "seas under a storm", title: "Storm Sea" },
+  ];
   for (let index = 0; index < 2; index++) await dreamOnce();
   projects.update("alice", city.id, { paused: false }, "you");
   projects.update("alice", beach.id, { paused: true }, "you");
@@ -1501,13 +1507,17 @@ test("Dream's ideas take the account's active projects, and visits record when t
     state.items.map((item) => item.dream?.projectId),
     [city.id, beach.id, beach.id],
   );
-  // The brief steers the writer; a project without one adds nothing.
+  // The brief steers the writer, and the project's latest ideas move the next one on; a
+  // project without one adds nothing.
   assert.match(
     state.calls[0].user,
     /Project brief \(Beach\):\n- Subjects: the sea\n- Avoid: people/,
   );
-  assert.match(state.calls[0].system, /keep to its brief/);
-  assert.doesNotMatch(state.calls[2].user, /Project brief/);
+  assert.match(state.calls[0].system, /the brief comes first/);
+  assert.doesNotMatch(state.calls[0].system, /Choose a different subject/);
+  assert.match(state.calls[1].user, /Rejected prompt: a mountain cabin\nYour prompt shows none/);
+  assert.match(state.calls[2].user, /The project's recent ideas:\n- the sea at dawn/);
+  assert.doesNotMatch(state.calls.at(-1)!.user, /Project brief/);
 
   const request = await serve(t, fx);
   const shown = (await request("")).body;
@@ -2537,6 +2547,10 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     ["1", "2"],
   );
   // Each proposed project gets its samples, written to its brief, before Dream returns to its own work.
+  state.replies = [
+    ...["neon", "rain", "dawn"].map((look) => ({ prompt: `Mara on a rooftop in ${look}` })),
+    ...["fog", "lamps", "tide"].map((look) => ({ prompt: `a harbour at dusk with ${look}` })),
+  ];
   for (let index = 0; index < 6; index++) await dreamOnce();
   const drafts = state.items.filter((item) => item.dream?.state === "draft");
   assert.deepEqual(
@@ -2831,7 +2845,7 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   assert.deepEqual(
     inbox.read("alice").proposals.map(({ kind, title }) => [kind, title]),
     [
-      ["pacing", "Pause Beach"],
+      ["pacing", "Disable Beach"],
       ["rule", "always a narrow waist"],
       ["brief", "Edit Beach's Avoid"],
     ],

@@ -7,11 +7,12 @@ import { Notifications, notifications, useNotifications } from "@mantine/notific
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router";
+import { unstable_HistoryRouter as HistoryRouter, UNSAFE_createBrowserHistory } from "react-router";
 
 import { failure } from "./api";
 import { App } from "./App";
 import { useAppearancePreference } from "./features/settings/accountPreferences";
+import { singleEntry } from "./singleEntry";
 import { AppearanceProvider } from "./ui/Appearance";
 import "./ui/popupClicks";
 import { usePhone } from "./ui/usePhone";
@@ -138,6 +139,12 @@ document.addEventListener(
 // The gallery places its own scroll when the viewer closes through Back; iOS Safari's restoration
 // of the opening position would land afterwards and override it.
 history.scrollRestoration = "manual";
+const routerHistory = UNSAFE_createBrowserHistory({ v5Compat: true });
+if (
+  matchMedia("(display-mode: standalone)").matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true
+)
+  singleEntry(routerHistory, sessionStorage);
 // The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.
 const fontReady = Promise.race([
   document.fonts.load('1em "Geist Variable"'),
@@ -148,9 +155,9 @@ void fontReady.then(() =>
     <QueryClientProvider client={client}>
       <AccountAppearance>
         {/* Stream updates must not keep declarative route changes in a pending transition. */}
-        <BrowserRouter useTransitions={false}>
+        <HistoryRouter history={routerHistory} useTransitions={false}>
           <App />
-        </BrowserRouter>
+        </HistoryRouter>
         <AppNotifications />
       </AccountAppearance>
     </QueryClientProvider>,
