@@ -12,32 +12,32 @@ import { useAccount, useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 const settingSections = {
   account: {
     label: "Account",
-    description: "Your sign-in details and personal MCP access.",
+    description: "Manage how you sign in and connect MCP clients to your account.",
     icon: icons.account,
     group: "Personal",
   },
   dream: {
     label: "Dream",
-    description: "Choose which media Dream makes and its daily limits.",
+    description: "Choose what Dream makes in the background and how much it can make each day.",
     icon: icons.dream,
     group: "Personal",
   },
   preferences: {
     label: "Preferences",
-    description: "Gallery display, exports and prompt history.",
+    description:
+      "Set how the gallery looks, which models are offered, and whether Studio keeps recent prompts.",
     icon: icons.settings,
     group: "Personal",
   },
   "where-work-runs": {
     label: "Where Work Runs",
-    description:
-      "Choose where work runs, which models are available to you and how new drafts start.",
+    description: "Choose where your work runs and the starting models, aspect and resolution.",
     icon: Route,
     group: "Personal",
   },
   "dream-policy": {
     label: "Dream",
-    description: "Shared queue rules and Dream overrides for all accounts.",
+    description: "Set when Dream can start jobs and which settings accounts can change.",
     icon: icons.dream,
     admin: true,
     group: "Administration",
@@ -51,7 +51,7 @@ const settingSections = {
   },
   groups: {
     label: "Groups",
-    description: "Model and feature access for each group.",
+    description: "Choose the models and features each access group can use.",
     icon: Shield,
     admin: true,
     group: "Administration",
@@ -65,7 +65,7 @@ const settingSections = {
   },
   users: {
     label: "Users",
-    description: "Accounts, their roles and groups, linked chat identities and the default group.",
+    description: "Manage accounts, access groups and linked chat identities.",
     icon: UsersRound,
     admin: true,
     group: "Administration",
@@ -79,7 +79,7 @@ const settingSections = {
   },
   about: {
     label: "About",
-    description: "Version, help, licences and credits.",
+    description: "Find this deployment's version, diagnostics, documentation and project credits.",
     icon: icons.details,
     apart: true,
   },

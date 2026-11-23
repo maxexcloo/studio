@@ -199,10 +199,7 @@ export function BenchmarkResults() {
   });
   if (!status?.configured) return null;
   return (
-    <SettingGroup title="Benchmarks">
-      <Text size="sm" c="dimmed">
-        Recent benchmarks, newest first, and who asked.
-      </Text>
+    <SettingGroup title="Benchmarks" description="Review benchmark results and open their logs.">
       <DataTable
         label="Benchmarks"
         rows={status.runs}

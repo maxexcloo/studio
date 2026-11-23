@@ -71,7 +71,7 @@ export function profileOptions(available: Profile[]) {
 /**
  * Every profile choice: a chip in the composer, or a `field` in a Settings row, listing `profiles`
  * by family with their readable names, facts and readiness. `unset` names the choice of none (a
- * setting's default), listed first; a saved profile no longer offered still reads by its ID.
+ * setting's default), shown as a placeholder with `clearable` or listed first.
  */
 export function ProfileSelect({
   name,
@@ -79,6 +79,7 @@ export function ProfileSelect({
   value,
   onChange,
   unset,
+  clearable,
   ...trigger
 }: {
   name: string;
@@ -87,7 +88,10 @@ export function ProfileSelect({
   onChange: (profile: Profile | null) => void;
   unset?: string;
 } & Partial<
-  Pick<ChipSelectProps, "field" | "disabled" | "swatch" | "title" | "target" | "label">
+  Pick<
+    ChipSelectProps,
+    "field" | "clearable" | "disabled" | "swatch" | "title" | "target" | "label"
+  >
 >) {
   const workers = useQuery(modelsQuery).data?.workers;
   const selected = profiles.find((profile) => isProfile(profile, value ?? undefined));
@@ -97,9 +101,13 @@ export function ProfileSelect({
     <ChipSelect
       name={name}
       searchable
+      clearable={clearable}
       nothingFoundMessage="No Matches"
-      data={[...(unset ? [{ value: "", label: unset }] : []), ...profileOptions(profiles)]}
-      value={selected?.id ?? (value || (unset ? "" : null))}
+      data={[
+        ...(unset && !clearable ? [{ value: "", label: unset }] : []),
+        ...profileOptions(profiles),
+      ]}
+      value={selected?.id ?? (value || (unset && !clearable ? "" : null))}
       renderOption={({ option, checked }) => {
         const profile = profiles.find((profile) => profile.id === option.value);
         const status = profile && profileReadiness(profile, workers);

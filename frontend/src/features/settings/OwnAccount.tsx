@@ -139,13 +139,13 @@ export function OwnAccount() {
           label="Role"
           description={
             admin
-              ? "Administrators can use and change everything."
-              : "Your access group decides which models, cloud models and uncensored content you can use."
+              ? "Administrators manage Studio settings and accounts."
+              : "Your access group controls the models and features you can use."
           }
         >
           <Badge miw="max-content">{admin ? "Administrator" : "User"}</Badge>
         </SettingRow>
-        <SettingRow label="Sign-In Method" description="The ways you can sign in to Studio.">
+        <SettingRow label="Sign-In Method">
           <Text size="sm">
             {[
               own.canChangePassword && "Password",

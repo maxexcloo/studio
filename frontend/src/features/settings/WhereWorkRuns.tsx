@@ -1,4 +1,4 @@
-import { Alert, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
+import { Alert, SegmentedControl, Select, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
@@ -36,19 +36,6 @@ const kinds: { kind: WorkKind | "dream"; label: string; description?: string }[]
       "Applies to writing and captions, including Dream. Local shares a GPU with images.",
   },
 ];
-
-const modelChoices = [
-  {
-    key: "loras",
-    label: "LoRAs",
-    description: "Offer the LoRAs you have access to, including in Dream.",
-  },
-  {
-    key: "uncensoredModels",
-    label: "Uncensored",
-    description: "Offer uncensored models and themes, and allow explicit prompt ideas.",
-  },
-] as const;
 
 function DreamProcessing({ label }: { label: string }) {
   const { data, error } = useQuery(dreamQuery);
@@ -124,6 +111,7 @@ export function WhereWorkRuns() {
             name={name}
             models={text}
             unset={studioDefault}
+            clearable
             value={value}
             onChange={choose}
           />
@@ -132,6 +120,7 @@ export function WhereWorkRuns() {
             field
             name={name}
             unset={studioDefault}
+            clearable
             profiles={(profiles || []).filter(
               (profile) =>
                 profile.kind === (kind === "images" ? "image" : "video") &&
@@ -209,21 +198,6 @@ export function WhereWorkRuns() {
             )}
           </SettingGroup>
         ),
-      )}
-      {modelChoices.some(({ key }) => status.grants[key]) && (
-        <SettingGroup title="Model Access">
-          {modelChoices
-            .filter(({ key }) => status.grants[key])
-            .map(({ key, label, description }) => (
-              <SettingRow key={key} label={label} description={description}>
-                <Switch
-                  aria-label={label}
-                  checked={preferences[key]}
-                  onChange={(event) => save.mutate({ [key]: event.currentTarget.checked })}
-                />
-              </SettingRow>
-            ))}
-        </SettingGroup>
       )}
     </Stack>
   );

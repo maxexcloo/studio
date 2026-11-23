@@ -17,6 +17,19 @@ const galleryWorkChoices = [
   { value: "running", label: "In Progress" },
   { value: "queued", label: "Queued" },
 ];
+
+const modelChoices = [
+  {
+    key: "loras",
+    label: "LoRAs",
+    description: "Offer the LoRAs your group allows, including in Dream.",
+  },
+  {
+    key: "uncensoredModels",
+    label: "Uncensored",
+    description: "Offer uncensored models and allow explicit prompt ideas.",
+  },
+] as const;
 /** Which unfinished work the gallery shows: none (unsaved), work in progress, or queued work too. */
 function GalleryWork() {
   const status = useQuery(preferencesQuery).data;
@@ -26,7 +39,7 @@ function GalleryWork() {
     <SettingRow
       wide
       label="Unfinished Work"
-      description="Show generations in the gallery before they finish: none, those in progress, or queued ones too."
+      description="Choose which generations appear in the gallery before they finish."
     >
       <SegmentedControl
         aria-label="Unfinished Work"
@@ -43,7 +56,9 @@ function GalleryWork() {
 export function Preferences() {
   const keep = useKeepRecentPrompts(true);
   const [tileCaptions, setTileCaptions] = useTileCaptions();
-  const loaded = useQuery(preferencesQuery).isSuccess;
+  const { data, isSuccess } = useQuery(preferencesQuery);
+  const save = useSavePreferences();
+  const access = modelChoices.filter(({ key }) => data?.grants[key]);
   return (
     <Stack gap="lg">
       {/* Settings run A–Z, then Export. */}
@@ -53,10 +68,10 @@ export function Preferences() {
           description="Show each tile's title and details on phones. Desktop shows them on hover."
         >
           <Switch
-            key={loaded ? "loaded" : "loading"}
+            key={isSuccess ? "loaded" : "loading"}
             aria-label="Tile Captions"
             checked={tileCaptions}
-            disabled={!loaded}
+            disabled={!isSuccess}
             onChange={(event) => setTileCaptions(event.currentTarget.checked)}
           />
         </SettingRow>
@@ -77,6 +92,22 @@ export function Preferences() {
           </Button>
         </SettingRow>
       </SettingGroup>
+      {data && access.length > 0 && (
+        <SettingGroup
+          title="Model Access"
+          description="These preferences apply within the access your group grants."
+        >
+          {access.map(({ key, label, description }) => (
+            <SettingRow key={key} label={label} description={description}>
+              <Switch
+                aria-label={label}
+                checked={data.preferences[key]}
+                onChange={(event) => save.mutate({ [key]: event.currentTarget.checked })}
+              />
+            </SettingRow>
+          ))}
+        </SettingGroup>
+      )}
       <SettingGroup title="Prompts">
         <SettingRow
           label="Keep Recent Prompts"

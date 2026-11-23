@@ -88,7 +88,10 @@ export function DreamAdministration() {
           "Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.",
         )}
       </SettingGroup>
-      <SettingGroup title="Account Overrides">
+      <SettingGroup
+        title="Account Overrides"
+        description="Choose Per Account to let people change a setting for themselves."
+      >
         {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
         {row(
           "spicy",

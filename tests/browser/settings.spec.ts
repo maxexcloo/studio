@@ -263,13 +263,13 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   expect(state.preferences.preferences.tileCaptions).toBe(true);
 });
 
-test("An administrator turns LoRAs and Uncensored off for itself in Where Work Runs", async ({
+test("An administrator turns LoRAs and Uncensored off for itself in Preferences", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   state.preferences.grants = { cloudModels: true, loras: true, uncensoredModels: true };
-  await page.goto("/settings#where-work-runs");
+  await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Model Access", exact: true });
   await expect(models.getByRole("switch")).toHaveCount(2);
   const loras = models.getByRole("switch", { name: "LoRAs", exact: true });
@@ -315,21 +315,19 @@ test("Where Work Runs saves each group’s processing and default models", async
   const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
   await expect(textCloud).toHaveText("Studio's Default");
   await textCloud.click();
-  const options = page.getByRole("listbox").getByRole("option");
-  await expect(options).toHaveText([
-    "Studio's Default",
-    "Auto · Cloud",
-    "DeepSeek Flash · Cloud - Uncensored",
-    "Cloud - Uncensored",
-  ]);
+  const options = page
+    .getByRole("listbox")
+    .getByRole("group", { name: "Cloud", exact: true })
+    .getByRole("option");
+  await expect(options).toHaveText(["Auto", "DeepSeek Flash Uncensored", "Uncensored"]);
   // The list scrolls inside the Settings modal and its choice applies at once.
   await options.last().scrollIntoViewIfNeeded();
   await options.last().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
-  await expect(textCloud).toHaveText("Cloud - Uncensored");
-  await textCloud.click();
-  await options.first().click();
+  await expect(textCloud).toHaveText("Cloud · Uncensored");
+  await group("Text").getByRole("button", { name: "Clear Cloud Model", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
+  await expect(textCloud).toHaveText("Studio's Default");
   const area = (kind: string) =>
     group(kind).getByRole("radiogroup", { name: "Run On", exact: true });
   const choose = (name: string, choice: string) =>
@@ -1007,10 +1005,13 @@ test("Settings › Generation saves and clears the default Text Profile", async 
       response.request().method() === "POST" &&
       response.ok(),
   );
-  await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Local", exact: true })
+    .getByRole("option", { name: "Auto", exact: true })
+    .click();
   await saved;
   await page.reload();
-  await expect(text).toHaveText("Auto · Local");
+  await expect(text).toHaveText("Local · Auto");
   await text.click();
   await page.getByRole("option", { name: "Gateway Default", exact: true }).click();
   await expect(text).toHaveText("Gateway Default");
