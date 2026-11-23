@@ -47,6 +47,10 @@ export function ChatGateway({
   change: ReturnType<typeof useGatewayChange>;
 }) {
   const [choices, setChoices] = useState<Record<string, string>>({});
+  const adminTools =
+    change.isPending && change.variables?.kind === "admin"
+      ? change.variables.on
+      : gateway?.adminTools === true;
   const options = [...accounts]
     .sort((a, b) => compareNames(a.username, b.username))
     .map((account) => ({ value: account.id, label: account.username }));
@@ -56,14 +60,14 @@ export function ChatGateway({
         <SettingRow
           label="Admin Tools"
           description={
-            gateway?.adminTools
+            adminTools
               ? "Linked administrators can manage Library, catalogue and profiles from chat."
               : "Only an administrator's personal MCP token gets admin tools."
           }
         >
           <Switch
             aria-label="Chat Gateway Admin Tools"
-            checked={gateway?.adminTools === true}
+            checked={adminTools}
             disabled={change.isPending}
             onChange={(event) => change.mutate({ kind: "admin", on: event.currentTarget.checked })}
           />

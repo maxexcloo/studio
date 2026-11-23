@@ -11,6 +11,11 @@
   color: var(--button-color, var(--mantine-color-white));
 }
 
+.button::before {
+  transition-duration: var(--studio-motion-duration);
+  transition-timing-function: var(--studio-ease-enter);
+}
+
 .actionIcon:where(:disabled, [data-disabled]):not([data-loading]) {
   opacity: 0.4;
   background: var(--ai-bg, var(--mantine-primary-color-filled));

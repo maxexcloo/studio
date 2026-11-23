@@ -59,7 +59,7 @@ test("Administrators link, dismiss and unlink chat identities in Settings › Us
   ]);
 });
 
-test("Gateway admin access remains unchanged after a failed save and reflects a confirmed retry", async ({
+test("Gateway admin access follows the switch and rolls back after a failed save", async ({
   page,
 }) => {
   const state = await accountFixture(page);
@@ -85,7 +85,7 @@ test("Gateway admin access remains unchanged after a failed save and reflects a 
   const control = page.getByRole("switch", { name: "Chat Gateway Admin Tools", exact: true });
   await control.click({ force: true });
   await expect(control).toBeDisabled();
-  await expect(control).not.toBeChecked();
+  await expect(control).toBeChecked();
   release();
   await expect(page.getByRole("alert")).toContainText("Gateway settings could not be saved");
   await expect(control).toBeEnabled();
