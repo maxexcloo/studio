@@ -136,6 +136,7 @@ export function PickerHeader<Tab extends string>({
   actions?: ReactNode;
 }) {
   const [filtering, setFiltering] = useState(false);
+  const phone = usePhone();
   return (
     <Box className={classes.header}>
       <div className={classes.headerRow}>
@@ -143,6 +144,7 @@ export function PickerHeader<Tab extends string>({
           <ScrollingSegments
             className={classes.tabs}
             aria-label={`${label} View`}
+            size={phone ? "xs" : undefined}
             classNames={{ control: classes.tab }}
             value={tab}
             onChange={(value) => onTabChange?.(value as Tab)}
