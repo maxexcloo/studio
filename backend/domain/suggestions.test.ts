@@ -852,13 +852,23 @@ test("a requested change picks one of the offered actions and rewrites the promp
 });
 
 test("Edit writes for the selected profile while describing the original result", async () => {
+  let action = "edit";
   const { calls, suggestions } = fixture({
     image: true,
-    reply: () => JSON.stringify({ action: "edit", label: "Night", prompt: "Make it night" }),
-    target: async (owner, _source, profileId) =>
-      owner === "alice" && profileId === "image:edit"
-        ? { label: "Edit Model", guide: { summary: "Describe the change." }, edits: "instruction" }
-        : null,
+    reply: () => JSON.stringify({ action, label: "Night", prompt: "Make it night" }),
+    target: async (owner, _source, profileId) => {
+      if (owner !== "alice") return null;
+      if (profileId === "image:edit")
+        return {
+          label: "Edit Model",
+          guide: { summary: "Describe the change." },
+          edits: "instruction",
+          profileBackend: "comfyui",
+        };
+      return profileId
+        ? null
+        : { label: "Source Model", guide: { summary: "Describe a full scene." } };
+    },
   });
   const request = {
     surface: "change",
@@ -878,6 +888,22 @@ test("Edit writes for the selected profile while describing the original result"
     (await suggestions.suggest("alice", { ...request, profileId: "image:unavailable" })).reason,
     "The selected Edit profile is unavailable.",
   );
+  const mixed = { ...request, actions: ["edit", "recreate"] };
+  const automatic = await suggestions.suggest("alice", { ...mixed, profileId: "image:edit" });
+  assert.equal((automatic.suggestions[0] as Change).action, "edit");
+  assert.equal((automatic.suggestions[0] as Change).profileBackend, "comfyui");
+  const choices = calls[1][0].content;
+  assert.match(choices, /For Edit: .*Edit Model.*Describe the change/);
+  assert.match(choices, /For Recreate: .*Source Model.*Describe a full scene/);
+  assert.match(
+    choices,
+    /For full descriptive prompts only: .*rewrite the words it concerns in place/,
+  );
+  action = "recreate";
+  const fallback = await suggestions.suggest("alice", { ...mixed, profileId: "image:unavailable" });
+  assert.equal((fallback.suggestions[0] as Change).action, "recreate");
+  assert.equal((fallback.suggestions[0] as Change).profileBackend, undefined);
+  assert.doesNotMatch(calls[2][0].content, /^- edit:/m);
 });
 
 test("a change lands where an edit can make it, else recreates with the seed, written in place", async () => {

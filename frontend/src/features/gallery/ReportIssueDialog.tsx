@@ -1,4 +1,5 @@
 import { ActionIcon, Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
 import type { ImageInspection } from "../../../../shared/suggestions";
@@ -7,8 +8,9 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { askChange, inspectImage } from "../taste/suggestions";
+import { inspectImage } from "../taste/suggestions";
 import { mediaSource } from "./mediaSource";
+import { askItemChange } from "./useItemChange";
 import { useItemMutation } from "./useItemMutation";
 import { type Iteration, useIterate } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
@@ -27,6 +29,7 @@ export function useReportIssue(
   inlineError = false,
 ) {
   const iterate = useIterate();
+  const client = useQueryClient();
   const ratings = useRatings();
   const video = item.type === "video";
   const queued = useRef<{ item: string; issue: string; job: string } | null>(null);
@@ -38,12 +41,11 @@ export function useReportIssue(
           ? queued.current.job
           : undefined;
       if (!jobId) {
-        const answer = await askChange(
-          item.jobId!,
+        const { answer, profileId } = await askItemChange(
+          client,
+          item,
           `Fix what is wrong, keeping everything else: ${issue}`,
           video ? ["recreate"] : ["edit", "recreate"],
-          undefined,
-          item.id,
         );
         const [change] = answer.suggestions;
         if (!change) throw new Error(answer.reason || "The assistant couldn't suggest a fix.");
@@ -52,6 +54,7 @@ export function useReportIssue(
           prompt: change.prompt,
           operation: change.action === "edit" ? "refine" : video ? "animate" : "image",
           sameSeed: change.action === "recreate",
+          ...(change.action === "edit" && { profileId, profileBackend: change.profileBackend }),
         };
         jobId = await iterate(item, next);
         queued.current = { item: item.id, issue, job: jobId };

@@ -123,6 +123,7 @@ export async function mediaDraft(
   videos?: SidePreference,
   seconds?: number | null,
   profileId?: string,
+  editBackend?: string,
 ) {
   // An action can run before the composer's models load.
   const { profiles } = await client.ensureQueryData(modelsQuery);
@@ -139,7 +140,10 @@ export async function mediaDraft(
     compatible.find(
       (profile) =>
         isProfile(profile, profileId) &&
-        profileForBackend(profile, undefined, true)?.ready !== false,
+        profileForBackend(profile, editBackend, true)?.ready !== false &&
+        (!editBackend ||
+          (profile.backendOptions?.some(({ id }) => id === editBackend) &&
+            takesReferences(profile, editBackend))),
     );
   if (profileId && !selected)
     throw new Error("The selected profile is unavailable for this action.");
@@ -185,7 +189,7 @@ export async function mediaDraft(
     ).asset;
   const saved = source?.input || item.settings || {};
   // The first reference slot of the backend a run with references uses.
-  const firstSlot = profileForBackend(profile, undefined, true)?.mediaInputs?.[0]?.id || "image";
+  const firstSlot = profileForBackend(profile, editBackend, true)?.mediaInputs?.[0]?.id || "image";
   const recordedReferences = source?.input.referenceAssets ?? item.settings?.referenceAssets;
   const recordedDetails = Array.isArray(saved.referenceDetails) ? saved.referenceDetails : [];
   const restored = Array.isArray(recordedReferences)
@@ -233,7 +237,9 @@ export async function mediaDraft(
   const ran = String(item.settings?.profileBackend || saved.profileBackend || "");
   const rerun = operation === "image" && profile.backend && ran;
   const profileBackend =
-    rerun && profile.backendOptions?.some((option) => option.id === ran) ? ran : undefined;
+    editBackend ??
+    (rerun && profile.backendOptions?.some((option) => option.id === ran) ? ran : undefined);
+  const editProfile = editBackend ? profileForBackend(profile, editBackend, true)! : profile;
   const note =
     rerun && !profileBackend
       ? `${profileName(profile)} no longer runs on ${backendLabel(ran)}, so this run uses ${backendLabel(profile.backend!)}.`
@@ -256,17 +262,17 @@ export async function mediaDraft(
       references: preparedReferences,
       input: {
         ...initialInput,
-        ...profile.defaults,
+        ...editProfile.defaults,
         // An edit runs the profile's reference mode, so it takes that mode's settings (a partial
         // denoise) rather than text-to-image's, which would redraw the image from scratch.
         ...(operation === "image"
           ? { ...source?.input, ...item.settings }
-          : profile.imageModes?.reference?.defaults),
+          : editProfile.imageModes?.reference?.defaults),
         ...(timing ? { duration: timing.duration, frames: timing.frames, fps: timing.fps } : {}),
         kind: targetKind,
         profileId: profile.id,
-        model: profile.model,
-        workflow: profile.workflow,
+        model: editProfile.model,
+        workflow: editProfile.workflow,
         // The profile's current checkpoint runs, not the file the original result loaded.
         modelName: undefined,
         // Reused drafts draw a new seed; only Run Again, Same Seed keeps the recorded one.
@@ -348,6 +354,7 @@ export type Iteration =
       operation: PromptOperation;
       sameSeed?: boolean;
       profileId?: string;
+      profileBackend?: string;
     };
 /** A motion prompt the assistant wrote for review, as edited: it runs exactly as given. */
 export interface WrittenPrompt {
@@ -389,6 +396,7 @@ export function useIterate() {
         videos,
         animate || given?.operation === "animate" ? seconds : undefined,
         animate ? iteration.profileId : given?.profileId,
+        given?.profileBackend,
       ));
     // An animation that can't run where the account prefers says where it runs instead.
     if (note || choice?.note) notifications.show({ message: note || choice?.note });
