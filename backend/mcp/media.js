@@ -2364,6 +2364,7 @@ export class McpMedia {
       !claims.all && jobId && (!record.kind || (claims.index !== undefined && !number))
         ? await this.job(claims.owner, jobId).catch(() => undefined)
         : undefined;
+    // Fetching the job notes its result numbers, so a number missing before may be known now.
     const target =
       number ||
       (!claims.all && this.numberOf(jobId, index)) ||

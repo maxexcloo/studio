@@ -168,7 +168,7 @@ function describe(metadata) {
 }
 
 /** What one LoRA is, as far as its metadata has been read; null before that. */
-export function loraInfo(name) {
+function loraInfo(name) {
   return cache.get(name) || null;
 }
 

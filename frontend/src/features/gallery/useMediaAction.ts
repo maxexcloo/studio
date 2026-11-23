@@ -44,7 +44,7 @@ interface AnimateChoice {
 }
 
 /** The preferred animation length in seconds; unset keeps the selected profile's default. */
-export const useAnimateLength = () => useRemembered<number | null>("animate-length", null);
+const useAnimateLength = () => useRemembered<number | null>("animate-length", null);
 
 /** Animate's Review Prompt: templates write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);

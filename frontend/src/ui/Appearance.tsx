@@ -145,7 +145,7 @@ export const useAppearance = () => useContext(Context);
 export function useMotionDuration() {
   return useMantineTheme().other.motionDuration as number;
 }
-export function AppearanceControls() {
+function AppearanceControls() {
   const phone = usePhone();
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();

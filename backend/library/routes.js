@@ -245,7 +245,7 @@ const subfolders = {
 };
 
 /** Whether a wanted file is installed: by checksum when known (or `verify`), else by name and size. */
-export async function inspectInstalled(want, { verify = false } = {}) {
+async function inspectInstalled(want, { verify = false } = {}) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder)) return { status: "missing" };
   const names = subfolders[want.folder] || [want.folder];
   const sized = (size) => !want.bytes || Math.abs(size - want.bytes) <= 2048;

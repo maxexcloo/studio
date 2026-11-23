@@ -11,7 +11,7 @@ const names = (text) =>
 const failure = (message, status = 400) => Object.assign(new Error(message), { status });
 const maxInstructionLength = 24_000;
 
-export function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
+function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
   const dir = (id) => path.join(dataDir, "history", "prompt-instructions", id);
   const current = new Map();
   function definition(id) {

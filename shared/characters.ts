@@ -76,7 +76,7 @@ export interface Character extends Card, Partial<Record<CharacterTrait, string>>
  */
 export const sheetRoles = ["face", "front", "side", "back", "sheet"] as const;
 export type SheetRole = (typeof sheetRoles)[number];
-export interface CharacterSheet {
+interface CharacterSheet {
   jobId: string;
   at: string;
   /** Account-owned reference asset IDs by role, once the sheet is split. */

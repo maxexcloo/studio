@@ -15,7 +15,7 @@ const date = z
     const day = new Date(`${value}T00:00:00.000Z`);
     return Number.isFinite(day.getTime()) && day.toISOString().startsWith(`${value}T`);
   }, "Use a valid calendar date");
-export const job = {
+const job = {
   job_id: z.string().min(1).max(200).describe('A ref such as "result 3", or a job_id.'),
 };
 export const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };

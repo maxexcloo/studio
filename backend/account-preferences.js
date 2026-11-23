@@ -66,7 +66,7 @@ export const defaultTextSide = (environment = process.env) =>
   environment[defaultTextProfileKey]?.startsWith("local/") ? "local" : "cloud";
 
 /** Where a kind runs if an account has not chosen a side. */
-export function sideOf(preferences, kind) {
+function sideOf(preferences, kind) {
   return preferences[kind] || (kind === "text" ? defaultTextSide() : "local");
 }
 

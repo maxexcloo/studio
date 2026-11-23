@@ -97,7 +97,7 @@ export const compatibleLoras = (profile: Profile | undefined, metadata: Record<s
     (file) => !loraRejection(metadata[file], profile) && !unavailableFor(profile, metadata[file]),
   );
 /** Why a LoRA can't run on this profile: its deferral covers only Radiance's composed adapter. */
-export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
+const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
   profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);

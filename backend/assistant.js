@@ -122,7 +122,7 @@ const backgroundSlots = 2;
 
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
-export const reasoningEfforts = {
+const reasoningEfforts = {
   animate: null,
   caption: "none",
   character: "none",

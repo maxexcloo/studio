@@ -301,7 +301,7 @@ const SortableQueue = lazy(loadSortable);
  * A run's recorded settings in short: the profile, size, length, steps, seed, LoRAs and outputs.
  * `loraName` lists each LoRA by name with its strength instead of counting them.
  */
-export function settingChips(
+function settingChips(
   input: QueueJob["input"],
   profile?: Profile,
   loraName?: (file: string) => string,

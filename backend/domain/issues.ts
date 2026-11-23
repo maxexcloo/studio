@@ -41,7 +41,7 @@ const maxIssues = 6;
 const maxEntries = 120;
 const entryCharacters = 300;
 
-export const issueInstructions = () =>
+const issueInstructions = () =>
   promptInstruction("group-issues", {
     americanEnglish,
     maxIssues,
@@ -221,4 +221,3 @@ export function createIssues({
     refresh,
   };
 }
-export type Issues = ReturnType<typeof createIssues>;

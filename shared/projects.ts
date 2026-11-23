@@ -15,7 +15,7 @@ export interface ProjectBrief extends Partial<Record<(typeof briefTexts)[number]
   loras?: string[];
 }
 /** What project generations in Dream and attached chats keep to. */
-export interface ProjectConstraints {
+interface ProjectConstraints {
   /** The only profiles it runs on, by exact id; none for any. */
   profiles: string[];
   loras: boolean;

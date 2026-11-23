@@ -10,7 +10,7 @@ import type { MediaItem } from "../../types";
 export type DreamMedia = "image" | "video";
 
 export type { DreamSettings } from "../../../../shared/dream";
-export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
+type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 export type DreamItem = MediaItem & {
   dream?: {
     prompt: string;

@@ -78,7 +78,7 @@ export function PlacementChanges({
   );
 }
 
-export const phaseColour = (phase: WorkloadPhase) =>
+const phaseColour = (phase: WorkloadPhase) =>
   ({
     running: "green",
     starting: "yellow",
@@ -87,7 +87,7 @@ export const phaseColour = (phase: WorkloadPhase) =>
     down: "red",
     unknown: "red",
   })[phase];
-export const phaseLabel = (phase: WorkloadPhase) =>
+const phaseLabel = (phase: WorkloadPhase) =>
   ({
     running: "Running",
     starting: "Starting",
