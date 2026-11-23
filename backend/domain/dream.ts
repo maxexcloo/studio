@@ -2091,8 +2091,14 @@ export function createDream(options: {
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
-    /** Why a reply can't be used, or "" when it can. */
-    const problem = (prompt: string, title: string, motifs: string[], cooling: string[]) => {
+    /** Why a reply can't be used, or "" when it can. A retry may miss the brief's subjects. */
+    const problem = (
+      prompt: string,
+      title: string,
+      motifs: string[],
+      cooling: string[],
+      retry: boolean,
+    ) => {
       if (!prompt) return "Your reply had no usable prompt.";
       const minor = options.minorAge(prompt);
       if (minor)
@@ -2108,7 +2114,7 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
-      if (project && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
+      if (project && !retry && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
         return `Your prompt shows none of the brief's subjects (${project.brief.subjects}).`;
       return freshProblem(prompt, title, motifs, cooling);
     };
@@ -2149,6 +2155,7 @@ export function createDream(options: {
               title,
               chosenMotifs,
               newConcept && latest ? cooledMotifs(latest, fixed, forbidden, paused) : [],
+              attempt > 0,
             );
       if (!wrong) {
         if (latest) {
