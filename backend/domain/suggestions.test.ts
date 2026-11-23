@@ -75,7 +75,7 @@ function fixture(
   };
   const suggestions = createSuggestions({
     taste: {
-      // Suggestions read only the summary and the signals.
+      // Keep the fixture's taste records small.
       read: (owner) => ({ summary: "", signals: [], ...records[owner] }) as TasteRecord,
     },
     cards: options.cards,
@@ -183,7 +183,7 @@ async function serve(t: TestContext, suggestions: ReturnType<typeof fixture>["su
   };
 }
 
-test("each suggestion picker requests six distinct ideas and caps an oversized reply", async () => {
+test("each suggestion picker caps an oversized reply at six distinct ideas", async () => {
   assert.equal(maxSuggestions, 6);
   for (const surface of ["composer", "viewer", "animate", "draft"]) {
     const labels = ["Wind", "Amber", "Rain", "Fog", "Snow", "Cloud", "Sun"];
@@ -202,7 +202,10 @@ test("each suggestion picker requests six distinct ideas and caps an oversized r
     });
     assert.equal(result.suggestions.length, 6, surface);
     assert.equal(new Set(result.suggestions.map((idea) => idea.label)).size, 6);
-    assert.match(calls[0][0].content, /(?:Write|Suggest) 6 useful, distinct/);
+    assert.match(
+      calls[0][0].content,
+      /(?:Write|Suggest) 6 useful, distinct|Offer up to 6 distinct/,
+    );
   }
 });
 
@@ -312,7 +315,7 @@ test("Animate's ideas and a draft's changes asked again offer different ones fro
   const { calls, suggestions } = fixture();
   await suggestions.suggest("alice", { surface: "animate", jobId: "job-a" });
   await suggestions.suggest("alice", { surface: "animate", jobId: "job-a", fresh: true });
-  assert.match(calls[0][0].content, /each from a different angle \(/);
+  assert.match(calls[0][0].content, /different visible detail or relationship/);
   assert.match(calls[1][1].content, /Already suggested \(offer different ones\): Warmer Light/);
   await suggestions.suggest("alice", { surface: "draft", kind: "image", prompt: "A fox" });
   assert.doesNotMatch(calls[2][1].content, /Already suggested/);
@@ -358,6 +361,12 @@ test("viewer next steps read the image itself where the text model can", async (
 
 test("Animate saves its own image-grounded motion instructions", async () => {
   const { calls, items, suggestions } = fixture({ image: true });
+  items["alice:job-a"].motionIdeas = {
+    steps: [{ label: "Old Camera Move", request: "Push in slowly" }],
+    at: new Date(0).toISOString(),
+    count: maxSuggestions,
+    revision: 2,
+  };
   const result = await suggestions.suggest("alice", { surface: "animate", jobId: "job-a" });
   assert.deepEqual(result.suggestions[1], {
     label: "Closer Crop",
@@ -365,9 +374,17 @@ test("Animate saves its own image-grounded motion instructions", async () => {
     prompt: "crop closer",
   });
   assert.match(calls[0][0].content, /becomes a short video/);
+  assert.match(calls[0][0].content, /different visible detail.*clear ending/);
   assert.match(calls[0][1].content, /Prompt: A harbour at dawn/);
+  assert.match(calls[0][1].content, /What it shows: Fishing boats moored in pale fog/);
+  assert.doesNotMatch(calls[0][1].content, /A lighthouse in fog/);
   assert.equal(calls[0][1].images, 1);
   assert.ok(items["alice:job-a"].motionIdeas);
+  assert.deepEqual(
+    await suggestions.suggest("alice", { surface: "animate", jobId: "job-a" }),
+    result,
+  );
+  assert.equal(calls.length, 1);
   assert.equal(items["alice:job-a"].nextSteps, undefined);
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });

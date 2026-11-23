@@ -345,10 +345,11 @@ export function MediaViewer({
   const position =
     canNavigate && itemLabel
       ? itemLabel(item)
-      : (item.resultSet && setPosition(item, members)) ||
-        (canNavigate
+      : item.resultSet && (!canNavigate || members.length > 1)
+        ? setPosition(item, members)
+        : canNavigate
           ? `${currentIndex + 1} / ${Math.max(total ?? 0, viewable.length)}`
-          : undefined);
+          : undefined;
   const iteration = useMediaIteration(item);
   const rememberQueued = (job: string) => setQueued((runs) => [...runs, { job, from: item.id }]);
   const closeForPrompt = () => {

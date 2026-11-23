@@ -91,6 +91,7 @@ const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "c
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
 const suggestionRevision = 2;
+const motionRevision = 3;
 /** Ideas avoid this many of the latest shown in the same menu. */
 const shownIdeas = 9;
 const maxIdea = 160;
@@ -333,7 +334,7 @@ export function createSuggestions({
       steps: steps as NextStep[],
       at: new Date(now()).toISOString(),
       count: maxSuggestions,
-      revision: suggestionRevision,
+      revision: field === "motionIdeas" ? motionRevision : suggestionRevision,
       ...(spicy ? { spicy } : {}),
     });
   }
@@ -398,14 +399,14 @@ export function createSuggestions({
       ],
       // Animate's instruction says what happens; its writer turns the instruction into the prompt.
       animate: [
-        `You suggest what could happen when an image a person made in a media studio becomes a short video, drawn from the image's prompt and settings${image ? ", what the attached image shows" : ""} and their taste profile.`,
-        `Suggest ${maxSuggestions} useful, distinct ideas that fit what the image shows, each from a different angle (${angles(motionAngles, maxSuggestions)}).`,
+        `You suggest what could happen when a person's image becomes a short video. Treat ${image ? "what the attached image shows" : "the source caption, then the source prompt"} as the opening frame. Use taste for tone only.`,
+        `Offer up to ${maxSuggestions} distinct ideas. Each uses a different visible detail or relationship in this frame and gives it one plausible motion with a clear ending. Use fewer ideas if the frame supports fewer.`,
         contentRule(spicy),
         suggestionChoices("video", spicy),
-        "One physically plausible action the opening frame supports, with a clear finish. Vary movement, viewpoint or the environment instead of defaulting to another push-in, turn or hair movement.",
+        "Mix subject action, interaction and environmental motion where supported. Include a camera move only when it reveals or follows something specific. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.",
         americanEnglish,
         avoidFiller(),
-        'Each has a label of at most four words in Title Case (such as "Slow Push In", "Hair in the Wind" or "Turns to Camera") and one short sentence saying what happens in the video.',
+        "Name the distinctive action in a Title Case label of at most four words. Give one short sentence saying what moves and how it ends. Leave prompt syntax, shot timings and technical settings to the video prompt writer.",
         data,
         'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<what happens>"}]}.',
       ],
@@ -517,6 +518,11 @@ export function createSuggestions({
     liked.length = Math.min(liked.length, 5);
     return {
       known: Boolean(record.summary || liked.length),
+      motionLines: [
+        record.summary ? `Taste for tone: ${record.summary}` : "",
+        ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
+        ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
+      ].filter(Boolean),
       lines: [
         `Taste profile: ${record.summary || "(none yet)"}`,
         "Prompts they liked:",
@@ -897,7 +903,7 @@ export function createSuggestions({
       if (
         saved?.steps.length &&
         saved.count === maxSuggestions &&
-        saved.revision === suggestionRevision &&
+        saved.revision === (surface === "animate" ? motionRevision : suggestionRevision) &&
         !fresh &&
         Boolean(saved.spicy) === spicy
       )
@@ -906,7 +912,7 @@ export function createSuggestions({
             unlike(fixed(surface === "animate" ? "animate" : "change")),
           ),
         };
-      const { known, lines } = tasteContext(ownerId);
+      const { known, lines, motionLines } = tasteContext(ownerId);
       const drafted = surface === "composer" || surface === "draft";
       const kind = drafted ? (body.kind as "image" | "video") : "image";
       const prompt = drafted || edited ? clean(body.prompt, maxPromptCharacters) : "";
@@ -966,7 +972,15 @@ export function createSuggestions({
         if (source && surface === "viewer")
           return stepsFor(model, ownerId, source, { image: picture, save: !edited, signal });
         const context = source
-          ? [...lines, "", "The image:", describeItem(source)].join("\n")
+          ? [
+              ...motionLines,
+              "",
+              "Opening frame:",
+              `Prompt: ${clean(source.prompt || source.suggestedPrompt, maxPromptCharacters)}`,
+              ...(source.caption?.text
+                ? [`What it shows: ${clean(source.caption.text, 600)}`]
+                : []),
+            ].join("\n")
           : [
               ...lines,
               ...(appliedCards.length ? ["", "Applied cards:", ...appliedCards] : []),
