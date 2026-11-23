@@ -11,7 +11,7 @@ import {
   takesSubjects,
 } from "../shared/characters.ts";
 import { slotCapacity, slotGroups } from "../shared/profiles.ts";
-import { listCards, refusal, shownCard, updateCharacter } from "./cards.js";
+import { listCards, refusal, shownCard, updateCard } from "./cards.js";
 import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { storedChatRecord } from "./gallery/records.js";
@@ -295,7 +295,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
     );
     if (admitted.status >= 400) return admitted;
     const jobId = String(admitted.payload.jobId);
-    const character = updateCharacter(account?.userId || "", card.id, (current) => ({
+    const character = updateCard("characters", account?.userId || "", card.id, (current) => ({
       ...current,
       sheet: { jobId, at: new Date().toISOString() },
     }));
@@ -304,7 +304,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
 
   /** Keeps a new character's finished portrait as its first image, then queues its sheet if asked. */
   async function keepPortrait(ownerId, card, item) {
-    const character = updateCharacter(ownerId, card.id, (current) =>
+    const character = updateCard("characters", ownerId, card.id, (current) =>
       current.portrait?.jobId === item.jobId && !current.referenceIds.length
         ? (({ portrait: _done, ...rest }) => ({ ...rest, referenceIds: [item.id] }))(current)
         : current,
@@ -334,7 +334,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
       panels.push({ role, referenceId: asset.id });
     }
     panels.sort((a, b) => sheetRoles.indexOf(a.role) - sheetRoles.indexOf(b.role));
-    updateCharacter(ownerId, card.id, (current) =>
+    updateCard("characters", ownerId, card.id, (current) =>
       current.sheet?.jobId === card.sheet.jobId
         ? { ...current, sheet: { ...current.sheet, panels } }
         : current,
@@ -396,7 +396,7 @@ export function createCharacterSheets({ admit, profiles, account: accountFor }) 
           await keep(ownerId, card, item);
         } catch (error) {
           logWarning(`Make Sheet: ${card.id}'s sheet was not split: ${error.message}`);
-          updateCharacter(ownerId, card.id, (current) =>
+          updateCard("characters", ownerId, card.id, (current) =>
             current.sheet?.jobId === item.jobId
               ? {
                   ...current,

@@ -22,6 +22,8 @@ export interface JobObservation {
   /** A lost synchronous request whose worker has confirmed it is idle. */
   restartInterrupted?: { seed?: string };
   reason?: string;
+  /** A failure a retry won't change: the request was refused, or a part it needs is missing. */
+  permanent?: true;
   providerJobId?: string;
   backend?: string;
   progress?: Record<string, unknown>;
@@ -394,6 +396,7 @@ export class GenerationQueue {
           status: "failed",
           progress: undefined,
           reason: `Writing the prompt failed: ${(error as Error).message}`,
+          ...((error as { permanent?: true }).permanent && { permanent: true }),
         });
         await this.adapter.settled?.(failed);
       } finally {

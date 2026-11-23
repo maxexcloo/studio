@@ -17,7 +17,6 @@ import { FilterButton } from "../generation/Picker";
 import {
   type FilterChip,
   FilterChips,
-  FilterToggle,
   GalleryFilterPanel,
   type GalleryFilterValues,
   emptyGalleryFilters,
@@ -65,13 +64,9 @@ export function GalleryToolbar({
     if (query && phone) setSearching(true);
   }, [query, phone]);
   const chips = useActiveFilters({ kind, value, onChange }, extraChips);
-  // Keep the current view and the toolbar's Liked toggle on.
+  // Keep the current view.
   const clear = () => {
-    onChange({
-      ...emptyGalleryFilters,
-      rating: value.rating === "liked" ? "liked" : "",
-      uploads: value.uploads,
-    });
+    onChange({ ...emptyGalleryFilters, uploads: value.uploads });
     for (const chip of extraChips) chip.remove();
   };
   const toolbar = useRef<HTMLDivElement>(null);
@@ -184,14 +179,6 @@ export function GalleryToolbar({
       >
         <GalleryFilterPanel kind={kind} value={value} onChange={onChange} toggles={toggles} />
       </ChipPopup>
-      <FilterToggle
-        label="Liked"
-        icon={icons.like}
-        on={value.rating === "liked"}
-        onToggle={() =>
-          onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
-        }
-      />
       {/* Desktop chips fill the row's free width; either way the actions end the row. */}
       {phone || !chips.length ? <div className={classes.chips} /> : filterChips}
       {results && !phone && (

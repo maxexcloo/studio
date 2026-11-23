@@ -111,10 +111,10 @@ export function TextBox({
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
   const openedFrom = useRef<Element | null>(null);
-  const viewport = useVisibleRect(editing);
-  const [closingViewport, setClosingViewport] = useState<typeof viewport>();
+  // The editor fits the room above the keyboard; closing, it fills the screen as the keyboard drops.
+  const viewport = useVisibleRect(editing, false);
   const closing = useRef(false);
-  const editorViewport = editing ? viewport : closingViewport;
+  const editorViewport = editing ? viewport : undefined;
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => close());
   // The text an in-place box had when it took focus: changed since, Reset returns to it.
@@ -173,12 +173,16 @@ export function TextBox({
   const [active, setActive] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar. Such a
-  // box shows its tools there while typing.
-  const barred =
-    mobile &&
-    inline &&
-    bar !== null &&
-    bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]');
+  // box shows its tools there while typing. Its surface is known once it has mounted, before paint.
+  const [barred, setBarred] = useState(false);
+  useLayoutEffect(() => {
+    setBarred(
+      mobile &&
+        inline &&
+        bar !== null &&
+        bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]'),
+    );
+  }, [mobile, inline, bar]);
   const inBar = barred && active ? bar : null;
   const restingTools = barred && !active && !hideTools && Boolean(tools?.length || send);
   const spins =
@@ -413,7 +417,6 @@ export function TextBox({
   const close = () => {
     if (!editing || closing.current) return;
     closing.current = true;
-    setClosingViewport(viewport);
     setMenuOpened(false);
     setEditing(false);
     const focused = document.activeElement;
@@ -610,7 +613,6 @@ export function TextBox({
           returnFocus={false}
           onExitTransitionEnd={() => {
             closing.current = false;
-            setClosingViewport(undefined);
             if (field.current && !layerAbove(field.current))
               field.current.focus({ preventScroll: true });
           }}

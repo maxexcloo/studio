@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import type { CardKind } from "../../../../shared/characters";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
@@ -25,6 +26,8 @@ export interface Comparison {
   axis?: string;
   /** The project whose brief a vote just proposed a change to, in Dream's Inbox. */
   proposal?: { projectId: string; name: string };
+  /** The card whose Generate References these are: the winner joins its images. */
+  card?: { kind: CardKind; id: string; name: string };
   /** A Dream comparison the account kept a side of, with its question; it is read-only. */
   dream?: { question: string };
 }
