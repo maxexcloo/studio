@@ -17,10 +17,23 @@
   gap: 6px;
 }
 
+.group:has(.strengthRow) {
+  flex-basis: 100%;
+}
+
+.group:has(.strengthRow) > .caption {
+  order: -1;
+}
+
+.strengthRow {
+  width: 100%;
+}
+
 /* Tile rules must outrank native button styles regardless of chunk load order. */
 .cell:global(.mantine-UnstyledButton-root) {
   position: relative;
   display: grid;
+  flex-shrink: 0;
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--mantine-color-default-border);

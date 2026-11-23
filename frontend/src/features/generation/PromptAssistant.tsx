@@ -9,6 +9,7 @@ import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { CustomDialog } from "./CustomDialog";
+import { profileForLoras } from "./payload";
 
 /** A fixed assistant option from Library › Prompt Styles, in its menu's order. */
 export interface AssistantOption {
@@ -127,8 +128,19 @@ export function usePromptAssistant({
   const mounted = useRef(false);
   const scope = useRef(0);
   const undoNotifications = useRef(new Set<string>());
-  const latest = useRef({ input, profile, onChange, onNegativeWritten });
-  latest.current = { input, profile, onChange, onNegativeWritten };
+  const hasReferences = Boolean(
+    references.length || input.referenceAssets?.length || input.referenceDetails?.length,
+  );
+  const loraProfile = profileForLoras(profile, input.profileBackend, hasReferences);
+  const latest = useRef({
+    input,
+    profile,
+    hasReferences,
+    loraProfile,
+    onChange,
+    onNegativeWritten,
+  });
+  latest.current = { input, profile, hasReferences, loraProfile, onChange, onNegativeWritten };
   useEffect(() => {
     mounted.current = true;
     scope.current++;
@@ -140,7 +152,7 @@ export function usePromptAssistant({
       undoNotifications.current.forEach((id) => notifications.hide(id));
       undoNotifications.current.clear();
     };
-  }, [profile?.id, scopeKey]);
+  }, [profile?.id, input.profileBackend, hasReferences, scopeKey]);
   const info = status.data;
   const preset =
     info?.presets.find((item) => item.id === presetId) ||
@@ -151,7 +163,7 @@ export function usePromptAssistant({
     !info?.noNegative?.includes(profile?.id || "");
   const negativeKey = JSON.stringify([profile?.id, input.prompt, input.cfg, input.loras]);
   const lorasOffered = Boolean(
-    info?.loras && profile?.capabilities.lora && profile.options?.loras?.length,
+    info?.loras && loraProfile?.capabilities.lora && loraProfile.options?.loras?.length,
   );
   function applyChange(message: string, patch: Partial<GenerationInput>) {
     const before = latest.current.input;
@@ -217,6 +229,8 @@ export function usePromptAssistant({
         throw new Error("Write a prompt and choose a profile first.");
       const source = {
         profileId: profile.id,
+        profileBackend: input.profileBackend,
+        hasReferences,
         prompt: input.prompt,
         negative: input.negative,
         scope: scope.current,
@@ -224,7 +238,10 @@ export function usePromptAssistant({
       const abort = new AbortController();
       controller.current = abort;
       const body: Record<string, unknown> = { profileId: profile.id, prompt: input.prompt };
-      if (action !== "loras")
+      if (action === "loras") {
+        body.profileBackend = input.profileBackend;
+        body.hasReferences = hasReferences;
+      } else
         body.loras = input.loras.filter((item) => item.enabled !== false).map((item) => item.name);
       if (action === "rewrite") {
         body.preset = preset;
@@ -252,6 +269,9 @@ export function usePromptAssistant({
       if (
         current.profile?.id !== source.profileId ||
         current.input.prompt !== source.prompt ||
+        (action === "loras" &&
+          (current.input.profileBackend !== source.profileBackend ||
+            current.hasReferences !== source.hasReferences)) ||
         (action === "negative" && !preview && current.input.negative !== source.negative)
       ) {
         notifications.show({
@@ -290,10 +310,15 @@ export function usePromptAssistant({
         applyChange("Negative prompt written", { negative: result.negative });
         current.onNegativeWritten?.();
       } else {
-        const offered = new Set(current.profile?.options?.loras || []);
+        const offered = new Set(current.loraProfile?.options?.loras || []);
         const usable = (result.loras || []).filter((item) => offered.has(item.name));
         setSuggestions(usable);
-        if (!usable.length) notifications.show({ message: "No LoRAs fit this prompt." });
+        if (!usable.length)
+          notifications.show({
+            message: result.loras?.length
+              ? "The suggested LoRAs are no longer available for the selected model."
+              : result.reason || "No LoRAs fit this prompt.",
+          });
       }
     },
     onSettled: () => {
@@ -303,7 +328,8 @@ export function usePromptAssistant({
   function apply(suggestion: Suggestion) {
     if (input.loras.some((item) => item.name === suggestion.name)) return;
     if (
-      input.loras.filter((item) => item.enabled !== false).length >= (profile?.maxLoras || maxLoras)
+      input.loras.filter((item) => item.enabled !== false).length >=
+      (loraProfile?.maxLoras || maxLoras)
     ) {
       notifications.show({
         color: "yellow",

@@ -490,7 +490,8 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             aria-label="Family"
             size="sm"
             radius="xl"
-            w="8rem"
+            flex="1 1 11rem"
+            miw={0}
             data={[
               { value: "all", label: "All Families" },
               ...families.map((value) => ({ value, label: modelFamilyLabel(value) })),

@@ -383,13 +383,3 @@
     transition: none;
   }
 }
-
-.uploadTile {
-  min-width: 0;
-}
-
-.upload:global(.mantine-Button-root) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1;
-}

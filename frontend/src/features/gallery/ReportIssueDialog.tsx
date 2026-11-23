@@ -1,4 +1,4 @@
-import { ActionIcon, Alert, Button, Chip, Group, Modal, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
 import { useRef, useState } from "react";
 
 import type { ImageInspection } from "../../../../shared/suggestions";
@@ -116,18 +116,16 @@ export function ReportIssueDialog({
             onChange={setDetails}
             rightSection={
               canInspect && (
-                <Tooltip label="Inspect Image">
-                  <ActionIcon
-                    aria-label="Inspect Image"
-                    variant="subtle"
-                    color="gray"
-                    loading={inspect.isPending}
-                    disabled={fix.isPending}
-                    onClick={() => inspect.mutate(undefined, { onSuccess: setFinding })}
-                  >
-                    <icons.assistant size={16} />
-                  </ActionIcon>
-                </Tooltip>
+                <ActionIcon
+                  aria-label="Inspect Image"
+                  variant="subtle"
+                  color="gray"
+                  loading={inspect.isPending}
+                  disabled={fix.isPending}
+                  onClick={() => inspect.mutate(undefined, { onSuccess: setFinding })}
+                >
+                  <icons.assistant size={16} />
+                </ActionIcon>
               )
             }
             rightSectionWidth={canInspect ? 44 : undefined}

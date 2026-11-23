@@ -961,11 +961,19 @@ export function createAssistant(
     liked = [],
     limit = 4,
     signal,
+    writer,
   } = {}) {
     const candidates = preFilterLoras({ profile, prompt, loras, liked });
-    if (!candidates.length) return { loras: [], source: "prefilter" };
+    if (!candidates.length)
+      return {
+        loras: [],
+        source: "prefilter",
+        reason: loras.length
+          ? "No LoRA catalogue keywords match this prompt for the selected model."
+          : "No LoRAs are available for the selected model.",
+      };
     const started = now();
-    const model = await modelFor("loras");
+    const model = await modelFor("loras", false, writer);
     const listed = candidates.map(({ name, info }) => ({
       name,
       title: loraName(name, info),

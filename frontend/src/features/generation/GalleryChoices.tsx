@@ -244,6 +244,7 @@ export function GalleryChoices({
                 <PickerTile
                   key={item.id}
                   {...tile(item, title)}
+                  title={uploads ? item.source?.title || item.filename || title : undefined}
                   image={item.thumbnailUrl || item.url}
                   drag={[galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })]}
                   preview={{

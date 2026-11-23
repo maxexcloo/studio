@@ -37,7 +37,7 @@ import {
   useReferenceList,
   useReferencePlacement,
 } from "./references";
-import { ReferenceRoles, ReferenceSlots, referenceCellType } from "./ReferenceSlots";
+import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowser";
 
 /** The Library's cards, after the gallery's tabs, with Characters. */
@@ -237,7 +237,7 @@ export function ReferencePicker({
       {references.length}/{capacity}
     </Text>
   );
-  // The chosen references and their roles; choosing a slot opens the choices on phones.
+  // Choosing a slot opens the choices on phones.
   const stackContent = (
     <Stack component="section" aria-label="Reference Stack" gap="sm" {...fileProps}>
       <ReferenceSlots
@@ -253,12 +253,8 @@ export function ReferencePicker({
           settle();
         }}
         onDrop={dropData}
-      />
-      <ReferenceRoles
-        references={references}
-        profile={profile}
         start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
-        onChange={list.set}
+        onStrengthChange={list.set}
       />
     </Stack>
   );

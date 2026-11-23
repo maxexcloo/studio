@@ -9,6 +9,7 @@ import {
   Group,
   Image,
   InputBase,
+  Loader,
   Menu,
   Modal,
   Popover,
@@ -453,25 +454,18 @@ export function UploadTile({
   onFiles: (files: File[]) => void;
 }) {
   return (
-    <div role="listitem" className={classes.uploadTile}>
-      <FileButton accept={uploadTypes.join(",")} multiple onChange={onFiles}>
-        {(props) => (
-          <Button
-            {...props}
-            className={classes.upload}
-            variant="default"
-            aria-label={label}
-            loading={loading}
-            disabled={disabled || loading}
-          >
-            <Stack align="center" gap="xs">
-              <icons.upload size={22} aria-hidden />
-              <span>Upload</span>
-            </Stack>
-          </Button>
-        )}
-      </FileButton>
-    </div>
+    <FileButton accept={uploadTypes.join(",")} multiple onChange={onFiles}>
+      {({ onClick }) => (
+        <PickerTile
+          label={label}
+          title="Upload"
+          placeholder={icons.upload}
+          disabled={disabled}
+          loading={loading}
+          onToggle={onClick}
+        />
+      )}
+    </FileButton>
   );
 }
 
@@ -486,6 +480,7 @@ export function PickerTile({
   selected,
   onToggle,
   disabled = false,
+  loading = false,
   image,
   placeholder: Placeholder,
   aspect = "1",
@@ -497,9 +492,10 @@ export function PickerTile({
   row = false,
 }: {
   label: string;
-  selected: boolean;
+  selected?: boolean;
   onToggle: () => void;
   disabled?: boolean;
+  loading?: boolean;
   image?: string;
   placeholder?: LucideIcon;
   /** The picture's aspect ratio, such as "4 / 3". */
@@ -554,7 +550,8 @@ export function PickerTile({
             className={classes.toggle}
             aria-label={label}
             aria-pressed={selected}
-            disabled={disabled && !selected}
+            aria-busy={loading || undefined}
+            disabled={loading || (disabled && !selected)}
             onClick={onToggle}
             draggable={!!drag}
             onDragStart={dragStart}
@@ -576,7 +573,11 @@ export function PickerTile({
             onKeyUp={(event) => preview && event.key === " " && event.preventDefault()}
           >
             <div className={classes.media} style={{ aspectRatio: aspect }}>
-              {Placeholder && <Placeholder size={row ? 18 : 22} aria-hidden />}
+              {loading ? (
+                <Loader size="sm" />
+              ) : (
+                Placeholder && <Placeholder size={row ? 18 : 22} aria-hidden />
+              )}
               {image && (
                 <Image
                   className={classes.image}

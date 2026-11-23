@@ -431,7 +431,7 @@ export function studioTheme({
       // The sliding indicator alone marks the choice; separators between items flicker and fade
       // unevenly beside it.
       SegmentedControl: SegmentedControl.extend({
-        classNames: { root: classes.segmented },
+        classNames: { root: classes.segmented, label: classes.segmentLabel },
         defaultProps: {
           // Compact text everywhere; its height follows the bar density below.
           size: "sm",
@@ -541,6 +541,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--studio-ease-exit": easing.exit,
       "--studio-scroll-behavior": theme.other.motionDuration ? "smooth" : "auto",
       "--studio-glass-filter": transparency ? "blur(24px) saturate(1.5)" : "none",
+      "--mantine-color-placeholder": "var(--mantine-color-dimmed)",
       "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),
     },
     dark: {
@@ -548,8 +549,8 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-default": "#18181b",
       "--mantine-color-default-hover": "#27272a",
       "--mantine-color-default-border": "#27272a",
-      // Mantine's dark placeholder is too faint over translucent surfaces.
-      "--mantine-color-placeholder": "var(--mantine-color-dark-2)",
+      "--mantine-color-dimmed":
+        "color-mix(in srgb, var(--mantine-color-dark-1), var(--mantine-color-dark-0) 45%)",
       // Mantine's dark light-variant red is near white, so a subtle Delete lost its colour.
       "--mantine-color-red-light-color": "var(--mantine-color-red-4)",
       ...glassTokens("dark", transparency),
@@ -559,6 +560,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-default": "#ffffff",
       "--mantine-color-default-hover": "#f4f4f5",
       "--mantine-color-default-border": "#e4e4e7",
+      "--mantine-color-dimmed": "var(--mantine-color-gray-7)",
       // Links take the primary's text shade, as its light buttons do; the filled shade is too pale.
       "--mantine-color-anchor": "var(--mantine-primary-color-light-color)",
       ...glassTokens("light", transparency),

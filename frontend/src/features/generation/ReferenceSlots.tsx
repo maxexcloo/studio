@@ -2,7 +2,7 @@ import { Badge, Group, Image, Menu, Stack, Text, UnstyledButton } from "@mantine
 import { ArrowLeft, ArrowRight, Replace } from "lucide-react";
 import { type DragEvent, useState } from "react";
 
-import type { Profile, ReferenceAsset } from "../../types";
+import type { ReferenceAsset } from "../../types";
 import { contextMenuHandlers } from "../../ui/contextMenu";
 import { icons } from "../../ui/icons";
 import type { SlotLayout } from "./payload";
@@ -33,6 +33,8 @@ export function ReferenceSlots({
   onView,
   caption = true,
   emptyLabel,
+  onStrengthChange,
+  start,
 }: {
   references: ReferenceAsset[];
   profile?: SlotLayout;
@@ -45,6 +47,18 @@ export function ReferenceSlots({
   /** Names each group under its slots and counts them; off where the form's label already does. */
   caption?: boolean;
   emptyLabel?: string;
+  onStrengthChange?: (references: ReferenceAsset[]) => void;
+  /** The img2img start slot and the denoise its Strength sets. */
+  start?: {
+    slot: string;
+    denoise?: {
+      value: number;
+      min: number;
+      max: number;
+      step: number;
+      onChange: (value: number) => void;
+    };
+  };
 }) {
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -74,6 +88,7 @@ export function ReferenceSlots({
     [next[from], next[to]] = [next[to], next[from]];
     onChange(next);
   }
+  const startImage = start && references.find((asset) => asset.slot === start.slot);
   return (
     <div className={classes.slots} role="group" aria-label="Reference Slots">
       {referenceCells(references, profile).map((group) => (
@@ -110,7 +125,26 @@ export function ReferenceSlots({
               const cellTarget = { slot: group.slot, replace: key };
               const peers = group.assets;
               const position = peers.indexOf(asset);
-              return (
+              const range = profile?.mediaInputs?.find(
+                (input) => input.id === asset.slot,
+              )?.strength;
+              const strength =
+                range && onStrengthChange
+                  ? {
+                      ...range,
+                      value: asset.strength ?? range.default,
+                      mark: range.default,
+                      onChange: (strength: number) =>
+                        onStrengthChange(
+                          references.map((reference) =>
+                            reference === asset ? { ...reference, strength } : reference,
+                          ),
+                        ),
+                    }
+                  : asset === startImage
+                    ? start?.denoise
+                    : undefined;
+              const tile = (
                 <Menu
                   key={key}
                   withinPortal={false}
@@ -199,11 +233,28 @@ export function ReferenceSlots({
                   </Menu.Dropdown>
                 </Menu>
               );
+              if (!strength) return tile;
+              return (
+                <Group key={key} className={classes.strengthRow} gap="sm" wrap="nowrap">
+                  {tile}
+                  <Stack gap={0} flex={1} miw={0}>
+                    <Text size="xs" c="dimmed">
+                      Strength
+                    </Text>
+                    <StrengthControl
+                      label={`${referenceLabel(asset, references.indexOf(asset), profile)} Strength`}
+                      {...strength}
+                    />
+                  </Stack>
+                </Group>
+              );
             })}
           </div>
           {caption && (
             <Text size="xs" c="dimmed" className={classes.caption}>
-              {group.label}
+              {group.slot === start?.slot || (startImage && group.assets.includes(startImage))
+                ? "Start Image"
+                : group.label}
               {group.guides && group.guides !== group.label && ` · ${group.guides}`}
               {group.capacity > 1 && ` · ${group.assets.length}/${group.capacity}`}
               {group.required && (
@@ -216,114 +267,5 @@ export function ReferenceSlots({
         </div>
       ))}
     </div>
-  );
-}
-
-/**
- * How placed references play their roles: one Strength for each that has one, and a note where one
- * is the start image the result is drawn from (img2img) rather than a guide. A guiding slot's
- * Strength is its own mapped input; the start image's is the profile's denoise.
- */
-export function ReferenceRoles({
-  references,
-  profile,
-  start,
-  onChange,
-}: {
-  references: ReferenceAsset[];
-  profile?: Profile;
-  /** The img2img start slot (shared/characters.ts startImageSlot) and the denoise its Strength sets. */
-  start?: {
-    slot: string;
-    denoise?: {
-      value: number;
-      min: number;
-      max: number;
-      step: number;
-      onChange: (value: number) => void;
-    };
-  };
-  onChange: (references: ReferenceAsset[]) => void;
-}) {
-  const startIndex = references.findIndex((asset) => asset.slot === start?.slot);
-  const strengths = references.flatMap<{
-    asset: ReferenceAsset;
-    index: number;
-    range: { min: number; max: number; step: number };
-    value: number;
-    mark?: number;
-    set: (value: number) => void;
-  }>((asset, index) => {
-    const range = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.strength;
-    if (range)
-      return [
-        {
-          asset,
-          index,
-          range,
-          value: asset.strength ?? range.default,
-          mark: range.default,
-          set: (strength: number) =>
-            onChange(
-              references.map((reference) =>
-                reference === asset ? { ...reference, strength } : reference,
-              ),
-            ),
-        },
-      ];
-    const denoise = index === startIndex ? start?.denoise : undefined;
-    return denoise
-      ? [
-          {
-            asset,
-            index,
-            range: denoise,
-            value: denoise.value,
-            mark: undefined,
-            set: denoise.onChange,
-          },
-        ]
-      : [];
-  });
-  if (startIndex < 0 && !strengths.length) return null;
-  return (
-    <Stack gap="xs">
-      {startIndex >= 0 && (
-        <Text size="xs" c="dimmed">
-          Reference {startIndex + 1} is the start image: the result is drawn from it.
-          {start?.denoise && " Higher Strength changes more."}
-        </Text>
-      )}
-      {strengths.map(({ asset, index, range, value, mark, set }) => {
-        const label = `${referenceLabel(asset, index, profile)} Strength`;
-        // Each strength stands beside its reference's thumbnail, as a LoRA's beside its name.
-        return (
-          <Group key={referenceKey(asset)} gap="sm" wrap="nowrap">
-            <Image
-              src={asset.thumbnailUrl || asset.url}
-              alt=""
-              h={40}
-              w={40}
-              radius="sm"
-              fallbackSrc=""
-            />
-            <Stack gap={0} flex={1} miw={0}>
-              <Text size="xs" c="dimmed" truncate>
-                {label}
-              </Text>
-              <StrengthControl
-                label={label}
-                value={value}
-                min={range.min}
-                max={range.max}
-                step={range.step}
-                mark={mark}
-                onChange={set}
-              />
-            </Stack>
-          </Group>
-        );
-      })}
-    </Stack>
   );
 }
