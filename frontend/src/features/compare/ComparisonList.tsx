@@ -55,7 +55,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
           </Stack>
         </Alert>
       ) : cards.length ? (
-        <SimpleGrid cols={columns} spacing="sm">
+        <SimpleGrid cols={columns} spacing="sm" style={{ alignItems: "start" }}>
           {cards.map(({ comparison, cover, title }) => (
             <Stack key={comparison.id} gap={4} miw={0}>
               <MediaTile
@@ -63,7 +63,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
                 hold={hold}
                 caption="none"
                 label={`Open Comparison: ${title}`}
-                style={{ aspectRatio: "1" }}
+                style={{ aspectRatio: `${cover.width || 1} / ${cover.height || 1}` }}
                 onOpen={() => void navigate(`/compare/${encodeURIComponent(comparison.id)}`)}
               />
               <Text size="sm" fw={500} truncate title={title}>
