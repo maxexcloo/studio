@@ -117,8 +117,8 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect.poll(() => asked).toEqual([first]);
   const dock = page.locator("[data-composer-dock]");
   const compactMenu = await promptMenu(dock, "Prompt");
-  await expect(compactMenu.getByRole("menuitem", { name: "Templates", exact: true })).toBeVisible();
-  // An empty prompt's ideas sit in the menu itself, beside the Templates submenu.
+  // An empty prompt has nothing to rewrite: its ideas sit in the menu itself, with no Templates.
+  await expect(compactMenu.getByRole("menuitem", { name: "Templates", exact: true })).toHaveCount(0);
   await expect(
     compactMenu.getByRole("menuitem", { name: ideas[0].label, exact: true }),
   ).toBeVisible();

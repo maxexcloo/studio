@@ -21,7 +21,7 @@ import {
 } from "./accountPreferences";
 
 /** The model a side uses until the account picks one. */
-const studioDefault = "Studio's Default";
+const studioDefault = "Studio Default";
 const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
