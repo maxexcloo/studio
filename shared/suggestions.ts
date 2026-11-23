@@ -23,8 +23,12 @@ export interface Change extends NextStep {
   /** The reference backend that supplied an Edit prompt's guide on a combined profile. */
   profileBackend?: string;
 }
-export const variationDirections = ["scene", "outfit", "style"] as const;
+export const variationDirections = ["light", "outfit", "pose", "scene", "style"] as const;
 export type VariationDirection = (typeof variationDirections)[number];
+/** Explore Three Directions: one variation each. */
+export const exploreDirections: VariationDirection[] = ["scene", "outfit", "style"];
+/** Varying one direction alone writes this many variations of it, to compare. */
+export const directionVariants = 4;
 /** `POST /api/suggestions`: none, with the reason, where the account or the text model can't. */
 export type Suggestions<T = PromptIdea> =
   | { suggestions: T[]; reason?: undefined }

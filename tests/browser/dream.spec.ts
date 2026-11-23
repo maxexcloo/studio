@@ -345,6 +345,51 @@ test("Suggest can queue a library item variation at its source", async ({ page }
   });
 });
 
+test("Keep & Vary accepts a Dream card and stages four variations of one thing to compare", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const dream = await serveDream(page, { unseen: [dreamItem("harbour"), dreamItem("next")] });
+  const poses = ["Seated Low", "Mid Stride", "Arms Crossed", "Looking Back"].map((label) => ({
+    action: "recreate",
+    request: "pose",
+    label,
+    prompt: `A harbour keeper, ${label.toLowerCase()}`,
+  }));
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "change") return route.fallback();
+    expect(body).toMatchObject({ itemId: "harbour", directions: ["pose"] });
+    return route.fulfill({ json: { suggestions: poses } });
+  });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Keep & Vary", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toContainText([
+    "Vary Light",
+    "Vary Outfit",
+    "Vary Pose",
+    "Vary Scene",
+    "Vary Style",
+    "Explore Three Directions",
+  ]);
+  await page.getByRole("menuitem", { name: "Vary Pose", exact: true }).click();
+  const review = page.getByRole("dialog", { name: "Vary Pose", exact: true });
+  await review.getByRole("button", { name: "Open Composer", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.map(({ path }) => path))
+    .toContain("/api/dream/harbour/keep");
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    poses[0].prompt,
+  );
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  expect(state.jobs.map((job) => job.input.prompt)).toEqual(poses.map(({ prompt }) => prompt));
+});
+
 test("Dream video Suggestions can stage an extension from the current clip", async ({ page }) => {
   const state = await fixtures(page);
   const dream = await serveDream(page, {

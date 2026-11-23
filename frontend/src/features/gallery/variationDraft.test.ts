@@ -56,9 +56,12 @@ test("keeps identity wording, references and seed while freeing each direction's
   );
   assert.deepEqual(
     variants.map((variant) => variant.input.referenceAssets.map(({ assetId }) => assetId)),
+    // Light, Outfit, Pose, Scene and Style.
     [
-      ["identity-asset", "style-asset"],
       ["identity-asset", "scene-asset"],
+      ["identity-asset", "scene-asset"],
+      ["identity-asset", "style-asset"],
+      ["identity-asset", "style-asset"],
       ["identity-asset", "scene-asset"],
     ],
   );

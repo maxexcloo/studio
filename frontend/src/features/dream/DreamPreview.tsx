@@ -408,6 +408,7 @@ export function DreamPreview({
                   card={card}
                   side={side}
                   onMore={() => act("more")}
+                  onKeep={() => act("keep")}
                   onApplied={onSuggestionApplied ?? close}
                 />
               }

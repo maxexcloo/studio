@@ -2,6 +2,7 @@ import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
+import type { VariationDirection } from "../../../../shared/suggestions";
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
 import { type Action, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
@@ -10,6 +11,7 @@ import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
 import { useItemChange } from "../gallery/useItemChange";
 import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
+import { VariationDialog, keepAndVaryAction } from "../gallery/VariationDialog";
 import { suggestionItems, useChangeSuggestions } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
@@ -20,6 +22,8 @@ interface DreamSuggestionsProps {
   card: DeckCard;
   side: number;
   onMore: () => void;
+  /** Accepts the card, as Keep & Vary does once its variations are staged. */
+  onKeep: () => void;
   onApplied?: () => void;
 }
 
@@ -34,6 +38,7 @@ function ItemSuggestions({
   item,
   side,
   onMore,
+  onKeep,
   onApplied,
 }: DreamSuggestionsProps & { item: MediaItem }) {
   const stage = useStageComparison();
@@ -44,6 +49,7 @@ function ItemSuggestions({
   const compare = useMutation({ mutationFn: () => stage.again(pair!), onSuccess: onApplied });
   const [opened, setOpened] = useState(false);
   const [custom, setCustom] = useState(false);
+  const [varying, setVarying] = useState<VariationDirection | "explore">();
   const iteration = useMediaIteration(item);
   const prepare = useMediaAction(item, onApplied);
   const canExtend = item.type === "video" && item.status === "done" && Boolean(item.url);
@@ -65,7 +71,10 @@ function ItemSuggestions({
     disabled: change.pending || iteration.isPending,
     onPick: send,
   });
+  const canVary =
+    available && item.type === "image" && (card.kind === "dream" || card.kind === "library");
   const more: Action[] = [
+    ...(canVary ? [keepAndVaryAction(setVarying)] : []),
     ...(canAskForMore
       ? [
           {
@@ -150,6 +159,18 @@ function ItemSuggestions({
           />
         </Menu.Dropdown>
       </Menu>
+      {varying && (
+        <VariationDialog
+          item={item}
+          direction={varying}
+          prompt={prompt}
+          onClose={() => setVarying(undefined)}
+          onApplied={() => {
+            onKeep();
+            onApplied?.();
+          }}
+        />
+      )}
       <CustomDialog
         opened={custom}
         title="Custom Change"
