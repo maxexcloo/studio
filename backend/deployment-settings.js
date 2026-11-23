@@ -67,6 +67,11 @@ export const catalogueFlags = [
     "The assistant offers ideas in the composer's AI menu for an empty prompt or a draft with applied cards.",
   ),
   flag(
+    "STUDIO_SELF_REVIEW",
+    "Self-Review",
+    "While Studio is idle, the assistant model scores recent images against their owner's rules and their project's brief. Needs a model that reads images.",
+  ),
+  flag(
     "STUDIO_SUGGESTED_PROMPTS",
     "Suggested Prompts",
     "While Studio is idle, the assistant model writes a prompt for uploads and other items without one, which Recreate uses.",

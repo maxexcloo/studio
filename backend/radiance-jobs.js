@@ -185,7 +185,8 @@ async function withModelTiming(id, client, model, marks, request, estimate) {
 }
 
 /**
- * A DELETE forgets an active video before its GPU stops; retain it until its terminal status.
+ * Follows a video to its MP4; nothing when it was stopped. Stop deletes the video: Radiance drops
+ * it while queued, but one already generating runs on unwatched until its GPU finishes it.
  * `marks` takes when Radiance accepted the video (its model loaded) and when it completed.
  */
 async function runVideo(id, client, record, save, body, pollMs, marks) {
@@ -203,6 +204,10 @@ async function runVideo(id, client, record, save, body, pollMs, marks) {
   let endsAt;
   while (video.status !== "completed") {
     if (ended(id)) throw new Error("Ended outside the run.");
+    if (stopping(id)) {
+      await client.deleteVideo(record.videoId).catch(() => null);
+      return cancelledRun(id);
+    }
     const failure = videoFailure(video);
     if (failure) throw Object.assign(new Error(failure), { terminal: true });
     const percent = Number(video.progress) || 0;
@@ -282,7 +287,7 @@ async function runRadiance(
 ) {
   const ownerId = body.ownerId || "";
   let record = store?.providerRecord(ownerId, id);
-  if (!recovered && record?.video === false && !record.outputs?.length) record = undefined;
+  if (!recovered && !record?.videoId && !record?.outputs?.length) record = undefined;
   let imageTimingBody;
   let imageEstimate;
   const save = () => store?.saveProviderRecord(ownerId, id, record);
@@ -305,14 +310,6 @@ async function runRadiance(
       };
       save();
     }
-    if (recovered && !record.video && !record.outputs.length) {
-      throw Object.assign(
-        new Error(
-          "Studio restarted during a synchronous Radiance image request. Its remote result cannot be recovered; retry explicitly.",
-        ),
-        { terminal: true },
-      );
-    }
     jobs.set(id, {
       ...jobs.get(id),
       status: stopping(id) ? "cancelling" : "running",
@@ -321,9 +318,8 @@ async function runRadiance(
     let outputs = record.outputs;
     if (!outputs.length) {
       let made;
-      if (record.videoId) {
-        made = await runVideo(id, client, record, save, undefined, pollMs);
-      } else {
+      if (record.videoId) made = await runVideo(id, client, record, save, undefined, pollMs);
+      else {
         const references = await referenceImages(record.body);
         const request = record.video
           ? videoRequest(record.values, references)
@@ -360,8 +356,8 @@ async function runRadiance(
           );
         }
         if (marks) marks.received = Date.now();
-        if (ended(id)) return;
       }
+      if (ended(id)) return;
       showProgress(id, "Saving");
       // Keep accepted bytes in this process while local storage is unavailable.
       for (const [index, bytes] of made.entries()) {
@@ -470,29 +466,30 @@ function publishFailure(id, failure) {
   updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
 }
 
-/** Pick up durable output, or allow one new attempt once an interrupted image's worker is idle. */
+/**
+ * Pick up durable output, or allow one new attempt when nothing recoverable was recorded: at once
+ * if nothing was sent, otherwise once the worker is idle or the interrupted request has timed out.
+ */
 export async function recoverRadianceJob(job, store, client) {
   const record = store.providerRecord(job.ownerId, job.id);
   const body = record?.body;
   const worker = workerById(job.backend);
-  if (
-    body &&
-    record.video === false &&
-    !record.outputs?.length &&
-    !job.memoryRecovery &&
-    (client || worker)
-  ) {
-    const idle = await (client || new RadianceClient(worker.url)).idle();
-    if (!idle)
+  if (!record?.videoId && !record?.outputs?.length && !job.memoryRecovery) {
+    if (
+      body &&
+      (client || worker) &&
+      Date.now() - (job.admittedAt ?? 0) < radianceWorkMs &&
+      !(await (client || new RadianceClient(worker.url)).idle())
+    )
       return /** @type {const} */ ({
         status: "starting",
-        reason: "Waiting for its worker to finish the interrupted image.",
+        reason: "Waiting for its worker to finish the interrupted run.",
       });
-    const seed = record.values?.seed;
+    const seed = record?.values?.seed;
     return /** @type {const} */ ({
       status: "queued",
       restartInterrupted: /^\d+$/.test(String(seed ?? "")) ? { seed: String(seed) } : {},
-      reason: "Studio restarted during this image's last run.",
+      reason: "Studio restarted during this job's last run.",
     });
   }
   jobs.set(job.id, {
@@ -501,20 +498,6 @@ export async function recoverRadianceJob(job, store, client) {
     status: job.cancelRequested ? "cancelling" : "running",
     promptId: record?.videoId || job.providerJobId,
   });
-  if (job.memoryRecovery) {
-    publishFailure(job.id, describeFailure({ message: job.memoryRecovery }));
-  } else if (body && (record.videoId || record.outputs?.length)) {
-    void runRadianceJob(
-      job.id,
-      body,
-      { url: workerById(job.backend).url },
-      { store, recovered: true },
-    );
-  } else {
-    setTerminalJob(job.id, {
-      status: "failed",
-      error:
-        "Studio restarted before Radiance recorded a recoverable result. Retry explicitly; this job was not resubmitted.",
-    });
-  }
+  if (job.memoryRecovery) publishFailure(job.id, describeFailure({ message: job.memoryRecovery }));
+  else void runRadianceJob(job.id, body, { url: worker.url }, { store, recovered: true });
 }

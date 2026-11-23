@@ -724,6 +724,22 @@ test("caption sends the image and reads the description and tags, or plain text 
   });
 });
 
+test("idle work's captions run two at a time", async () => {
+  let open = 0;
+  let most = 0;
+  const seen = fakeGateway(async () => {
+    most = Math.max(most, (open += 1));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    open -= 1;
+    return json("A red barn.");
+  });
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  const image = { mime: "image/jpeg", data: "AAAA" };
+  await Promise.all(Array.from({ length: 5 }, () => engine.caption({ image })));
+  assert.equal(seen.calls.length, 5);
+  assert.equal(most, 2);
+});
+
 test("character describes a card's image as one short phrase of lasting details", async () => {
   const seen = fakeGateway(() => json('  "Red-haired woman, green cloak,\nscar over left eye."'));
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });

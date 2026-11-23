@@ -192,13 +192,28 @@ test("recovered queued jobs transition to running and then deliver their video",
 test("offline backends do not mark jobs failed; a missing recovered prompt requires two confirmed misses", async () => {
   const s = fixture();
   s.gallery = [tile("one", "pending")];
-  s.jobs.set("one", { recovered: true, status: "running", comfyBackend: "video" });
+  s.jobs.set("one", { recovered: true, status: "running", comfyBackend: "video", promptId: "p1" });
   s.snapshots.video.error = true;
   await s.recover();
   assert.equal(s.jobs.get("one").status, "running");
   s.snapshots.video.error = false;
   await s.recover();
   assert.equal(s.jobs.get("one").status, "running");
+  await s.recover();
+  assert.equal(s.jobs.get("one").status, "failed");
+});
+
+test("a recovered job with no recorded prompt fails once absent from its own worker for three minutes", async () => {
+  const s = fixture();
+  s.gallery = [tile("one", "pending")];
+  s.jobs.set("one", { recovered: true, status: "running", comfyBackend: "video" });
+  // Another worker being offline doesn't hold it.
+  s.snapshots.primary.error = true;
+  await s.recover();
+  s.now = 2 * 60_000;
+  await s.recover();
+  assert.equal(s.jobs.get("one").status, "running");
+  s.now = 3 * 60_000;
   await s.recover();
   assert.equal(s.jobs.get("one").status, "failed");
 });

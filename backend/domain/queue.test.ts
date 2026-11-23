@@ -519,6 +519,40 @@ test("a run without progress for 10 minutes is stopped, failed and queued once o
   }
 });
 
+test("work nothing reports on for 30 minutes ends: a lost recovery fails, an unconfirmed Stop cancels", async () => {
+  const { store, queue, adapter, observations } = fixture();
+  let at = 0;
+  queue.now = () => at;
+  try {
+    const session = store.createSession("alice");
+    const lost = store.enqueue(
+      "alice",
+      session.id,
+      { kind: "video" },
+      "animate",
+      undefined,
+      "worker:primary",
+    ).id;
+    const stopping = store.enqueue("alice", session.id, {}, "image", undefined, "worker:other").id;
+    await queue.tick();
+    observations.delete(lost);
+    observations.set(stopping, { status: "running" });
+    adapter.cancel = async () => {};
+    await queue.cancel("alice", stopping);
+    await queue.tick();
+    at = 29 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", lost)?.status, "running");
+    at = 30 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", lost)?.status, "failed");
+    assert.equal(store.job("alice", lost)?.reason, "Stopped: no progress for 30 min.");
+    assert.equal(store.job("alice", stopping)?.status, "cancelled");
+  } finally {
+    store.close();
+  }
+});
+
 test("failed output persistence retains saving state and blocks conflicting work", async () => {
   const { store, queue, adapter, observations, submitted } = fixture();
   try {
@@ -1965,6 +1999,13 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
   assert.equal(store.hasOpenOwnWork(), false);
   const own = queue(queuePriority.mcp);
   assert.equal(store.hasOpenOwnWork(true), true);
+  // Waiting work a paused queue holds doesn't hold back Dream or idle work for others.
+  store.setPaused("alice", true);
+  assert.equal(store.hasOpenOwnWork(), false);
+  store.setPaused("alice", false);
+  store.setPaused(everyone, true);
+  assert.equal(store.hasOpenOwnWork(true), false);
+  store.setPaused(everyone, false);
   assert.deepEqual(
     store.openDreamJobs(undefined, true).map((job) => job.id),
     [dream.id],
@@ -1978,6 +2019,9 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
     store.openDreamJobs("alice").map((job) => job.id),
     [dream.id],
   );
+  store.saveProviderRecord("alice", own.id, { outputs: [] });
   store.save({ ...own, status: "completed" });
   assert.equal(store.hasOpenOwnWork(), false);
+  // A finished job's provider journal goes with it.
+  assert.equal(store.providerRecord("alice", own.id), undefined);
 });

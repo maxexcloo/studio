@@ -196,6 +196,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_PROMPT_IDEAS`                 | Offer ideas in the composer's AI menu                                                       | `1`                                          | Studio                 |
 | `STUDIO_RADIANCE_KEY`                 | API key Studio sends to Radiance                                                            | none                                         |                        |
 | `STUDIO_REDLIB_URL`                   | Redlib front end for Reddit imports                                                         | none: Reddit imports refused                 |                        |
+| `STUDIO_SELF_REVIEW`                  | Score recent images against their owner's rules and brief                                   | `1`                                          | Studio                 |
 | `STUDIO_SUGGESTED_PROMPTS`            | Write prompts for uploads and other items without one                                       | `1`                                          | Studio                 |
 | `STUDIO_TASTE_UPDATES`                | Summarise each account's taste as it rates                                                  | `1`                                          | Studio                 |
 | `STUDIO_WORKERS`                      | Workers as a JSON array ([Workers](#workers))                                               | discovered by runtime control, else none     |                        |

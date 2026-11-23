@@ -79,6 +79,8 @@ export const everyone = "*";
 /** Not yet done: pending, or handed to a provider. */
 const openStatuses = [...pendingStatuses, ...activeStatuses];
 const jobPriority = "json_extract(record, '$.priority')";
+const jobResource = "json_extract(record, '$.resource')";
+const jobTier = `COALESCE(${jobPriority}, ${queuePriority.manual})`;
 const dreamPriority = `${jobPriority} = ${queuePriority.dream}`;
 const pendingMemoryRecovery = `status = 'failed'
   AND json_extract(record, '$.memoryRecovery') IS NOT NULL
@@ -139,6 +141,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS studio_queue_session ON studio_queue(session_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_set ON studio_queue(json_extract(record, '$.queueSet'));
       CREATE INDEX IF NOT EXISTS studio_queue_priority ON studio_queue(status, ${jobPriority});
+      CREATE INDEX IF NOT EXISTS studio_queue_overtakes ON studio_queue(${jobResource}, ${jobTier}, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_dream_recent ON studio_queue(owner_id, created_at) WHERE ${dreamPriority};
       CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
@@ -160,6 +163,12 @@ export class Store {
     this.db.exec(
       "DROP INDEX IF EXISTS studio_queue_prompted; CREATE INDEX IF NOT EXISTS studio_queue_profile ON studio_queue(owner_id, profile_id, created_at, status)",
     );
+    // Includes any a run still finishing wrote after its job ended (save drops the rest).
+    this.db
+      .prepare(
+        `DELETE FROM studio_provider_jobs WHERE id IN (SELECT id FROM studio_queue WHERE status IN (${placeholders(terminalStatuses)}))`,
+      )
+      .run(...terminalStatuses);
   }
 
   /** A session holds the jobs of one request or run of requests, such as an MCP conversation's. */
@@ -418,15 +427,22 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
-  /** Whether any unfinished job is someone's own work, not Dream's, read from the priority index alone. */
+  /**
+   * Whether any unfinished job is someone's own work, not Dream's, read from the priority index;
+   * work a paused queue holds doesn't count.
+   */
   hasOpenOwnWork(waiting = false): boolean {
     const statuses = waiting ? pendingStatuses : openStatuses;
     return Boolean(
       this.db
         .prepare(
-          `SELECT 1 FROM studio_queue INDEXED BY studio_queue_priority WHERE status IN (${placeholders(statuses)}) AND ${jobPriority} IS NOT ${queuePriority.dream} LIMIT 1`,
+          `SELECT 1 FROM studio_queue INDEXED BY studio_queue_priority
+           WHERE status IN (${placeholders(statuses)}) AND ${jobPriority} IS NOT ${queuePriority.dream}
+             AND NOT (status IN (${placeholders(pendingStatuses)}) AND EXISTS (
+               SELECT 1 FROM studio_queue_pauses WHERE studio_queue_pauses.owner_id IN (studio_queue.owner_id, ?)))
+           LIMIT 1`,
         )
-        .get(...statuses),
+        .get(...statuses, ...pendingStatuses, everyone),
     );
   }
 
@@ -669,9 +685,9 @@ export class Store {
     // A cancelled job never started, so it overtook nothing.
     const startedFinished = [...terminalStatuses].filter((status) => status !== "cancelled");
     const later = this.db.prepare(
-      `SELECT rowid, created_at, record FROM studio_queue WHERE status IN (${placeholders(startedFinished)})
-        AND created_at >= ? AND json_extract(record, '$.resource') = ?
-        AND COALESCE(json_extract(record, '$.priority'), ${queuePriority.manual}) = ?
+      `SELECT rowid, created_at, record FROM studio_queue INDEXED BY studio_queue_overtakes
+        WHERE status IN (${placeholders(startedFinished)})
+        AND created_at >= ? AND ${jobResource} = ? AND ${jobTier} = ?
         ORDER BY created_at DESC, rowid DESC LIMIT ?`,
     );
     for (const { resource, tier, since } of oldest.values())
@@ -795,6 +811,9 @@ export class Store {
     this.db
       .prepare("UPDATE studio_queue SET record = ?, status = ? WHERE id = ? AND owner_id = ?")
       .run(JSON.stringify(next), next.status, next.id, next.ownerId);
+    // A finished job's provider journal has nothing left to recover.
+    if (terminalStatuses.has(next.status))
+      this.db.prepare("DELETE FROM studio_provider_jobs WHERE id = ?").run(next.id);
     return next;
   }
 

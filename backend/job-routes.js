@@ -9,19 +9,17 @@ import { queueSchedule } from "./queue-eta.js";
  * from the queue's records. MCP reads and cancels a job through the first two.
  */
 export function registerJobRoutes(app, { store, queue }) {
-  /** Open jobs on its resource that run before a waiting job: started ones, then the queue's order by priority. */
+  /** Jobs on its resource that run before a waiting job: started ones, then those the queue puts first. */
   function aheadOf(job) {
-    const open = store.openJobs().filter((other) => other.resource === job.resource);
-    const at = open.findIndex((other) => other.id === job.id);
-    const priority = job.priority ?? 0;
-    return open.filter(
-      (other, index) =>
-        other.id !== job.id &&
-        (["running", "saving"].includes(other.status) ||
-          (other.reason !== pausedReason &&
-            ((other.priority ?? 0) < priority ||
-              ((other.priority ?? 0) === priority && index < at)))),
-    ).length;
+    const started = store
+      .openJobs()
+      .filter(
+        (other) =>
+          other.id !== job.id &&
+          other.resource === job.resource &&
+          ["starting", "running", "saving"].includes(other.status),
+      ).length;
+    return started + Math.max(0, (queue.queuePosition(job.id) ?? 1) - 1);
   }
   function generationJobResponse(account, id) {
     const queued = store.job(account?.userId || "", id);

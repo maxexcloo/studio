@@ -371,7 +371,7 @@ test("async video resumes its persisted provider ID after restart without anothe
   }
 });
 
-test("lost synchronous response is recovered without resubmit and only its owner may cancel", async () => {
+test("a lost synchronous response fails without resubmitting", async () => {
   const store = new Store(openDatabase(":memory:"));
   const remote = fixture();
   remote.failImages();
@@ -402,19 +402,14 @@ test("lost synchronous response is recovered without resubmit and only its owner
     await restarted.tick();
     assert.equal(store.job("alice", independent.id)?.status, "completed");
     assert.equal(remote.calls.filter((call) => call.path === "/v1/images/generations").length, 2);
-    assert.equal(await restarted.cancel("bob", job.id), undefined);
-    await restarted.cancel("alice", job.id);
-    await restarted.tick();
-    assert.equal(store.job("alice", job.id)?.status, "running");
-    assert.equal(store.job("alice", job.id)?.cancelRequested, true);
-    await restarted.abandon("alice", job.id);
-    assert.equal(store.job("alice", job.id)?.status, "cancelled");
+    assert.equal(store.job("alice", job.id)?.status, "failed");
+    assert.match(String(store.job("alice", job.id)?.reason), /lost the provider's response/);
   } finally {
     store.close();
   }
 });
 
-test("Stop keeps an accepted cloud video visible until its result is saved", async () => {
+test("Stop ends an accepted cloud video at once and saves nothing it finishes", async () => {
   const store = new Store(openDatabase(":memory:"));
   const remote = fixture();
   const saved: string[] = [];
@@ -447,12 +442,12 @@ test("Stop keeps an accepted cloud video visible until its result is saved", asy
     );
     await queue.tick();
     await queue.cancel("alice", job.id);
-    assert.equal(store.job("alice", job.id)?.status, "running");
+    assert.equal(store.job("alice", job.id)?.status, "cancelled");
     remote.complete();
     await queue.tick();
-    assert.equal(store.job("alice", job.id)?.status, "completed");
-    assert.deepEqual(saved, [job.id]);
-    assert.deepEqual(published, ["/fixture-video"]);
+    assert.equal(store.job("alice", job.id)?.status, "cancelled");
+    assert.deepEqual(saved, []);
+    assert.deepEqual(published, []);
     assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/generations").length, 1);
   } finally {
     store.close();

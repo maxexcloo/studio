@@ -1174,6 +1174,7 @@ const captioner = createCaptioner({
 registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
 // Self-review (domain/review.ts): recent results scored against their owner's rules and any project's brief.
 const selfReview = createReview({
+  enabled: () => flagEnabled("STUDIO_SELF_REVIEW"),
   writer: assistantEngine,
   text: textWriter,
   idle: galleryIdle,
