@@ -9,11 +9,14 @@ function radianceBase(model, family) {
   return {
     model,
     family: refinedFamily(familyFromName(model) || loraFamilyId(family), model),
-    accepts: Boolean(model) && !isNoct(model) && !isFastH3(model) && !/\biq8r\b/i.test(model),
+    accepts: Boolean(model) && !isFastH3(model) && !/\biq8r\b/i.test(model),
   };
 }
 
-/** Noct stays on its own base. Other non-adapter Radiance models may have a separate LoRA model. */
+/**
+ * Noct takes no optional LoRAs and stays on its own base; its profile's fixed adapters (Lightning)
+ * still run where the base takes them. Other Radiance models may have a separate LoRA model.
+ */
 export function workflowLoraBase(workflow, modelName = "") {
   const { defaults, family, graph, loraStack } = workflow;
   const node =
@@ -31,7 +34,7 @@ export function workflowLoraBase(workflow, modelName = "") {
 export function radianceLorasForBase(loras, workflow, model) {
   if (!loras?.length) return [];
   const loraBase = radianceBase(String(model || ""), workflow.family);
-  if (!loraBase.accepts || isNoct(String(workflow.defaults?.model || ""))) return [];
+  if (!loraBase.accepts) return [];
   const view = loraCatalogue().loraView();
   return loras.filter(({ name }) => {
     const file =
