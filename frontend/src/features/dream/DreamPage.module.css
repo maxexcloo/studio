@@ -51,14 +51,13 @@
 .card:active {
   cursor: grabbing;
 }
-/* Comparisons use the width wide screens give them, side by side. */
+/* A phone held sideways gives a comparison's sides its full width. */
 .card[data-pair] {
   max-width: 1200px;
 }
+/* Wider screens give single cards and comparisons one width, wide enough for sides beside each
+   other, so the card keeps its size from one to the next. */
 :where(:root:not([data-phone])) .stage > .card {
-  max-width: 64rem;
-}
-:where(:root:not([data-phone])) .stage > .card[data-pair] {
   max-width: 96rem;
 }
 .card[data-depth="1"] {
