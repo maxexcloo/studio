@@ -11,7 +11,7 @@ import { useIsMutating } from "@tanstack/react-query";
 import { ArrowUp, Image as ImageIcon, Video } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
 
-import { maxLoras } from "../../../../shared/profiles";
+import { maxLoras, slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { ClearButton } from "../../ui/ClearButton";
 import { LoadingState } from "../../ui/LoadingState";
@@ -20,7 +20,14 @@ import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
-import { primaryReference, profileForBackend, referenceDetails, usesNegative } from "./payload";
+import {
+  primaryReference,
+  profileForBackend,
+  referenceDetails,
+  runReferenceSlots,
+  splitReferenceSlots,
+  usesNegative,
+} from "./payload";
 import { type DraftChange, PromptFields, useGenerationPromptAssistant } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
@@ -78,17 +85,15 @@ export function submitBlockedReason({
     referenceCount > 0,
     input.loras.some((lora) => lora.enabled),
   );
-  const referenceMaximum = profile?.mediaInputs?.length
-    ? profile.mediaInputs.reduce((total, slot) => total + (slot.max ?? 1), 0)
-    : profile?.capabilities.startImage
-      ? 1
-      : 0;
+  const slots = runReferenceSlots(profile);
+  const supplied = references.length
+    ? referenceDetails(references, input, profile)
+    : input.referenceAssets;
+  const referenceMaximum = slotCapacity(slots);
+  const { placed, unused } = splitReferenceSlots<{ slot?: string }>(supplied, slots);
   const loraMaximum = profile?.maxLoras ?? maxLoras;
-  const requiredReference = profile?.mediaInputs?.some(
-    (slot) =>
-      slot.required &&
-      !referenceDetails(references, input, profile).some((asset) => asset.slot === slot.id) &&
-      !input.referenceAssets.some((asset) => asset.slot === slot.id),
+  const requiredReference = slots.some(
+    (slot) => slot.required && !placed.some((asset) => asset.slot === slot.id),
   );
   // A combined profile is ready when the backend this run uses is, whatever its current one is.
   const backend = profile?.backendOptions?.find(
@@ -104,15 +109,17 @@ export function submitBlockedReason({
         ? "Describe what you want to create."
         : referenceCount > referenceMaximum
           ? `This backend takes at most ${referenceMaximum} reference images. Choose another backend or remove references.`
-          : input.loras.filter((lora) => lora.enabled !== false).length > loraMaximum
-            ? `This backend takes at most ${loraMaximum} enabled LoRAs. Disable or remove LoRAs, or choose another backend.`
-            : requiredReference
-              ? "Add a reference image."
-              : uploading
-                ? "Wait for the reference upload to finish."
-                : assisting
-                  ? "Wait for the prompt assistant to finish."
-                  : undefined;
+          : unused.length
+            ? "Some references don't fit this backend's slots. Remove them or choose another backend."
+            : input.loras.filter((lora) => lora.enabled !== false).length > loraMaximum
+              ? `This backend takes at most ${loraMaximum} enabled LoRAs. Disable or remove LoRAs, or choose another backend.`
+              : requiredReference
+                ? "Add a reference image."
+                : uploading
+                  ? "Wait for the reference upload to finish."
+                  : assisting
+                    ? "Wait for the prompt assistant to finish."
+                    : undefined;
 }
 
 /** Keeps a blocked Generate focusable so its tooltip and description still explain why. */
@@ -154,7 +161,6 @@ export function GenerationEditor({
   assistantScope,
   presets,
   compare,
-  variants,
   submitLabel,
   autoFocusPrompt = false,
   focusPrompt = false,
@@ -192,8 +198,6 @@ export function GenerationEditor({
   presets?: ReactNode;
   /** The gallery composer's Compare ▾, in the generation controls. */
   compare?: ReactNode;
-  /** Which compared variant is being edited (`VariantStrip`), over the prompt. */
-  variants?: ReactNode;
   /** Names the submit in place of Generate, as a comparison's does. */
   submitLabel?: string;
   /** Lets the surrounding focus trap start in the prompt. */
@@ -256,11 +260,7 @@ export function GenerationEditor({
   const details = referenceDetails(references, input, profile);
   const primary = primaryReference(details, profile);
   const referenceProfile = profileForBackend(listedProfile, input.profileBackend, true);
-  const supportsReferences = Boolean(
-    referenceProfile?.mediaInputs?.length ||
-    referenceProfile?.capabilities?.img2img ||
-    referenceProfile?.capabilities?.imageInput,
-  );
+  const supportsReferences = runReferenceSlots(referenceProfile).length > 0;
   const inpaint = input.inpaint as
     | { assetId?: string; mask?: string; strength?: number; feather?: number }
     | undefined;
@@ -298,7 +298,7 @@ export function GenerationEditor({
       input={input}
       profile={profile}
       onChange={onChange}
-      references={supportsReferences ? referencePicker : undefined}
+      references={supportsReferences || details.length ? referencePicker : undefined}
       hasReferences={!!details.length}
       mask={mask}
       presets={presets}
@@ -327,7 +327,6 @@ export function GenerationEditor({
             </Alert>
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}
-          {variants}
           <TextToolsBar.Provider value={fill ? toolsBar : null}>
             <PromptFields
               textareaRef={prompt}

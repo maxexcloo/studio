@@ -230,6 +230,7 @@ export function GalleryChoices({
         >
           <PickerGrid
             label={`${label} Choices`}
+            fixedThumbnails
             ref={grid}
             style={{
               paddingTop: first * pitch,

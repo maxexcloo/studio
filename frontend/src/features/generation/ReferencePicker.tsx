@@ -1,4 +1,4 @@
-import { Button, ScrollArea, Stack, Text } from "@mantine/core";
+import { ActionIcon, Button, ScrollArea, Stack, Text, Tooltip } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { type ClipboardEvent, type DragEvent, useState } from "react";
 
@@ -14,14 +14,23 @@ import { useRemembered } from "../auth/useRemembered";
 import { cardSortGroups, useCardListing } from "../characters/cardListing";
 import { CharacterChoices } from "../characters/CharacterChoices";
 import { PromptCardChoices } from "../characters/PromptCardChoices";
+import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { chipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
-import { controlRange, referenceDetails, referenceGroup, referenceGroups } from "./payload";
+import {
+  controlRange,
+  referenceDetails,
+  referenceGroup,
+  runReferenceSlots,
+  splitReferenceSlots,
+} from "./payload";
 import {
   ChipContent,
   ChipPopup,
+  PickerGrid,
   PickerHeader,
+  PickerTile,
   PopupHeading,
   UploadTile,
   usePickerChoices,
@@ -111,11 +120,27 @@ export function ReferencePicker({
     referenceDetails(value || draft.references, selectedInput || draft.input, profile),
     profile,
   );
+  const slots = runReferenceSlots(profile);
+  const { placed: active, unused } = splitReferenceSlots(references, slots);
+  const preview = useMediaPreview();
+  const openPreview = (asset: ReferenceAsset) =>
+    preview.open(
+      references.map((reference, index) =>
+        pictureItem({
+          ...reference,
+          id: referenceKey(reference),
+          url: reference.url || reference.thumbnailUrl,
+          name: referenceLabel(reference, index, profile),
+        }),
+      ),
+      references.indexOf(asset),
+    );
   const [adding, setAdding] = usePickerChoices(phone && opened, !references.length);
   const placement = useReferencePlacement(list);
   // An img2img start image's Strength is the profile's denoise, where the profile maps one.
   const input = selectedInput || draft.input;
-  const startSlot = profile?.kind === "image" ? startImageSlot(profile) : undefined;
+  const startSlot =
+    profile?.kind === "image" ? startImageSlot({ ...profile, mediaInputs: slots }) : undefined;
   const denoiseRange =
     profile?.capabilities.denoise === true
       ? controlRange(profile, "denoise", { min: 0, max: 1, step: 0.05 })
@@ -141,16 +166,15 @@ export function ReferencePicker({
   const cardTab = tab !== "gallery" && tab !== "uploads" ? tab : undefined;
   const cardOrder = useCardListing("references", cardTab ?? "characters");
   const [mediaSort, setMediaSort] = useRemembered<GallerySort>("reference-media-sort", "newest");
-  const target = nextReferenceTarget(references, profile, chosen);
+  const target = slots.length ? nextReferenceTarget(active, profile, chosen) : null;
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
   const settle = () => browse({ target: null });
   // A profile taking one reference closes the picker once it is picked, saving the dismissing click.
-  const groups = referenceGroups(profile);
-  const single = groups.length === 1 && slotCapacity(groups[0]) === 1;
-  const capacity = groups.reduce((total, group) => total + slotCapacity(group), 0);
+  const capacity = slotCapacity(slots);
+  const single = capacity === 1;
   // The phone's choices return to the stack once a pick fills its chosen slot or the last free one.
   const placed = (into: ReferenceTarget | null, count: number) => {
     if (into || count >= capacity) setAdding(false);
@@ -163,7 +187,7 @@ export function ReferencePicker({
     });
   }
   function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
-    if (!files.length) return;
+    if (!target || !files.length) return;
     const before = list.get().map(referenceKey);
     void placement.uploadFiles(files, into).then(() => {
       if (!list.get().some((asset, index) => referenceKey(asset) !== before[index])) return;
@@ -226,36 +250,81 @@ export function ReferencePicker({
       dropData(event.dataTransfer);
     },
   };
-  const count = (
+  const count = capacity > 0 && (
     <Text
       span
       size="xs"
       c="dimmed"
       style={{ whiteSpace: "nowrap" }}
-      aria-label={`${references.length} of ${capacity} References`}
+      aria-label={`${active.length} of ${capacity} References`}
     >
-      {references.length}/{capacity}
+      {active.length}/{capacity}
     </Text>
   );
   // Choosing a slot opens the choices on phones.
   const stackContent = (
     <Stack component="section" aria-label="Reference Stack" gap="sm" {...fileProps}>
-      <ReferenceSlots
-        references={references}
-        profile={profile}
-        target={target}
-        onChoose={(target) => {
-          browse({ target });
-          if (phone) setAdding(true);
-        }}
-        onChange={(next) => {
-          list.set(next);
-          settle();
-        }}
-        onDrop={dropData}
-        start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
-        onStrengthChange={list.set}
-      />
+      {slots.length > 0 && (
+        <ReferenceSlots
+          references={active}
+          profile={profile}
+          target={target}
+          onChoose={(target) => {
+            browse({ target });
+            if (phone) setAdding(true);
+          }}
+          onChange={(next) => {
+            list.set([...next, ...unused]);
+            settle();
+          }}
+          onDrop={dropData}
+          onView={openPreview}
+          start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
+          onStrengthChange={(next) => list.set([...next, ...unused])}
+        />
+      )}
+      {unused.length > 0 && (
+        <Stack gap="xs" component="section" aria-label="Unused References">
+          <Text size="sm" fw={500}>
+            Not Used
+          </Text>
+          <Text size="xs" c="dimmed">
+            These images don't fit the selected profile's slots. Remove them here or choose another
+            profile.
+          </Text>
+          <PickerGrid label="Unused References" fixedThumbnails>
+            {unused.map((asset) => {
+              const label = referenceLabel(asset, references.indexOf(asset), profile);
+              return (
+                <PickerTile
+                  key={referenceKey(asset)}
+                  label={`Preview ${label}`}
+                  image={asset.thumbnailUrl || asset.url}
+                  onToggle={() => openPreview(asset)}
+                  action={
+                    <Tooltip label="Remove">
+                      <ActionIcon
+                        variant="default"
+                        aria-label={`Remove ${label}`}
+                        onClick={() =>
+                          list.set(
+                            list
+                              .get()
+                              .filter((other) => referenceKey(other) !== referenceKey(asset)),
+                          )
+                        }
+                      >
+                        <icons.clear size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  }
+                />
+              );
+            })}
+          </PickerGrid>
+        </Stack>
+      )}
+      {preview.element}
     </Stack>
   );
   // Desktop heads its column Stack and scrolls it; the phone sheet is the stack itself.
@@ -353,8 +422,9 @@ export function ReferencePicker({
           notice={
             !target && (
               <Text size="xs" c="dimmed">
-                All slots are filled. Choose a reference to replace it, or a selected image to
-                remove it.
+                {slots.length
+                  ? "All slots are filled. Choose a reference to replace it, or a selected image to remove it."
+                  : "This profile doesn't take references."}
               </Text>
             )
           }
@@ -389,15 +459,15 @@ export function ReferencePicker({
       {...chipProps}
       aria-label="Choose References"
       aria-expanded={opened}
-      color={missing ? "yellow" : undefined}
-      variant={missing ? "outline" : chipProps.variant}
+      color={missing || unused.length ? "yellow" : undefined}
+      variant={missing || unused.length ? "outline" : chipProps.variant}
       rightSection={<ChevronDown size={14} />}
       onClick={() => setOpened(!opened)}
     >
       <ChipContent
         label="References"
         icon={icons.reference}
-        items={references.map((asset, index) => ({
+        items={active.map((asset, index) => ({
           key: referenceKey(asset),
           label: referenceLabel(asset, index, profile),
           src: asset.thumbnailUrl || asset.url,
@@ -419,7 +489,7 @@ export function ReferencePicker({
         width="100%"
         opened={opened}
         onOpenedChange={setOpened}
-        trap={!layer && !adding}
+        trap={!layer && !adding && !preview.opened}
         target={trigger}
         detail={count}
         {...clear}
@@ -457,7 +527,7 @@ export function ReferencePicker({
       width="min(56rem, calc(100vw - 2rem))"
       opened={opened}
       onOpenedChange={setOpened}
-      trap={!layer}
+      trap={!layer && !preview.opened}
       target={trigger}
       aside={stack}
       {...clear}

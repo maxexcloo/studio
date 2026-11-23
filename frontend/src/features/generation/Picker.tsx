@@ -417,12 +417,14 @@ export function dragPicture(data: DataTransfer, picture: HTMLImageElement) {
 export function PickerGrid({
   label,
   rows = false,
+  fixedThumbnails = false,
   ref,
   style,
   children,
 }: {
   label: string;
   rows?: boolean;
+  fixedThumbnails?: boolean;
   ref?: Ref<HTMLDivElement>;
   style?: CSSProperties;
   children: ReactNode;
@@ -432,6 +434,7 @@ export function PickerGrid({
       ref={ref}
       className={classes.grid}
       data-rows={rows || undefined}
+      data-fixed-thumbnails={fixedThumbnails || undefined}
       role="list"
       aria-label={label}
       style={style}
