@@ -457,11 +457,19 @@ test("Clear restores profile defaults and random seed; masked inputs load as Pai
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expandComposer(page);
-  await page
-    .getByRole("group", { name: "Generation Actions", exact: true })
-    .getByRole("button", { name: "Clear", exact: true })
-    .click();
+  // Clear also returns to the account's default profile, and Undo to the one picked.
+  const profile = page.getByRole("combobox", { name: "Profile", exact: true });
+  await profile.click();
+  await page.getByRole("option", { name: /^Image Fast\b/ }).click();
+  await expect(profile).toHaveText("Image Fast");
+  const actions = page.getByRole("group", { name: "Generation Actions", exact: true });
+  await actions.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(prompt).toHaveValue("");
+  await expect(profile).toHaveText("Image Quality");
+  await actions.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(profile).toHaveText("Image Fast");
+  await actions.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(profile).toHaveText("Image Quality");
   await withSettings(page, async () => {
     await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("");
     await expect(page.getByRole("textbox", { name: "Steps", exact: true })).toHaveValue("20");
