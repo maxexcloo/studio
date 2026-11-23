@@ -5,7 +5,7 @@ import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
 import { imageAspects, resolutions } from "../../../../shared/resolution";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { useAccount, useGroupFeature } from "../auth/AccountGate";
+import { useGroupFeature } from "../auth/AccountGate";
 import { lockedByAdministrator, useDreamSettings } from "../dream/DreamSettings";
 import { dreamQuery } from "../dream/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -53,19 +53,26 @@ function DreamProcessing({ label }: { label: string }) {
           const label = kind === "images" ? "Images" : "Videos";
           const key = kind === "images" ? "imageBackend" : "videoBackend";
           const locked = data.locked.includes(key);
+          const makes = data.settings[kind];
           return (
             <SettingRow
               key={key}
               wide
               label={label}
-              description={locked ? lockedByAdministrator : "Waits for an available model."}
+              description={
+                locked
+                  ? lockedByAdministrator
+                  : makes
+                    ? "Waits for an available model."
+                    : `Dream makes no ${kind}; turn them on in Settings › Dream.`
+              }
             >
               <SegmentedControl
                 role="radiogroup"
                 aria-label={`Dream ${label}`}
                 fullWidth
                 value={data.settings[key]}
-                disabled={locked || !data.settings[kind]}
+                disabled={locked || !makes}
                 data={sides}
                 onChange={(value) => save.mutate({ [key]: value })}
               />
@@ -80,8 +87,8 @@ function DreamProcessing({ label }: { label: string }) {
 
 /** Personal processing, model and image defaults. */
 export function WhereWorkRuns() {
-  const account = useAccount().data;
   const dream = useGroupFeature("dream");
+  const cloud = useGroupFeature("cloudModels");
   const { data: status, error } = useQuery(preferencesQuery);
   const profiles = useQuery(modelsQuery).data?.profiles;
   const assistant = useQuery(assistantQuery).data;
@@ -90,11 +97,9 @@ export function WhereWorkRuns() {
     return error ? (
       <Alert color="red">{error.message}</Alert>
     ) : (
-      <LoadingState fill label="Loading Work Preferences" />
+      <LoadingState fill label="Loading Where Work Runs" />
     );
   const { preferences } = status;
-  const cloud =
-    preferences.cloudModels && (account?.mode === "single-user" || status.grants.cloudModels);
   const defaultRow = (kind: WorkKind, side: SidePreference) => {
     const key = defaultModelKeys[kind][side];
     const sideLabel = side === "cloud" ? "Cloud" : "Local";
@@ -138,7 +143,7 @@ export function WhereWorkRuns() {
       {kinds.map(({ kind, label, description }) =>
         kind === "dream" ? (
           dream && cloud && <DreamProcessing key={kind} label={label} />
-        ) : (
+        ) : kind === "text" && !assistant?.available ? null : (
           <SettingGroup key={kind} title={label}>
             {cloud && (
               <SettingRow wide label="Run On" description={description}>

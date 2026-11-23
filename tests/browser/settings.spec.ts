@@ -268,7 +268,7 @@ test("An administrator turns LoRAs and Uncensored off for itself in Preferences"
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  state.preferences.grants = { cloudModels: true, loras: true, uncensoredModels: true };
+  state.preferences.grants = { loras: true, uncensoredModels: true };
   await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Model Access", exact: true });
   await expect(models.getByRole("switch")).toHaveCount(2);
@@ -288,7 +288,6 @@ test("Where Work Runs saves each group’s processing and default models", async
   const state = await fixtures(page);
   const dream = await serveDream(page, { enabled: true });
   await signIn(page, { id: "member", role: "user" });
-  state.preferences.grants.cloudModels = true;
   state.preferences.preferences.videos = "local";
   await page.route("**/api/assistant", (route) =>
     route.fulfill({

@@ -11,7 +11,7 @@
  * and its own prompt ideas, suggestions and proposed changes are worded explicitly only with it.
  * `allModels` grants every local profile, including ones added later.
  *
- * Any account may turn the Cloud Models, LoRAs and Uncensored Models it has off for itself
+ * Any account may turn the LoRAs and Uncensored Models it has off for itself
  * (account-preferences.js); its effective features are then off everywhere they apply. For an
  * administrator this narrows only its own use: administration (profile and catalogue editing, the
  * Library) does not go through these checks.
@@ -75,7 +75,7 @@ export function normaliseAccessProfile(profile, availableProfiles = null) {
 }
 
 /** Features an account may turn off for itself, among those its role or group grants. */
-export const personalFeatures = Object.freeze(["cloudModels", "loras", "uncensoredModels"]);
+export const personalFeatures = Object.freeze(["loras", "uncensoredModels"]);
 const narrowed = (features, preferences) => ({
   ...features,
   ...Object.fromEntries(

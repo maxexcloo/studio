@@ -238,13 +238,12 @@ export async function fixtures(page: Page) {
 
   const preferences = {
     preferences: {
-      cloudModels: true,
       loras: true,
       tileCaptions: false,
       uncensoredModels: true,
     } as Record<string, unknown>,
     saved: [] as string[],
-    grants: { cloudModels: false, loras: false, uncensoredModels: false },
+    grants: { loras: false, uncensoredModels: false },
   };
 
   await page.route("**/api/**", async (route) => {
