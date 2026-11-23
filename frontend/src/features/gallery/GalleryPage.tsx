@@ -89,12 +89,19 @@ type PageState = GalleryState &
     viewFrom?: string;
   };
 type GalleryView = "gallery" | "uploads" | "comparisons" | "review";
+const loadReview = () => import("./GalleryReview");
+const loadComparisons = () => import("../compare/ComparisonList");
 const GalleryReview = lazy(() =>
-  import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
+  loadReview().then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
 const ComparisonList = lazy(() =>
-  import("../compare/ComparisonList").then(({ ComparisonList }) => ({ default: ComparisonList })),
+  loadComparisons().then(({ ComparisonList }) => ({ default: ComparisonList })),
 );
+// Review and Comparisons load once the page is idle, so opening them doesn't wait for their code.
+(window.requestIdleCallback || setTimeout)(() => {
+  void loadReview();
+  void loadComparisons();
+});
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
