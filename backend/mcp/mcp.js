@@ -73,7 +73,7 @@ const conciseError = (message) => {
   )
     return 'Unknown field "prompt". Use prompts: ["..."] (an array of finished prompts) in one generate call; count is images per prompt. Do not repeat this unchanged invalid call.';
   // An oversized set is the usual mistake; say how to split it.
-  const split = issues.some((issue) => /^(?:count|prompts): Too big/.test(issue))
+  const split = issues.some((issue) => /^(?:count|prompts): (?:Too big|Invalid input)/.test(issue))
     ? ` count is at most ${maxJobsPerCall} per prompt, and one call queues at most ${maxSplitJobs} images (prompts × count); split a bigger set into calls made one after another.`
     : "";
   return `Fix the ${match[1]} arguments: ${issues.join("; ")}.${split}`;
@@ -354,7 +354,15 @@ export function registerMcpRoutes(
         throw new Error(
           `Reference "${value.trim()}" is ambiguous: pass #${value.trim()} for that result, or an upload's id from search with uploads: true.`,
         );
-      if (!media.namesResult(value)) return media.uploads.resolve(value);
+      if (!media.namesResult(value)) {
+        const id = media.uploads.resolve(value);
+        // Said here, so a preview catches it rather than the queue refusing it later.
+        if (!media.rows.assetOwners(id).includes(owner))
+          throw new Error(
+            `Reference "${value}" isn't an image Studio knows for this chat: use an id from search with uploads: true, a result's #number, or give the user an upload_link.`,
+          );
+        return id;
+      }
       const found = await resolveOutput(value, signal);
       return (await media.resultReference(owner, found.jobId, found.index ?? 0, signal)).asset.id;
     };

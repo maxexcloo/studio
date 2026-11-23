@@ -1297,10 +1297,15 @@ test("Models and Generate follow the run's backend: its sizes, reference limit a
   assert.deepEqual(detail.controls.aspect.options, { "16:9": "1344×768" });
   assert.equal(detail.defaults.size, "1008×1344");
   // Five references are past Radiance's four slots: refused, naming the limit.
+  const uploaded = [];
+  for (let index = 0; index < 5; index++)
+    uploaded.push(
+      data(await call(client, "upload", { content_base64: png.toString("base64") })).asset.id,
+    );
   const many = await call(client, "generate", {
     profile_id: "custom:qwen",
     prompts: ["A fox"],
-    reference_asset_ids: ["asset-1", "asset-2", "asset-3", "asset-4", "asset-5"],
+    reference_asset_ids: uploaded,
   });
   assert.equal(many.isError, true);
   assert.match(texts(many), /Qwen · Fast on Radiance takes at most 4 references; pass 4 or fewer/);
@@ -3569,6 +3574,9 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   const bare = await ask(third, { reference_asset_ids: ["1"] });
   assert.equal(bare.isError, true);
   assert.match(texts(bare), /ambiguous: pass #1/);
+  // A preview already says when a reference is no image Studio knows for the chat.
+  const unknown = await ask(third, { preview: true, reference_asset_ids: ["made-up"] });
+  assert.match(texts(unknown), /"made-up" isn't an image Studio knows/);
 });
 
 test("a chat turn stops at the number of images asked for and its later calls bring new prompts", async (t) => {
