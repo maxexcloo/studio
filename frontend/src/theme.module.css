@@ -260,6 +260,11 @@
   --tab-border-color: var(--mantine-color-default-border);
 }
 
+.option[data-combobox-selected] {
+  background-color: var(--mantine-primary-color-light);
+  color: inherit;
+}
+
 /* An off switch's track stands out from dark surfaces as it does from light ones. */
 [data-mantine-color-scheme="dark"] .switchTrack {
   --switch-bg: var(--mantine-color-dark-4);

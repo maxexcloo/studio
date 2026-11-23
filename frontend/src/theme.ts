@@ -49,6 +49,8 @@ import { PopupRoot } from "./ui/PopupRoot";
 import classes from "./theme.module.css";
 
 const chevron = createElement(ChevronDown, { size: 16 });
+// The keyboard's current option takes the light selection tint, as chosen chips and segments do.
+const option = { option: classes.option };
 
 // Adapted from MantineHub's exported Shadcn theme (MIT, RubixCube Innovations).
 // https://github.com/RubixCube-Innovations/mantine-theme-builder/tree/main/src/themes/shadcn
@@ -293,8 +295,8 @@ export function studioTheme({
       }),
       // Option rows are touch targets on touch screens: Recent Prompts here, the chips' lists
       // (ComboboxPopover) next, and Select and MultiSelect below.
-      Combobox: Combobox.extend({ styles: { option: target } }),
-      ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
+      Combobox: Combobox.extend({ classNames: option, styles: { option: target } }),
+      ComboboxPopover: ComboboxPopover.extend({ classNames: option, styles: { option: target } }),
       // A drawer's content is its scroller; a full-height one is a full-screen surface.
       Divider: Divider.extend({ classNames: { root: classes.hairline } }),
       Drawer: Drawer.extend({
@@ -485,12 +487,14 @@ export function studioTheme({
       }),
       // Every control that opens a picker shows ▾, as the chips do (AGENTS.md › UI Patterns).
       MultiSelect: MultiSelect.extend({
+        classNames: option,
         defaultProps: { rightSection: chevron },
         styles: { option: target },
       }),
       // A Select without search is a button in effect: its read-only text takes no selection, so a
       // tap on a phone doesn't raise the selection or autofill bar.
       Select: Select.extend({
+        classNames: option,
         defaultProps: { checkIconPosition: "right", rightSection: chevron, autoComplete: "off" },
         styles: (_theme, props) => ({
           option: target,
