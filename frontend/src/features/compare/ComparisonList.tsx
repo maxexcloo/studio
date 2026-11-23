@@ -29,8 +29,13 @@ export function ComparisonList({ view }: { view: ReactNode }) {
       items.find((item) => item.url) ||
       items[0];
     if (!cover) return [];
+    // A run's variants are named by their labels as given, which their set titles title-case.
     const title =
-      comparison.axis || comparison.dream ? comparisonTitle(comparison) : mediaTitle(cover);
+      comparison.axis || comparison.dream
+        ? comparisonTitle(comparison)
+        : cover.resultSet?.id === comparison.id
+          ? comparison.variants.find(({ item }) => item === cover)!.label
+          : mediaTitle(cover);
     return [{ comparison, cover, title }];
   });
   const hold = useHoldToSelect(
