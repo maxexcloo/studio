@@ -478,6 +478,32 @@ test("Closing a navigated viewer reveals and focuses its current virtualised gal
   await expect(current).toBeInViewport();
 });
 
+test("The installed app opens and closes the viewer without adding history entries", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const matchMedia = window.matchMedia.bind(window);
+    window.matchMedia = (query) =>
+      query === "(display-mode: standalone)"
+        ? ({ ...matchMedia(query), matches: true } as MediaQueryList)
+        : matchMedia(query);
+  });
+  await fixtures(page);
+  await page.route("**/api/gallery?**", (route) =>
+    route.fulfill({ json: { items: results(3), nextCursor: "", hasMore: false } }),
+  );
+  await page.goto("/images");
+  const entries = await page.evaluate(() => history.length);
+  await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/images\/.+/);
+  await dialog.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/\/images$/);
+  expect(await page.evaluate(() => history.length)).toBe(entries);
+});
+
 test("Single-item viewer keyboard actions like and request deletion through the existing confirmation", async ({
   page,
 }) => {
