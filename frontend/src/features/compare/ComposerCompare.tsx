@@ -59,6 +59,7 @@ import {
   draftVariants,
   fitsComparison,
   modelInputs,
+  removeVariant,
   showVariant,
 } from "./variants";
 
@@ -345,6 +346,7 @@ export function CompareMenu({ labels }: { labels: string[] }) {
 }
 
 function VariantOverview({ labels }: { labels: string[] }) {
+  const { setDraft } = useGeneration();
   return (
     <Stack component="ol" aria-label="Variants" gap="xs" m={0} p={0}>
       {labels.map((label, index) => (
@@ -352,7 +354,17 @@ function VariantOverview({ labels }: { labels: string[] }) {
           <Badge variant="default" size="sm">
             {letter(index)}
           </Badge>
-          <Text size="sm">{label}</Text>
+          <Text size="sm" flex={1}>
+            {label}
+          </Text>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label={`Remove Variant ${letter(index)}`}
+            onClick={() => setDraft((draft) => removeVariant(draft, index))}
+          >
+            Remove
+          </Button>
         </Group>
       ))}
     </Stack>

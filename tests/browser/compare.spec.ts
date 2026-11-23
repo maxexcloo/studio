@@ -186,6 +186,13 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   await compareMenu(page, "Add Variant");
   await expectVariant(page, "D");
   await expect(prompt(page)).toHaveValue("A silver fox");
+  // Remove drops one variant; Clear drops them all.
+  const overview = await openCompare(page);
+  await overview.getByRole("button", { name: "Remove Variant D", exact: true }).click();
+  await expect(overview.getByRole("listitem")).toHaveCount(3);
+  await page.keyboard.press("Escape");
+  await expect(overview).toBeHidden();
+  await expectVariant(page, "C");
 
   // Seeds start over from the variant being edited, each run with its own seed.
   await compareMenu(page, "Clear");
