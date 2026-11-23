@@ -31,7 +31,6 @@ import { catalogueQuery } from "./queries";
 interface CatalogueItem extends LibraryItem {
   baseModel?: string;
   role?: string;
-  triggers?: string[];
   tags?: string[];
   uncensored?: boolean;
   hidden?: boolean;

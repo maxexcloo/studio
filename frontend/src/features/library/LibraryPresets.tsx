@@ -3,8 +3,8 @@ import { notifications } from "@mantine/notifications";
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord } from "../../ui/DataTable";
-import { dateFormat } from "../../ui/dates";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
+import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SelectionBar } from "../../ui/SelectionBar";
@@ -16,8 +16,9 @@ import {
   inputForProfile,
   useGeneration,
 } from "../generation/GenerationProvider";
+import { modelFamilyLabel } from "../generation/modelFamily";
 import { useOpenComposer } from "../generation/openComposer";
-import { generationInput } from "../generation/payload";
+import { generationInput, profileName } from "../generation/payload";
 import { useDeletePresets, usePresets } from "../generation/PresetPicker";
 import {
   type Preset,
@@ -26,9 +27,8 @@ import {
   presetReplacesUnsaved,
 } from "../generation/presets";
 
-const savedDate = dateFormat({ dateStyle: "medium" });
-const savedOn = (preset: Preset) =>
-  preset.savedAt ? savedDate.format(new Date(preset.savedAt)) : "";
+const kindLabels = { image: "Image", video: "Video" };
+const kindOf = (preset: Preset) => kindLabels[preset.input.kind || "image"];
 
 /**
  * Library › Presets: the account's presets with what each holds. Selecting a name loads it in Composer,
@@ -88,6 +88,18 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
     if (loading(preset).replaces) setReplacing(preset);
     else edit(preset);
   };
+  // The model a preset loads, where it holds the settings; else the family its LoRAs were chosen for.
+  const modelOf = (preset: Preset) => {
+    const profile =
+      (!preset.parts || preset.parts.includes("settings")) &&
+      profiles.find((entry) => entry.id === preset.input.profileId);
+    return profile
+      ? profileName(profile)
+      : preset.family
+        ? modelFamilyLabel(preset.family)
+        : undefined;
+  };
+  const secondary = { size: phone ? "xs" : "sm", c: phone ? "dimmed" : undefined } as const;
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -128,13 +140,19 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
       ) : (
         <DataTable
           label="Presets"
-          rows={presets.records}
+          // Sorted by name first, so the stable type sort leaves each type in name order.
+          rows={[...presets.records].sort((a, b) => compareNames(a.title, b.title))}
           rowKey={(preset) => preset.id}
           rowName={(preset) => preset.title}
           loading={presets.isPending && "Loading Presets"}
           query={query}
-          searchText={(preset) => [preset.title, presetHolds(preset)]}
-          initialSort={{ key: "name", descending: false }}
+          searchText={(preset) => [
+            preset.title,
+            kindOf(preset),
+            modelOf(preset),
+            presetHolds(preset),
+          ]}
+          initialSort={{ key: "type", descending: false }}
           empty="No Presets"
           selection={
             selection
@@ -155,6 +173,12 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           }
           columns={[
             {
+              key: "type",
+              header: "Type",
+              sortValue: kindOf,
+              cell: (preset) => <Text {...secondary}>{kindOf(preset)}</Text>,
+            },
+            {
               key: "name",
               header: "Name",
               main: true,
@@ -166,6 +190,17 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
                   onOpen={selection ? undefined : () => open(preset)}
                 />
               ),
+            },
+            {
+              key: "model",
+              header: "Model",
+              sortValue: modelOf,
+              cell: (preset) =>
+                modelOf(preset) && (
+                  <Text {...secondary} style={{ whiteSpace: "nowrap" }}>
+                    {modelOf(preset)}
+                  </Text>
+                ),
             },
             {
               key: "holds",
@@ -181,11 +216,16 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               key: "saved",
               header: "Saved",
               sortValue: (preset) => preset.savedAt,
-              cell: (preset) => (
-                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
-                  {savedOn(preset)}
-                </Text>
-              ),
+              cell: (preset) =>
+                preset.savedAt && (
+                  <Text
+                    {...secondary}
+                    title={formatDateTime(preset.savedAt)}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {formatDate(preset.savedAt)}
+                  </Text>
+                ),
             },
           ]}
           rowActions={

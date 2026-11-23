@@ -8,6 +8,7 @@ import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
+import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import {
@@ -39,6 +40,8 @@ interface GuideRow {
   name: string;
   version: number;
   aiDrafted?: boolean;
+  /** When it was last saved; empty for a seeded guide never edited. */
+  editedAt: string;
 }
 /** Which guide each profile uses: its own binding (by runtime id), else its family's for its kind. */
 interface GuideBindings {
@@ -515,6 +518,7 @@ function UsedBy({ guide, profiles = [] }: { guide: string; profiles?: string[] }
 
 /** Library › Guides: the prompting guides profiles use, under the section's toolbar; each keeps its saved versions. */
 export function GuideDefinitions({ heading }: { heading: ReactNode }) {
+  const phone = usePhone();
   const [guideQuery, setGuideQuery] = useState("");
   const [editing, setEditing] = useState<Editing | null>(null);
   const [deleting, setDeleting] = useState<Deleting | null>(null);
@@ -579,6 +583,22 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               header: "Version",
               sortValue: (entry) => entry.version,
               cell: (entry) => <Version {...entry} />,
+            },
+            {
+              key: "updated",
+              header: "Updated",
+              sortValue: (entry) => entry.editedAt,
+              cell: (entry) =>
+                entry.editedAt && (
+                  <Text
+                    size={phone ? "xs" : "sm"}
+                    c={phone ? "dimmed" : undefined}
+                    title={formatDateTime(entry.editedAt)}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {formatDate(entry.editedAt)}
+                  </Text>
+                ),
             },
           ]}
           rowActions={(entry) =>
