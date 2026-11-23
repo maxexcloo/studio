@@ -19,6 +19,10 @@ test("gallery badges use saved provenance and favour comparisons over their sour
     "From Import",
   );
   assert.equal(badge({ chat: { conversationId: "conversation" } }), "From Chat");
+  assert.equal(
+    badge({ resultSet: { id: "set", index: 0, source: "MCP", title: "A Set" } }),
+    "From MCP",
+  );
   assert.equal(badge({ dream }), "From Dream");
   assert.equal(badge({ dream: { ...dream, projectId: "project" } }), "From Project");
   assert.equal(
