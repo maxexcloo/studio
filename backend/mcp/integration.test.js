@@ -1225,8 +1225,8 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   assert.deepEqual(detail.controls.cfg, { min: 0, max: 20, default: 0 });
   assert.deepEqual(detail.controls.sampler.options, ["euler", "dpmpp_2m"]);
   assert.equal(detail.controls.scheduler, undefined, "a single scheduler is fixed");
-  assert.equal(detail.defaults.count, 2);
-  assert.equal(detail.controls.count.default, 2);
+  assert.equal(detail.defaults.count, 1);
+  assert.equal(detail.controls.count.default, 1);
   assert.equal(detail.prompting, undefined);
   await failure(client, "models", { profile_id: "another-studio-profile" });
   // A guessed id or a label finds the profile; a miss names the closest profiles in one reply.
@@ -1563,7 +1563,7 @@ test("a prompt holding generation instructions is refused with the count to pass
   assert.equal(f.submitted.at(-1).prompt, "Create two cats on a sofa");
 });
 
-test("omitted counts queue two images as one batch or one video job; a count is one image batch, or a job per video", async (t) => {
+test("omitted counts queue one image or video job; a count is one image batch, or a job per video", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   for (const profile of [imageProfile, videoProfile]) {
@@ -1574,7 +1574,7 @@ test("omitted counts queue two images as one batch or one video job; a count is 
     assert.equal(result.jobs.length, 1);
     assert.deepEqual(
       f.submitted.slice(-1).map((body) => [body.kind, body.count]),
-      [[profile.kind, profile.kind === "image" ? 2 : 1]],
+      [[profile.kind, 1]],
     );
     const pair = await generate(client, { profile_id: profile.id, count: 2 });
     const batched = profile.kind === "image";
@@ -5458,7 +5458,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
   assert.match(generate.description, /at most 30 images per call\./);
-  assert.match(generate.inputSchema.properties.count.description, /default 2 for one image prompt/);
+  assert.match(generate.inputSchema.properties.count.description, /default 1\)/);
   assert.equal(f.submitted.length, 7);
 });
 
@@ -5910,7 +5910,7 @@ test("ordinary MCP generation follows the configured default and keeps exact pro
     const { profileId, count, loras, width, height } = f.submitted.at(-1);
     return { profileId, count, loras, size: [width, height] };
   };
-  const vague = { profileId: quality.id, count: 2, loras: [], size: [1024, 1024] };
+  const vague = { profileId: quality.id, count: 1, loras: [], size: [1024, 1024] };
   assert.deepEqual(await run({}), vague);
   assert.deepEqual(await run({ profile_id: quality.id }), vague);
   assert.equal((await run({ profile_id: fast.id })).profileId, fast.id);
@@ -5920,7 +5920,7 @@ test("ordinary MCP generation follows the configured default and keeps exact pro
     quality.id,
   );
   assert.equal((await run({ tier: "quality" })).profileId, quality.id);
-  assert.equal((await run({ count: 1 })).count, 1);
+  assert.equal((await run({ count: 2 })).count, 2);
 });
 
 test("chat links open the exact result, set, turn or cumulative media view", async (t) => {
