@@ -101,7 +101,7 @@ export function ViewerDetails({
         <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
             <ViewerTitle item={item} title={title} fw={600} lineClamp={2} lh={1.2} />
-            {opened && details}
+            {details}
           </Stack>
         </ScrollArea>
       </aside>

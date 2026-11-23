@@ -71,9 +71,6 @@ export function ConvertToRadiance({
   const conversion = state.data?.conversion;
   const running = conversion?.status === "running";
   useEffect(() => {
-    if (profile) setName(suggestedName(profile.name || profile.id));
-  }, [profile]);
-  useEffect(() => {
     if (conversion?.applied)
       for (const queryKey of [definitionsKey, modelsQuery.queryKey])
         void client.invalidateQueries({ queryKey });
@@ -92,14 +89,16 @@ export function ConvertToRadiance({
     mutationFn: () => post<{ conversion: Conversion }>("/api/profiles/radiance/cancel"),
     onSuccess: (data) => client.setQueryData(radianceConversionQuery.queryKey, data),
   });
-  const close = () => {
+  // Reset as it opens, so the closing dialog keeps its contents while it fades.
+  useEffect(() => {
+    if (!profile) return;
     start.reset();
     setUrl("");
-    onClose();
-  };
+    setName(suggestedName(profile.name || profile.id));
+  }, [profile]);
   const downloading = running && conversion.stage === "download" && conversion.totalBytes;
   return (
-    <Modal opened={Boolean(profile)} onClose={close} title="Convert to Radiance">
+    <Modal opened={Boolean(profile)} onClose={onClose} title="Convert to Radiance">
       <FocusTrap.InitialFocus />
       <Stack>
         {running ? (
@@ -160,7 +159,7 @@ export function ConvertToRadiance({
         {(start.error || stop.error || state.error) && (
           <Alert color="red">{(start.error || stop.error || state.error)?.message}</Alert>
         )}
-        <DialogFooter onCancel={close}>
+        <DialogFooter onCancel={onClose}>
           {running ? (
             <Button color="red" loading={stop.isPending} onClick={() => stop.mutate()}>
               Stop Conversion

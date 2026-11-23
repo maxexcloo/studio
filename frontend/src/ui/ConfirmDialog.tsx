@@ -5,6 +5,7 @@ import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { closeWhenTop } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
+import { useLastWhileClosing } from "./useLastWhileClosing";
 import { usePhone } from "./usePhone";
 
 /** A footer's secondary action: a default button before Cancel. */
@@ -125,12 +126,14 @@ export function ConfirmDialog({
     origin.current = { element, dialog: element.closest<HTMLElement>('[role="dialog"]') };
   }
   wasOpen.current = opened;
+  // Callers often clear the record their text reads as they close.
+  const shown = useLastWhileClosing(opened ? { title, children, action, error } : null);
   return (
     <Modal
       id={id}
       opened={opened}
       onClose={closeWhenTop(id, close)}
-      title={title}
+      title={shown?.title}
       size="md"
       variant="compact"
       zIndex={zIndex}
@@ -149,12 +152,12 @@ export function ConfirmDialog({
       <FocusTrap.InitialFocus />
       <Stack>
         <Text size="sm" component="div">
-          {children}
+          {shown?.children}
         </Text>
-        {error && <Alert color="red">{error}</Alert>}
+        {shown?.error && <Alert color="red">{shown.error}</Alert>}
         <DialogFooter pending={pending} onCancel={close}>
           <Button color="red" loading={pending} disabled={disabled} onClick={onConfirm}>
-            {action}
+            {shown?.action}
           </Button>
         </DialogFooter>
       </Stack>

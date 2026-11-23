@@ -33,6 +33,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { chipProps } from "../generation/chip";
@@ -68,17 +69,19 @@ export function CardDialog({
 }) {
   const phone = usePhone();
   const id = useId();
+  // Callers clear the card their contents read as they close.
+  const shown = useLastWhileClosing(opened ? { title, children } : null);
   return (
     <Modal
       id={id}
       opened={opened}
       onClose={closeWhenTop(id, onClose)}
-      title={title}
+      title={shown?.title}
       fullScreen={phone}
       zIndex={phone ? undefined : getDefaultZIndex("overlay")}
     >
       <FocusTrap.InitialFocus />
-      {children}
+      {shown?.children}
     </Modal>
   );
 }

@@ -161,14 +161,12 @@ export function OwnAccount() {
       <PersonalMcpToken />
       <Modal opened={editing} onClose={() => setEditing(false)} title={credentialsLabel(own)}>
         <FocusTrap.InitialFocus />
-        {editing && (
-          <AccountForm
-            key={own.id}
-            account={own}
-            saved={() => setEditing(false)}
-            onCancel={() => setEditing(false)}
-          />
-        )}
+        <AccountForm
+          key={own.id}
+          account={own}
+          saved={() => setEditing(false)}
+          onCancel={() => setEditing(false)}
+        />
       </Modal>
     </Stack>
   );
