@@ -1,4 +1,4 @@
-import { Button, Group, Menu, Text } from "@mantine/core";
+import { Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { useRemembered } from "../auth/useRemembered";
@@ -305,15 +306,23 @@ export function PresetPicker({
         )
       }
     >
-      {presets.isPending ? (
-        <LoadingState label="Loading Presets" />
-      ) : (
-        presets.error && (
-          <Text c="red" size="sm">
+      <Stack mih="5rem" justify="center">
+        {presets.isPending ? (
+          <LoadingState label="Loading Presets" fill />
+        ) : presets.error ? (
+          <Text c="red" size="sm" ta="center">
             {presets.error.message}
           </Text>
-        )
-      )}
+        ) : selected ? (
+          <Text c="dimmed" size="sm" ta="center">
+            {selected.detail}
+          </Text>
+        ) : (
+          <EmptyState fill>
+            {records.length ? "Choose a Saved Preset" : "No Saved Presets"}
+          </EmptyState>
+        )}
+      </Stack>
     </ChipPopup>
   );
 }
