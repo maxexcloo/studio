@@ -147,8 +147,8 @@ export function SendButton({
 }
 
 /**
- * Suggestions as a submenu and Refresh beside it. Neither spins: Suggestions greys until it has
- * options, saying why once an answer brings none, and keeps them while Refresh asks for others.
+ * Suggestions as a submenu and Refresh beside it. Neither spins: Suggestions keeps its options
+ * while Refresh asks for others.
  */
 export function suggested(
   list: Action[],
@@ -167,21 +167,19 @@ export function suggested(
     onRefresh: () => void;
   },
 ): { action: Action; refresh: Action } {
-  const empty = !list.length;
+  // Until options arrive the list holds one greyed line: loading, or why there are none.
+  const waiting: Action = {
+    id: "suggestions-status",
+    label: answered && !loading ? failure || "No suggestions." : "Loading…",
+    disabled: true,
+  };
   return {
     action: {
       id: "suggestions",
       label: "Suggestions",
       icon: icons.assistant,
-      disabled: disabled || empty,
-      description: !empty
-        ? undefined
-        : loading
-          ? "Loading…"
-          : answered
-            ? failure || "No suggestions."
-            : undefined,
-      menu: [list],
+      disabled,
+      menu: [list.length ? list : [waiting]],
     },
     refresh: {
       id: "refresh",
@@ -271,18 +269,9 @@ export const assistMenu = ({
   return [settings, inline, tail, ...others, last];
 };
 
-/** Suggestions' options listed in place, or one greyed item saying why there are none yet. */
+/** Suggestions' options, or its greyed status line, listed in place. */
 export function suggestionItems(action: Action): Action[] {
   const ideas = action.menu?.[0] ?? [];
-  if (!ideas.length)
-    return [
-      {
-        ...action,
-        menu: undefined,
-        label: action.description ?? action.label,
-        description: undefined,
-      },
-    ];
   return action.disabled ? ideas.map((idea) => ({ ...idea, disabled: true })) : ideas;
 }
 

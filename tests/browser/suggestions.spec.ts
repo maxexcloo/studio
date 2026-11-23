@@ -189,7 +189,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const menu = await viewerChangeMenu(page);
   await expect(menu.getByRole("menuitem", { name: "Use as Character", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
-  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeDisabled();
+  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeEnabled();
   await expect(menu.getByRole("menuitem", { name: "Review Prompt", exact: true })).toHaveAttribute(
     "aria-checked",
     "false",
@@ -200,8 +200,9 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const refresh = menu.getByRole("menuitem", { name: "Refresh", exact: true });
   await expect(refresh).toBeDisabled();
   await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
-  release[0]();
   await expandAssistantMenu(menu, "Suggestions");
+  await expect(menu.getByRole("menuitem", { name: "Loading…", exact: true })).toBeDisabled();
+  release[0]();
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
   await backToActionMenu(menu);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
