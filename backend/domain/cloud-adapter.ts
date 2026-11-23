@@ -343,14 +343,24 @@ export function createCloudQueueAdapter({
       if (!state) return undefined;
       if (["saved", "failed", "cancelled"].includes(state.state)) return result(state);
       if (state.providerId) return poll(job, state);
-      if (state.outputs.length && !submitting.has(job.id))
+      if (!submitting.has(job.id))
         return result(
-          save(job, {
-            ...state,
-            state: "saved",
-            reason:
-              "Previously saved images recovered. An interrupted provider response was not resubmitted.",
-          }),
+          save(
+            job,
+            state.outputs.length
+              ? {
+                  ...state,
+                  state: "saved",
+                  reason:
+                    "Previously saved images recovered. An interrupted provider response was not resubmitted.",
+                }
+              : {
+                  ...state,
+                  state: "failed",
+                  reason:
+                    "Studio lost the provider's response, so it can't tell whether this ran. It was not submitted again; Retry runs it.",
+                },
+          ),
         );
       return {
         status: "running",
