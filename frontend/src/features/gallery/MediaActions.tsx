@@ -284,7 +284,7 @@ export function useMediaActions(
   const recreate = useRecreateAction(item, onApplied);
   const changedPrompt = draft?.changedPrompt;
   const variationPrompt = changedPrompt ?? (typedPrompt(item) || item.prompt || "");
-  // An upload has only its recorded or suggested prompt to recreate.
+  // An upload recreates on the composer's model from its prompt, suggested prompt or caption.
   const recreateAction = item.uploaded
     ? recreate
     : {
@@ -701,8 +701,6 @@ export function useMediaActions(
         onClick: rating.dislike,
       }),
     ready &&
-      !item.uploaded &&
-      item.jobId &&
       assisted &&
       itemAction("report", {
         loading: report.isPending,

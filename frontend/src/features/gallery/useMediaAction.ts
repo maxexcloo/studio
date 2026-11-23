@@ -14,7 +14,12 @@ import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { useRemembered } from "../auth/useRemembered";
-import { initialInput, modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
+import {
+  defaultProfile,
+  initialInput,
+  modelsQuery,
+  useGenerationActions,
+} from "../generation/GenerationProvider";
 import { lengthChoices } from "../generation/length";
 import { useOpenComposer } from "../generation/openComposer";
 import {
@@ -125,14 +130,15 @@ export async function mediaDraft(
   editBackend?: string,
 ) {
   // An action can run before the composer's models load.
-  const { profiles } = await client.ensureQueryData(modelsQuery);
+  const models = await client.ensureQueryData(modelsQuery);
+  const { profiles } = models;
   const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
   const priorId = String(item.settings?.profileId || "");
   const compatible = profiles.filter(
     (profile) => profile.kind === targetKind && (operation === "image" || takesReferences(profile)),
   );
   const original = compatible.find((profile) =>
-    priorId ? isProfile(profile, priorId) : profile.model === item.model,
+    priorId ? isProfile(profile, priorId) : Boolean(item.model) && profile.model === item.model,
   );
   const selected =
     profileId &&
@@ -155,19 +161,33 @@ export async function mediaDraft(
     targetKind === "video" && !retained
       ? await client.fetchQuery(animateProfileQuery(item, profileId))
       : undefined;
+  // A result made elsewhere, or on a model Studio no longer has, recreates on the account's default.
+  const fallback =
+    operation === "image" && !original ? defaultProfile(models, targetKind) : undefined;
   const profile =
     selected ||
     retained ||
     (choice && profiles.find((profile) => isProfile(profile, choice.profileId))) ||
     (operation === "refine" ? automaticEditProfile(profiles, item) : undefined) ||
     original ||
-    (operation !== "image" ? compatible.find((profile) => profile.ready !== false) : undefined);
+    fallback ||
+    compatible.find((profile) => profile.ready !== false);
   if (!profile)
     throw new Error(
       operation === "image"
-        ? "The original profile is unavailable. Choose another model."
+        ? `No ${targetKind} model is available.`
         : `No ${targetKind} model takes a reference.`,
     );
+  // Its recorded settings belong to the original model.
+  const foreign = profile === fallback;
+  // A result without a run of its own (an upload or import) gets one, so the recreation is one of
+  // its versions, with the prompt it recreates from: its own, else what it shows.
+  const start =
+    operation === "image" && !item.jobId
+      ? await post<{ sessionId: string; jobId: string; prompt: string }>("/api/gallery/recreate", {
+          galleryItemId: item.id,
+        })
+      : undefined;
   const queue = await client.fetchQuery(queueQuery);
   const source =
     queue.jobs.find((job) => job.id === item.jobId) ||
@@ -177,7 +197,7 @@ export async function mediaDraft(
           () => undefined,
         )
       : undefined);
-  const sourceSession = source?.sessionId || "";
+  const sourceSession = source?.sessionId || start?.sessionId || "";
   let asset: ReferenceAsset | undefined;
   if (operation !== "image")
     asset = (
@@ -186,10 +206,12 @@ export async function mediaDraft(
         ...(item.type === "video" ? { frame: "last" } : {}),
       })
     ).asset;
-  const saved = source?.input || item.settings || {};
+  const saved = foreign ? {} : source?.input || item.settings || {};
   // The first reference slot of the backend a run with references uses.
   const firstSlot = profileForBackend(profile, editBackend, true)?.mediaInputs?.[0]?.id || "image";
-  const recordedReferences = source?.input.referenceAssets ?? item.settings?.referenceAssets;
+  const recordedReferences = foreign
+    ? undefined
+    : (source?.input.referenceAssets ?? item.settings?.referenceAssets);
   const recordedDetails = Array.isArray(saved.referenceDetails) ? saved.referenceDetails : [];
   const restored = Array.isArray(recordedReferences)
     ? recordedReferences.map((reference) => ({ ...reference }))
@@ -233,7 +255,7 @@ export async function mediaDraft(
   const preparedReferences = asset ? [{ ...asset, slot: firstSlot }] : references;
   // A combined profile reruns on the backend that ran while the profile still has it; otherwise on
   // its current one, and the note says so.
-  const ran = String(item.settings?.profileBackend || saved.profileBackend || "");
+  const ran = foreign ? "" : String(item.settings?.profileBackend || saved.profileBackend || "");
   const rerun = operation === "image" && profile.backend && ran;
   const profileBackend =
     editBackend ??
@@ -255,7 +277,7 @@ export async function mediaDraft(
     draft: {
       sessionId: sourceSession,
       operation: (operation === "extend" ? "animate" : operation) as "image" | "refine" | "animate",
-      parentJobId: sourceSession ? item.jobId : undefined,
+      parentJobId: sourceSession ? (item.jobId ?? start?.jobId) : undefined,
       // Every run from the item records it, also outside its session, so its results stay versions.
       parentItemId: item.id,
       references: preparedReferences,
@@ -264,9 +286,11 @@ export async function mediaDraft(
         ...editProfile.defaults,
         // An edit runs the profile's reference mode, so it takes that mode's settings (a partial
         // denoise) rather than text-to-image's, which would redraw the image from scratch.
-        ...(operation === "image"
-          ? { ...source?.input, ...item.settings }
-          : editProfile.imageModes?.reference?.defaults),
+        ...(operation !== "image"
+          ? editProfile.imageModes?.reference?.defaults
+          : foreign
+            ? {}
+            : { ...source?.input, ...item.settings }),
         ...(timing ? { duration: timing.duration, frames: timing.frames, fps: timing.fps } : {}),
         kind: targetKind,
         profileId: profile.id,
@@ -276,7 +300,7 @@ export async function mediaDraft(
         modelName: undefined,
         // Reused drafts draw a new seed; only Run Again, Same Seed keeps the recorded one.
         seed: "",
-        prompt: typedPrompt(item),
+        prompt: start?.prompt ?? typedPrompt(item),
         negative: item.negative || "",
         ...(choice?.size ??
           (item.width ? { width: item.width, height: item.height || item.width } : {})),

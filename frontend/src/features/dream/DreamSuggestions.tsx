@@ -54,7 +54,7 @@ function ItemSuggestions({
     restore: () => {},
   });
   const prompt = typedPrompt(item);
-  const canAskForMore = card.kind === "dream" && item.type === "image" && Boolean(prompt.trim());
+  const canAskForMore = card.kind === "dream" && item.type === "image";
   const menuBounds = useActionMenuBounds(opened, false);
   const send = (request: string) => change.send(request, prompt);
   const suggestions = useChangeSuggestions({

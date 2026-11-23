@@ -116,7 +116,7 @@ export function ReportIssueDialog({
         : finding?.status === "unavailable"
           ? finding.reason
           : undefined));
-  const canInspect = item.type === "image" && Boolean(item.jobId);
+  const canInspect = item.type === "image";
   const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
     <Modal
