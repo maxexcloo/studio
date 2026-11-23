@@ -25,6 +25,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
           REPOSITORY: ${{ github.event.repository.name }}
+        # Bash runs with pipefail, so a failed inspect stops the run before it deletes anything unlisted.
+        shell: bash
         run: |
           # A version two weeks old goes when every tag it has is a CI candidate's (sha-, tree-), or
           # when it is untagged and no image that stays lists it (platform images, attestations).

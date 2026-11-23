@@ -57,8 +57,8 @@ export function registerDreamRoutes(
     };
   };
   /**
-   * A Dream route, for an account with Dream only. A change (mostly a verdict or a visit) that
-   * leaves the deck nearly empty starts Dream's next work now rather than at its next tick.
+   * A Dream route, for an account with Dream only. Any successful POST that leaves the deck nearly
+   * empty starts Dream's next work now rather than at its next tick.
    */
   const route = (method: string, path: string, run: RouteRun) =>
     directRoute(app, method, path, async (account, input) => {
