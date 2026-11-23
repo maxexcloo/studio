@@ -24,7 +24,7 @@ import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaJobStatus } from "./MediaJobStatus";
 import { mediaTitle } from "./mediaLabels";
-import { isTallMedia, mediaSource, playbackUrl } from "./mediaSource";
+import { mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
 import { setMembers, setPosition } from "./resultSets";
@@ -112,10 +112,19 @@ function ViewerVideo({
   const player = useRef<HTMLVideoElement>(null);
   const [controls, setControls] = useState(false);
   const [refused, setRefused] = useState(false);
+  const [silent, setSilent] = useState(false);
+  const silentFallback = useRef(false);
   const play = useCallback((media: HTMLVideoElement | null) => {
     if (!media) return;
     player.current = media;
-    const release = playVideo(media, () => setRefused(true));
+    const release = playVideo(
+      media,
+      () => setRefused(true),
+      (value) => {
+        silentFallback.current = value;
+        setSilent(value);
+      },
+    );
     return () => {
       player.current = null;
       release();
@@ -137,8 +146,15 @@ function ViewerVideo({
     <>
       <video
         ref={play}
-        muted={muted}
-        onVolumeChange={onVolumeChange}
+        muted={muted || silent}
+        onVolumeChange={(event) => {
+          if (silentFallback.current) {
+            if (event.currentTarget.muted) return;
+            silentFallback.current = false;
+            setSilent(false);
+          }
+          onVolumeChange(event);
+        }}
         onPlaying={() => setRefused(false)}
         data-media-id={id}
         src={src}
@@ -345,7 +361,7 @@ export function MediaViewer({
   const position =
     canNavigate && itemLabel
       ? itemLabel(item)
-      : item.resultSet
+      : item.resultSet && (!canNavigate || members.length > 1)
         ? setPosition(item, members)
         : canNavigate
           ? `${currentIndex + 1} / ${Math.max(total ?? 0, viewable.length)}`
@@ -594,7 +610,6 @@ export function MediaViewer({
               ref={containStage}
               className={`${classes.stage} ${classes.viewerStage}`}
               data-viewer-stage
-              data-tall={isTallMedia(source) || undefined}
               tabIndex={-1}
               onPointerDown={(event) => {
                 // The zoom library cancels mouse down to pan, so the prompt won't blur on its own.

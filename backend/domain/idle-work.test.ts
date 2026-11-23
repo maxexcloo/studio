@@ -63,6 +63,36 @@ test("overlapping wakes select from the gallery once", async () => {
   assert.deepEqual(started, ["a"]);
 });
 
+test("an interrupted completion keeps its turn ahead of the gallery walk", async () => {
+  let clock = 0;
+  const completed = { id: "completed", status: "done" };
+  const older = { id: "older", status: "done" };
+  const started: string[] = [];
+  const work = createIdleWork({
+    name: "Test work",
+    enabled: () => true,
+    unavailable: async () => "",
+    idle: () => true,
+    allowed: () => true,
+    items: () => [older],
+    visible: () => true,
+    wanted: () => true,
+    run: async (item) => {
+      started.push(item.id);
+      if (started.length === 1) work.interrupt();
+    },
+    now: () => clock,
+  });
+  work.prioritiseRecent([completed]);
+  await work.settled();
+
+  clock += 10_000;
+  assert.equal(await work.tick(), "done");
+  clock += 10_000;
+  assert.equal(await work.tick(), "done");
+  assert.deepEqual(started, ["completed", "completed", "older"]);
+});
+
 test("after a walk finds nothing, a gallery change reads only recent records until the next whole walk", async () => {
   let clock = 1_000_000_000;
   let changes = 0;

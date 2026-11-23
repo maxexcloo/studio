@@ -157,23 +157,77 @@ const motifAliases = [
   ],
 ] as const;
 
-function promptMotifs(prompt: string) {
-  return motifAliases.filter(([, pattern]) => pattern.test(prompt)).map(([motif]) => motif);
+const motifNegation =
+  /\b(?:avoid(?:ing)?|omit|exclude|no|never|without|free of|do not|don['\u2019]t|not(?! just\b| only\b))\b/i;
+const conditionalMotif = /\b(?:except|if|only|unless|when|where|while)\b/i;
+
+/** A negative list lasts to its clause boundary; keep it separate from the pictured detail. */
+function motifClauses(text: string) {
+  return text
+    .split(/[.!?;\n]+|,\s*(?=(?:he|she|they|it|someone)\b)|\b(?:but|however|yet|then)\b/gi)
+    .map((part) => {
+      const negative = motifNegation.exec(part);
+      return negative
+        ? {
+            shown: part.slice(0, negative.index),
+            excluded: part.slice(negative.index + negative[0].length),
+          }
+        : { shown: part, excluded: "" };
+    });
+}
+
+const aliasMotifs = (text: string) =>
+  motifAliases.filter(([, pattern]) => pattern.test(text)).map(([motif]) => motif);
+const shownMotifs = (clauses: string[]) => [...new Set(clauses.flatMap(aliasMotifs))];
+const promptMotifs = (prompt: string) =>
+  shownMotifs(motifClauses(prompt).map(({ shown }) => shown));
+
+export function mentionsMotif(text: string, motif: string) {
+  const alias = motifAliases.find(([name]) => name === motif)?.[1];
+  return alias?.test(text) || ` ${phraseWords(text)} `.includes(` ${motif} `);
+}
+
+/** Explicit avoids and negative rules. For unrecognised concepts use only short, literal phrases. */
+export function forbiddenMotifs(avoids: string[], rules: string[]) {
+  const exclusions = [
+    ...avoids,
+    ...rules.flatMap((rule) => motifClauses(rule).map(({ excluded }) => excluded)),
+  ];
+  return [
+    ...new Set(
+      exclusions
+        .filter((text) => !conditionalMotif.test(text))
+        .flatMap((text) =>
+          text.split(/[,;\n]+|\b(?:and|or)\b/gi).flatMap((part) => {
+            const aliases = aliasMotifs(part);
+            if (aliases.length) return aliases;
+            const phrase = phraseWords(part.replace(motifNegation, "")).replace(
+              /^(?:any|an?|the) /,
+              "",
+            );
+            return phrase && phrase.length <= 48 && phrase.split(" ").length <= 4 ? [phrase] : [];
+          }),
+        ),
+    ),
+  ];
 }
 
 export function ideaMotifs(value: unknown, prompt = "") {
+  const clauses = motifClauses(prompt);
+  const shown = clauses.map((clause) => clause.shown);
   const labels = Array.isArray(value)
     ? value
         .slice(0, 5)
         .map((motif) => phraseWords(clean(motif, 48)))
         .filter(Boolean)
+        .map((label) => aliasMotifs(label)[0] ?? label)
+        .filter(
+          (label) =>
+            shown.some((part) => mentionsMotif(part, label)) ||
+            !clauses.some(({ excluded }) => mentionsMotif(excluded, label)),
+        )
     : [];
-  return [
-    ...new Set([
-      ...promptMotifs(prompt),
-      ...labels.map((label) => promptMotifs(label)[0] ?? label),
-    ]),
-  ].slice(0, 5);
+  return [...new Set([...shownMotifs(shown), ...labels])].slice(0, 5);
 }
 
 function recurringMotifs(history: string[][]) {
@@ -186,25 +240,25 @@ function recurringMotifs(history: string[][]) {
 export function cooledMotifs(
   { motifs = [], recent }: { motifs?: string[][]; recent: string[] },
   fixed = "",
+  forbidden: string[] = [],
 ) {
-  const required = new Set<string>(promptMotifs(fixed));
-  const words = ` ${phraseWords(fixed)} `;
+  const shown = motifClauses(fixed).map((clause) => clause.shown);
   return [
     ...new Set([
       ...recurringMotifs(motifs.slice(0, motifWindow)),
       ...recurringMotifs(recent.map(promptMotifs)),
     ]),
-  ].filter((motif) => !required.has(motif) && !words.includes(` ${motif} `));
+  ].filter(
+    (motif) => forbidden.includes(motif) || !shown.some((part) => mentionsMotif(part, motif)),
+  );
 }
 
-export function repeatedMotif(
-  prompt: string,
-  cooling: string[],
-  motifs: string[] = promptMotifs(prompt),
-) {
+export function repeatedMotif(prompt: string, cooling: string[], motifs: string[] = []) {
   if (!cooling.length) return;
-  const words = ` ${phraseWords(prompt)} `;
-  return cooling.find((motif) => motifs.includes(motif) || words.includes(` ${motif} `));
+  const shown = motifClauses(prompt).map((clause) => clause.shown);
+  return cooling.find(
+    (motif) => motifs.includes(motif) || shown.some((part) => mentionsMotif(part, motif)),
+  );
 }
 
 /** Draw away from recently used anchors as well as asking for a different concept. */

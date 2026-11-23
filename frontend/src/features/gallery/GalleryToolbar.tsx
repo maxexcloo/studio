@@ -34,6 +34,7 @@ export function GalleryToolbar({
   sort,
   onSortChange,
   extraChips,
+  chipTools,
   toggles,
   count,
   actions,
@@ -46,6 +47,7 @@ export function GalleryToolbar({
   sort: GallerySort;
   onSortChange: (sort: GallerySort) => void;
   extraChips: FilterChip[];
+  chipTools?: ReactNode;
   toggles: ReactNode;
   count?: number;
   actions: ReactNode;
@@ -129,7 +131,11 @@ export function GalleryToolbar({
         {actions}
       </Group>
     );
-  const filterChips = <FilterChips chips={chips} onClear={clear} />;
+  const filterChips = (
+    <FilterChips chips={chips} onClear={clear}>
+      {chipTools}
+    </FilterChips>
+  );
   const row = (
     <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
       {phone ? (

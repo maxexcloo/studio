@@ -12,11 +12,14 @@ import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
 import {
+  chatConversation,
+  chatTurn,
   dreamArm,
   dreamPair,
   dreamProject,
   dreamState,
   galleryKey,
+  listedChatSet,
   galleryOrder as order,
   summaryFields,
 } from "../persistence/gallery-rows.ts";
@@ -148,6 +151,7 @@ function where(query = {}) {
   }
   if (query.setId) add("set_id = ?", query.setId);
   if (query.rating) add("rating = ?", query.rating);
+  if (query.unrated) add("rating IS NULL");
   if (query.status !== undefined)
     add("status IN (SELECT value FROM json_each(?))", list([query.status].flat()));
   if (query.notStatus !== undefined)
@@ -181,11 +185,8 @@ function where(query = {}) {
       String(query.ownerId),
     );
   if (query.conversationIds)
-    add(
-      "json_extract(value, '$.chat.conversationId') IN (SELECT value FROM json_each(?))",
-      list(query.conversationIds),
-    );
-  if (query.turnId) add("json_extract(value, '$.chat.turnId') = ?", String(query.turnId));
+    add(`${chatConversation} IN (SELECT value FROM json_each(?))`, list(query.conversationIds));
+  if (query.turnId) add(`${chatTurn} = ?`, String(query.turnId));
   // Words found in the row's own JSON (lowercased by SQLite, ASCII only): a cheap first pass a
   // search's filter confirms. Pending rows always pass, as searches never hide work in progress.
   if (query.contains?.length)
@@ -259,6 +260,22 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
     .map(parse);
 }
 
+/** A chat's finished visible results grouped by recorded set ID. Text comes from each latest row. */
+export function galleryChatSets(ownerId, type, { conversationId, turnId }) {
+  return statement(
+    `SELECT set_id AS id, count(*) AS count, max(gallery_ms) AS at,
+       json_extract(value, '$.resultSet.title') AS title,
+       json_extract(value, '$.resultSet.context.series') AS series,
+       coalesce(nullif(json_extract(value, '$.resultSet.context.notes'), ''),
+         json_extract(value, '$.resultSet.caption')) AS notes
+     FROM studio_gallery INDEXED BY studio_gallery_chat
+     WHERE owner_id = ? AND type = ? AND ${chatConversation} = ?
+       ${turnId ? `AND ${chatTurn} = ?` : ""}
+       AND ${listedChatSet}
+     GROUP BY set_id ORDER BY at DESC, id`,
+  ).all(ownerId, type, conversationId, ...(turnId ? [turnId] : []));
+}
+
 /** Read Dream's badge inputs without loading whole gallery records or sorting them. */
 export function unseenDreamReadiness(ownerId) {
   const query = { ownerId, dreamState: "unseen" };
@@ -292,10 +309,29 @@ const rowKey = (row) => ({
  * of the whole gallery never holds all of it.
  */
 function* galleryRows(query = {}, after = null, columns = keyColumns) {
-  // Disliked First ranks both partitions after reading them. Each batch can use the order index.
+  // Seek each partition through its index, then interleave the results by position.
   if (query.includeDisliked && query.unlisted === undefined) {
-    yield* galleryRows({ ...query, unlisted: false }, after, columns);
-    yield* galleryRows({ ...query, unlisted: true }, after, columns);
+    const listed = galleryRows({ ...query, unlisted: false }, after, columns);
+    const disliked = galleryRows({ ...query, unlisted: true }, after, columns);
+    let a = listed.next();
+    let b = disliked.next();
+    while (!a.done && !b.done) {
+      if (compareGalleryKeys(rowKey(a.value), rowKey(b.value)) <= 0) {
+        yield a.value;
+        a = listed.next();
+      } else {
+        yield b.value;
+        b = disliked.next();
+      }
+    }
+    if (!a.done) {
+      yield a.value;
+      yield* listed;
+    }
+    if (!b.done) {
+      yield b.value;
+      yield* disliked;
+    }
     return;
   }
   const base = where(query);
@@ -958,6 +994,7 @@ export function pageGallery({
   limit = 200,
   cursor = "",
   includeFailed = true,
+  includeDisliked = false,
   uploads = false,
   query = {},
   filter = null,
@@ -973,7 +1010,7 @@ export function pageGallery({
   const sql = {
     ...query,
     uploaded: uploads,
-    ...(sort === "disliked" && !rank && !query.rating
+    ...((includeDisliked || (sort === "disliked" && !rank)) && !query.rating
       ? { includeDisliked: true }
       : { unlisted: query.rating === "disliked" }),
     ...(type && { type }),
@@ -1314,6 +1351,16 @@ export function cleanupGalleryState(queue, query = {}) {
            ${scope} upscale_status = 'running' AND status IS NOT 'pending'`,
         ).all(...params, ...params);
   if (!open.length) return;
+  const jobs = new Map();
+  const jobState = (ownerId, jobId) => {
+    const key = JSON.stringify([ownerId, jobId]);
+    let state = jobs.get(key);
+    if (!state) {
+      state = { unfinished: queue.unfinished(ownerId, jobId) };
+      jobs.set(key, state);
+    }
+    return state;
+  };
   const updated = [];
   const removed = [];
   for (const row of open) {
@@ -1321,15 +1368,19 @@ export function cleanupGalleryState(queue, query = {}) {
     const ownerId = before.ownerId || "";
     let item = before;
     // An upscale whose job is no longer unfinished (or was never recorded) is not running anymore.
-    if (item.upscale?.status === "running" && !queue.unfinished(ownerId, item.upscale.jobId))
+    if (item.upscale?.status === "running" && !jobState(ownerId, item.upscale.jobId).unfinished)
       item = { ...item, upscale: { ...item.upscale, status: "cancelled", progress: null } };
-    if (item.status === "pending") {
+    if (item.status === "pending" && item.jobId) {
+      const state = jobState(ownerId, item.jobId);
       // A job still unfinished after a restart waits for recovery; a tile without one never arrives.
-      if (item.jobId && !queue.unfinished(ownerId, item.jobId))
+      if (!state.unfinished)
         item = { ...item, status: "failed", filename: "Generation interrupted" };
-      else if (item.jobId && hasGalleryItems({ ownerId, jobId: item.jobId, status: "done" })) {
-        removed.push(item);
-        continue;
+      else {
+        state.hasResults ??= hasGalleryItems({ ownerId, jobId: item.jobId, status: "done" });
+        if (state.hasResults) {
+          removed.push(item);
+          continue;
+        }
       }
     }
     if (item !== before) updated.push(item);

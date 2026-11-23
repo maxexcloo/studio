@@ -3,6 +3,7 @@ import { type Ref, memo } from "react";
 
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -235,7 +236,14 @@ export function PromptFields({
         />
         {assistant.dialog}
       </div>
-      {negative && <NegativePrompt value={input.negative} onChange={onChange} fill={fill} />}
+      {negative && (
+        <NegativePrompt
+          value={input.negative}
+          onChange={onChange}
+          fill={fill}
+          assistant={assistant.negativeTool}
+        />
+      )}
     </>
   );
 }
@@ -244,10 +252,12 @@ const NegativePrompt = memo(function NegativePrompt({
   value,
   onChange,
   fill,
+  assistant,
 }: {
   value: string;
   onChange: (patch: Partial<GenerationInput>) => void;
   fill: boolean;
+  assistant?: Action;
 }) {
   const history = usePromptHistory({
     kind: "negative",
@@ -257,7 +267,7 @@ const NegativePrompt = memo(function NegativePrompt({
   return (
     <div className={classes.negative} data-fill={fill || undefined} data-text-box="negative">
       <TextBox
-        tools={[history.action]}
+        tools={assistant ? [assistant, history.action] : [history.action]}
         popups={history.popup}
         classNames={{ input: classes.input }}
         variant="unstyled"

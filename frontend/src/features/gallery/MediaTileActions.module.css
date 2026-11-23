@@ -36,3 +36,10 @@
 :where(:root[data-phone]) .like {
   display: none;
 }
+
+@container (max-width: 13rem) {
+  .download,
+  .like {
+    display: none;
+  }
+}

@@ -109,7 +109,7 @@ export function registerResultTools({
     server,
     "search",
     "search gallery",
-    "Find gallery results by words, file name or look. Filter by rating, model, LoRA, aspect or date. Cursor pages. summary: what matches share. uploads: true finds chat attachments and other uploads by file name, as reference_asset_ids.",
+    "Find gallery results by words, file name or look. Filter by rating, model, LoRA, aspect or date. Cursor pages. summary: what matches share. uploads: true lists recent uploads as reference_asset_ids. For a chat attachment, omit query unless its filename is known.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
@@ -155,7 +155,16 @@ export function registerResultTools({
       );
       if (!hits.length)
         return {
-          content: [{ type: "text", text: "Nothing in the gallery matches." }],
+          content: [
+            {
+              type: "text",
+              text: args.uploads
+                ? args.query
+                  ? "No uploads match. Omit query to check recent uploads. If the requested image cannot be identified, use upload_link."
+                  : "No uploads match. Use upload_link to let the user send the requested photo to Studio."
+                : "Nothing in the gallery matches.",
+            },
+          ],
           structuredContent: { results: [] },
         };
       if (args.uploads) {
@@ -179,7 +188,7 @@ export function registerResultTools({
           content: [
             {
               type: "text",
-              text: `${hits.length === 1 ? "One upload" : `${hits.length} uploads`}, newest first. Pass one to generate in reference_asset_ids.\n\n${lines.join("\n")}`,
+              text: `${hits.length === 1 ? "One upload" : `${hits.length} uploads`}, newest first. Pass a confirmed match in reference_asset_ids. If the requested image cannot be identified, use upload_link.\n\n${lines.join("\n")}`,
             },
           ],
           structuredContent: { results },
@@ -472,7 +481,7 @@ export function registerResultTools({
     server,
     "upload_link",
     "upload link",
-    "One-time image upload link and reference_asset_id. Search uploads first for chat attachments.",
+    "One-time image upload link and reference_asset_id. Use if the requested photo cannot be identified in recent uploads. Wait for the user to upload before generating.",
     {},
     async () => {
       const { url, expires, reference } = media.uploads.link(owner);

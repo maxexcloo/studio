@@ -277,8 +277,8 @@ recur across features.
   separate bottom dock. A touch tap cycles through actions, actions with
   thumbnails and media alone. Hiding the chrome gives its space back to
   the media. Swipe up opens Details. Dream fullscreen keeps its verdicts
-  and opens Details on swipe up. In both viewers, media at 9:16 or
-  narrower can extend behind the header. Bottom controls have their own space.
+  and opens Details on swipe up. Both viewers fit media between the header
+  and bottom controls by default.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping
   has one owner in `gallery/versions.ts`. Viewing and upscale
@@ -288,7 +288,7 @@ recur across features.
   avoid autoplaying tile videos. Only the Dream Deck's top card plays its
   videos, in step, with sound on by default and the viewer's explicit mute
   choice remembered. A comparison plays audio from only the selected side.
-  Dream retries silently if sound blocks autoplay. Offer Play if playback still
+  Dream and the viewer retry silently if sound blocks autoplay. Offer Play if playback still
   needs a tap. Release closed players and pause playback
   when the tab hides. Heavy tools load only when opened. Paging keeps loaded
   results and offers retry on failure.

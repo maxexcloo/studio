@@ -68,7 +68,11 @@ export function usePromptIdeas({
             id: "suggestions",
             label: "Suggestions",
             icon: icons.assistant,
-            menu: [ideas.isPending ? [] : options],
+            menu: [
+              ideas.isPending && !ideas.isFetching
+                ? [{ id: "loading-suggestions", label: "Loading…", disabled: true }]
+                : options,
+            ],
             onOpen: () => load(),
           } satisfies Action,
           refresh: again,

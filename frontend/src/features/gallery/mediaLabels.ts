@@ -14,15 +14,20 @@ export function mediaTitle(item: Pick<MediaItem, "prompt" | "title" | "resultSet
   );
 }
 
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-// Made once: `toLocaleString` with options builds a formatter on every call, once per tile render.
-const timeOnly = dateFormat({ hour: "numeric", minute: "2-digit" });
-const dayAndTime = dateFormat({
-  day: "numeric",
-  month: "short",
-  hour: "numeric",
-  minute: "2-digit",
-});
+const shortDate = dateFormat({ day: "numeric", month: "short" });
+const otherYear = dateFormat({ day: "numeric", month: "short", year: "numeric" });
+const timeOnly = dateFormat({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+export function mediaTimestamp(item: Pick<MediaItem, "createdAt" | "galleryAt">, now = new Date()) {
+  const value = item.galleryAt || item.createdAt;
+  const date = value && new Date(value);
+  if (!date || Number.isNaN(date.getTime())) return;
+  const day =
+    date.toDateString() === now.toDateString()
+      ? "Today"
+      : (date.getFullYear() === now.getFullYear() ? shortDate : otherYear).format(date);
+  return { value, label: `${day}, ${timeOnly.format(date)}` };
+}
 
 const modelFile = (value: unknown) =>
   String(value || "")
@@ -56,19 +61,14 @@ export function mediaProfileName(item: MediaItem, profiles: Profile[]) {
   return names.size === 1 ? [...names][0] : "";
 }
 
-/** When it was made, its profile name and the duration for videos. */
-export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: boolean) {
+/** Its profile name and the duration for videos. */
+export function mediaDetail(item: MediaItem, profiles: Profile[]) {
   const settings = item.settings || {};
-  const created = item.createdAt ? new Date(item.createdAt) : null;
-  const time =
-    withTime && created && !Number.isNaN(created.getTime())
-      ? (sameDay(created, new Date()) ? timeOnly : dayAndTime).format(created)
-      : "";
   const name = mediaProfileName(item, profiles);
   const seconds =
     Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
   const duration = item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "";
-  return [time, name, duration].filter(Boolean).join(" · ");
+  return [name, duration].filter(Boolean).join(" · ");
 }
 
 /** The local day an item was made, as `YYYY-MM-DD`, or "" when it has no date. */
@@ -85,12 +85,6 @@ const thisYear = dateFormat({
   day: "numeric",
   month: "short",
 });
-const otherYear = dateFormat({
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
-
 /** A day heading for a `mediaDay` key: Today, Yesterday, then the date. */
 export function dayHeading(day: string, now = new Date()) {
   const [year, month, date] = day.split("-").map(Number);
