@@ -52,7 +52,7 @@ export function MediaTileActions({
             {(["like", "dislike"] as const).map((id) => {
               const pressed = item.rating === (id === "like" ? "liked" : "disliked");
               const Icon = icons[id];
-              const label = ratingLabel(id, pressed);
+              const label = ratingLabel(id);
               return (
                 <Tooltip key={id} label={label}>
                   <ActionIcon

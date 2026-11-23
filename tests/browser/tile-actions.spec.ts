@@ -83,23 +83,21 @@ test("A tile can be liked and read back without opening the viewer", async ({ pa
   await expect(
     page.getByRole("button", { name: "Dislike Copper Bird", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Like Copper Bird", exact: true }).click();
-  const liked = page.getByRole("button", { name: "Unlike Copper Bird", exact: true });
-  await expect(liked).toHaveAttribute("aria-pressed", "true");
+  const like = page.getByRole("button", { name: "Like Copper Bird", exact: true });
+  await like.click();
+  await expect(like).toHaveAttribute("aria-pressed", "true");
   if (!testInfo.project.use.isMobile) {
     await page.mouse.move(0, 0);
-    await expect(liked).toHaveCSS("opacity", "0");
+    await expect(like).toHaveCSS("opacity", "0");
   }
   await expect.poll(() => state.gallery[0].rating).toBe("liked");
   await expect(page).toHaveURL(/\/images$/);
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.reload();
-  await expect(liked).toBeVisible();
+  await expect(like).toHaveAttribute("aria-pressed", "true");
 });
 
-test("Dislike hides a tile, Disliked shows it and Undo Dislike brings it back", async ({
-  page,
-}) => {
+test("Dislike hides a tile, and can be cleared from the Disliked filter", async ({ page }) => {
   const state = await galleryFixture(page);
   const select = async () => {
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
@@ -118,7 +116,7 @@ test("Dislike hides a tile, Disliked shows it and Undo Dislike brings it back", 
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
-  await selectionAction(page, "Undo Dislike").click();
+  await selectionAction(page, "Dislike").click();
   await expect(tile).toBeHidden();
   await expect.poll(() => state.gallery[0].rating).toBeUndefined();
   await page.getByRole("button", { name: "Remove Disliked Filter", exact: true }).click();
