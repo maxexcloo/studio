@@ -54,10 +54,15 @@ test("Returning to Gallery offers a jump only after an image arrives while away"
   await jump.click();
   await expect(page.getByRole("button", { name: "Open image: New Bird" })).toBeInViewport();
   await expect(jump).toBeHidden();
-  await page.getByRole("button", { name: "Review Gallery" }).click();
-  const deck = page.getByRole("dialog", { name: "Review Gallery" });
-  await deck.getByRole("combobox", { name: "Review Time" }).click();
-  await page.getByRole("option", { name: "New Since Last Gallery Visit" }).click();
+  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await expect(page).toHaveURL(/\/images\/review$/);
+  const deck = page.getByRole("region", { name: "Review", exact: true });
+  await deck.getByRole("button", { name: "Review Filters" }).click();
+  await page
+    .getByRole("radiogroup", { name: "Time", exact: true })
+    .getByText("New Since Last Gallery Visit", { exact: true })
+    .click();
+  await page.keyboard.press("Escape");
   await expect(deck.getByText("New Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Old Bird", { exact: true })).toBeHidden();
 });
@@ -75,10 +80,10 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await page.goto("/images");
   const search = await toolbarSearch(page);
   await search.fill("Bird");
-  const review = page.getByRole("button", { name: "Review Gallery" });
+  const review = page.getByRole("link", { name: "Review", exact: true });
   await expect(page.getByRole("button", { name: "Open image: Summer Harbour" })).toBeHidden();
   await review.click();
-  const deck = page.getByRole("dialog", { name: "Review Gallery" });
+  const deck = page.getByRole("region", { name: "Review", exact: true });
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect.poll(() => state.gallery.find(({ id }) => id === "first")?.rating).toBe("liked");
@@ -88,13 +93,20 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await expect(deck.getByText("No Unrated Results")).toBeVisible();
   await deck.getByRole("button", { name: "Undo" }).click();
   await expect(deck.getByText("Bird at Sea", { exact: true })).toBeVisible();
-  await deck.getByRole("combobox", { name: "Review Rating" }).click();
-  await page.getByRole("option", { name: "Liked", exact: true }).click();
-  await deck.getByRole("combobox", { name: "Review Time" }).click();
-  await page.getByRole("option", { name: "Last 24 Hours", exact: true }).click();
+  await deck.getByRole("button", { name: "Review Filters" }).click();
+  await page
+    .getByRole("radiogroup", { name: "Rating", exact: true })
+    .getByText("Liked", { exact: true })
+    .click();
+  await page
+    .getByRole("radiogroup", { name: "Time", exact: true })
+    .getByText("Last 24 Hours", { exact: true })
+    .click();
+  await page.keyboard.press("Escape");
   await expect(deck.getByText("Common Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeHidden();
-  await page.keyboard.press("Escape");
+  await deck.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page).toHaveURL(/\/images$/);
   await expect(deck).toBeHidden();
   await expect(search).toHaveValue("Bird");
 });
@@ -121,8 +133,8 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
     });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Review Gallery", exact: true }).click();
-  const deck = page.getByRole("dialog", { name: "Review Gallery", exact: true });
+  await page.getByRole("link", { name: "Review", exact: true }).click();
+  const deck = page.getByRole("region", { name: "Review", exact: true });
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
   const chosen = page.waitForRequest(
@@ -135,4 +147,19 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
     request: "change the light",
   });
   expect(asked).toEqual(["bird"]);
+});
+
+test("Opening Video Review directly returns to the video gallery", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(result("image", "Still Bird"), {
+    ...result("video", "Flying Bird"),
+    type: "video",
+  });
+  await page.goto("/videos/review");
+  const deck = page.getByRole("region", { name: "Review", exact: true });
+  await expect(deck.getByText("Flying Bird", { exact: true })).toBeVisible();
+  await expect(deck.getByText("Still Bird", { exact: true })).toBeHidden();
+  await deck.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page).toHaveURL(/\/videos$/);
+  await expect(page.getByRole("button", { name: "Open video: Flying Bird" })).toBeVisible();
 });

@@ -7,6 +7,7 @@ export const viewerItemId = (item: { id: string; number?: number }) =>
 export const isResultNumber = (id: string) => /^[1-9]\d{0,8}$/.test(id);
 
 export const galleryPath = (kind: MediaKind) => (kind === "video" ? "/videos" : "/images");
+export const galleryReviewPath = (kind: MediaKind) => `${galleryPath(kind)}/review`;
 
 /** The gallery a path shows, with or without an item in its viewer. */
 export const galleryKind = (pathname: string): MediaKind | undefined =>
@@ -16,11 +17,17 @@ export const galleryKind = (pathname: string): MediaKind | undefined =>
       ? "video"
       : undefined;
 
+export const isGalleryReviewPath = (pathname: string) => {
+  const kind = galleryKind(pathname);
+  return kind !== undefined && pathname.replace(/\/$/, "") === galleryReviewPath(kind);
+};
+
 /**
  * The item a gallery path names, or "". Read from the path itself: React Router's params turn a
  * literal "%2F" into "/", and a generated item's ID is its media URL, whose subfolder has one.
  */
 export const viewerPathId = (pathname: string) => {
+  if (isGalleryReviewPath(pathname)) return "";
   const segment = /^\/(?:images|videos)\/([^/]+)/.exec(pathname)?.[1] || "";
   try {
     return decodeURIComponent(segment);
