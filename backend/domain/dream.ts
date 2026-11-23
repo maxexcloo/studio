@@ -55,10 +55,12 @@ import { resolveImageMode, runProfile } from "../workflow-modes.js";
 import { promptInstruction } from "./../prompt-instructions.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import {
+  boilerplate,
   clean,
   cooledMotifs,
   direction,
   diversity,
+  fashionableLooks,
   forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
@@ -68,6 +70,7 @@ import {
   namedMotif,
   normalised,
   phraseWords,
+  promptBody,
   recentPromptCharacters,
   repeatedMotif,
   similarPrompt,
@@ -171,6 +174,8 @@ type DreamQuery = {
   dreamArm?: string | string[];
   dreamProject?: string;
   notDreamArm?: string;
+  /** Leaves out every Dream result. */
+  notDream?: true;
   dreamPair?: false;
   dreamPassReason?: DreamPassReason;
   dreamDecidedSince?: string;
@@ -509,9 +514,18 @@ const usedLimit = 500;
 const recentIdeas = 100;
 /** The writer avoids this many of the latest disliked subjects. */
 const avoidDislikes = 8;
-/** The writer sees this many recent subjects, and this many recent prompts cut to this length. */
+/**
+ * The writer sees this many recent subjects, and this many recent prompts, without their shared
+ * style clause, cut to this length.
+ */
 const writerSubjects = 30;
-const writerPrompts = { count: 10, characters: 200 };
+const writerPrompts = { count: 10, characters: 500 };
+/**
+ * Each new idea sees a few of the taste profile's likes and one of its styles, drawn afresh, so
+ * no idea works through the whole profile as a checklist; and a few of the account's own liked
+ * prompts from outside Dream, cut to this length.
+ */
+const tasteDraw = { likes: [2, 3], styles: 1, prompts: [4, 6], characters: 600 };
 /** Profiles and LoRAs weigh by their keep rate over this many of the latest judged Dream images. */
 const judgedRates = 200;
 /** Dream revisits a concept only once it is liked more than twice. */
@@ -1690,13 +1704,21 @@ export function createDream(options: {
       .filter(Boolean)
       .slice(0, 6);
   }
-  /** A few liked prompts from the account's whole history, sampled so each idea sees different ones. */
+  /**
+   * A few prompts the account liked outside Dream, from its whole history, sampled so each idea
+   * sees different ones: Dream's own results would only echo its past ideas.
+   */
   async function tastePrompts(ownerId: string) {
-    return (await readyGenerations(ownerId, { rating: "liked", sample: seedSample }))
+    const [least, most] = tasteDraw.prompts;
+    return (
+      await readyGenerations(ownerId, { rating: "liked", notDream: true, sample: seedSample })
+    )
       .filter((item) => item.prompt)
-      .slice(0, 3 + random(3))
-      .map((item) => clean(item.prompt, 300));
+      .slice(0, least + random(most - least + 1))
+      .map((item) => clean(item.prompt, tasteDraw.characters));
   }
+  /** `count` entries drawn at random, or all where there are no more. */
+  const sampled = <T>(entries: T[], count: number) => shuffled(entries).slice(0, count);
   /** Consecutive failed writes per account, and when Dream may try that account again. */
   const failures = new Map<string, { count: number; until: number }>();
   /**
@@ -1814,10 +1836,13 @@ export function createDream(options: {
       [...rules, project?.brief.rules ?? ""],
       true,
     );
+    const [fewest, most] = tasteDraw.likes;
+    const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
+    const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
-      ...(likes.length ? [`Likes: ${likes.join(", ")}`] : []),
-      ...(styles.length ? [`Preferred Styles: ${styles.join(", ")}`] : []),
+      ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
+      ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),
     ];
     const rulesRule = rules.length
       ? [
@@ -1865,6 +1890,9 @@ export function createDream(options: {
     const similar = like ? [] : similarPasses(ownerId);
     const paused = pausedMotifs(similar);
     const cooling = newConcept ? cooledMotifs(record, fixed, forbidden, paused) : [];
+    // A project's brief may set its look, so only other ideas cool what is in fashion.
+    const fashionable = newConcept && !brief.length ? fashionableLooks(recent, fixed) : [];
+    const common = boilerplate(recent);
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}. ${language}`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
@@ -1986,6 +2014,7 @@ export function createDream(options: {
             Boolean(likes.length || styles.length || liked.length),
             random,
             Boolean(brief.length),
+            [...forbidden, ...forbiddenMotifs(avoid, [], true)],
           );
       drawnAnchors = concept?.anchors || [];
       noveltyPrompts.push(...liked);
@@ -2057,12 +2086,21 @@ export function createDream(options: {
                   "Recent prompts: avoid their underlying concepts, even with different wording:",
                   ...recent
                     .slice(0, writerPrompts.count)
-                    .map((prompt) => `- ${clean(prompt, writerPrompts.characters)}`),
+                    .map(
+                      (prompt) =>
+                        `- ${clean(promptBody(prompt, common), writerPrompts.characters)}`,
+                    ),
                 ]
               : []),
             ...(cooling.length
               ? [`Recently repeated optional motifs to leave out this time: ${cooling.join(", ")}.`]
               : []),
+            ...(fashionable.length
+              ? [
+                  `Colors, garments, light and expressions many recent ideas share; pick others this time: ${fashionable.join(", ")}.`,
+                ]
+              : []),
+            ...(concept?.vary ? [`Change first this time: ${concept.vary}.`] : []),
             ...(passed.length
               ? ["Disliked subjects to avoid:", ...passed.map((subject) => `- ${subject}`)]
               : []),
@@ -2087,7 +2125,7 @@ export function createDream(options: {
         },
       ];
     }
-    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed);
+    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed, fashionable);
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
