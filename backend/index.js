@@ -833,13 +833,19 @@ registerCompareRoutes(app, {
     }
     return recordsForRequest(items, req);
   },
-  dreamSides: (req) =>
-    galleryItems({
+  dreamSides: (req, limit) => {
+    // A pair has at most three sides; one cut off by the read is left out.
+    const max = limit && limit * 3;
+    const sides = galleryItems({
       ownerId: ownerIdForRequest(req),
       type: "image",
       dreamState: ["kept", "discarded"],
       dreamPair: true,
-    }).filter(hasGalleryMedia),
+      limit: max,
+    });
+    const cut = sides.length === max && sides.at(-1).dream.pair.id;
+    return sides.filter((item) => hasGalleryMedia(item) && item.dream.pair.id !== cut);
+  },
   pendingItems: makePendingItems,
   numbered: (items) => resultNumbers.numbered(items),
   voted: (ownerId, image, others) => {
@@ -1286,6 +1292,7 @@ const enricher = createEnricher({
   text: textWriter,
   image: smallImage,
   save: (item, enriched) => updateGalleryJob(galleryKey(item), enriched),
+  failed: (reason) => logWarning(`Couldn't enrich a new result: ${reason}`),
 });
 /** New results' Background AI: one read each, then titles and captions it left to their own work. */
 async function enrichCompleted(items) {

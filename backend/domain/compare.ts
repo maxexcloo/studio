@@ -90,8 +90,11 @@ export function registerCompareRoutes(
     /** The caller's visible gallery, or `null` when the account may not use the gallery. */
     gallery(req: Request, ids: ComparisonIds): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
-    /** The sides of the caller's answered Dream comparisons. */
-    dreamSides(req: Request): GalleryItem[];
+    /**
+     * The sides of the caller's answered Dream comparisons; with `limit`, those of at least the
+     * newest that many.
+     */
+    dreamSides(req: Request, limit?: number): GalleryItem[];
     /** The variants' items with their result numbers. */
     numbered(items: GalleryItem[]): GalleryItem[];
     /** Hears the winning image and other finished variants, for the taste profile; must not throw. */
@@ -291,7 +294,7 @@ export function registerCompareRoutes(
                   ...records.map((record) => show(record, items)),
                   ...dreamComparisons(
                     account?.userId || "",
-                    options.dreamSides({ studioAccount: account ?? undefined, params: {} }),
+                    options.dreamSides({ studioAccount: account ?? undefined, params: {} }, 100),
                   ),
                 ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       },

@@ -126,10 +126,6 @@ export function createImportStore({
     get,
     put,
     remove,
-    reload: () => {
-      index = null;
-      return load();
-    },
   };
 }
 
