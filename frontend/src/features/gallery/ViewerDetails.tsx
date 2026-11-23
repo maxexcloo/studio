@@ -4,8 +4,9 @@ import { type ReactNode, useId } from "react";
 import type { MediaItem } from "../../types";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { useSwipeClose } from "../../ui/useSwipeClose";
-import { MediaDetails, MediaDetailsMetadata } from "./MediaDetails";
+import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
+import { ViewerMetadata } from "./ViewerChrome";
 
 import classes from "./MediaViewer.module.css";
 
@@ -74,7 +75,7 @@ export function ViewerDetails({
                   {title}
                 </Text>
               </Drawer.Title>
-              <MediaDetailsMetadata item={item} />
+              <ViewerMetadata item={item} />
             </Stack>
             <Drawer.CloseButton aria-label="Close Details" />
           </Drawer.Header>
@@ -105,7 +106,7 @@ export function ViewerDetails({
               <Text fw={600} lineClamp={2} lh={1.2}>
                 {title}
               </Text>
-              <MediaDetailsMetadata item={item} />
+              <ViewerMetadata item={item} />
             </Stack>
             {opened && details}
           </Stack>

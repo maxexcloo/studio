@@ -6,8 +6,49 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { mediaProfileName, mediaTimestamp, mediaTitle } from "./mediaLabels";
+import { mediaSource } from "./mediaSource";
 
 import classes from "./MediaViewer.module.css";
+
+export function ViewerMetadata({ item, compact }: { item: MediaItem; compact?: boolean }) {
+  const { profiles } = useGenerationActions();
+  const model = mediaProfileName(item, profiles);
+  const { width, height } = mediaSource(item);
+  const timestamp = mediaTimestamp(item);
+  const settings = item.settings || {};
+  const steps = Number(settings.steps);
+  const stepLabel = steps > 0 && !/\b\d+\s+steps?\b/i.test(model) ? `${steps} Steps` : "";
+  const seconds = Number(settings.duration) || Number(settings.frames) / Number(settings.fps);
+  const sizeAndDuration = [
+    width && height ? `${width} × ${height}` : "",
+    item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10}s` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <>
+      {(model || stepLabel) && (
+        <Text
+          size="xs"
+          lh={1.25}
+          lineClamp={compact ? 1 : 2}
+          title={[model, stepLabel].filter(Boolean).join(" · ")}
+        >
+          {model && <span>{model}</span>}
+          {model && stepLabel && " · "}
+          {stepLabel}
+        </Text>
+      )}
+      {(timestamp || sizeAndDuration) && (
+        <Text size="xs" c="dimmed" lh={1.25}>
+          {timestamp && <time dateTime={timestamp.value}>{timestamp.label}</time>}
+          {timestamp && sizeAndDuration && " · "}
+          {sizeAndDuration}
+        </Text>
+      )}
+    </>
+  );
+}
 
 export function ViewerChrome({
   item,
@@ -28,11 +69,8 @@ export function ViewerChrome({
   details?: { opened: boolean; phone: boolean; toggle: () => void };
   focusClose?: boolean;
 }) {
-  const { profiles } = useGenerationActions();
   if (hidden) return null;
   const title = item && mediaTitle(item);
-  const model = item && mediaProfileName(item, profiles);
-  const timestamp = item && mediaTimestamp(item);
   return (
     <Group
       className={classes.topBar}
@@ -45,35 +83,12 @@ export function ViewerChrome({
       onClick={(event) => event.stopPropagation()}
     >
       <Group gap={6} wrap="nowrap" miw={0}>
-        {title && (
+        {item && (
           <Paper withBorder radius="md" px="sm" py={4} miw={0}>
             <Text size="sm" fw={500} truncate title={title}>
               {title}
             </Text>
-            {(model || timestamp) && (
-              <Group gap={6} wrap="nowrap">
-                {model && (
-                  <Text size="xs" truncate title={model} miw={0}>
-                    {model}
-                  </Text>
-                )}
-                {model && timestamp && (
-                  <Text size="xs" c="dimmed" aria-hidden>
-                    ·
-                  </Text>
-                )}
-                {timestamp && (
-                  <Text
-                    component="time"
-                    size="xs"
-                    dateTime={timestamp.value}
-                    style={{ flexShrink: 0 }}
-                  >
-                    {timestamp.label}
-                  </Text>
-                )}
-              </Group>
-            )}
+            <ViewerMetadata item={item} compact />
           </Paper>
         )}
         {label}

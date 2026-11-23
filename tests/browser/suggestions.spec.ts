@@ -180,10 +180,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const menu = await viewerChangeMenu(page);
   await expect(menu.getByRole("menuitem", { name: "Use as Character", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
-  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
+  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeDisabled();
   await expect(menu.getByRole("menuitem", { name: "Review Prompt", exact: true })).toHaveAttribute(
     "aria-checked",
     "false",
@@ -196,8 +193,8 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await expect(thinking).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toHaveCount(0);
   await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
-  await expandAssistantMenu(menu, "Suggestions");
   release[0]();
+  await expandAssistantMenu(menu, "Suggestions");
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
   await backToActionMenu(menu);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
@@ -487,10 +484,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await expect(menu).toBeHidden();
   menu = await viewerChangeMenu(page, "Recreate");
   await expect(review()).toHaveAttribute("aria-checked", "false");
-  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
+  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeEnabled();
   await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Compare in Composer");
   await expect(menu.getByRole("menuitem").last()).toHaveText("Recreate in Composer");
   await expandAssistantMenu(menu, "Suggestions");

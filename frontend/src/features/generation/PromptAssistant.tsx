@@ -320,7 +320,7 @@ export function usePromptAssistant({
     });
   }
   if (!info?.available || !profile || !info.presets.length)
-    return { working: undefined, dialog: null, suggestions: null };
+    return { working: undefined, dialog: null };
   const disabled = !input.prompt.trim();
   const run = (action: Action, style?: string) => {
     if (style) setPresetId(style);
@@ -347,14 +347,9 @@ export function usePromptAssistant({
         },
       ]
     : [];
-  const more: ToolAction[] = [
-    ...(lorasOffered
-      ? [{ id: "loras", label: "Suggest LoRAs", disabled, onClick: () => run("loras") }]
-      : []),
-    ...(negativeOffered
-      ? [{ id: "negative", label: "Write Negative", disabled, onClick: () => run("negative") }]
-      : []),
-  ];
+  const more: ToolAction[] = negativeOffered
+    ? [{ id: "negative", label: "Write Negative", disabled, onClick: () => run("negative") }]
+    : [];
   const working = change?.pending
     ? "Asking for a Change…"
     : assistance.isPending && assistance.variables
@@ -410,8 +405,6 @@ export function usePromptAssistant({
               variant="default"
               disabled={added || assistance.isPending}
               aria-label={`Apply ${item.title || item.name}`}
-              // The text keeps focus, so the phone sheet's typing layout stays put under the press.
-              onMouseDown={(event) => event.preventDefault()}
               onClick={() => apply(item)}
             >
               {added ? "Added" : "Apply"}
@@ -430,16 +423,17 @@ export function usePromptAssistant({
         id: "negative-assistant",
         label: "Improve Negative Prompt",
         icon: icons.assistant,
+        onOpen: () => {
+          if (!disabled && preview === undefined && !assistance.isPending) loadNegative();
+        },
         menu: [
           [
             {
               id: "negative-suggestions",
               label: "Suggestions",
               icon: icons.assistant,
-              disabled,
-              onOpen: () => {
-                if (!preview && !assistance.isPending) loadNegative();
-              },
+              disabled: disabled || negativeLoading,
+              loading: negativeLoading,
               menu: [
                 [
                   negativeLoading || (preview === undefined && !negativeFailed)
@@ -460,6 +454,7 @@ export function usePromptAssistant({
               label: "Refresh",
               icon: icons.refresh,
               disabled: disabled || assistance.isPending,
+              loading: negativeLoading,
               keepOpen: true,
               onClick: loadNegative,
             },
@@ -474,7 +469,14 @@ export function usePromptAssistant({
     stop,
     working,
     dialog,
-    suggestions: list,
+    loraSuggestions: lorasOffered
+      ? {
+          disabled: disabled || assistance.isPending || change?.pending,
+          loading: assistance.isPending && assistance.variables?.action === "loras",
+          onClick: () => run("loras"),
+          list,
+        }
+      : undefined,
     negativeTool,
   };
 }

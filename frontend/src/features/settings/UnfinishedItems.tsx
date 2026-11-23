@@ -10,7 +10,6 @@ import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { ToolbarAction } from "../../ui/SectionToolbar";
-import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -22,7 +21,6 @@ const unfinishedQuery = queryOptions({
   queryKey: ["unfinished-jobs"],
   queryFn: () => api<{ jobs: UnfinishedJob[] }>("/api/maintenance/unfinished"),
 });
-const count = (value: number) => value.toLocaleString();
 // Every listed job at once; Retry All runs straight away, the others confirm first.
 const bulk = {
   "retry-all": { label: "Retry All", icon: icons.retry },
@@ -40,31 +38,6 @@ const bulk = {
   },
 } as const;
 type Bulk = keyof typeof bulk;
-
-export function UnfinishedItemsRow({ onOpen }: { onOpen: () => void }) {
-  const unfinished = useQuery({ ...unfinishedQuery, refetchInterval: 60_000 });
-  const jobs = unfinished.data?.jobs || [];
-  return (
-    <SettingRow
-      label="Unfinished Items"
-      description={[
-        "Unfinished generations from every account, to retry, stop or clear stuck ones.",
-        unfinished.data && `${count(jobs.length)} now.`,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <Button
-        size="compact-sm"
-        variant="default"
-        leftSection={<icons.unfinished size={16} />}
-        onClick={onOpen}
-      >
-        Review
-      </Button>
-    </SettingRow>
-  );
-}
 
 /** Administrators can retry, stop or clear unfinished generations from any account. */
 export function UnfinishedItems({ opened, onClose }: { opened: boolean; onClose: () => void }) {

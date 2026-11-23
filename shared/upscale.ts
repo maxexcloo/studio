@@ -43,17 +43,3 @@ export interface UpscaleResponse {
   };
   revision: number;
 }
-
-/** One account's Finish Liked Images settings (`/api/finishing`). It is off until turned on. */
-export interface FinishingSettings {
-  enabled: boolean;
-  quality: UpscaleQuality;
-  /** Adds face detail where the prompt shows a full-body person. */
-  faceDetail: boolean;
-}
-
-export interface FinishingStatus {
-  settings: FinishingSettings;
-  /** Liked images waiting to be finished. */
-  waiting: number;
-}

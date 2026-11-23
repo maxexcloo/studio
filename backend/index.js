@@ -71,7 +71,6 @@ import { registerDreamRoutes } from "./domain/dream-routes.ts";
 import { createDream } from "./domain/dream.ts";
 import { createFaceCheck } from "./domain/face-check.ts";
 import { createFaceRedo } from "./domain/face-redo.ts";
-import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { createInbox } from "./domain/inbox.ts";
@@ -157,7 +156,6 @@ import { recommendedNegative } from "./lora/prompts.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
-import { fullBodyPerson } from "./mcp/prompt-checks.js";
 import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
 import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
@@ -659,16 +657,6 @@ const taste = createTaste({
 const itemsRated = (ownerId, items, issue = "", strict = false) => {
   dream.rated(ownerId, items);
   const liked = items.filter((item) => item.rating === "liked");
-  finishing.liked(
-    ownerId,
-    liked.map((item) => item.id),
-    true,
-  );
-  finishing.liked(
-    ownerId,
-    items.filter((item) => item.was === "liked").map((item) => item.id),
-    false,
-  );
   const undone = { liked: "unlike", disliked: "undislike" };
   const done = { liked: "like", disliked: issue ? "report" : "dislike" };
   taste.record(
@@ -691,14 +679,13 @@ const itemsRated = (ownerId, items, issue = "", strict = false) => {
     strict,
   );
 };
-// A manual or chat iteration teaches taste. Foreground work makes a waiting finishing upscale step aside.
+// A manual or chat iteration teaches taste.
 // Animating one of the account's photos, from the app or MCP but not Dream, likes that photo.
 const jobAdmitted = (job) => {
   if (job.priority !== queuePriority.dream && (job.parentJobId || job.parentItemId))
     taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
   const photo = job.priority === queuePriority.dream ? null : animatedPhoto(job);
   if (photo) itemsRated(job.ownerId, setGalleryRatings([photo.id], "liked"));
-  finishing.admitted(job);
   captioner.interrupt();
   selfReview.interrupt();
   imageSearch.interrupt();
@@ -763,12 +750,14 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
+    const images = items.filter((item) => item.type === "image");
+    if (images.length) captioner.prioritiseRecent(images);
     nextSteps.prioritiseRecent(items);
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
+  dream: () => dream,
   dreamImageSwitchMinutes: () => dreamTimingMinutes("imageSwitchMinutes"),
-  dreamIdleWait: (job) => dream.idleWaitForJob(job),
   generationRoutes,
   promptStage,
   recoverRunningJobs,
@@ -1091,7 +1080,7 @@ const inbox = createInbox({
   taste,
   issues: (ownerId) => issues.read(ownerId).issues,
   writer: assistantEngine,
-  text: textWriter,
+  text: dream.text,
   online: textOnline,
   cards: accountCards,
   createCard,
@@ -1108,32 +1097,10 @@ registerDreamRoutes(app, {
   inbox,
   listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });
-// Idle for background work: no live job but Dream's. Dream yields to all of it, so review,
-// captions and finishing don't wait for Dream to reach its caps.
+// Dream yields to idle background work, so review and captions can run before it reaches its caps.
 const studioIdle = () => !store.hasOpenOwnWork();
 // Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
 const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
-// Finish Liked Images (domain/finishing.ts): idle-time smart upscales of what an account likes.
-const finishing = createFinishing({
-  dataDir,
-  store,
-  owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
-  allowed: (ownerId) => {
-    if (!ownerId) return !multiUserEnabled;
-    const account = accountAccessForId(ownerId);
-    return Boolean(account?.authenticated);
-  },
-  item: (ownerId, itemId) => galleryItem(itemId, ownerId),
-  idle: studioIdle,
-  ready: (quality) => upscale.upscaleReady(quality),
-  fullBody: fullBodyPerson,
-  upscale: (ownerId, request) =>
-    upscale.queueUpscale(ownerId ? accountAccessForId(ownerId) : undefined, request, {
-      priority: queuePriority.finishing,
-    }),
-  cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
-});
-registerFinishingRoutes(app, { finishing });
 // A gone or disabled account's gallery never reaches the text model.
 function promptAssistantOwner(ownerId) {
   if (!multiUserEnabled) return true;
@@ -1313,7 +1280,6 @@ const nextSteps = createNextStepWork({
 const backgroundWork = [
   generationQueue,
   dream,
-  finishing,
   captioner,
   selfReview,
   imageSearch,
@@ -1323,8 +1289,7 @@ const backgroundWork = [
   nextSteps,
 ];
 
-const upscale = registerUpscaleRoutes(app, {
-  finishing,
+registerUpscaleRoutes(app, {
   loadComfyContext,
   queue: generationQueue,
   store,

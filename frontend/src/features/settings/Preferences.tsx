@@ -1,7 +1,6 @@
-import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
+import { Button, SegmentedControl, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import { imageAspects, resolutions } from "../../../../shared/resolution";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
@@ -12,52 +11,6 @@ import {
   useTileCaptions,
 } from "./accountPreferences";
 import { DeleteFailedItems } from "./DeleteFailedItems";
-import { FinishLikedImages } from "./FinishLikedImages";
-
-type ModelChoice = "loras" | "uncensoredModels";
-/** A switch for a model choice the account turns off for itself, shown only where its role or group grants it. */
-function ModelChoiceRow({
-  choice,
-  label,
-  description,
-}: {
-  choice: ModelChoice;
-  label: string;
-  description: string;
-}) {
-  const status = useQuery(preferencesQuery).data;
-  const save = useSavePreferences();
-  if (!status?.grants[choice]) return null;
-  return (
-    <SettingRow label={label} description={description}>
-      <Switch
-        aria-label={label}
-        checked={status.preferences[choice]}
-        onChange={(event) => save.mutate({ [choice]: event.currentTarget.checked })}
-      />
-    </SettingRow>
-  );
-}
-
-/** LoRAs and Uncensored, where the account's role or group grants them. */
-function ModelChoices() {
-  const grants = useQuery(preferencesQuery).data?.grants;
-  if (!grants?.loras && !grants?.uncensoredModels) return null;
-  return (
-    <SettingGroup title="Models">
-      <ModelChoiceRow
-        choice="loras"
-        label="LoRAs"
-        description="Offer the LoRAs you have access to. Off hides them everywhere, Dream included."
-      />
-      <ModelChoiceRow
-        choice="uncensoredModels"
-        label="Uncensored"
-        description="Offer uncensored models and themes, and allow explicit prompt ideas."
-      />
-    </SettingGroup>
-  );
-}
 
 const galleryWorkChoices = [
   { value: "none", label: "None" },
@@ -86,48 +39,6 @@ function GalleryWork() {
   );
 }
 
-function ImageSizePreferences() {
-  const preferences = useQuery(preferencesQuery).data?.preferences;
-  const save = useSavePreferences();
-  if (!preferences) return null;
-  return (
-    <SettingGroup title="Images">
-      <SettingRow
-        wide
-        label="Default Aspect"
-        description="The shape to start with when the profile supports it."
-      >
-        <Select
-          aria-label="Default Aspect"
-          placeholder="Profile Default"
-          data={[...imageAspects]}
-          value={preferences.imageAspect ?? null}
-          clearable
-          onChange={(choice) =>
-            save.mutate({ imageAspect: imageAspects.find((value) => value === choice) ?? null })
-          }
-        />
-      </SettingRow>
-      <SettingRow
-        wide
-        label="Default Resolution"
-        description="The resolution for new and cleared image drafts when supported."
-      >
-        <Select
-          aria-label="Default Resolution"
-          placeholder="Profile Default"
-          data={[...resolutions]}
-          value={preferences.imageResolution ?? null}
-          clearable
-          onChange={(choice) =>
-            save.mutate({ imageResolution: resolutions.find((value) => value === choice) ?? null })
-          }
-        />
-      </SettingRow>
-    </SettingGroup>
-  );
-}
-
 /** Settings › Preferences: how Studio works for this account, saved with it. */
 export function Preferences() {
   const keep = useKeepRecentPrompts(true);
@@ -137,7 +48,6 @@ export function Preferences() {
     <Stack gap="lg">
       {/* Settings run A–Z, then Export. */}
       <SettingGroup title="Gallery">
-        <FinishLikedImages />
         <SettingRow
           label="Tile Captions"
           description="Show each tile's title and details on phones. Desktop shows them on hover."
@@ -167,8 +77,6 @@ export function Preferences() {
           </Button>
         </SettingRow>
       </SettingGroup>
-      <ImageSizePreferences />
-      <ModelChoices />
       <SettingGroup title="Prompts">
         <SettingRow
           label="Keep Recent Prompts"

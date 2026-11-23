@@ -695,6 +695,8 @@ export function createSuggestions({
      */
     async prepare(source: SuggestionItem, signal: AbortSignal): Promise<void> {
       const surfaces = source.type === "image" ? ["viewer", "animate"] : ["viewer"];
+      let picture: Promise<ModelImage | null> | undefined;
+      const readPicture = () => (picture ??= image(source));
       for (const surface of surfaces) {
         if (signal.aborted) return;
         const answer = await service.suggest(
@@ -704,7 +706,7 @@ export function createSuggestions({
             jobId: source.jobId,
             itemId: source.id,
           },
-          { prepared: source, signal },
+          { prepared: source, readPicture, signal },
         );
         if (answer.reason && !signal.aborted) throw new Error(answer.reason);
       }
@@ -789,7 +791,15 @@ export function createSuggestions({
         actions?: unknown;
         cardIds?: unknown;
       },
-      { prepared, signal }: { prepared?: SuggestionItem; signal?: AbortSignal } = {},
+      {
+        prepared,
+        readPicture,
+        signal,
+      }: {
+        prepared?: SuggestionItem;
+        readPicture?: () => Promise<ModelImage | null>;
+        signal?: AbortSignal;
+      } = {},
     ): Promise<Suggestions<PromptIdea | NextStep | Change>> {
       const surface = body.surface as SuggestionSurface;
       if (!surfaces.has(surface))
@@ -967,7 +977,9 @@ export function createSuggestions({
         if (!(await online())) return empty("The text model is offline.");
         // Without the picture the steps still come from its prompt and caption.
         const picture =
-          source && source.type !== "video" ? await image(source).catch(() => null) : null;
+          source && source.type !== "video"
+            ? await (readPicture?.() ?? image(source)).catch(() => null)
+            : null;
         if (signal?.aborted) return empty("Suggestion writing was interrupted.");
         if (source && surface === "viewer")
           return stepsFor(model, ownerId, source, { image: picture, save: !edited, signal });

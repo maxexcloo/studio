@@ -36,7 +36,7 @@ import { backendLabel, isProfile, profileForBackend } from "../generation/payloa
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
-import { mediaProfileName, mediaTimestamp, mediaTitle } from "./mediaLabels";
+import { mediaProfileName, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { galleryItemQuery } from "./queries";
 import { derivations } from "./versions";
@@ -60,29 +60,6 @@ const time = (value?: string) => {
   const date = value ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : "";
 };
-/** When it was made, its size and a video's length, under the title in the panel and phone sheet. */
-export function MediaDetailsMetadata({ item }: { item: MediaItem }) {
-  const source = mediaSource(item);
-  const timestamp = mediaTimestamp(item);
-  const settings = item.settings || {};
-  const seconds =
-    Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
-  const line = [
-    timestamp?.label,
-    source.width && source.height ? `${source.width} × ${source.height}` : "",
-    item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10}s` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    line && (
-      <Text size="xs" c="dimmed" lh={1.25}>
-        {line}
-      </Text>
-    )
-  );
-}
-
 type Row = [label: string, value: string];
 const sortRows = <T extends [string, unknown]>(rows: T[]) =>
   [...rows].sort(([a], [b]) => compareNames(a, b));
@@ -706,20 +683,37 @@ const openHere =
 /** Links to the pages of results an item was made from or made. */
 function RelatedLinks({ items, open }: { items: MediaItem[]; open?: (item: MediaItem) => void }) {
   return (
-    <Stack gap={2} align="flex-start">
-      {items.map((related) => (
-        <Anchor
-          key={related.id}
-          component={Link}
-          to={viewerPath(related)}
-          state={followed}
-          size="sm"
-          ta="left"
-          onClick={openHere(related, open)}
-        >
-          {mediaTitle(related)}
-        </Anchor>
-      ))}
+    <Stack gap={4} align="flex-start">
+      {items.map((related) => {
+        const source = mediaSource(related);
+        const thumbnail = source.thumbnailUrl || (related.type === "image" ? source.url : "");
+        return (
+          <Anchor
+            key={related.id}
+            component={Link}
+            to={viewerPath(related)}
+            state={followed}
+            size="sm"
+            ta="left"
+            maw="100%"
+            onClick={openHere(related, open)}
+          >
+            <Group component="span" gap="xs" wrap="nowrap">
+              <Image
+                src={thumbnail || undefined}
+                alt=""
+                w={48}
+                h={48}
+                flex="0 0 auto"
+                radius="sm"
+                loading="lazy"
+                fallbackSrc=""
+              />
+              <span>{mediaTitle(related)}</span>
+            </Group>
+          </Anchor>
+        );
+      })}
     </Stack>
   );
 }

@@ -21,7 +21,7 @@ import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, profileForBackend, referenceDetails, usesNegative } from "./payload";
-import { type DraftChange, PromptFields } from "./PromptFields";
+import { type DraftChange, PromptFields, useGenerationPromptAssistant } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
 
@@ -223,6 +223,15 @@ export function GenerationEditor({
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
   const phone = usePhone();
+  const assistant = useGenerationPromptAssistant({
+    input,
+    profile,
+    references,
+    onChange,
+    onNegativeWritten,
+    scopeKey: assistantScope,
+    ask,
+  });
   const submitState = useSubmitState({
     input,
     profile,
@@ -284,6 +293,7 @@ export function GenerationEditor({
   const inputs = (
     <GenerationInputControls
       loraPicker={loraPicker}
+      loraSuggestions={assistant.loraSuggestions}
       input={input}
       profile={profile}
       onChange={onChange}
@@ -321,12 +331,10 @@ export function GenerationEditor({
             <PromptFields
               textareaRef={prompt}
               input={input}
-              profile={profile}
               references={references}
               onChange={onChange}
-              assistantScope={assistantScope}
+              assistant={assistant}
               negative={usesNegative(profile)}
-              onNegativeWritten={onNegativeWritten}
               autoFocus={autoFocusPrompt}
               fill={fill}
               ideas={offerIdeas}

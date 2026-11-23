@@ -5,10 +5,17 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { type Flag, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 import { GalleryPass } from "./GalleryPass";
-import { UnfinishedItemsRow } from "./UnfinishedItems";
 
-/** Settings › Maintenance: Background AI switches, gallery passes and unfinished items. */
-export function MaintenanceSettings({ onOpenUnfinished }: { onOpenUnfinished: () => void }) {
+const gallerySettings = new Set([
+  "STUDIO_FACE_CHECK",
+  "STUDIO_FACE_REDO",
+  "STUDIO_GALLERY_CAPTIONS",
+  "STUDIO_GALLERY_TITLES",
+  "STUDIO_GALLERY_WHILE_BUSY",
+  "STUDIO_IMAGE_SEARCH",
+]);
+
+export function MaintenanceSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
   if (deployment.isPending) return <LoadingState label="Loading Maintenance" fill />;
@@ -28,16 +35,11 @@ export function MaintenanceSettings({ onOpenUnfinished }: { onOpenUnfinished: ()
       />
     </SettingRow>
   );
-  // The gallery passes' switch sits with them under Gallery, whose rows run A–Z by label.
-  const whileBusy = catalogue.find((flag) => flag.key === "STUDIO_GALLERY_WHILE_BUSY");
-  // The rest are Background AI, A–Z as deployment-settings.js lists them.
-  const background = catalogue.filter((flag) => flag !== whileBusy);
+  const background = catalogue.filter((flag) => !gallerySettings.has(flag.key));
   return (
     <Stack gap="lg">
-      {background.length > 0 && (
-        <SettingGroup title="Background AI">{background.map(flagRow)}</SettingGroup>
-      )}
       <SettingGroup title="Gallery">
+        {catalogue.filter((flag) => gallerySettings.has(flag.key)).map(flagRow)}
         <GalleryPass
           route="/api/gallery/captions"
           label="Caption Gallery"
@@ -60,11 +62,10 @@ export function MaintenanceSettings({ onOpenUnfinished }: { onOpenUnfinished: ()
           remaining="to index"
           progressLabel="Index Progress"
         />
-        {whileBusy && flagRow(whileBusy)}
       </SettingGroup>
-      <SettingGroup title="Queue">
-        <UnfinishedItemsRow onOpen={onOpenUnfinished} />
-      </SettingGroup>
+      {background.length > 0 && (
+        <SettingGroup title="Prompt Assistance & Taste">{background.map(flagRow)}</SettingGroup>
+      )}
     </Stack>
   );
 }

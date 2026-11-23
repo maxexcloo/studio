@@ -10,7 +10,9 @@ import {
 } from "../../../../shared/suggestions";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
+import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { useGroupFeature } from "../auth/AccountGate";
 import { charactersQuery } from "../characters/queries";
@@ -29,6 +31,31 @@ import { presetReplacesUnsaved } from "../generation/presets";
 import { mediaDraft } from "./useMediaAction";
 import { directionLabels, variationVariants } from "./variationDraft";
 
+export function keepAndVaryAction(
+  choose: (direction: VariationDirection | "explore") => void,
+): Action {
+  return {
+    id: "keep-and-vary",
+    label: "Keep & Vary",
+    icon: icons.assistant,
+    menu: [
+      variationDirections.map((direction) => ({
+        id: `vary-${direction}`,
+        label: `Vary ${directionLabels[direction]}`,
+        onClick: () => choose(direction),
+      })),
+      [
+        {
+          id: "explore-three-directions",
+          label: "Explore Three Directions",
+          icon: icons.compare,
+          onClick: () => choose("explore"),
+        },
+      ],
+    ],
+  };
+}
+
 export function VariationDialog({
   item,
   direction,
@@ -40,7 +67,7 @@ export function VariationDialog({
   direction: VariationDirection | "explore";
   prompt: string;
   onClose: () => void;
-  onApplied: () => void;
+  onApplied?: () => void;
 }) {
   const id = useId();
   const client = useQueryClient();
@@ -96,7 +123,7 @@ export function VariationDialog({
     onSuccess: (draft) => {
       setDraft(draft);
       onClose();
-      onApplied();
+      onApplied?.();
       openComposer("image");
     },
   });

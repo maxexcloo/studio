@@ -174,7 +174,7 @@ export function MediaTile({
   selection,
   hold,
   caption,
-  showTimestamp,
+  galleryTile,
   detail,
   actions,
   className,
@@ -193,7 +193,7 @@ export function MediaTile({
   hold: ReturnType<typeof useHoldToSelect>;
   /** Hover captions, captions always shown, or none (phones without Tile Captions). */
   caption: "hover" | "pinned" | "none";
-  showTimestamp?: boolean;
+  galleryTile?: boolean;
   detail?: string;
   actions?: ReactNode;
   className?: string;
@@ -220,14 +220,15 @@ export function MediaTile({
   const [retry, setRetry] = useState({ source, count: 0 });
   const attempt = retry.source === source ? retry.count : 0;
   const title = mediaTitle(item);
-  const timestamp = showTimestamp && item.status === "done" ? mediaTimestamp(item) : undefined;
+  const timestamp = galleryTile && item.status === "done" ? mediaTimestamp(item) : undefined;
   const drifted = !selecting && item.identity?.drifted;
   const subtitle = item.resultSet?.caption || detail;
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
   );
   // The rating sits small at the right of the caption's line, where the caption is.
-  const rated = item.status === "done" && !upscaleShown && !selecting && Boolean(item.rating);
+  const rated =
+    !galleryTile && item.status === "done" && !upscaleShown && !selecting && Boolean(item.rating);
   const RatingIcon = item.rating === "disliked" ? icons.dislike : icons.like;
   function openMenu(x: number, y: number) {
     if (selecting) {

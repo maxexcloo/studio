@@ -534,8 +534,23 @@ export function createAssistant(
     const side = defaultTextSide(environment);
     const local = (writer?.side ?? side) === "local" && (await localText());
     const chosen = local ? writer?.local : writer?.cloud;
-    if (chosen && (writer.uncensored || !uncensoredText(chosen))) return chosen;
     const configured = environment[defaultTextProfileKey];
+    if (writer?.censoredOnly) {
+      const candidates =
+        writer.side === "local"
+          ? local && [chosen, side === "local" && configured, local.model]
+          : [chosen, side === "cloud" && configured, settings().cloud];
+      // The gateway's local/auto alias is itself uncensored.
+      const allowed =
+        candidates &&
+        candidates.find((model) => model && model !== "local/auto" && !uncensoredText(model));
+      if (!allowed)
+        throw new AssistantError("No text model is available for Dream's content setting.", {
+          status: 503,
+        });
+      return allowed;
+    }
+    if (chosen && (writer.uncensored || !uncensoredText(chosen))) return chosen;
     const fallback =
       configured &&
       side === (local ? "local" : "cloud") &&
@@ -1106,14 +1121,19 @@ export function createAssistant(
    * (domain/captions.ts). The caller checks the model reads images. A reply that isn't the asked-for
    * JSON is kept as plain text without tags; the text is cut to `captionCharacters`.
    */
-  async function caption({ image, signal, writer } = {}) {
+  async function caption({ image, prompt, signal, writer } = {}) {
     const model = await modelFor("caption", false, writer);
+    const context = one(prompt, maxPromptCharacters);
+    const instruction = context
+      ? `Caption this image. Use the original generation prompt only to help name details you can see.
+Prompt: ${context}`
+      : "Caption this image.";
     const reply = await chat({
       call: "caption",
       model,
       messages: [
         { role: "system", content: captionInstructions },
-        { role: "user", content: userContent("Caption this image.", [image], true) },
+        { role: "user", content: userContent(instruction, [image], true) },
       ],
       temperature: 0.2,
       signal,

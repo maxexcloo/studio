@@ -429,7 +429,7 @@ const GridCell = memo(function GridCell({
     <MediaTile
       {...tile}
       item={item}
-      showTimestamp
+      galleryTile
       detail={detail(item)}
       style={{
         position: "absolute",

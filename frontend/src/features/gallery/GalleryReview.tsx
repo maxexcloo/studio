@@ -44,9 +44,9 @@ export function GalleryReview({
       onClose={closeWhenTop(id, close)}
       title="Review Gallery"
       fullScreen={phone}
-      size="xl"
+      size="min(90vw, 72rem)"
     >
-      <Stack gap="xs" h={phone ? "100%" : "min(70dvh, 44rem)"}>
+      <Stack gap="xs" h={phone ? "100%" : "min(80dvh, 64rem)"}>
         <Group gap="xs" grow wrap="nowrap">
           <Select
             aria-label="Review Time"
@@ -68,6 +68,7 @@ export function GalleryReview({
           listing={listing}
           rating={rating}
           since={Number(cutoff)}
+          close={close}
         />
       </Stack>
     </Modal>
@@ -78,10 +79,12 @@ function GalleryReviewDeck({
   listing,
   rating,
   since,
+  close,
 }: {
   listing: GalleryListing;
   rating: GalleryReviewRating;
   since: number;
+  close: () => void;
 }) {
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [history, setHistory] = useState<Judgement[]>([]);
@@ -96,6 +99,7 @@ function GalleryReviewDeck({
   return (
     <DreamDeck
       quickRating
+      onSuggestionApplied={close}
       items={[]}
       setDecided={setDecided}
       history={history}
