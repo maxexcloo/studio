@@ -17,10 +17,17 @@ export function useRemembered<T>(name: string, defaultValue: T) {
     key: useRememberedKey(name),
     defaultValue,
     getInitialValueInEffect: false,
-    // Objects saved by an earlier version take on fields added to the default since.
+    // Objects saved by an earlier version take on the default's current fields; an empty default
+    // is an open map and keeps every saved key.
     deserialize: (saved) => {
       const value = saved && JSON.parse(saved);
-      return value && isRecord(defaultValue) ? { ...defaultValue, ...value } : value;
+      if (!value || !isRecord(defaultValue)) return value;
+      const fields = Object.entries(defaultValue as Record<string, unknown>);
+      return fields.length
+        ? Object.fromEntries(
+            fields.map(([field, fallback]) => [field, field in value ? value[field] : fallback]),
+          )
+        : value;
     },
   });
 }

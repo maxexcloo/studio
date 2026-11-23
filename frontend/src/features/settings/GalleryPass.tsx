@@ -1,6 +1,6 @@
 import { Button, Progress, Select, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 
 import { api, post } from "../../api";
 import { SettingRow } from "../../ui/SettingRows";
@@ -52,9 +52,9 @@ const scopeLabels: Record<PassScope, string> = {
 };
 
 /**
- * A Settings › Studio row for a background feature (`children`, its switch) that also starts or
- * stops its catch-up pass at `route` and follows it; with `scopeLabel` it also chooses the pass's
- * scope (All, Missing or Out of Date, the default).
+ * A Settings › Studio › Catch Up row that starts or stops a background feature's pass over the
+ * gallery at `route` and follows it; with `scopeLabel` it also chooses the pass's scope (All,
+ * Missing or Out of Date, the default).
  */
 export function GalleryPass({
   route,
@@ -63,17 +63,15 @@ export function GalleryPass({
   remaining,
   progressLabel,
   scopeLabel,
-  children,
 }: {
   route: string;
   label: string;
-  description: ReactNode;
+  description: string;
   /** What the ready count is waiting for, such as "to index". */
   remaining: string;
   progressLabel: string;
   /** The scope selector's accessible name; without it every pass is Out of Date. */
   scopeLabel?: string;
-  children: ReactNode;
 }) {
   const client = useQueryClient();
   const query = passQuery(route);
@@ -153,7 +151,6 @@ export function GalleryPass({
           Catch Up
         </Button>
       )}
-      {children}
     </SettingRow>
   );
 }

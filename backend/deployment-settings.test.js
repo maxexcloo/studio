@@ -79,9 +79,9 @@ test("saving writes SQLite, refuses deployment values and clears back to the def
 
 test("Dream overrides force only what is set, off included, and deployment locks apply", () => {
   assert.deepEqual(settings.dreamOverrides(), {});
-  settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_SPICY", "0");
+  settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_UNCENSORED", "0");
   settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND", "cloud");
-  assert.deepEqual(settings.dreamOverrides(), { spicy: false, imageBackend: "cloud" });
+  assert.deepEqual(settings.dreamOverrides(), { uncensored: false, imageBackend: "cloud" });
   assert.equal(settings.describeDreamPolicy().imageBackend.source, "studio");
   assert.equal(settings.describeDreamPolicy().enabled.value, null);
   process.env.STUDIO_DREAM_OVERRIDE_ENABLED = "1";

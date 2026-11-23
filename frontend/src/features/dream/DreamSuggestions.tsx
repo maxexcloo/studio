@@ -2,7 +2,6 @@ import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { VariationDirection } from "../../../../shared/suggestions";
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
 import { type Action, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
@@ -11,8 +10,7 @@ import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
 import { useItemChange } from "../gallery/useItemChange";
 import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
-import { VariationDialog, keepAndVaryAction } from "../gallery/VariationDialog";
-import { useChangeSuggestions } from "../generation/AskChange";
+import { suggestionItems, useChangeSuggestions } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
@@ -46,7 +44,6 @@ function ItemSuggestions({
   const compare = useMutation({ mutationFn: () => stage.again(pair!), onSuccess: onApplied });
   const [opened, setOpened] = useState(false);
   const [custom, setCustom] = useState(false);
-  const [varying, setVarying] = useState<VariationDirection | "explore">();
   const iteration = useMediaIteration(item);
   const prepare = useMediaAction(item, onApplied);
   const canExtend = item.type === "video" && item.status === "done" && Boolean(item.url);
@@ -59,8 +56,7 @@ function ItemSuggestions({
   const prompt = typedPrompt(item);
   const available = change.available && Boolean(prompt.trim());
   const canAskForMore = card.kind === "dream" && item.type === "image" && Boolean(prompt.trim());
-  const canVary = available && item.type === "image" && !item.uploaded;
-  const menuBounds = useActionMenuBounds(opened, canVary);
+  const menuBounds = useActionMenuBounds(opened, false);
   const send = (request: string) => change.send(request, prompt);
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item.jobId!, undefined, item.id),
@@ -70,7 +66,6 @@ function ItemSuggestions({
     onPick: send,
   });
   const more: Action[] = [
-    ...(canVary ? [keepAndVaryAction(setVarying)] : []),
     ...(canAskForMore
       ? [
           {
@@ -128,19 +123,12 @@ function ItemSuggestions({
         <Menu.Dropdown>
           <ActionMenuItems
             leading={
-              available && (
-                <>
-                  {card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>}
-                  {suggestions.action.description && (
-                    <Menu.Label fw={400}>{suggestions.action.description}</Menu.Label>
-                  )}
-                </>
-              )
+              available && card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>
             }
             groups={[
               ...(available
                 ? [
-                    suggestions.options.map((option) => ({
+                    suggestionItems(suggestions.action).map((option) => ({
                       ...option,
                       disabled: option.disabled || loading,
                     })),
@@ -168,15 +156,6 @@ function ItemSuggestions({
         onClose={() => setCustom(false)}
         onSend={send}
       />
-      {varying && (
-        <VariationDialog
-          item={item}
-          direction={varying}
-          prompt={prompt}
-          onClose={() => setVarying(undefined)}
-          onApplied={onApplied}
-        />
-      )}
     </>
   );
 }

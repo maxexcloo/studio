@@ -474,7 +474,9 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   }
 });
 
-test("Prompt Styles sort by name, and can be filtered and edited", async ({ page }) => {
+test("Prompt Styles sort by enabled, type and name, and can be filtered and edited", async ({
+  page,
+}) => {
   await fixtures(page);
   const style = (id: string, kind: string, label: string, extra = {}) => ({
     id,
@@ -487,7 +489,7 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
   });
   let styles = [
     style("candid", "improve", "Candid"),
-    style("spicy", "improve", "Bold", { uncensored: true }),
+    style("uncensored", "improve", "Bold", { uncensored: true }),
     style("cinematic", "animate", "Cinematic Camera"),
   ];
   let hash = "h1";
@@ -508,9 +510,9 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
   const names = table.getByRole("button", { name: /^Edit / });
-  await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
+  await expect(names).toHaveText(["Cinematic Camera", "Bold Uncensored", "Candid"]);
   await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
-  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Bold Uncensored"]);
+  await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   const type = page.getByRole("radiogroup", { name: "Type", exact: true });
   await type.getByText("Improve Prompt", { exact: true }).click();
@@ -532,6 +534,7 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
   const creating = page.getByRole("dialog", { name: "New Prompt Style", exact: true });
   await expect(creating.getByRole("radio", { name: "Animate", exact: true })).toBeChecked();
   await creating.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("button", { name: "New Style", exact: true })).toBeFocused();
   // Editing keeps the style's ID and kind and saves in a dialog.
   await table.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
   await page
@@ -540,13 +543,19 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit Prompt Style", exact: true });
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
+  await dialog
+    .getByRole("radiogroup", { name: "Offered To", exact: true })
+    .getByText("Without Uncensored", { exact: true })
+    .click();
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(saves.at(-1).styles[2]).toMatchObject({
     id: "cinematic",
     kind: "animate",
     description: "A moving camera.",
+    censored: true,
   });
+  expect(saves.at(-1).styles[2].uncensored).toBeUndefined();
   await expect(table.getByText("A moving camera.")).toBeVisible();
 });
 

@@ -83,9 +83,7 @@ export function MediaViewerActions({
     ...handlers,
     onVersionChange,
     retryInStage: !item.url,
-  }).map((group) =>
-    group.map((action) => (action.id === "ai" ? { ...action, label: "Viewer Actions" } : action)),
-  );
+  });
   if (shortcuts) shortcuts.current = groups;
   return (
     <ActionBarSurface

@@ -1,5 +1,15 @@
-import { Badge, Group, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  ActionIcon,
+  Badge,
+  Group,
+  Image,
+  Menu,
+  Stack,
+  Text,
+  Tooltip,
+  UnstyledButton,
+} from "@mantine/core";
+import { ArrowLeft, ArrowRight, GripVertical } from "lucide-react";
 import { type DragEvent, useState } from "react";
 
 import { menuWidth } from "../../theme";
@@ -17,6 +27,7 @@ import {
 } from "./references";
 import { StrengthControl } from "./StrengthControl";
 
+import tileClasses from "../gallery/MediaTileActions.module.css";
 import pickerClasses from "./Picker.module.css";
 import classes from "./ReferencePicker.module.css";
 
@@ -98,7 +109,7 @@ export function ReferenceSlots({
       aria-label="Reference Slots"
     >
       {referenceCells(references, profile).map((group) => (
-        <div key={group.slot} className={classes.group}>
+        <div key={group.slot} className={classes.group} data-many={group.capacity > 1 || undefined}>
           <div className={classes.cells}>
             {group.cells.map(({ asset, number }) => {
               if (!asset) {
@@ -150,96 +161,140 @@ export function ReferenceSlots({
                   : asset === startImage
                     ? start?.denoise
                     : undefined;
+              const remove = () =>
+                onChange(references.filter((reference) => referenceKey(reference) !== key));
+              const startDrag = (event: DragEvent<HTMLElement>) => {
+                event.dataTransfer.effectAllowed = "copyMove";
+                event.dataTransfer.setData(referenceCellType, key);
+                const picture = event.currentTarget
+                  .closest(`.${classes.frame}`)
+                  ?.querySelector("img");
+                if (picture?.naturalWidth) dragPicture(event.dataTransfer, picture);
+              };
               const tile = (
-                <Menu
-                  key={key}
-                  withinPortal={false}
-                  position="bottom-start"
-                  width={menuWidth}
-                  opened={menuKey === key}
-                  onChange={(open) =>
-                    setMenuKey((last) => (open ? key : last === key ? null : last))
-                  }
-                >
-                  <Menu.Target>
-                    <UnstyledButton
-                      className={classes.cell}
-                      aria-label={label}
-                      data-target={target?.replace === key || undefined}
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "copyMove";
-                        event.dataTransfer.setData(referenceCellType, key);
-                        const picture = event.currentTarget.querySelector("img");
-                        if (picture?.naturalWidth) dragPicture(event.dataTransfer, picture);
-                      }}
-                      {...dropProps(key, cellTarget)}
-                      {...contextMenuHandlers(() => setMenuKey(key))}
-                    >
-                      <Image
-                        src={asset.thumbnailUrl || asset.url}
-                        alt=""
-                        h="100%"
-                        w="100%"
-                        fit="cover"
-                        fallbackSrc=""
-                        draggable={false}
-                      />
-                      <Badge
-                        className={classes.number}
-                        size="xs"
-                        circle
-                        variant="filled"
-                        color="dark"
+                <div key={key} className={classes.frame}>
+                  <Menu
+                    withinPortal={false}
+                    position="bottom-start"
+                    width={menuWidth}
+                    opened={menuKey === key}
+                    onChange={(open) =>
+                      setMenuKey((last) => (open ? key : last === key ? null : last))
+                    }
+                  >
+                    <Menu.Target>
+                      <UnstyledButton
+                        className={classes.cell}
+                        aria-label={label}
+                        data-target={target?.replace === key || undefined}
+                        draggable
+                        onDragStart={startDrag}
+                        {...dropProps(key, cellTarget)}
+                        {...contextMenuHandlers(() => setMenuKey(key))}
                       >
-                        {number}
-                      </Badge>
-                    </UnstyledButton>
-                  </Menu.Target>
-                  <Menu.Dropdown aria-label={label}>
-                    {onView && (
+                        <Image
+                          src={asset.thumbnailUrl || asset.url}
+                          alt=""
+                          h="100%"
+                          w="100%"
+                          fit="cover"
+                          fallbackSrc=""
+                          draggable={false}
+                        />
+                        <Badge
+                          className={classes.number}
+                          size="xs"
+                          circle
+                          variant="filled"
+                          color="dark"
+                        >
+                          {number}
+                        </Badge>
+                      </UnstyledButton>
+                    </Menu.Target>
+                    <Menu.Dropdown aria-label={label}>
+                      {peers.length > 1 && (
+                        <>
+                          <Menu.Item
+                            leftSection={<ArrowLeft size={16} />}
+                            disabled={position === 0}
+                            onClick={() => move(peers, asset, -1)}
+                          >
+                            Move Earlier
+                          </Menu.Item>
+                          <Menu.Item
+                            leftSection={<ArrowRight size={16} />}
+                            disabled={position === peers.length - 1}
+                            onClick={() => move(peers, asset, 1)}
+                          >
+                            Move Later
+                          </Menu.Item>
+                        </>
+                      )}
+                      {onView && (
+                        <Menu.Item
+                          leftSection={<icons.preview size={16} />}
+                          onClick={() => onView(asset)}
+                        >
+                          Preview
+                        </Menu.Item>
+                      )}
                       <Menu.Item
-                        leftSection={<icons.preview size={16} />}
-                        onClick={() => onView(asset)}
+                        leftSection={<icons.replace size={16} />}
+                        onClick={() => onChoose(cellTarget)}
                       >
-                        Preview
+                        Replace
                       </Menu.Item>
-                    )}
-                    <Menu.Item
-                      leftSection={<icons.replace size={16} />}
-                      onClick={() => onChoose(cellTarget)}
-                    >
-                      Replace
-                    </Menu.Item>
-                    {peers.length > 1 && (
-                      <>
-                        <Menu.Item
-                          leftSection={<ArrowLeft size={16} />}
-                          disabled={position === 0}
-                          onClick={() => move(peers, asset, -1)}
+                      <Menu.Divider />
+                      <Menu.Item leftSection={<icons.clear size={16} />} onClick={remove}>
+                        Remove
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                  <div className={`${tileClasses.actions} ${classes.actions}`}>
+                    <Group gap={4} wrap="nowrap">
+                      {onView && (
+                        <Tooltip label="Preview">
+                          <ActionIcon
+                            className={tileClasses.control}
+                            aria-label={`Preview ${label}`}
+                            variant="default"
+                            size={24}
+                            onClick={() => onView(asset)}
+                          >
+                            <icons.preview size={14} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      <Tooltip label="Remove">
+                        <ActionIcon
+                          className={tileClasses.control}
+                          aria-label={`Remove ${label}`}
+                          variant="default"
+                          size={24}
+                          onClick={remove}
                         >
-                          Move Earlier
-                        </Menu.Item>
-                        <Menu.Item
-                          leftSection={<ArrowRight size={16} />}
-                          disabled={position === peers.length - 1}
-                          onClick={() => move(peers, asset, 1)}
-                        >
-                          Move Later
-                        </Menu.Item>
-                      </>
-                    )}
-                    <Menu.Divider />
-                    <Menu.Item
-                      leftSection={<icons.clear size={16} />}
-                      onClick={() =>
-                        onChange(references.filter((reference) => referenceKey(reference) !== key))
-                      }
-                    >
-                      Remove
-                    </Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
+                          <icons.clear size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                    {/* Drags like the tile itself; a click opens the tile's menu, which moves it too. */}
+                    <Tooltip label="Drag to Reorder">
+                      <ActionIcon
+                        className={tileClasses.control}
+                        aria-label={`Drag ${label}`}
+                        variant="default"
+                        size={24}
+                        style={{ cursor: "grab" }}
+                        draggable
+                        onDragStart={startDrag}
+                        onClick={() => setMenuKey(key)}
+                      >
+                        <GripVertical size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </div>
+                </div>
               );
               if (!strength) return tile;
               return (

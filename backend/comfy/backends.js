@@ -86,7 +86,7 @@ export const workerReachable = (id, now = Date.now()) => {
   return last.up || now - last.at < retryUnreachableMs ? last.up : null;
 };
 /** How a worker's inventory names a profile on one backend of a combined profile. */
-export const profileOnBackendKey = (profileId, backend = "") =>
+const profileOnBackendKey = (profileId, backend = "") =>
   backend ? `${profileId}@${backend}` : profileId;
 /** Logs the profiles a worker stops offering, which routing then sends elsewhere. */
 export const noteWorkerProfiles = (id, profiles = []) => {
@@ -114,7 +114,7 @@ let radianceAnswers;
  * Whether profile `profileId` runs on Radiance nodes on `backend` (its default without one), and so
  * only on a Radiance worker; every other profile runs only on ComfyUI workers.
  */
-export function runsOnRadiance(profileId, backend = "") {
+function runsOnRadiance(profileId, backend = "") {
   if (!radianceAnswers) {
     radianceAnswers = new Map();
     setImmediate(() => (radianceAnswers = undefined));

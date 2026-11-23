@@ -72,8 +72,8 @@ import {
   type GalleryState,
   galleryKind,
   galleryPath,
-  galleryReviewPath,
-  isGalleryReviewPath,
+  galleryRouteView,
+  galleryViewPath,
   viewerItemId,
   viewerPath,
   viewerPathId,
@@ -84,14 +84,26 @@ import classes from "./GalleryPage.module.css";
 type PageState = GalleryState &
   OpenComposerState & {
     compose?: boolean;
-    reviewFrom?: string;
+    /** Arrived from another mode: the gallery opens on its home view, not Uploads. */
+    home?: boolean;
     reviewQuery?: string;
     viewer?: boolean;
+    viewFrom?: string;
   };
 type GalleryView = "gallery" | "uploads" | "comparisons" | "review";
+const loadReview = () => import("./GalleryReview");
+const loadComparisons = () => import("../compare/ComparisonList");
 const GalleryReview = lazy(() =>
-  import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
+  loadReview().then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
+const ComparisonList = lazy(() =>
+  loadComparisons().then(({ ComparisonList }) => ({ default: ComparisonList })),
+);
+// Review and Comparisons load once the page is idle, so opening them doesn't wait for their code.
+(window.requestIdleCallback || setTimeout)(() => {
+  void loadReview();
+  void loadComparisons();
+});
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -128,7 +140,9 @@ export function GalleryPage() {
 function Gallery() {
   const location = useLocation();
   const state = location.state as PageState | null;
-  const review = isGalleryReviewPath(location.pathname);
+  // Review and Comparisons have their own address and leave the gallery's listing idle.
+  const routeView = galleryRouteView(location.pathname);
+  const review = routeView === "review";
   const initialQuery = review ? (state?.reviewQuery ?? "") : "";
   const [query, setQueryText] = useState(initialQuery);
   const [search, setSearch] = useState(initialQuery);
@@ -157,6 +171,10 @@ function Gallery() {
   const captions = preferences?.tileCaptions ?? false;
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
+  const home = state?.home;
+  useEffect(() => {
+    if (home) setFilters((current) => (current.uploads ? { ...current, uploads: false } : current));
+  }, [home, location.key, setFilters]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
   const linkedQuery = state?.q;
@@ -254,7 +272,7 @@ function Gallery() {
   const listingKey = listingQuery.queryKey;
   const gallery = useInfiniteQuery({
     ...listingQuery,
-    enabled: !review,
+    enabled: !routeView,
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
@@ -265,7 +283,7 @@ function Gallery() {
   });
   // The tiles only need one page. Let it arrive before requesting summaries of the listing.
   const listingReady =
-    !review && gallery.isSuccess && !gallery.isPlaceholderData && query === search;
+    !routeView && gallery.isSuccess && !gallery.isPlaceholderData && query === search;
   const arrivals =
     useQuery({
       ...galleryArrivalsQuery(listing, leftAt),
@@ -353,7 +371,7 @@ function Gallery() {
   const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
     // A date jump can skip thousands of items. Never bridge from the newest page to that window.
-    if (historical || review) return;
+    if (historical || routeView) return;
     if (
       client.isFetching({ queryKey: listingKey, exact: true }) ||
       client.isFetching({ queryKey: refreshKey, exact: true })
@@ -366,7 +384,7 @@ function Gallery() {
       if (sort === "newest") void readFirst({ cancelRefetch: false });
       else void client.invalidateQueries({ queryKey: listingKey, exact: true });
     }
-  }, [client, historical, listingKey, readFirst, refreshKey, review, sort]);
+  }, [client, historical, listingKey, readFirst, refreshKey, routeView, sort]);
   useEffect(
     () => () => {
       pendingFirst.current = null;
@@ -392,12 +410,12 @@ function Gallery() {
   // Pending tiles need polling for live previews only while the listing can show them. Other
   // sorts would reread every loaded page, so their tiles change only as the queue does.
   useEffect(() => {
-    if (review || !showWork || !jobs?.active || sort !== "newest") return;
+    if (routeView || !showWork || !jobs?.active || sort !== "newest") return;
     const timer = setInterval(() => {
       if (!document.hidden) void refreshFirst();
     }, 3000);
     return () => clearInterval(timer);
-  }, [review, showWork, jobs?.active, refreshFirst, sort]);
+  }, [routeView, showWork, jobs?.active, refreshFirst, sort]);
   useEffect(
     () =>
       focusManager.subscribe((focused) => {
@@ -542,12 +560,12 @@ function Gallery() {
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
-  // Liked, Uploads or Comparisons alone already has its own control in the toolbar.
+  // Liked or Uploads alone already has its own control in the toolbar.
   const toggledOnly =
     !search &&
     !similar &&
-    (filters.uploads || filters.comparisons || filters.rating === "liked") &&
-    JSON.stringify({ ...filters, uploads: false, comparisons: false, rating: "" }) ===
+    (filters.uploads || filters.rating === "liked") &&
+    JSON.stringify({ ...filters, uploads: false, rating: "" }) ===
       JSON.stringify(emptyGalleryFilters);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
@@ -654,7 +672,7 @@ function Gallery() {
   const page = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
   const viewButton = useRef<HTMLButtonElement>(null);
-  const reviewScroll = useRef<{ key: string; top: number } | null>(null);
+  const viewScroll = useRef<{ key: string; top: number } | null>(null);
   useLayoutEffect(() => {
     const host = page.current;
     const controls = toolbar.current;
@@ -665,66 +683,60 @@ function Gallery() {
     const observer = new ResizeObserver(measure);
     observer.observe(controls, { box: "border-box" });
     return () => observer.disconnect();
-  }, [review]);
+  }, [routeView]);
   useLayoutEffect(() => {
-    if (review) {
+    if (routeView) {
       window.scrollTo({ top: 0, behavior: "instant" });
       return;
     }
-    const previous = reviewScroll.current;
+    const previous = viewScroll.current;
     if (previous?.key !== location.key) return;
-    reviewScroll.current = null;
+    viewScroll.current = null;
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: previous.top, behavior: "instant" });
       viewButton.current?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
-  }, [location.key, review]);
-  const closeReview = () => {
+  }, [location.key, routeView]);
+  const leaveView = () => {
     const entry = window.history.state?.key;
     // An action that stages work in the composer can navigate while leaving Review.
     setTimeout(() => {
       if (window.history.state?.key !== entry) return;
-      if (state?.reviewFrom) void routerNavigate(-1);
+      if (state?.viewFrom) void routerNavigate(-1);
       else void routerNavigate(base, { replace: true });
     });
   };
   function showView(next: GalleryView) {
-    if (next === "review") {
-      if (review) return;
-      reviewScroll.current = { key: location.key, top: window.scrollY };
-      void routerNavigate(galleryReviewPath(kind), {
-        state: {
-          chat,
-          set: setId,
-          show: state?.show,
-          similar,
-          turn: chatTurn,
-          reviewFrom: location.key,
-          reviewQuery: query,
-        } satisfies PageState,
+    if (next === routeView) return;
+    if (next === "review" || next === "comparisons") {
+      // Switching between Review and Comparisons keeps the gallery entry that Back returns to.
+      if (!routeView) viewScroll.current = { key: location.key, top: window.scrollY };
+      void routerNavigate(galleryViewPath(kind, next), {
+        replace: Boolean(routeView),
+        state: routeView
+          ? state
+          : ({
+              chat,
+              set: setId,
+              show: state?.show,
+              similar,
+              turn: chatTurn,
+              reviewQuery: query,
+              viewFrom: location.key,
+            } satisfies PageState),
       });
       return;
     }
     const uploads = next === "uploads";
-    const comparisons = next === "comparisons";
-    if (uploads !== filters.uploads || comparisons !== filters.comparisons)
-      setFilters({ ...filters, uploads, comparisons, rating: "" });
-    if (review) closeReview();
+    if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
+    if (routeView) leaveView();
   }
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
       ref={viewButton}
-      value={
-        review
-          ? "review"
-          : filters.uploads
-            ? "uploads"
-            : filters.comparisons
-              ? "comparisons"
-              : "gallery"
-      }
+      value={routeView ?? (filters.uploads ? "uploads" : "gallery")}
       groups={[
         [
           { value: "gallery", label: "Gallery" },
@@ -745,9 +757,16 @@ function Gallery() {
           key={kind}
           listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
           leftAt={leftAt}
-          close={closeReview}
+          close={leaveView}
           view={view}
         />
+      </Suspense>
+    );
+  }
+  if (routeView === "comparisons") {
+    return (
+      <Suspense fallback={<LoadingState fill label="Loading Comparisons" />}>
+        <ComparisonList view={view} />
       </Suspense>
     );
   }
@@ -780,7 +799,9 @@ function Gallery() {
         void droppedFiles(event.dataTransfer).then(upload.upload);
       }}
     >
-      <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
+      <VisuallyHidden component="h1">
+        {filters.uploads ? "Uploads" : kind === "video" ? "Videos" : "Images"}
+      </VisuallyHidden>
       {/* The search and filters stay in place while selecting; the selection bar follows them.
           Phones keep them in sight only while a search, filter or selection applies. */}
       <div
@@ -993,9 +1014,7 @@ function Gallery() {
             : toggledOnly
               ? filters.uploads
                 ? "No Uploads"
-                : filters.comparisons
-                  ? "No Comparisons"
-                  : `No Liked ${kind === "video" ? "Videos" : "Images"}`
+                : `No Liked ${kind === "video" ? "Videos" : "Images"}`
               : search || hasFilters
                 ? "No Matches"
                 : kind === "video"

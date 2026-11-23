@@ -4,19 +4,22 @@
   gap: var(--mantine-spacing-sm) var(--mantine-spacing-md);
 }
 
+/* Groups and their cells grow to fill the row; a group of several cells takes a row of its own. */
 .group {
   display: flex;
+  flex: 1 1 var(--picker-thumbnail-size);
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
 
 .cells {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--picker-thumbnail-size), 1fr));
   gap: 6px;
 }
 
+.group[data-many],
 .group:has(.strengthRow) {
   flex-basis: 100%;
 }
@@ -26,7 +29,27 @@
 }
 
 .strengthRow {
-  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.frame {
+  position: relative;
+  min-width: 0;
+}
+
+.strengthRow > .frame {
+  flex-shrink: 0;
+  width: var(--picker-thumbnail-size);
+}
+
+/* The gallery tile's hover actions, fitted to the smaller tile: Preview and Remove in the corner,
+   the drag handle below them. */
+.frame > .actions {
+  inset: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
 /* Tile rules must outrank native button styles regardless of chunk load order. */
@@ -42,8 +65,8 @@
   transition:
     border-color var(--studio-motion-duration) var(--studio-ease-enter),
     opacity var(--studio-motion-duration) var(--studio-ease-enter);
-  width: var(--picker-thumbnail-size);
-  height: var(--picker-thumbnail-size);
+  width: 100%;
+  aspect-ratio: 1;
   color: var(--mantine-color-dimmed);
 }
 

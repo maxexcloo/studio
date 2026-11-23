@@ -12,6 +12,7 @@ import {
   Table,
   Text,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId } from "react";
 
@@ -24,6 +25,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
+import { useReturnFocus } from "../../ui/useReturnFocus";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
 import { InspirationPreset } from "./InspirationPreset";
@@ -43,7 +45,11 @@ export interface ImportRecord {
   audit: "busy" | "failed" | "needs-files" | "ready" | "substitute";
   /** Failed, or waiting on a file no provider gives: Clear Stale removes it. */
   stale?: boolean;
+  /** Its name-and-size matches are being hashed in the background. */
+  verifying?: boolean;
   input?: { url?: string; kind?: string; fileName?: string };
+  modelType?: string;
+  baseModel?: string;
   grade?: { value: string; reasons: string[] };
   error?: string;
   warnings?: string[];
@@ -105,18 +111,24 @@ export const gradeColours: Record<string, string> = {
   close: "yellow",
   partial: "orange",
 };
-const stateLabels: Record<string, string> = {
-  failed: "Failed",
-  "needs-files": "Needs Files",
-  ready: "Ready",
-  resolving: "Resolving",
-};
-/** An import state as words, such as Needs Files. */
-export const stateLabel = (state: string) =>
-  stateLabels[state] || titleCase(state.replaceAll("-", " "));
-/** An import still resolving or downloading, which polling follows until it settles. */
+/** A state or grade as words, such as Downloading. */
+export const stateLabel = (state: string) => titleCase(state.replaceAll("-", " "));
+/** An import still resolving, downloading or verifying, which polling follows until it settles. */
 export const importBusy = (record: ImportRecord) =>
-  ["resolving", "downloading"].includes(record.state);
+  ["resolving", "downloading"].includes(record.state) || Boolean(record.verifying);
+/** Where an import stands, in plain words: its row's and review's badge. */
+export function importStatus(record: ImportRecord): { label: string; color: string } {
+  const required = (record.resources || []).filter((resource) => !resource.optional);
+  if (record.audit === "failed") return { label: "Failed", color: "red" };
+  if (record.audit === "busy") return { label: stateLabel(record.state), color: "blue" };
+  if (record.audit === "substitute") return { label: "Substitute", color: "yellow" };
+  if (record.audit === "ready") return { label: "Installed", color: "green" };
+  if (required.some((resource) => resource.status === "conflict"))
+    return { label: "Conflict", color: "red" };
+  if (required.some((resource) => resource.downloadable))
+    return { label: "Needs Download", color: "orange" };
+  return { label: "Unavailable", color: "gray" };
+}
 const folders = ["checkpoints", "clip_vision", "diffusion_models", "loras", "text_encoders", "vae"];
 
 /** Accept keeps a substitute for good; Reject drops it for the exact file, to download. */
@@ -168,6 +180,7 @@ export function LibraryImportReview({
 }) {
   const client = useQueryClient();
   const phone = usePhone();
+  useReturnFocus();
   const dialog = useId();
   const key = ["imports", id];
   const query = useQuery({
@@ -193,6 +206,8 @@ export function LibraryImportReview({
         void client.invalidateQueries({ queryKey: editableProfilesQuery.queryKey });
       }
       if (result.import.id !== id) onOpen(result.import.id);
+      if (result.failures?.length)
+        notifications.show({ color: "yellow", message: result.failures.join(" ") });
     },
   });
   const record = query.data?.import;
@@ -255,14 +270,17 @@ export function LibraryImportReview({
         ) : record ? (
           <>
             <Group gap="xs">
+              <Badge color={importStatus(record).color}>{importStatus(record).label}</Badge>
               {record.grade && (
-                <Badge color={gradeColours[record.grade.value] || "gray"}>
-                  {stateLabel(record.grade.value)}
+                <Badge variant="light" color={gradeColours[record.grade.value] || "gray"}>
+                  {stateLabel(record.grade.value)} Match
                 </Badge>
               )}
-              <Text size="sm" c="dimmed">
-                {stateLabel(record.state)}
-              </Text>
+              {record.verifying && (
+                <Text size="sm" c="dimmed">
+                  Verifying…
+                </Text>
+              )}
               <Button
                 variant="default"
                 size="compact-sm"
@@ -274,9 +292,6 @@ export function LibraryImportReview({
               </Button>
             </Group>
             {record.error && <Alert color="red">{record.error}</Alert>}
-            {!!action.data?.failures?.length && (
-              <Alert color="yellow">{action.data.failures.join(" ")}</Alert>
-            )}
             {canDraft && (
               <Button
                 variant="default"

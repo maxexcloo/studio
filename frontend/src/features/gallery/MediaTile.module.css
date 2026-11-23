@@ -210,6 +210,7 @@
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 :where(:root[data-phone]) .timestamp {
@@ -222,7 +223,7 @@
 }
 
 @media (hover: hover) {
-  :where(:root:not([data-phone])) .tile:not(:hover):not(:focus-within) .timestamp {
+  :where(:root:not([data-phone])) .tile:not(:hover):not(:has(:focus-visible)) .timestamp {
     opacity: 0;
   }
 }

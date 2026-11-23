@@ -245,14 +245,16 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
       profileId: "image:fast",
     },
   ]);
-  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await surface.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("An amber bird");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
   await askForChange("Recreate");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Recreate");
   expect(asked.at(-1)).toMatchObject({ actions: ["recreate"], request: "make it night" });
   expect(asked.at(-1)).not.toHaveProperty("profileId");
-  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await surface.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await askForChange("Edit");
   await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
@@ -335,7 +337,12 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   // The finding fills the details in place, with Undo.
   const details = report.getByRole("textbox", { name: "Details", exact: true });
   await expect(details).toHaveValue("six toes");
-  await expect(report.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+  await promptMenu(report, "Details");
+  await expect(page.getByRole("menuitem", { name: "Undo", exact: true })).toBeVisible();
+  // Escape closes only the menu, not the dialog beneath it.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(report).toBeVisible();
   expect(inspected).toEqual([{ jobId: "job-hub", itemId: "hub", upscaled: false }]);
   expect(state.jobs).toHaveLength(1);
   expect(state.gallery.find((item) => item.id === "hub")?.rating).toBeUndefined();
@@ -408,7 +415,6 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
   );
   await viewerChangeMenu(page);
   await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
-  await expandAssistantMenu(page, "Suggestions");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await closeTextEditor(page, "Prompt");
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
@@ -426,7 +432,8 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
     },
   ]);
   // Undo restores the prompt before the suggestion.
-  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await viewer.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("An amber bird");
 });
 
@@ -468,7 +475,6 @@ test("A delayed automatic change runs on its source without closing the next ima
   });
   try {
     await viewerChangeMenu(page, "Recreate");
-    await expandAssistantMenu(page, "Suggestions");
     const requested = page.waitForRequest(
       (request) =>
         request.url().endsWith("/api/suggestions") && request.postDataJSON()?.surface === "change",
@@ -596,7 +602,7 @@ test("Custom Animation edits and submits in one dialog with its text tools", asy
   }
   await more.click();
   const tools = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
-  await expect(tools.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeVisible();
+  await expect(tools.getByRole("menuitem", { name: "Refresh", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -671,7 +677,6 @@ test("The viewer prompt offers suggestions for review beside the field and in th
   );
   const suggest = async (surface: typeof viewer) => {
     await surface.getByRole("button", { name: "AI", exact: true }).click();
-    await expandAssistantMenu(page, "Suggestions");
     await page.getByRole("menuitem", { name: "At Dusk", exact: true }).click();
     await expect(surface.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
       "An amber bird at dusk",
@@ -680,7 +685,8 @@ test("The viewer prompt offers suggestions for review beside the field and in th
   const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await suggest(viewer);
   expect(state.jobs).toHaveLength(1);
-  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await viewer.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("An amber bird");
   let editor = viewer;
   if (isMobile) {
@@ -752,7 +758,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
       });
     }),
   );
-  await viewerAction(page, "Viewer Actions", "Keep & Vary", "Explore Three Directions");
+  await viewerAction(page, "Discover", "Keep & Vary", "Explore Three Directions");
   const review = page.getByRole("dialog", { name: "Explore Three Directions", exact: true });
   await review.getByRole("button", { name: "Open Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
@@ -999,7 +1005,7 @@ test("AI › More Like This Set asks for new variations of a result's set", asyn
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Viewer Actions", "More Like This Set");
+  await viewerAction(page, "Discover", "More Like This Set");
   await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "set" }]);
 });
 
@@ -1011,7 +1017,7 @@ test("AI › More Like This explicitly selects only the current image", async ({
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await expect(
     page.getByRole("menuitem", { name: "More Like This Set", exact: true }),
   ).toBeVisible();
@@ -1021,7 +1027,7 @@ test("AI › More Like This explicitly selects only the current image", async ({
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await expect(page.getByRole("menuitem", { name: "More Like This", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -1504,7 +1510,6 @@ test("A video's Animate template continues it from its last frame, and Edit make
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
-  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.referenceRequests.at(-1)).toEqual({ galleryItemId: "clip", frame: "last" });
@@ -1849,7 +1854,7 @@ test("Details keep the caption, run notes and source ahead of LoRAs and prompts"
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
   // The title's line holds when and how big; Output carries no result number.
-  await expect(details.getByText(/^\d{2}:\d{2}, 23 Oct(?: 2026)? · 1024 × 1024$/)).toBeVisible();
+  await expect(details.getByText(/\d{2}:\d{2}, 23 Oct(?: 2026)? · 1024 × 1024$/)).toBeVisible();
   await expect(details.getByRole("cell", { name: "#866", exact: true })).toHaveCount(0);
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
@@ -2373,7 +2378,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Edit",
       "Recreate",
       "Upscale",
-      "Viewer Actions",
+      "Discover",
       "Share",
       "Like",
       "Dislike",
@@ -2671,7 +2676,7 @@ test("The desktop viewer bar keeps its actions on one row in a narrow window", a
   await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
 });
 
-test("Phone viewer shows Report beside Delete and Similar under Viewer Actions", async ({
+test("Phone viewer shows Report beside Delete and Similar under Discover", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
@@ -2682,7 +2687,7 @@ test("Phone viewer shows Report beside Delete and Similar under Viewer Actions",
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
-  await viewerAction(page, "Viewer Actions", "Similar");
+  await viewerAction(page, "Discover", "Similar");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
 });

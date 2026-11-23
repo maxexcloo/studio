@@ -336,7 +336,7 @@ export function ideasFrom(
  * The usable brief edits in the text model's reply: one field of one of the numbered `projects`,
  * rewritten whole within a brief's length, different from now and stating no age under 18.
  */
-export function editsFrom(
+function editsFrom(
   reply: Record<string, unknown> | null,
   {
     projects,

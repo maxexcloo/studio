@@ -6,7 +6,7 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -15,7 +15,7 @@ import { icons } from "../../ui/icons";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
-import { dreamCountQuery } from "../dream/queries";
+import { dreamCountQuery, dreamQuery } from "../dream/queries";
 import { type GalleryState, galleryKind } from "../gallery/viewerLink";
 import { FinishedAway } from "./FinishedAway";
 import { HeaderOptions } from "./HeaderOptions";
@@ -45,6 +45,9 @@ function ModeSwitcher({ mode }: { mode: string }) {
       select: (count) => count.unseen,
     }).data || 0;
   const unseenId = useId();
+  const client = useQueryClient();
+  // Dream's deck starts loading as the pointer or focus reaches its tab.
+  const prefetchDream = () => void client.prefetchQuery(dreamQuery);
   return (
     <Group
       ref={setRoot}
@@ -102,10 +105,14 @@ function ModeSwitcher({ mode }: { mode: string }) {
                   component={Link}
                   to={item.to}
                   state={
-                    linkedGallery && galleryKind(item.to) ? { chat, turn, show, set } : undefined
+                    galleryKind(item.to)
+                      ? { ...(linkedGallery && { chat, turn, show, set }), home: !active }
+                      : undefined
                   }
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
+                  onPointerEnter={item.to === "/dream" && !active ? prefetchDream : undefined}
+                  onFocus={item.to === "/dream" && !active ? prefetchDream : undefined}
                   variant="subtle"
                   color={active ? undefined : "gray"}
                   className={classes.mode}

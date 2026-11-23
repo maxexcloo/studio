@@ -59,9 +59,10 @@ export function loadMcpPrompting(file) {
 
 /**
  * A profile guide as one paragraph: the family's summary, rules, pitfalls and example, then its
- * mode's and variant's, without sources; `max` caps it for a preview.
+ * mode's and variant's, without sources; `max` caps it for a preview, and `essentials` keeps only
+ * the summaries and rules.
  */
-export function compactGuide(guide, max = Infinity) {
+export function compactGuide(guide, max = Infinity, { essentials = false } = {}) {
   if (!guide || typeof guide !== "object") return "";
   const parts = [];
   const add = (value) => {
@@ -72,6 +73,7 @@ export function compactGuide(guide, max = Infinity) {
     if (source && typeof source === "object") {
       add(source.summary);
       add(source.rules);
+      if (essentials) continue;
       add(source.pitfalls);
       if (source.example)
         add(

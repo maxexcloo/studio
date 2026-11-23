@@ -8,7 +8,7 @@ import { compareNames } from "../../ui/DataTable";
 import { useGroupFeature } from "../auth/AccountGate";
 import { appliedCardIds } from "../characters/cardParts";
 import { draftSuggestionContext, promptIdeasQuery } from "../taste/suggestions";
-import { UndoButton, suggested } from "./AskChange";
+import { suggested } from "./AskChange";
 import { assistantQuery } from "./PromptAssistant";
 
 /** Taste-led ideas for an empty prompt or a draft with cards, applied only on selection. */
@@ -70,13 +70,11 @@ export function usePromptIdeas({
         }
       : undefined,
     label: current?.label,
-    undo: current && (
-      <UndoButton
-        onClick={() => {
-          onChange(current.before);
-          setPicked(null);
-        }}
-      />
-    ),
+    undo:
+      current &&
+      (() => {
+        onChange(current.before);
+        setPicked(null);
+      }),
   };
 }

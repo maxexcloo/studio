@@ -33,6 +33,8 @@ const idPattern = /^imp-[a-z0-9]{6,40}$/;
 const states = new Set(["resolving", "needs-files", "downloading", "ready", "failed", "cancelled"]);
 const folders = new Set(Object.keys(catalogueKinds));
 const now = () => new Date().toISOString();
+/** Imports whose name-and-size matches are being hashed in the background. */
+const verifying = new Set();
 
 /** A new record id: time-ordered, never reused. */
 export function importId(at = Date.now()) {
@@ -191,6 +193,7 @@ export function publicImport(record) {
     ...rest,
     audit: importAudit(record),
     stale: staleImport(record),
+    ...(verifying.has(record.id) ? { verifying: true } : {}),
     resources: (record.resources || []).map(({ spec: _spec, ...resource }, index) => ({
       ...resource,
       ...(downloadable(record.resources[index]) ? { downloadable: true } : {}),
@@ -198,6 +201,13 @@ export function publicImport(record) {
     offers: publicOffers(record.offers || []),
   };
 }
+
+/** An installed file matched by name and size against a checksum it hasn't been hashed against yet. */
+const unverifiedFile = (resource) =>
+  resource.status === "installed" &&
+  resource.unverified &&
+  Boolean(resource.want?.sha256) &&
+  !resource.nameOnly;
 
 /** A file's key in a record's substitute choices, so a rebuilt resource keeps its choice. */
 const choiceKey = (resource) =>
@@ -431,6 +441,15 @@ export function createImportEngine({
             note: resource.note || "",
           };
           const before = previous.get(choiceKey(item));
+          if (
+            item.status === "installed" &&
+            item.want.sha256 &&
+            !item.nameOnly &&
+            (!item.unverified || before?.verified === item.want.sha256)
+          ) {
+            delete item.unverified;
+            item.verified = item.want.sha256;
+          }
           if (item.status !== "installed" && before?.downloadId) {
             item.downloadId = before.downloadId;
             if (followDownload(item, queue)) {
@@ -458,6 +477,7 @@ export function createImportEngine({
           ...preset,
           resources: (preset.resources || []).map((resource, at) => ({
             ...resource,
+            unverified: record.resources[at].unverified,
             ...(record.resources[at].substitute
               ? {
                   status: "substitute",
@@ -473,9 +493,14 @@ export function createImportEngine({
     }
     for (const resource of record.resources) {
       if (followDownload(resource, queue)) continue;
+      // A file hashed once stays verified while its name and size still match.
+      const known = Boolean(resource.want.sha256) && resource.verified === resource.want.sha256;
       const found = resource.want.file
-        ? await inspect(resource.want, { verify }).catch(() => ({ status: "missing" }))
+        ? await inspect(resource.want, { verify: verify && !known }).catch(() => ({
+            status: "missing",
+          }))
         : { status: "missing" };
+      if (found.status !== "installed") delete resource.verified;
       // A stand-in stays in use until it is rejected for the exact file.
       if (resource.substitute) {
         resource.status = "substitute";
@@ -486,8 +511,11 @@ export function createImportEngine({
       if (found.status === "installed") {
         resource.status = "installed";
         delete resource.downloadError;
-        if (found.unverified) resource.unverified = true;
-        else delete resource.unverified;
+        if (found.unverified && !known) resource.unverified = true;
+        else {
+          delete resource.unverified;
+          if (resource.want.sha256) resource.verified = resource.want.sha256;
+        }
         if (modelRoles.has(resource.role))
           resource.profileId =
             (await Promise.resolve(profileFor(resource.want.file)).catch(() => "")) || "";
@@ -779,15 +807,38 @@ export function createImportEngine({
         changed.push(record);
     }
     for (const record of changed) store.put(record);
+    for (const record of records) verifyLater(record);
     return records;
   }
 
-  /** One record, its files checked in full. */
+  let verifications = Promise.resolve();
+  /**
+   * Hashes an import's name-and-size matches once, in the background and one import at a time,
+   * keeping the result: a large checkpoint takes tens of seconds.
+   */
+  function verifyLater(record) {
+    if (verifying.has(record.id) || !(record.resources || []).some(unverifiedFile)) return;
+    verifying.add(record.id);
+    verifications = verifications.then(async () => {
+      try {
+        const current = store.get(record.id);
+        if (current) store.put(await refresh(current, { verify: true }));
+      } catch (error) {
+        logger.warn?.(`Couldn't verify import ${record.id}: ${error.message}`);
+      } finally {
+        verifying.delete(record.id);
+      }
+    });
+  }
+
+  /** One record, brought up to date by name and size; its unverified files are hashed in the background. */
   async function open(id) {
     const record = store.get(id);
     if (!record) return null;
-    await refresh(record, { verify: true });
-    return store.put(record);
+    await refresh(record);
+    store.put(record);
+    verifyLater(record);
+    return record;
   }
 
   /** Prompt, settings and files read from a dropped image; without metadata, the vision model describes it. */

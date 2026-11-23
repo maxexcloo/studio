@@ -26,6 +26,7 @@ import {
 import { resolutions } from "../../../../shared/resolution";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
@@ -40,7 +41,6 @@ import { ChipSelect } from "../generation/ChipSelect";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName } from "../generation/payload";
-import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
 import { ProjectBriefField } from "./ProjectBriefField";
 import { projectPath, projectsQuery } from "./queries";
@@ -74,7 +74,6 @@ function FieldChip({
       floating
       // The project dialog stacks above popovers.
       withinPortal={false}
-      width={340}
       position="bottom-start"
       opened={opened}
       onOpenedChange={setOpened}

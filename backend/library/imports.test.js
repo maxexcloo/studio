@@ -94,7 +94,7 @@ const paid = {
   entry: { ...lora.entry, title: "Paid" },
 };
 
-function harness(t, { resolved = lora, log = quiet } = {}) {
+function harness(t, { resolved = lora, log = quiet, inspect } = {}) {
   const dir = tempDir(t);
   const store = createImportStore({ dataDir: dir, log });
   const catalogue = createCatalogueStore({
@@ -113,8 +113,10 @@ function harness(t, { resolved = lora, log = quiet } = {}) {
     resolveHf: async () => {
       throw new Error("This repository is gated or private.");
     },
-    inspect: async (want) =>
-      installed.has(want.file) ? { status: "installed" } : { status: "missing" },
+    inspect:
+      inspect ||
+      (async (want) =>
+        installed.has(want.file) ? { status: "installed" } : { status: "missing" }),
     downloads: () => state,
     startDownload: async (item) => {
       started.push(item.id);
@@ -200,6 +202,35 @@ test("a LoRA link becomes a durable record with a grade, a catalogue entry and D
   const again = createImportStore({ dataDir: h.dir, log: quiet });
   assert.equal(again.get(record.id).state, "ready");
   await assert.rejects(h.engine.downloadMissing(record.id), /Nothing is missing/);
+});
+
+test("a file matched by name and size is hashed once in the background, and stays verified", async (t) => {
+  const hashed = [];
+  let h;
+  h = harness(t, {
+    inspect: async (want, { verify } = {}) => {
+      if (!h.installed.has(want.file)) return { status: "missing" };
+      if (!verify) return { status: "installed", unverified: true };
+      hashed.push(want.file);
+      return { status: "installed" };
+    },
+  });
+  h.installed.add("water.safetensors");
+  const record = await h.engine.create("https://civitai.com/models/9?modelVersionId=20");
+  assert.equal(record.grade.value, "close");
+  // Opening answers from names and sizes at once; the hash follows.
+  const opened = await h.engine.open(record.id);
+  assert.equal(publicImport(opened).verifying, true);
+  assert.equal(opened.state, "ready");
+  while (publicImport(h.store.get(record.id)).verifying)
+    await new Promise((resolve) => setImmediate(resolve));
+  const [listed] = await h.engine.list();
+  assert.deepEqual(
+    [listed.grade.value, listed.resources[0].unverified, publicImport(listed).verifying],
+    ["exact", undefined, undefined],
+  );
+  await h.engine.open(record.id);
+  assert.deepEqual(hashed, ["water.safetensors"], "hashed once");
 });
 
 test("paid files are listed as unavailable with the reason and never queued", async (t) => {

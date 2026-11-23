@@ -5,13 +5,14 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type GallerySort, gallerySortGroups } from "../../../../shared/gallery-sort";
 import type { MediaKind } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { SearchInput } from "../../ui/SearchInput";
 import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { iconChipProps } from "../generation/chip";
-import { ChipPopup, FilterButton } from "../generation/Picker";
+import { FilterButton } from "../generation/Picker";
 import {
   type FilterChip,
   FilterChips,
@@ -161,7 +162,6 @@ export function GalleryToolbar({
         spacious={false}
         opened={filtering}
         onOpenedChange={setFiltering}
-        width={340}
         position="bottom-start"
         detail={
           results && (

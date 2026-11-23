@@ -10,6 +10,7 @@ import {
   image,
   promptMenu,
   stamp,
+  undoProposal,
   viewerAction,
   viewerChangeButton,
   viewerChangeMenu,
@@ -113,8 +114,9 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   const dock = page.locator("[data-composer-dock]");
   const compactMenu = await promptMenu(dock, "Prompt");
   await expect(compactMenu.getByRole("menuitem", { name: "Templates", exact: true })).toBeVisible();
+  // An empty prompt's ideas sit in the menu itself, beside the Templates submenu.
   await expect(
-    compactMenu.getByRole("menuitem", { name: "Suggestions", exact: true }),
+    compactMenu.getByRole("menuitem", { name: ideas[0].label, exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(compactMenu).toBeHidden();
@@ -131,26 +133,23 @@ test("The composer groups ideas and draft suggestions in its compact and expande
     { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
   ]);
   let menu = await promptMenu(page, "Prompt");
-  await expandAssistantMenu(menu, "Suggestions");
-  const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
   const sorted = ideas.map((idea) => idea.label).sort((a, b) => a.localeCompare(b));
-  await expect(suggestions.getByRole("menuitem").first()).toHaveText(sorted[0]);
+  await expect(menu.getByRole("menuitem").first()).toHaveText(sorted[0]);
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
   expect(asked).toEqual([
     { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
   ]);
-  await backToActionMenu(menu);
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
-  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1].prompt);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("");
   await prompt.fill("A fox");
   menu = await promptMenu(page, "Prompt");
   await expandAssistantMenu(menu, "Suggestions");
+  const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
   await expect(
     suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }),
   ).toBeVisible();
@@ -165,7 +164,7 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(prompt).toHaveValue(steps[0].prompt);
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
   expect(state.jobs).toHaveLength(0);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await undoProposal(page, "Prompt");
   await expect(prompt).toHaveValue("A fox");
 });
 
@@ -191,7 +190,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const menu = await viewerChangeMenu(page);
   await expect(menu.getByRole("menuitem", { name: "Use as Character", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
-  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeDisabled();
+  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeEnabled();
   await expect(menu.getByRole("menuitem", { name: "Review Prompt", exact: true })).toHaveAttribute(
     "aria-checked",
     "false",
@@ -202,8 +201,9 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const refresh = menu.getByRole("menuitem", { name: "Refresh", exact: true });
   await expect(refresh).toBeDisabled();
   await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
-  release[0]();
   await expandAssistantMenu(menu, "Suggestions");
+  await expect(menu.getByRole("menuitem", { name: "Loading…", exact: true })).toBeDisabled();
+  release[0]();
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
   await backToActionMenu(menu);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
@@ -245,7 +245,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
     "An amber bird",
   );
   expect(asked.filter((body) => body.surface === "change")).toEqual([]);
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText([
     "Keep & Vary",
     "More Like This",
@@ -279,7 +279,6 @@ test("Custom Animation suggests what could happen from the image, filling the in
     .getByRole("button", { name: "AI Instruction Actions", exact: true })
     .click();
   const menu = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
-  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" }]);
   await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(
@@ -394,9 +393,7 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const reason = "Like a few results so Studio learns your taste.";
   const menu = await viewerChangeMenu(page);
-  const suggestions = menu.getByRole("menuitem", { name: "Suggestions", exact: true });
-  await expect(suggestions).toHaveAccessibleDescription(reason);
-  await expect(suggestions).toBeDisabled();
+  await expect(menu.getByRole("menuitem", { name: reason, exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
   await closeTextEditor(page, "Prompt");
@@ -406,9 +403,7 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const ideas = await promptMenu(page, "Prompt");
   await expect(ideas.getByRole("menuitem", { name: "Recent Prompts", exact: true })).toBeVisible();
-  const ideaSuggestions = ideas.getByRole("menuitem", { name: "Suggestions", exact: true });
-  await expect(ideaSuggestions).toHaveAccessibleDescription(reason);
-  await expect(ideaSuggestions).toBeDisabled();
+  await expect(ideas.getByRole("menuitem", { name: reason, exact: true })).toBeDisabled();
 });
 
 test("Review stays off after editing and Reset, while an explicit opt-in preserves the current prompt for Undo", async ({
@@ -453,7 +448,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await closeTextEditor(page, "Prompt");
   menu = await viewerChangeMenu(page);
   await expect(review()).toHaveAttribute("aria-checked", "true");
-  await expandAssistantMenu(menu, "Suggestions");
+  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toHaveCount(0);
   await expect(menu.getByRole("menuitem", { name: "Night Version", exact: true })).toBeVisible();
   await expect
     .poll(() => asked.filter((body) => body.surface === "viewer").at(-1))
@@ -471,7 +466,8 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
     request: steps[2].request,
   });
   expect(state.jobs).toHaveLength(1);
-  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await viewer.getByRole("button", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(edited);
   menu = await viewerChangeMenu(page);
   await review().click();
@@ -484,10 +480,9 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await expect(menu).toBeHidden();
   menu = await viewerChangeMenu(page, "Recreate");
   await expect(review()).toHaveAttribute("aria-checked", "false");
-  await expect(menu.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeEnabled();
+  await expect(menu.getByRole("menuitem", { name: "Night Version", exact: true })).toBeEnabled();
   await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Compare in Composer");
   await expect(menu.getByRole("menuitem").last()).toHaveText("Recreate in Composer");
-  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Night Version", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(asked.filter((body) => body.surface === "change").at(-1)).toMatchObject({

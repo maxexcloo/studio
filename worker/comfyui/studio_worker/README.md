@@ -2,7 +2,7 @@
 
 A ComfyUI custom node for running ComfyUI as a stateless worker behind Studio.
 
-Studio fetches each finished output over ComfyUI's `/view` API into its own per-account storage. It then calls this node to delete ComfyUI's copy, along with any reference images staged for that run only. ComfyUI has no delete API of its own, so this node is what keeps it free of studio data. Studio and ComfyUI no longer need to share a folder.
+Studio fetches each finished output over ComfyUI's `/view` API into its own per-account storage. It then calls this node to delete ComfyUI's copy, along with any reference images staged for that run only. ComfyUI has no delete API of its own, so this node is what keeps it free of studio data. Studio and ComfyUI need not share a folder.
 
 ## Install
 
@@ -36,14 +36,11 @@ text_encoders, ultralytics_bbox and vae. Only `.safetensors` and `.gguf` files
 are accepted, except in ultralytics_bbox (Impact Subpack's face detectors),
 which accepts only `.pt`.
 
-Local model storage remains the default. In worker mode, a local mirror mount
-is never used for downloads; use Downloads for the active worker library.
-
 ## Token
 
 Set the same `STUDIO_WORKER_TOKEN` in ComfyUI's environment and in Studio's.
-Without one, only the media deletion endpoint retains its existing open-worker
-behaviour; model inventory and mutations are refused. Keep ComfyUI reachable
+Without one, only the media deletion endpoint stays open; model inventory and
+mutations are refused. Keep ComfyUI reachable
 only by Studio and administrators.
 
 Without this node, Studio still stores everything in its own storage, but ComfyUI keeps its copies. Studio logs a warning once per backend.

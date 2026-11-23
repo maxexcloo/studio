@@ -29,6 +29,7 @@ import {
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
+import { ChipPopup, PopupHeading } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -44,11 +45,9 @@ import { modelFamilyLabel } from "./modelFamily";
 import { isProfile, profileForLoras } from "./payload";
 import {
   ChipContent,
-  ChipPopup,
   PickerGrid,
   PickerHeader,
   PickerTile,
-  PopupHeading,
   SavedName,
   useNaming,
   usePickerChoices,
@@ -98,7 +97,7 @@ export const compatibleLoras = (profile: Profile | undefined, metadata: Record<s
     (file) => !loraRejection(metadata[file], profile) && !unavailableFor(profile, metadata[file]),
   );
 /** Why a LoRA can't run on this profile: its deferral covers only Radiance's composed adapter. */
-export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
+const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
   profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
@@ -223,7 +222,6 @@ export function LoraPicker({
     return (
       <ChipPopup
         title="LoRAs"
-        width="100%"
         opened={picker.opened}
         onOpenedChange={picker.setOpened}
         trap={!adding}
@@ -233,7 +231,6 @@ export function LoraPicker({
         leading={
           <ChipPopup
             title="Add LoRAs"
-            width="100%"
             opened={picker.opened && adding}
             onOpenedChange={setAdding}
             target={
@@ -261,7 +258,7 @@ export function LoraPicker({
     <ChipPopup
       title="LoRAs"
       position={position}
-      width="min(56rem, calc(100vw - 2rem))"
+      wide
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
       target={trigger}
@@ -778,7 +775,7 @@ function StackEntry({
               });
             }}
           >
-            <Scroller controlSize={28} edgeGradientColor="var(--mantine-color-body)">
+            <Scroller controlSize={28} edgeGradientColor="transparent">
               <Group gap={6} wrap="nowrap" role="group" aria-label={`${title} Trigger Words`}>
                 <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
                   Trigger Words

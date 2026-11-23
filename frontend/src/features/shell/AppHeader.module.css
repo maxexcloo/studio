@@ -84,8 +84,7 @@
 }
 
 :where(:root[data-phone]) .header button[data-queue-count] {
-  width: auto;
-  padding-inline: 3px;
+  padding-inline: 4px;
 }
 
 :where(:root[data-phone]) .header:has([data-queue-count]) .modes {

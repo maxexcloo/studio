@@ -59,9 +59,9 @@ interface TasteSettings {
   duration?: number;
 }
 /**
- * The result a signal is about: its job and gallery item, prompt, negative, profile, enabled LoRAs,
- * settings, seed, title and caption tags. Older signals keep only the job, a prompt cut to 300
- * characters, the profile and LoRA names.
+ * The result a signal is about: its job and gallery item, prompt and negative cut to 300 characters,
+ * profile, enabled LoRAs, settings, seed, title and caption tags. Older signals keep only the job,
+ * the prompt, the profile and LoRA names.
  */
 export interface TasteChoice {
   jobId?: string;
@@ -185,12 +185,14 @@ export interface TasteWriter<Content = string> {
   }): Promise<{ text: string }>;
 }
 
-const maxSignals = 200;
+const maxSignals = 1000;
+/** Signals past this many drop their prompt, negative and caption, keeping what the scores read. */
+const maxDetailed = 200;
 /** Comparison answers fill at most half the signals, so a run of them can't push out likes and keeps. */
 const answerKinds = new Set<TasteKind>(["preferred", "pair-both", "pair-neither"]);
 /** One action, such as a bulk like, adds at most this many signals so it can't flood the profile. */
 const maxPerCall = 20;
-/** The summariser reads each prompt cut to this length; signals keep it whole. */
+/** Signals keep each prompt, negative and caption cut to this length. */
 const maxPrompt = 300;
 /** The summariser writes after this many new signals, at most every ten minutes. */
 const summariseAfter = 10;
@@ -205,7 +207,7 @@ const details = (choice: TasteChoice) => [
   choice.profileId && `model ${choice.profileId}`,
   choice.loras?.length && `LoRAs ${choice.loras.map(loraText).join(", ")}`,
   choice.title && `title ${JSON.stringify(choice.title)}`,
-  choice.prompt && `prompt ${JSON.stringify(choice.prompt.slice(0, maxPrompt))}`,
+  choice.prompt && `prompt ${JSON.stringify(choice.prompt)}`,
   choice.caption && `caption ${JSON.stringify(choice.caption)}`,
   choice.tags?.length && `tags ${choice.tags.join(", ")}`,
 ];
@@ -221,6 +223,12 @@ const describe = (signal: TasteSignal) =>
   ]
     .filter(Boolean)
     .join("; ");
+function brief(signal: TasteSignal) {
+  const copy = structuredClone(signal);
+  for (const choice of [copy, copy.over, copy.also, copy.third])
+    for (const key of ["prompt", "negative", "caption"] as const) delete choice?.[key];
+  return copy;
+}
 const owner = (account: RouteAccount) => account?.userId || "";
 const empty = (): StoredTaste => ({
   preferences: {},
@@ -593,8 +601,8 @@ function tasteChoice(jobId: unknown, values: ChoiceValues = {}): TasteChoice {
     ),
     title: text(values.title),
     caption: text(values.caption).slice(0, maxPrompt),
-    prompt: text(values.prompt),
-    negative: text(values.negative),
+    prompt: text(values.prompt).slice(0, maxPrompt),
+    negative: text(values.negative).slice(0, maxPrompt),
     profileId: text(values.profileId),
     loras,
     settings: tasteSettings(values),
@@ -805,7 +813,8 @@ export function createTaste({
           ...taste.signals,
         ]
           .filter((signal) => !answerKinds.has(signal.kind) || ++answers <= maxSignals / 2)
-          .slice(0, maxSignals);
+          .slice(0, maxSignals)
+          .map((signal, index) => (index < maxDetailed ? signal : brief(signal)));
         taste.since += signals.length;
         write(ownerId, taste);
         // Best effort in the background; the request that added the signal never waits.

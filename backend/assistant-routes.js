@@ -235,7 +235,7 @@ export function registerAssistantRoutes(
     if (!engine || !allowed(account, "promptAssistant"))
       return res.json({ ok: true, available: false, presets: [], themes: [], changes: [] });
     try {
-      const spicy = allowed(account, "uncensoredModels");
+      const uncensored = allowed(account, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
       const noNegative = (await profiles(req))
         .filter((profile) => {
@@ -270,7 +270,7 @@ export function registerAssistantRoutes(
             key,
             promptStyleStore()
               .usable(kind)
-              .filter((style) => !style.uncensored || spicy)
+              .filter((style) => (uncensored ? !style.censored : !style.uncensored))
               // A fixed AI edit runs as its instruction, as a picked suggestion's request does.
               .map(({ id, label, description, instruction }) => ({
                 id,
@@ -280,7 +280,7 @@ export function registerAssistantRoutes(
               })),
           ]),
         ),
-        spicy,
+        uncensored,
         loras: allowed(account, "loras"),
         noNegative,
       });

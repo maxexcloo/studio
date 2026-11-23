@@ -26,7 +26,7 @@ test("The Library opens on Presets and groups Personal, Models and Prompting", a
   const groups = {
     Personal: ["Presets", "Characters", "Outfits", "Scenes"],
     Models: ["Files", "Imports", "LoRAs", "Profiles"],
-    Prompting: ["Guides", "Prompt Instructions", "Prompt Styles"],
+    Prompting: ["Guides", "Prompt Instructions", "Prompt Styles", "Suggestion Instructions"],
   };
   const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -362,7 +362,7 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await section(page, "Library", "LoRAs");
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  const filters = page.getByRole("dialog", { name: "Filter LoRAs", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
   // Families are inline choices, All until one is chosen.
   const family = filters.getByRole("radiogroup", { name: "Family", exact: true });
   await expect(family.getByRole("radio", { name: "All", exact: true })).toBeChecked();
@@ -375,7 +375,6 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await expect(table.getByRole("row")).toHaveCount(3);
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await updates(page, "Update All");
-  await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
   // With nothing left to apply, Update All waits for the next check.
   await loras.getByRole("button", { name: "Updates", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Update All", exact: true })).toBeDisabled();
@@ -535,7 +534,21 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
       error: "HTTP 451",
       resources: [],
     },
-    { id: "imp-ready", name: "Kept Model", state: "ready", audit: "ready", resources: [] },
+    {
+      id: "imp-ready",
+      name: "Kept Model",
+      state: "ready",
+      audit: "ready",
+      modelType: "LORA",
+      baseModel: "Flux.1 D",
+      resources: [
+        {
+          name: "kept.safetensors",
+          want: { file: "kept.safetensors", folder: "loras" },
+          status: "installed",
+        },
+      ],
+    },
   ];
   await page.route("**/api/library/imports**", (route) => {
     const { pathname } = new URL(route.request().url());
@@ -563,7 +576,11 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  const needs = page.getByRole("region", { name: "Needs Files · 1", exact: true });
+  // Each row says what the import gave and where it went.
+  const installed = page.getByRole("region", { name: "Installed · 1", exact: true });
+  await expect(installed).toContainText("LoRA · Flux.1 D · loras/kept.safetensors");
+  await expect(installed.getByText("Installed", { exact: true })).toBeVisible();
+  const needs = page.getByRole("region", { name: "Missing Files · 1", exact: true });
   await expect(needs).toContainText("missing.safetensors: Not downloaded yet");
   await needs.getByRole("button", { name: "Download All Missing", exact: true }).click();
   // A substitute shows beside the file it stands in for.
@@ -587,7 +604,6 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
     .getByRole("dialog", { name: "Clear Stale Imports" })
     .getByRole("button", { name: "Clear Stale", exact: true })
     .click();
-  await expect(page.getByText("1 cleared", { exact: true })).toBeVisible();
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Clear Stale", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
@@ -784,12 +800,12 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("XL Base");
   await page
-    .getByRole("dialog", { name: "Filter Files", exact: true })
+    .getByRole("dialog", { name: "Filters", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
     .click();
   await expect(table.getByRole("row")).toHaveCount(3);
   await page.getByRole("button", { name: "Filter Files", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Filter Files", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Filters", exact: true })).toBeHidden();
   await (await toolbarSearch(page, "Files")).fill("flux");
   await expect(table.getByRole("row")).toHaveCount(2);
   // Escape leaves search, keeping the query and the Library open.

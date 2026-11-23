@@ -58,7 +58,7 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
     jobId: "job-1",
     itemId: "item-1",
     title: "Fox in Snow",
-    prompt: "a fox ".repeat(80).trim(),
+    prompt: "a fox ".repeat(80).trim().slice(0, 300),
     negative: "blurry",
     profileId: "flux-2",
     loras: [{ name: "film.safetensors", strength: 0.7 }, { name: "grain" }],
@@ -81,7 +81,7 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
     kind: "like",
     jobId: "job-2",
   });
-  for (let index = 0; index < 205; index++)
+  for (let index = 0; index < 1005; index++)
     taste.record("alice", [tasteSignal("like", `job-${index}`)]);
   taste.record("bob", [tasteSignal("unlike", "theirs")]);
   // A bulk like adds at most 20 signals.
@@ -91,15 +91,25 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
   );
   assert.equal(taste.read("carol").signals.length, 20);
   // A run of comparison answers fills at most half, leaving the likes before it.
-  for (let index = 0; index < 150; index++)
+  for (let index = 0; index < 600; index++)
     taste.record("carol", [tasteSignal("preferred", `answer-${index}`)]);
   const kinds = taste.read("carol").signals.map((signal) => signal.kind);
-  assert.deepEqual([kinds.length, kinds.filter((kind) => kind === "like").length], [120, 20]);
+  assert.deepEqual([kinds.length, kinds.filter((kind) => kind === "like").length], [520, 20]);
   const alice = taste.read("alice");
-  assert.equal(alice.signals.length, 200);
-  assert.equal(alice.signals[0].jobId, "job-204");
-  assert.equal(alice.since, 205);
+  assert.equal(alice.signals.length, 1000);
+  assert.equal(alice.signals[0].jobId, "job-1004");
+  assert.equal(alice.since, 1005);
   assert.ok(alice.signals[0].at);
+  // Past the newest 200, signals keep what the scores read without their text.
+  taste.record("dave", [tasteSignal("keep", "old", itemValues(item))]);
+  for (let index = 0; index < 200; index++)
+    taste.record("dave", [tasteSignal("like", `new-${index}`, itemValues(item))]);
+  const dave = taste.read("dave").signals;
+  assert.equal(dave[199].prompt, item.prompt.trim().slice(0, 300));
+  assert.deepEqual(
+    [dave[200].jobId, dave[200].prompt, dave[200].negative, dave[200].tags],
+    ["old", undefined, undefined, ["fox", "snow"]],
+  );
   assert.deepEqual(
     taste.read("bob").signals.map((signal) => signal.jobId),
     ["theirs"],

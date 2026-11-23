@@ -179,7 +179,6 @@ function CardDescription({
         value={props.value}
         onChange={props.onChange}
         tools={assisted ? [ideas.action] : []}
-        send={ideas.undo}
       />
       {ideas.dialog}
     </>

@@ -185,6 +185,13 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   await compareMenu(page, "Add Variant");
   await expectVariant(page, "D");
   await expect(prompt(page)).toHaveValue("A silver fox");
+  // Remove drops one variant; Clear drops them all.
+  const overview = await openCompare(page);
+  await overview.getByRole("button", { name: "Remove Variant D", exact: true }).click();
+  await expect(overview.getByRole("listitem")).toHaveCount(3);
+  await page.keyboard.press("Escape");
+  await expect(overview).toBeHidden();
+  await expectVariant(page, "C");
 
   // Seeds start over from the variant being edited, each run with its own seed.
   await compareMenu(page, "Clear");
@@ -196,7 +203,7 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const requests = state.comparisons[0].requests;
   expect(requests.map((variant: any) => variant.input.prompt)).toEqual(
-    Array(3).fill("A silver fox"),
+    Array(3).fill("A golden fox"),
   );
   expect(new Set(requests.map((variant: any) => variant.input.seed)).size).toBe(3);
   expect(requests.every((variant: any) => /^Seed \d+$/.test(variant.label))).toBe(true);
@@ -477,7 +484,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(page).toHaveURL(/\/images$/);
   await page.getByRole("button", { name: "Open image: Prompt B", exact: true }).click();
   // The viewer's AI menu opens the comparison the image belongs to.
-  await viewerAction(page, "Viewer Actions");
+  await viewerAction(page, "Discover");
   await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });
@@ -535,16 +542,17 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
   ).toHaveAttribute("aria-pressed", "false");
   expect(state.comparisons[0].winnerItemId).toBeNull();
 
-  // The Comparisons filter keeps only compared results.
-  await page.getByRole("link", { name: "Back to Images", exact: true }).click();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Comparisons", exact: true }).click();
+  // The Comparisons view lists the new comparison, covered by its first variant.
+  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Comparisons",
+  );
+  await expect(
+    page.getByRole("button", { name: "Open Comparison: Tin Owl", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Open image: Felt Owl", exact: true })).toHaveCount(
     0,
   );
-  await expect(
-    page.getByRole("button", { name: "Open image: Tin Owl", exact: true }),
-  ).toBeVisible();
 });
 
 test("Variants of a result show their numbers, the axis they vary and propose a pick for the brief", async ({

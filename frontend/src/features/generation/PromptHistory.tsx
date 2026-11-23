@@ -23,11 +23,11 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { api, post } from "../../api";
 import type { Action } from "../../ui/ActionBar";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
-import { ChipPopup } from "./Picker";
 
 type PromptKind = "positive" | "negative";
 interface PromptEntry {
@@ -185,7 +185,6 @@ export function usePromptHistory({
     <ChipPopup
       title={title}
       position="top-end"
-      width={500}
       opened={opened}
       onOpenedChange={setOpened}
       target={<span />}

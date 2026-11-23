@@ -142,7 +142,14 @@ export function AboutStudio() {
           {outputs ? ` ${plural(outputs, "result")} made here · no telemetry.` : ""}
         </Text>
       </Stack>
-      {/* What is running leads; the other groups follow A–Z. */}
+      <SettingGroup title="Credits">
+        {credits.map((credit) => (
+          <SettingRow key={credit.name} label={credit.name} description={credit.what}>
+            {link(credit.url, credit.name)}
+          </SettingRow>
+        ))}
+      </SettingGroup>
+      <Help />
       <SettingGroup title="Release">
         {release && (
           <SettingRow label="Version" description="The release running here.">
@@ -171,14 +178,6 @@ export function AboutStudio() {
           {link(repository, "GitHub")}
         </SettingRow>
       </SettingGroup>
-      <SettingGroup title="Credits">
-        {credits.map((credit) => (
-          <SettingRow key={credit.name} label={credit.name} description={credit.what}>
-            {link(credit.url, credit.name)}
-          </SettingRow>
-        ))}
-      </SettingGroup>
-      <Help />
     </Stack>
   );
 }

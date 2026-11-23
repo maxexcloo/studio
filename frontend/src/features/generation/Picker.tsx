@@ -5,15 +5,12 @@ import {
   Button,
   Combobox,
   FileButton,
-  FocusTrap,
   Group,
   Image,
   InputBase,
   Loader,
   Menu,
-  Modal,
   Popover,
-  type PopoverProps,
   ScrollArea,
   Stack,
   Text,
@@ -27,8 +24,6 @@ import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import {
   type CSSProperties,
   type DragEvent,
-  type FocusEvent,
-  type KeyboardEvent,
   type ReactNode,
   type Ref,
   useEffect,
@@ -38,8 +33,7 @@ import {
 } from "react";
 
 import { menuWidth } from "../../theme";
-import { ClearButton } from "../../ui/ClearButton";
-import { DialogFooter } from "../../ui/ConfirmDialog";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
@@ -48,8 +42,7 @@ import { ScrollingSegments } from "../../ui/ScrollingSegments";
 import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
 import { usePhone, useTouch } from "../../ui/usePhone";
-import { useSwipeClose } from "../../ui/useSwipeClose";
-import { chipProps, escapePanel, fittedPopup, iconChipProps } from "./chip";
+import { chipProps, iconChipProps } from "./chip";
 import { uploadTypes } from "./references";
 
 import classes from "./Picker.module.css";
@@ -68,205 +61,6 @@ export function usePickerChoices(opened: boolean, empty: boolean) {
     setAdding(opened && empty);
   }
   return [adding, setAdding] as const;
-}
-
-/**
- * A popup's or column's heading: its title and any `detail`, then a saved record's `name` (its
- * `SavedName`) filling the row, then any compact subtle `actions` at the end.
- */
-export function PopupHeading({
-  title,
-  detail,
-  name,
-  actions,
-}: {
-  title: string;
-  detail?: ReactNode;
-  name?: ReactNode;
-  actions?: ReactNode;
-}) {
-  return (
-    <Group
-      className={classes.heading}
-      justify="space-between"
-      gap="xs"
-      mih={28}
-      wrap={name ? "wrap" : "nowrap"}
-    >
-      <Group gap="xs" wrap="nowrap" miw={0} flex={name ? "none" : undefined}>
-        <Text fw={600} truncate>
-          {title}
-        </Text>
-        {detail}
-      </Group>
-      {name}
-      {actions && (
-        <Group gap="xs" wrap="nowrap">
-          {actions}
-        </Group>
-      )}
-    </Group>
-  );
-}
-
-/**
- * A chip's popup. Its heading holds the title, any `detail`, any saved record's `name` and any
- * compact subtle `actions` in one row, on desktop as in the phone sheet's header beside Close. Its footer is the shared `DialogFooter`:
- * at most one `leading` action that adds content (Add) at the left edge, then `onClear` as the shared ✕, then the
- * `primary`. Choices apply as they are made, so the footer ends with Done where it has no
- * `primary`, and desktop shows one only where it has an action besides Done.
- * An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it as a
- * column beside everything else, divided to the top, above the footer; phones leave it out.
- * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
- * between the header and the footer, pinned above the safe area, unless the popup is `floating`: a
- * small form, such as Settings or Presets, stays a popover fitted to the screen, as the rail's other
- * dropdowns. Escape closes nested layers first.
- */
-export function ChipPopup({
-  title,
-  detail,
-  name,
-  opened,
-  onOpenedChange,
-  target,
-  tooltip = false,
-  actions,
-  width,
-  position = "top-start",
-  trap = true,
-  withinPortal = true,
-  floating = false,
-  spacious = !floating,
-  leading,
-  onClear,
-  clearDisabled,
-  primary,
-  aside,
-  children,
-}: {
-  title: string;
-  detail?: ReactNode;
-  /** The `SavedName` of the record the popup edits. */
-  name?: ReactNode;
-  opened: boolean;
-  onOpenedChange: (opened: boolean) => void;
-  target: ReactNode;
-  /** Icon-only chips name themselves with the title's tooltip. */
-  tooltip?: boolean;
-  actions?: ReactNode;
-  width: number | string;
-  position?: PopoverProps["position"];
-  /** Off while a confirmation over the popup owns focus and clicks. */
-  trap?: boolean;
-  /** Off for a popup inside another, so pressing in it is not outside its parent. */
-  withinPortal?: boolean;
-  /** A popover on phones too, instead of a full-screen sheet. */
-  floating?: boolean;
-  /** Reserves a minimum body height when anchored, including if floating on a phone. */
-  spacious?: boolean;
-  leading?: ReactNode;
-  onClear?: () => void;
-  clearDisabled?: boolean;
-  primary?: ReactNode;
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
-  const phone = usePhone();
-  const touch = useTouch();
-  const close = () => onOpenedChange(false);
-  const footer = (
-    <DialogFooter leading={leading}>
-      {onClear && <ClearButton disabled={clearDisabled} onClear={onClear} />}
-      {primary || <Button onClick={close}>Done</Button>}
-    </DialogFooter>
-  );
-  // Pulling the phone sheet down by its header, or its content from the top, closes it.
-  const swipe = useSwipeClose("down", close);
-  // The popup handles its own Escape, so the composer's Drawer behind it stays open. A dialog it
-  // opens, such as a card editor, portals elsewhere and keeps its own Escape.
-  const layer = {
-    "data-composer-layer": true,
-    "data-chip-popup": true,
-    "aria-label": title,
-    onFocusCapture: (event: FocusEvent<HTMLElement>) => {
-      if (event.currentTarget.contains(event.target))
-        event.target.setAttribute("data-mantine-stop-propagation", "true");
-    },
-  };
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => trap && escapePanel(event, close);
-  if (phone && !floating)
-    return (
-      <>
-        {target}
-        <Modal.Root
-          opened={opened}
-          onClose={close}
-          fullScreen
-          trapFocus={trap}
-          closeOnEscape={false}
-          returnFocus
-          classNames={{ content: classes.sheet, body: classes.sheetBody }}
-        >
-          <Modal.Overlay />
-          {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
-          <Modal.Content {...layer} {...swipe} onKeyDownCapture={onKeyDown}>
-            {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
-            <FocusTrap.InitialFocus />
-            <Modal.Header className={classes.sheetHeader}>
-              {/* The detail stays outside the title, which names the sheet. */}
-              <div className={classes.sheetTitle}>
-                <Modal.Title>{title}</Modal.Title>
-                {detail}
-              </div>
-              {name}
-              {actions}
-              <Modal.CloseButton aria-label={`Close ${title}`} />
-            </Modal.Header>
-            <Modal.Body>{children}</Modal.Body>
-            {footer}
-          </Modal.Content>
-        </Modal.Root>
-      </>
-    );
-  return (
-    <Popover
-      opened={opened}
-      onChange={onOpenedChange}
-      width={width}
-      position={position}
-      trapFocus={trap}
-      closeOnClickOutside={trap}
-      closeOnEscape={false}
-      returnFocus
-      shadow="md"
-      withinPortal={withinPortal}
-      {...fittedPopup}
-    >
-      <PopupTooltip label={title} disabled={!tooltip}>
-        <Popover.Target>{target}</Popover.Target>
-      </PopupTooltip>
-      <Popover.Dropdown
-        data-popup-outside={trap}
-        {...layer}
-        aria-labelledby=""
-        maw="calc(100vw - 24px)"
-        onKeyDown={onKeyDown}
-      >
-        {/* Touch screens focus the popup itself, so its first field doesn't raise the keyboard. */}
-        {touch && <FocusTrap.InitialFocus />}
-        <Stack gap="sm">
-          <div className={aside ? classes.columns : undefined}>
-            <Stack gap="sm">
-              <PopupHeading title={title} detail={detail} name={name} actions={actions} />
-              {spacious ? <div className={classes.popupBody}>{children}</div> : children}
-            </Stack>
-            {aside && <div className={classes.aside}>{aside}</div>}
-          </div>
-          {(leading || onClear || primary) && footer}
-        </Stack>
-      </Popover.Dropdown>
-    </Popover>
-  );
 }
 
 export function FilterButton({
@@ -375,7 +169,6 @@ export function PickerHeader<Tab extends string>({
               spacious={false}
               opened={filtering}
               onOpenedChange={setFiltering}
-              width={340}
               position="bottom-end"
               withinPortal={false}
               onClear={onClearFilters}
@@ -419,14 +212,12 @@ export function dragPicture(data: DataTransfer, picture: HTMLImageElement) {
 export function PickerGrid({
   label,
   rows = false,
-  fixedThumbnails = false,
   ref,
   style,
   children,
 }: {
   label: string;
   rows?: boolean;
-  fixedThumbnails?: boolean;
   ref?: Ref<HTMLDivElement>;
   style?: CSSProperties;
   children: ReactNode;
@@ -436,7 +227,6 @@ export function PickerGrid({
       ref={ref}
       className={classes.grid}
       data-rows={rows || undefined}
-      data-fixed-thumbnails={fixedThumbnails || undefined}
       role="list"
       aria-label={label}
       style={style}
@@ -855,7 +645,7 @@ export function SavedName<T extends SavedItem>({
   };
   return (
     <>
-      <Group className={classes.name} gap="xs" wrap="nowrap" flex="1 1 0" miw={0}>
+      <Group gap="xs" wrap="nowrap" flex="1 1 0" miw={0}>
         {/* The list outgrows the field, which shares its heading's row. */}
         <Combobox
           store={combobox}

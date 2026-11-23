@@ -10,11 +10,17 @@ Studio reads process environment variables first, then its settings file on star
 
 On a Linux host, copy [compose.yaml](config/compose.yaml) and [studio.env.example](config/studio.env.example), saved as `.env`, into one folder and run `docker compose up -d`. For the [`docker run` quick start](README.md#run-with-docker), pass `--env-file .env` in place of `-e HOST=127.0.0.1`. Recreate the container with the same data volume after changing the file.
 
+Without host networking (Docker Desktop, or published ports), no browser reaches Studio over loopback, so single-user mode answers nobody. Set `STUDIO_MULTI_USER=1`, then create the recovery administrator inside the container; it asks for the password twice without echoing it:
+
+```sh
+docker exec -it studio node backend/commands/create-admin.mjs --email you@example.com
+```
+
 The environment example points to a ComfyUI server on the same Linux host. Edit the worker URL for your installation, or follow the [Radiance setup](#radiance). Chat integrations and the prompt assistant are optional.
 
 ## Kubernetes
 
-Start from [kubernetes.yaml](config/kubernetes.yaml): a one-replica Deployment with the `Recreate` strategy, a persistent volume at `/data`, a Service on port 8787 and probes on `/api/ping` (liveness) and `/api/ready` (readiness). Supply credentials through a Secret. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator, then set `STUDIO_ALLOWED_HOSTS` and add your HTTPS ingress.
+Start from [kubernetes.yaml](config/kubernetes.yaml): a one-replica Deployment with the `Recreate` strategy, a persistent volume at `/data`, a Service on port 8787 and probes on `/api/ping` (liveness) and `/api/ready` (readiness: the data folder is writable), which answer without an account. Supply credentials through a Secret. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator, then set `STUDIO_ALLOWED_HOSTS` and add your HTTPS ingress.
 
 ### Runtime Control
 
@@ -63,13 +69,11 @@ This path uses Radiance's own media API. Install the [ComfyUI worker](worker/REA
 
 ## Accounts & Single Sign-On
 
-`STUDIO_MULTI_USER=1` turns on accounts. Create the recovery administrator from a browser connected directly over loopback, then add accounts in **Settings › Users** and grant features in **Settings › Groups**. Without it, Studio is single-user and answers only direct loopback connections.
+`STUDIO_MULTI_USER=1` turns on accounts. Create the recovery administrator from a browser connected directly over loopback (or with [`create-admin`](#docker)), then add accounts in **Settings › Users** and grant features in **Settings › Groups**. Without it, Studio is single-user and answers only direct loopback connections.
 
 For the [Docker quick start](README.md#run-with-docker), set `STUDIO_MULTI_USER=1` in `.env` and create the administrator at <http://127.0.0.1:8787> before adding a TLS proxy. Keep the same data volume when recreating the container. `STUDIO_ALLOWED_HOSTS` lists the public hostnames Studio answers to, separated by commas. See [Security](SECURITY.md) for the trust rules.
 
 Single sign-on (Pocket ID or another OpenID Connect provider) needs `STUDIO_OIDC_ISSUER`, `STUDIO_OIDC_CLIENT_ID` and `STUDIO_OIDC_REDIRECT_URI` (`https://<studio>/api/accounts/oidc/callback`); `STUDIO_OIDC_CLIENT_SECRET` serves confidential clients and `STUDIO_OIDC_LABEL` names the button. Setting only some stops Studio at start. `/?password=1` keeps the password form reachable. The provider decides who may sign in; roles and groups never come from it.
-
-`/api/ping` (liveness) and `/api/ready` (the data folder is writable) answer without an account.
 
 ## MCP & Chat Gateway
 
@@ -112,7 +116,7 @@ Use an ordinary Studio account for this shared connection. Every authorised Open
 
 The optional prompt assistant accepts an OpenAI-compatible Chat Completions endpoint directly or through Bifrost. Set `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` to the endpoint's URL, key and model ID. Leave all three unset to run Studio without the assistant. With managed local text workloads, `STUDIO_LOCAL_TEXT_MODEL` supplies their model ID.
 
-**Background AI** (**Settings › Studio**) has a switch for each call Studio makes on its own; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
+**Background AI** (**Settings › Studio**) has a switch for each task Studio does on its own, and a finished image is read once for the caption, title, review and suggested prompt it needs; [Settings](#settings) lists their variables. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use.
 
 ## Downloads & Imports
 
@@ -165,7 +169,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `2`                                          | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_ENABLED`       | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` | `local` or `cloud` for every account's Dream images                                         | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_SPICY`         | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_UNCENSORED`    | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND` | `local` or `cloud` for every account's Dream videos                                         | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_VIDEO_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its videos          | `5`                                          | Dream (Administration) |
 | `STUDIO_ENV_FILE`                     | Settings file read on startup                                                               | `/data/.env` in the image, else `.env`       |                        |
@@ -234,13 +238,9 @@ A download may have stopped early or saved a web page instead of the model. Repl
 
 Try a smaller size, fewer outputs or a lighter profile. Check other workloads on the same GPU. Do not stop a worker while accepted jobs are running or outputs are being saved.
 
-<a name="comfyui-does-not-have-a-file-this-run-asked-for"></a>
-
 #### ComfyUI can't find a file this run uses
 
 ComfyUI returned "Value not in list". Check that the profile's model, LoRA, text encoder and VAE filenames match the selected worker's files and model paths. Correct the owned configuration or worker mount, then refresh the worker's model list.
-
-<a name="parts-that-do-not-fit-together"></a>
 
 #### A LoRA doesn't fit this model
 

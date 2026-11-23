@@ -1050,12 +1050,6 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   // Liked applies in Gallery, while Uploads is its own view.
   await showOnly(page, "Liked");
   await showOnly(page, "Uploads");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", /^Generating/);
   await status.click();
@@ -1216,7 +1210,6 @@ test("Gallery filters submit repeated models and origins together with LoRA, siz
   await pick("Models", "Motion Quality");
   await pick("LoRAs", "Detail Slider");
   const show = page.getByRole("group", { name: "Show", exact: true });
-  await expect(show.getByRole("button", { name: "Comparisons", exact: true })).toBeVisible();
   await show.getByRole("button", { name: "Dream", exact: true }).click();
   await show.getByRole("button", { name: "Chat", exact: true }).click();
   await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
@@ -1691,7 +1684,6 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(dislikedChip).toBeVisible();
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
-  await page.getByRole("button", { name: "Comparisons", exact: true }).click();
   await page.keyboard.press("Escape");
   // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
@@ -1699,10 +1691,6 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await liked.click();
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
-  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
   await page.keyboard.press("Escape");
   await expect(search).toHaveValue("Browse");
   // Filters persist across reloads; the transient search does not.
@@ -2385,16 +2373,62 @@ for (const captions of [false, true])
     ).toBeVisible();
   });
 
-test("Comparisons is a gallery view of the results in comparisons", async ({ page }) => {
+test("Comparisons lists each comparison and kept Dream comparison as a card that opens all its variants", async ({
+  page,
+}) => {
   const state = await fixtures(page);
-  state.gallery.push(...results(2));
-  state.comparisons.push({ id: "compare-1", itemIds: ["browse-0"], jobIds: [] });
+  state.gallery.push(...results(4).map((item, index) => ({ ...item, jobId: `job-${index}` })));
+  state.comparisons.push(
+    {
+      id: "dream-pair",
+      seed: "5",
+      requests: [
+        { input: { prompt: "Browse Result 2" } },
+        { input: { prompt: "Browse Result 3" } },
+      ],
+      jobIds: ["job-2", "job-3"],
+      itemIds: ["browse-2", "browse-3"],
+      labels: ["20 Steps", "30 Steps"],
+      vote: "job-3",
+      winnerItemId: "browse-3",
+      dream: { question: "Which Steps?" },
+    },
+    {
+      id: "compare-1",
+      seed: "",
+      requests: [
+        { input: { prompt: "Browse Result 0" } },
+        { input: { prompt: "Browse Result 1" } },
+      ],
+      jobIds: ["job-0", "job-1"],
+      itemIds: ["browse-0", "browse-1"],
+      labels: ["Variant A", "Variant B"],
+      vote: null,
+    },
+  );
   await page.goto("/images");
   await showGalleryView(page, "Comparisons");
-  const compared = page.getByRole("button", { name: "Open image: Browse Result 0" });
-  const single = page.getByRole("button", { name: "Open image: Browse Result 1" });
-  await expect(compared).toBeVisible();
-  await expect(single).toBeHidden();
+  // A kept Dream comparison opens read-only, its kept side as the winner.
+  await page.getByRole("button", { name: "Open Comparison: Which Steps?", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/dream-pair$/);
+  await expect(page.getByRole("button", { name: "Open 30 Steps", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Pick|Clear Winner)/ })).toHaveCount(0);
+  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
+  await expect(card).toBeVisible();
+  await expect(page.getByText(/^2 Variants\b/)).toHaveCount(2);
+  // One card per comparison, without the gallery's tiles.
+  await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(2);
+  await card.click();
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  for (const label of ["Variant A", "Variant B"])
+    await expect(page.getByRole("button", { name: `Open ${label}`, exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Comparisons",
+  );
   await showGalleryView(page, "Gallery");
-  await expect(single).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
+  ).toBeVisible();
 });

@@ -28,6 +28,28 @@ test("compare runs queue one seeded set, read back per owner and record the star
   let gallery: Record<string, unknown>[] = [
     { id: "old-a-0", jobId: "old-a", ownerId: "alice", type: "image", status: "done", prompt: "p" },
   ];
+  // Answered Dream comparisons: one kept side, one discarded outright, and another account's.
+  const side = (pair: string, side: number, state: string, ownerId = "alice") => ({
+    id: `${pair}-${side}`,
+    jobId: `${pair}-job-${side}`,
+    ownerId,
+    type: "image",
+    status: "done",
+    createdAt: "2026-01-02T00:00:00.000Z",
+    settings: { seed: 5 },
+    dream: {
+      state,
+      pair: { id: pair, side, label: `${side * 10 + 20} Steps`, question: "Which Steps?" },
+    },
+  });
+  const dreamSides = [
+    side("kept", 1, "kept"),
+    side("kept", 0, "discarded"),
+    side("neither", 0, "discarded"),
+    side("neither", 1, "discarded"),
+    side("foreign", 0, "kept", "bob"),
+    side("foreign", 1, "discarded", "bob"),
+  ];
   const admit = createGenerationAdmission({
     store,
     queue: { tick: async () => undefined } as unknown as GenerationQueue,
@@ -59,6 +81,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
     },
     gallery: (req) =>
       gallery.filter((item) => item.ownerId === (req.studioAccount?.userId || "")) as never,
+    dreamSides: (req) =>
+      dreamSides.filter((item) => item.ownerId === (req.studioAccount?.userId || "")) as never,
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
@@ -243,13 +267,14 @@ test("compare runs queue one seeded set, read back per owner and record the star
     "an image must belong to its job",
   );
 
+  // The whole list adds the owner's kept Dream comparisons, in date order.
   const history = (await request("")).body.comparisons;
   assert.deepEqual(
     history.map((entry: { id: string }) => entry.id),
-    [selected.body.id, created.body.id, offered.body.id, run.body.id, "legacy"],
+    [selected.body.id, created.body.id, offered.body.id, run.body.id, "dream-kept", "legacy"],
   );
   assert.deepEqual(
-    history[4].variants.map((entry: { label: string; item: unknown }) => [
+    history[5].variants.map((entry: { label: string; item: unknown }) => [
       entry.label,
       Boolean(entry.item),
     ]),
@@ -325,6 +350,26 @@ test("compare runs queue one seeded set, read back per owner and record the star
   );
   assert.ok("payload" in foreignRead);
   assert.deepEqual(foreignRead.payload, { comparisons: [] });
+
+  // A kept Dream comparison is read-only, with its kept side as the winner.
+  const dream = await request("/dream-kept");
+  assert.deepEqual(
+    [dream.body.dream, dream.body.seed, dream.body.vote, dream.body.winnerItemId],
+    [{ question: "Which Steps?" }, "5", "kept-job-1", "kept-1"],
+  );
+  assert.deepEqual(
+    dream.body.variants.map((entry: { label: string; item: { id: string } }) => [
+      entry.label,
+      entry.item.id,
+    ]),
+    [
+      ["20 Steps", "kept-0"],
+      ["30 Steps", "kept-1"],
+    ],
+  );
+  assert.equal((await request("/dream-foreign")).status, 404);
+  assert.equal((await request("/dream-kept", undefined, "GET", "bob")).status, 404);
+  assert.equal((await request("/dream-kept/vote", { itemId: "kept-0" }, "PUT")).status, 404);
 
   // Comparison iterations retain their exact source, without grouping unrelated session work.
   const iteration = await request("/run", {

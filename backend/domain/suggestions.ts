@@ -38,13 +38,13 @@ type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
 // The viewer's next steps and Animate's motion ideas may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
 // `count` records the requested count so older saved menus refresh once, even if a reply is short.
-// `spicy` marks steps worded explicitly, so a change of Uncensored Models writes them again.
+// `uncensored` marks steps worded explicitly, so a change of Uncensored Models writes them again.
 type SavedSteps = {
   steps: NextStep[];
   at: string;
   count?: number;
   revision?: number;
-  spicy?: true;
+  uncensored?: true;
 };
 /** A finished gallery item the viewer asks about, already checked to belong to the owner. */
 interface SuggestionItem extends IdleItem {
@@ -95,7 +95,7 @@ const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "c
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
 const suggestionRevision = 2;
-const motionRevision = 3;
+const motionRevision = 4;
 /** Ideas avoid this many of the latest shown in the same menu. */
 const shownIdeas = maxSuggestions;
 const maxRequest = 500;
@@ -348,14 +348,14 @@ export function createSuggestions({
     source: SuggestionItem,
     field: "nextSteps" | "motionIdeas",
     steps: (PromptIdea | NextStep)[],
-    spicy: boolean,
+    uncensored: boolean,
   ) {
     save(source, field, {
       steps: steps as NextStep[],
       at: new Date(now()).toISOString(),
       count: maxSuggestions,
       revision: field === "motionIdeas" ? motionRevision : suggestionRevision,
-      ...(spicy ? { spicy } : {}),
+      ...(uncensored ? { uncensored } : {}),
     });
   }
 
@@ -370,14 +370,14 @@ export function createSuggestions({
       images = [],
       writing,
       hasReferences,
-      spicy = false,
+      uncensored = false,
       cardDraft,
     }: {
       signal?: AbortSignal;
       images?: ModelImage[];
       writing?: WritingTarget | null;
       hasReferences?: boolean;
-      spicy?: boolean;
+      uncensored?: boolean;
       cardDraft?: string;
     } = {},
   ): Promise<Suggestions<PromptIdea | NextStep>> {
@@ -396,12 +396,12 @@ export function createSuggestions({
               ]
             : [promptInstruction("ideas-with-applied-cards", { maxSuggestions, kind })]
           ).join("\n"),
-          contentRule: contentRule(spicy),
+          contentRule: contentRule(uncensored),
           guide: targetLines(writing).join("\n"),
           withoutGuide: !writing?.guide && promptInstruction("ideas-without-model-guide"),
           keepDescriptions: keepDescriptions(),
           standalonePrompt: standalonePrompt(),
-          suggestionChoices: suggestionChoices(kind, spicy),
+          suggestionChoices: suggestionChoices(kind, uncensored),
           variety: variety(),
           draftContext: cardDraft !== undefined && promptInstruction("keep-applied-cards"),
           americanEnglish,
@@ -420,8 +420,8 @@ export function createSuggestions({
           applyChange: applyChange(),
           keepDescriptions: keepDescriptions(),
           subjectFirst: subjectFirst(),
-          contentRule: contentRule(spicy),
-          suggestionChoices: suggestionChoices(kind, spicy),
+          contentRule: contentRule(uncensored),
+          suggestionChoices: suggestionChoices(kind, uncensored),
           variety: variety(),
           americanEnglish,
           avoidFiller: avoidFiller(),
@@ -434,8 +434,8 @@ export function createSuggestions({
             ? "what the attached image shows"
             : "the source caption, then the source prompt",
           maxSuggestions,
-          contentRule: contentRule(spicy),
-          suggestionChoices: suggestionChoices("video", spicy),
+          contentRule: contentRule(uncensored),
+          suggestionChoices: suggestionChoices("video", uncensored),
           americanEnglish,
           avoidFiller: avoidFiller(),
           data,
@@ -454,8 +454,8 @@ export function createSuggestions({
                   maxSuggestions,
                   areas: angles(stepAreas, stepAreas.length),
                 }),
-          contentRule: contentRule(spicy),
-          suggestionChoices: suggestionChoices(kind, spicy),
+          contentRule: contentRule(uncensored),
+          suggestionChoices: suggestionChoices(kind, uncensored),
           variety: variety(),
           americanEnglish,
           avoidFiller: avoidFiller(),
@@ -535,12 +535,12 @@ export function createSuggestions({
   /** The taste profile and the prompts the owner liked, as the model's context. */
   function tasteContext(ownerId: string) {
     const record = taste.read(ownerId);
-    // Signals keep whole prompts; a few opening sentences show the taste.
+    // Signals keep a prompt's opening sentences, which show the taste.
     const prompts = (kinds: string[]) => [
       ...new Set(
         record.signals
           .filter((signal) => kinds.includes(signal.kind) && signal.prompt)
-          .map((signal) => signal.prompt!.slice(0, 300)),
+          .map((signal) => signal.prompt!),
       ),
     ];
     const liked = prompts(["like", "compare"]);
@@ -580,14 +580,14 @@ export function createSuggestions({
     options: { signal?: AbortSignal; image?: ModelImage | null; save?: boolean } = {},
   ): Promise<Suggestions<PromptIdea | NextStep>> {
     const kind = source.type === "video" ? "video" : "image";
-    const spicy = explicit(ownerId);
+    const uncensored = explicit(ownerId);
     const menu = JSON.stringify([
       ownerId,
       "viewer",
       source.id,
       source.jobId,
       source.prompt || source.suggestedPrompt,
-      spicy,
+      uncensored,
     ]);
     const latest = shown.get(menu) ?? source.nextSteps?.steps.map(describeIdea) ?? [];
     const context = [
@@ -602,11 +602,11 @@ export function createSuggestions({
     const answer = await write(model, ownerId, "viewer", kind, context.join("\n"), {
       images: options.image ? [options.image] : [],
       signal: options.signal,
-      spicy,
+      uncensored,
     });
     if (!answer.reason && !options.signal?.aborted) rememberShown(menu, answer.suggestions);
     if (!answer.reason && !options.signal?.aborted && options.save !== false)
-      saveSteps(source, "nextSteps", answer.suggestions, spicy);
+      saveSteps(source, "nextSteps", answer.suggestions, uncensored);
     return answer;
   }
 
@@ -975,7 +975,7 @@ export function createSuggestions({
       const model = writer(ownerId);
       if (!model) return empty("This account can't use suggestions.");
       const fresh = body.fresh === true;
-      const spicy = explicit(ownerId);
+      const uncensored = explicit(ownerId);
       const edited =
         surface === "viewer" &&
         typeof body.prompt === "string" &&
@@ -990,7 +990,7 @@ export function createSuggestions({
         saved.count === maxSuggestions &&
         saved.revision === (surface === "animate" ? motionRevision : suggestionRevision) &&
         !fresh &&
-        Boolean(saved.spicy) === spicy
+        Boolean(saved.uncensored) === uncensored
       )
         return {
           suggestions: saved.steps.filter(
@@ -1037,7 +1037,7 @@ export function createSuggestions({
         referenceIds,
         source?.jobId ?? body.jobId ?? "",
         source?.id ?? itemId,
-        spicy,
+        uncensored,
       ]);
       const cached = cache.get(key);
       if (cached && cached.until > now() && !fresh && !cached.signal?.aborted) {
@@ -1091,7 +1091,7 @@ export function createSuggestions({
             : surface === "draft"
               ? prompt
               : [source?.jobId, source?.id],
-          spicy,
+          uncensored,
           profileId ?? "",
           referenceIds,
         ]);
@@ -1108,7 +1108,7 @@ export function createSuggestions({
             images: picture ? [picture] : referenceImages(draftContext),
             hasReferences: referenceIds.length > 0,
             writing,
-            spicy,
+            uncensored,
             cardDraft,
             signal,
           },
@@ -1124,7 +1124,7 @@ export function createSuggestions({
         rememberShown(menu, fresh);
         const choices = fresh.length ? fresh : ideas.suggestions;
         if (source && surface === "animate" && !signal?.aborted)
-          saveSteps(source, "motionIdeas", choices, spicy);
+          saveSteps(source, "motionIdeas", choices, uncensored);
         return {
           suggestions:
             cardDraft === undefined

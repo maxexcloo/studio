@@ -14,9 +14,8 @@ import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { DialogKeyboard } from "./ui/useKeyboard";
 import { usePhone } from "./ui/usePhone";
-const ComparePage = lazy(() =>
-  import("./features/compare/ComparePage").then((module) => ({ default: module.ComparePage })),
-);
+const loadCompare = () => import("./features/compare/ComparePage");
+const ComparePage = lazy(() => loadCompare().then((module) => ({ default: module.ComparePage })));
 const loadDream = () => import("./features/dream/DreamPage");
 const DreamPage = lazy(() => loadDream().then((module) => ({ default: module.DreamPage })));
 const loadLibrary = () => import("./features/library/LibraryPage");
@@ -48,9 +47,10 @@ function Workspace() {
     if (overlay && location.hash) setSections((saved) => ({ ...saved, [overlay]: location.hash }));
   }, [overlay, location.hash, setSections]);
   const resumeSection = overlay && !location.hash && sections[overlay];
-  // The other modes, Library and Settings load once the first mode is up, so opening them never
-  // shows their loader.
+  // The other modes, a comparison's page, Library and Settings load once the first mode is up, so
+  // opening them never shows their loader.
   useEffect(() => {
+    void loadCompare();
     void loadDream();
     void loadLibrary();
     void loadSettings();

@@ -7,18 +7,14 @@ import {
   Group,
   Input,
   Menu,
-  Popover,
-  ScrollArea,
   Stack,
-  Text,
   Tooltip,
 } from "@mantine/core";
 import { ChevronDown, type LucideIcon, Search } from "lucide-react";
 import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { menuWidth } from "../theme";
-import { ClearButton } from "./ClearButton";
-import { DialogFooter } from "./ConfirmDialog";
+import { ChipPopup } from "./ChipPopup";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { ScrollingSegments } from "./ScrollingSegments";
@@ -254,64 +250,42 @@ export function SectionToolbar({
           </Tooltip>
         )}
         {filters && (
-          <Popover
-            position="bottom-end"
-            width={300}
-            trapFocus
+          <ChipPopup
+            title="Filters"
+            tooltip={`Filter ${label}`}
+            floating
             opened={filtering}
-            onChange={setFiltering}
+            onOpenedChange={setFiltering}
+            position="bottom-end"
+            onClear={onClearFilters}
+            clearDisabled={!filterCount}
+            target={
+              <ActionIcon
+                aria-label={`Filter ${label}`}
+                variant={filterCount ? "light" : "subtle"}
+                color={filterCount ? undefined : "gray"}
+                pos="relative"
+                onClick={() => setFiltering(!filtering)}
+              >
+                <icons.filter size={18} />
+                {filterCount > 0 && (
+                  <Badge
+                    size="xs"
+                    circle
+                    variant="filled"
+                    pos="absolute"
+                    top={0}
+                    right={0}
+                    aria-hidden
+                  >
+                    {filterCount}
+                  </Badge>
+                )}
+              </ActionIcon>
+            }
           >
-            {/* The Tooltip wraps the target, so the button itself carries aria-expanded. */}
-            <PopupTooltip label={`Filter ${label}`}>
-              <Popover.Target>
-                <ActionIcon
-                  aria-label={`Filter ${label}`}
-                  variant={filterCount ? "light" : "subtle"}
-                  color={filterCount ? undefined : "gray"}
-                  pos="relative"
-                  onClick={() => setFiltering(!filtering)}
-                >
-                  <icons.filter size={18} />
-                  {filterCount > 0 && (
-                    <Badge
-                      size="xs"
-                      circle
-                      variant="filled"
-                      pos="absolute"
-                      top={0}
-                      right={0}
-                      aria-hidden
-                    >
-                      {filterCount}
-                    </Badge>
-                  )}
-                </ActionIcon>
-              </Popover.Target>
-            </PopupTooltip>
-            <Popover.Dropdown
-              aria-label={`${label} Filters`}
-              role="dialog"
-              onFocusCapture={(event) =>
-                event.target.setAttribute("data-mantine-stop-propagation", "true")
-              }
-            >
-              <ScrollArea.Autosize mah="min(60dvh, 420px)">
-                {/* Titled and ended with ✕ and Done, as the gallery's and the pickers' Filters are. */}
-                <Stack gap="sm">
-                  <Text fw={600} mih={28}>
-                    Filters
-                  </Text>
-                  {filters}
-                  <DialogFooter>
-                    {onClearFilters && (
-                      <ClearButton disabled={!filterCount} onClear={onClearFilters} />
-                    )}
-                    <Button onClick={() => setFiltering(false)}>Done</Button>
-                  </DialogFooter>
-                </Stack>
-              </ScrollArea.Autosize>
-            </Popover.Dropdown>
-          </Popover>
+            <Stack gap="sm">{filters}</Stack>
+          </ChipPopup>
         )}
         {(onQueryChange || filters) && more.length > 0 && <ToolbarDivider />}
         {more.length > 0 && (

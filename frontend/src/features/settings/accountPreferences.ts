@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 
 import type { Appearance } from "../../../../shared/appearance";
 import { defaultModelKeys } from "../../../../shared/profiles";
-import type { ImageSizePreference } from "../../../../shared/resolution";
+import type { ImagePreference } from "../../../../shared/resolution";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -33,7 +33,7 @@ interface PreferenceValues {
 }
 /** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
 export type Preferences = PreferenceValues &
-  ImageSizePreference &
+  ImagePreference &
   Partial<Record<DefaultModelKey, string | null>>;
 export interface PreferencesStatus {
   preferences: Preferences;
@@ -75,6 +75,7 @@ export function useSavePreferences() {
         changed("images") ||
         changed("videos") ||
         "imageAspect" in patch ||
+        "imageCount" in patch ||
         "imageResolution" in patch
       )
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });

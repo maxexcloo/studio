@@ -22,6 +22,11 @@
   max-width: 100%;
   min-width: 0;
 }
+/* On desktop the heading keeps at least half the row; a toolbar too wide for the other half
+   wraps onto its own row rather than squeezing the heading. */
+:root:not([data-phone]) .header > :first-child:not(:last-child) {
+  flex: 1 1 calc(50% - var(--mantine-spacing-md) / 2);
+}
 .header > :last-child:has(.searching) {
   flex-basis: 100%;
 }

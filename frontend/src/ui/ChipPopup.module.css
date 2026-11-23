@@ -1,0 +1,80 @@
+.sheet[data-full-screen] {
+  height: 100%;
+  overflow: clip;
+}
+
+/* A drag on the header belongs to the sheet and can pull it closed. Tall content scrolls in the body
+   rather than squeezing the header. */
+.sheetHeader {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-xs);
+  touch-action: none;
+}
+
+/* The title and its detail take the room before the heading's actions and Close, unless a saved
+   name fills it. */
+.sheetTitle {
+  display: flex;
+  flex: 1;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
+  min-width: 0;
+}
+
+.sheetTitle[data-named] {
+  flex: none;
+}
+
+.heading button {
+  flex-shrink: 0;
+}
+
+.sheetBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.popupBody {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--studio-panel-min-height);
+}
+
+/* A popup's aside: a column beside the rest, divided from it to the top, whose own content never
+   sets the popup's height. */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--mantine-spacing-md);
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  min-height: 0;
+}
+
+.columns > .aside {
+  contain: size;
+  padding-left: var(--mantine-spacing-md);
+  border-left: 1px solid var(--mantine-color-default-border);
+}
+
+/* A chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself
+   doesn't clip, so a nested Select's list, positioned against it, still shows in full. A scroller
+   clips both axes, so it reaches 4px into the dropdown's padding: rings and focus outlines on
+   content at its edges (the reference slots) draw in full. */
+.fitted {
+  display: flex;
+  flex-direction: column;
+}
+
+.fitted > * {
+  min-height: 0;
+  margin: -4px;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

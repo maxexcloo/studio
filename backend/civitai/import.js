@@ -464,7 +464,7 @@ export async function importCivitaiImage(
  * Finds each resource's file in the Model Library worker's library (workers.js). `verify: false`
  * (the Library's list) never reads a model: a known checksum decides,
  * otherwise the same file name and size count as installed (marked
- * `unverified`); opening one image checks its checksums in full.
+ * `unverified`); Library › Imports hashes them once in the background.
  */
 export async function matchResources(
   preset,

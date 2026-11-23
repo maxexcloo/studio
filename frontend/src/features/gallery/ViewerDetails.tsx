@@ -75,12 +75,16 @@ export function ViewerDetails({
                   {title}
                 </Text>
               </Drawer.Title>
-              <ViewerMetadata item={item} />
+              <ViewerMetadata item={item} compact title={title} />
             </Stack>
             <Drawer.CloseButton aria-label="Close Details" />
           </Drawer.Header>
           <Drawer.Body>
-            <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
+            <Stack
+              gap="lg"
+              pt="md"
+              pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))"
+            >
               {details}
             </Stack>
           </Drawer.Body>

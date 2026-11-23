@@ -84,6 +84,7 @@ export interface PromptStyle {
   instruction: string;
   enabled: boolean;
   uncensored?: boolean;
+  censored?: boolean;
 }
 export interface PromptStyleVersion {
   version: number;
@@ -106,6 +107,7 @@ export interface PromptInstruction {
   id: string;
   label: string;
   area: string;
+  suggestions?: true;
   text: string;
   initial: string;
   hash: string;

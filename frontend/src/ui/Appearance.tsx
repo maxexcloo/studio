@@ -145,7 +145,7 @@ export const useAppearance = () => useContext(Context);
 export function useMotionDuration() {
   return useMantineTheme().other.motionDuration as number;
 }
-export function AppearanceControls() {
+function AppearanceControls() {
   const phone = usePhone();
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();
@@ -291,7 +291,7 @@ export function AppearanceControls() {
 
 export function AppearanceMenu() {
   return (
-    <Popover width={290} position="bottom-end" shadow="md" trapFocus>
+    <Popover width="var(--studio-popup-width)" position="bottom-end" shadow="md" trapFocus>
       <PopupTooltip label="Appearance">
         <Popover.Target>
           <ActionIcon aria-label="Appearance" variant="subtle" color="gray">

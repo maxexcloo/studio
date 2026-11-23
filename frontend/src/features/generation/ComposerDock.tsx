@@ -14,7 +14,7 @@ import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 
 import classes from "./ComposerDock.module.css";
-export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
+const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /**
  * The gallery's generation composer; it answers `useOpenComposer` and shared images. The gallery
  * passes what it needs from its history state, so stepping through the viewer doesn't render it.

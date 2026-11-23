@@ -62,6 +62,13 @@ export function addVariant(draft: Draft): Draft {
   return showVariant(draft, next, next.length - 1);
 }
 
+/** Removes `variants[index]`, still editing the same variant unless it was the one removed. */
+export function removeVariant(draft: Draft, index: number): Draft {
+  const active = draft.compare?.active ?? 0;
+  const next = draftVariants(draft).filter((_, each) => each !== index);
+  return showVariant(draft, next, Math.min(active > index ? active - 1 : active, next.length - 1));
+}
+
 export const canAddVariant = (draft: Draft) => draftVariants(draft).length < compareVariants.max;
 
 export const fitsComparison = (count: number) =>

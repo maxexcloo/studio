@@ -495,7 +495,7 @@ test("On a phone held sideways, a deck card's caption stands beside its media", 
 
 test("Dream explains itself while off and saves its settings in Settings", async ({ page }) => {
   await fixtures(page);
-  const dream = await serveDream(page, { enabled: false, spicyAvailable: true });
+  const dream = await serveDream(page, { enabled: false, uncensoredAvailable: true });
   await page.goto("/dream");
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
@@ -561,7 +561,7 @@ test("Dream settings an administrator forces stay locked for the account", async
   await fixtures(page);
   await serveDream(page, {
     enabled: false,
-    spicyAvailable: true,
+    uncensoredAvailable: true,
     locked: ["enabled", "imageBackend"],
   });
   await page.goto("/dream");
@@ -1041,13 +1041,14 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
   await page.goto("/dream");
   await page.getByRole("button", { name: "View A · Quiet", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
-  await preview.getByRole("radio", { name: "B · Bright", exact: true }).press("Space");
+  const bright = preview.getByRole("radio", { name: "B · Bright", exact: true });
+  await bright.press("Space");
+  await expect(bright).toBeChecked();
   const request = page.waitForRequest(
     (req) => req.url().endsWith("/api/suggestions") && req.method() === "POST",
   );
   await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Keep & Vary", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Edit Comparison", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
   expect((await request).postDataJSON()).toMatchObject({
@@ -1488,7 +1489,8 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
       brief: { subjects: "", styles: "", avoid: "" },
     },
   ]);
-  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await editor.getByRole("button", { name: "AI Styles Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(editor.getByRole("status")).toHaveCount(0);
 });
 

@@ -55,7 +55,7 @@ export function contentRule(explicit: boolean) {
 }
 
 /** Creative choices share context and variety rules, while each surface keeps its own task. */
-export function suggestionChoices(kind: "image" | "video" | "card", spicy: boolean) {
+export function suggestionChoices(kind: "image" | "video" | "card", uncensored: boolean) {
   return [
     promptInstruction("suggestion-context"),
     promptInstruction("suggestion-distinction"),
@@ -63,9 +63,9 @@ export function suggestionChoices(kind: "image" | "video" | "card", spicy: boole
       ? promptInstruction("suggestion-card")
       : kind === "video"
         ? promptInstruction("suggestion-video")
-        : spicy && promptInstruction("suggestion-appearance"),
-    spicy && kind !== "card" && promptInstruction("suggestion-extended"),
-    spicy &&
+        : uncensored && promptInstruction("suggestion-appearance"),
+    uncensored && kind !== "card" && promptInstruction("suggestion-extended"),
+    uncensored &&
       "Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",
   ]
     .filter(Boolean)

@@ -78,7 +78,7 @@ export function PlacementChanges({
   );
 }
 
-export const phaseColour = (phase: WorkloadPhase) =>
+const phaseColour = (phase: WorkloadPhase) =>
   ({
     running: "green",
     starting: "yellow",
@@ -87,7 +87,7 @@ export const phaseColour = (phase: WorkloadPhase) =>
     down: "red",
     unknown: "red",
   })[phase];
-export const phaseLabel = (phase: WorkloadPhase) =>
+const phaseLabel = (phase: WorkloadPhase) =>
   ({
     running: "Running",
     starting: "Starting",
@@ -517,6 +517,7 @@ export function RuntimeWorkloads({
           {
             key: "state",
             header: "State",
+            width: 110,
             sortValue: (item) => phaseLabel(item.phase),
             cell: (item) => {
               const { pending } = changePhase(item.id, item.phase, operation);
@@ -777,6 +778,7 @@ export function RuntimeHistory() {
           {
             key: "result",
             header: "Result",
+            width: 120,
             cell: (entry) => (
               <Badge color={operationColour(entry.status)} miw="max-content">
                 {operationLabel(entry.status)}

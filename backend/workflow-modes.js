@@ -39,18 +39,38 @@ function linkedTo(value, id) {
   return Array.isArray(value) && value.length === 2 && value[0] === id;
 }
 
+const referenceInput = (name) =>
+  name.startsWith("images.") ||
+  name.startsWith("ref_images.") ||
+  name === "first_frame" ||
+  name === "last_frame";
+
+/** How omitting `node`'s inputs `affected` changes it, or nothing where it cannot do without them. */
+function omission(node, affected) {
+  if (node.class_type === "ReferenceLatent" && affected.every(([name]) => name === "latent"))
+    return "bypass";
+  if (["ImageScaleToTotalPixels", "VAEEncode", "GetImageSize"].includes(node.class_type))
+    return "delete";
+  if (affected.every(([name]) => referenceInput(name))) return "unlink";
+}
+
+const consumers = (graph, id) =>
+  Object.entries(graph).flatMap(([consumer, node]) => {
+    const affected = Object.entries(node.inputs || {}).filter(([, value]) => linkedTo(value, id));
+    return affected.length ? [[consumer, node, affected]] : [];
+  });
+
 function omitReference(graph, loader) {
-  if (!loader || !graph[loader]) return;
+  // A slot on the generating node itself (Radiance), whose output is the work rather than a
+  // reference, stays at its empty default.
+  if (!graph[loader] || consumers(graph, loader).some(([, node, a]) => !omission(node, a))) return;
   const removed = [loader];
   delete graph[loader];
   while (removed.length) {
     const missing = removed.shift();
-    for (const [id, node] of Object.entries(graph)) {
-      const affected = Object.entries(node.inputs || {}).filter(([, value]) =>
-        linkedTo(value, missing),
-      );
-      if (!affected.length) continue;
-      if (node.class_type === "ReferenceLatent" && affected.every(([name]) => name === "latent")) {
+    for (const [id, node, affected] of consumers(graph, missing)) {
+      const change = omission(node, affected);
+      if (change === "bypass") {
         const replacement = node.inputs.conditioning;
         for (const consumer of Object.values(graph)) {
           for (const [name, value] of Object.entries(consumer.inputs || {})) {
@@ -58,20 +78,10 @@ function omitReference(graph, loader) {
           }
         }
         delete graph[id];
-      } else if (
-        ["ImageScaleToTotalPixels", "VAEEncode", "GetImageSize"].includes(node.class_type)
-      ) {
+      } else if (change === "delete") {
         delete graph[id];
         removed.push(id);
-      } else if (
-        affected.every(
-          ([name]) =>
-            name.startsWith("images.") ||
-            name.startsWith("ref_images.") ||
-            name === "first_frame" ||
-            name === "last_frame",
-        )
-      ) {
+      } else if (change === "unlink") {
         for (const [name] of affected) delete node.inputs[name];
       } else {
         throw new Error(

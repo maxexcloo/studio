@@ -126,7 +126,7 @@ export function ChipSelect({
     <Combobox
       store={combobox}
       returnFocus
-      width="min(440px, 100vw - 32px)"
+      width="min(var(--studio-popup-width), 100vw - 32px)"
       position={field ? "bottom-end" : "top-start"}
       middlewares={{ ...popupMiddlewares, size: { padding: 12 } }}
       classNames={{ dropdown: classes.fittedList }}
@@ -169,7 +169,7 @@ export function ChipSelect({
             <Text
               span
               inherit
-              c={clearable && !value ? "dimmed" : undefined}
+              c={clearable && !value ? "var(--input-placeholder-color)" : undefined}
               className={classes.fieldLabel}
             >
               {label}

@@ -127,13 +127,6 @@ export function ConvertToRadiance({
           </Stack>
         ) : (
           <>
-            {conversion?.status === "done" && (
-              <Text size="sm" c="dimmed" role="status">
-                {conversion.applied
-                  ? `Added ${conversion.name}.rad as the Radiance backend of ${conversion.note?.profile}.`
-                  : `Installed ${conversion.name}.rad.`}
-              </Text>
-            )}
             {conversion?.status === "failed" && (
               <Alert color="red">
                 {conversion.name}.rad failed: {conversion.error}

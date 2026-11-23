@@ -75,11 +75,9 @@ export function GalleryChoices({
     browser.scroll.current = 0;
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
-  // Uploads is the gallery's own filter, set by the tab; uploads have no ratings, comparisons or
-  // versions, so the Show filters stay out of it.
-  const applied = uploads
-    ? { ...filters, rating: "" as const, comparisons: false, uploads }
-    : filters;
+  // Uploads is the gallery's own filter, set by the tab; uploads have no ratings or versions, so
+  // the Show filters stay out of it.
+  const applied = uploads ? { ...filters, rating: "" as const, uploads } : filters;
   const grouped = !uploads && originalsOnly;
   const filterProps = {
     kind: "image" as const,
@@ -222,7 +220,6 @@ export function GalleryChoices({
         >
           <PickerGrid
             label={`${label} Choices`}
-            fixedThumbnails
             ref={grid}
             style={{
               paddingTop: first * pitch,

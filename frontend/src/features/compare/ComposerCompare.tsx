@@ -30,6 +30,7 @@ import {
   withResolution,
 } from "../../../../shared/resolution";
 import type { GenerationInput } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
@@ -42,7 +43,6 @@ import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
 import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { profileForBackend, profileForLoras, profileName } from "../generation/payload";
-import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
 import {
   letter,
@@ -59,6 +59,7 @@ import {
   draftVariants,
   fitsComparison,
   modelInputs,
+  removeVariant,
   showVariant,
 } from "./variants";
 
@@ -184,7 +185,6 @@ export function CompareMenu({ labels }: { labels: string[] }) {
       }
       opened={opened}
       onOpenedChange={setOpened}
-      width={draft.compare ? 360 : 420}
       floating={!!draft.compare}
       spacious
       target={
@@ -345,6 +345,7 @@ export function CompareMenu({ labels }: { labels: string[] }) {
 }
 
 function VariantOverview({ labels }: { labels: string[] }) {
+  const { setDraft } = useGeneration();
   return (
     <Stack component="ol" aria-label="Variants" gap="xs" m={0} p={0}>
       {labels.map((label, index) => (
@@ -352,7 +353,28 @@ function VariantOverview({ labels }: { labels: string[] }) {
           <Badge variant="default" size="sm">
             {letter(index)}
           </Badge>
-          <Text size="sm">{label}</Text>
+          <Text size="sm" flex={1}>
+            {label}
+          </Text>
+          {/* Fewer than the minimum ends the comparison, so Clear does that. */}
+          {labels.length > compareVariants.min && (
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              aria-label={`Remove Variant ${letter(index)}`}
+              onClick={(event) => {
+                // Rows are keyed by position, so only the last row's button goes; focus stays in the popup.
+                if (index === labels.length - 1)
+                  event.currentTarget
+                    .closest("li")
+                    ?.previousElementSibling?.querySelector("button")
+                    ?.focus();
+                setDraft((draft) => removeVariant(draft, index));
+              }}
+            >
+              Remove
+            </Button>
+          )}
         </Group>
       ))}
     </Stack>

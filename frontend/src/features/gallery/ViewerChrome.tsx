@@ -10,14 +10,24 @@ import { mediaSource } from "./mediaSource";
 
 import classes from "./MediaViewer.module.css";
 
-export function ViewerMetadata({ item, compact }: { item: MediaItem; compact?: boolean }) {
+/** `title`, when given, is the heading above: a model it already names isn't repeated. */
+export function ViewerMetadata({
+  item,
+  compact,
+  title,
+}: {
+  item: MediaItem;
+  compact?: boolean;
+  title?: string;
+}) {
   const { profiles } = useGenerationActions();
-  const model = mediaProfileName(item, profiles);
+  const named = mediaProfileName(item, profiles);
+  const model = title?.includes(named) ? "" : named;
   const { width, height } = mediaSource(item);
-  const timestamp = compact ? undefined : mediaTimestamp(item);
+  const timestamp = compact && !title ? undefined : mediaTimestamp(item);
   const settings = item.settings || {};
   const steps = Number(settings.steps);
-  const stepLabel = steps > 0 && !/\b\d+\s+steps?\b/i.test(model) ? `${steps} Steps` : "";
+  const stepLabel = steps > 0 && !/\b\d+\s+steps?\b/i.test(title ?? model) ? `${steps} Steps` : "";
   const seconds = Number(settings.duration) || Number(settings.frames) / Number(settings.fps);
   const sizeAndDuration = [
     width && height ? `${width} × ${height}` : "",

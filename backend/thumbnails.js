@@ -25,7 +25,7 @@ const thumbnailDir = path.join(dataDir, ".thumbnails");
  * picture up to a size no screen needs more of at fit or 1:1, a fraction of
  * the original PNG's bytes. The viewer asks for the original only past it.
  */
-export const RENDITIONS = {
+const RENDITIONS = {
   thumb: { longestEdge: 768, quality: 72 },
   display: { longestEdge: displayEdge, quality: 90 },
 };

@@ -21,7 +21,7 @@ type SetDeckCard = {
   item: DreamItem;
   items: DreamItem[];
 };
-export type MultiDeckCard = PairDeckCard | SetDeckCard;
+type MultiDeckCard = PairDeckCard | SetDeckCard;
 export type DeckCard =
   | { kind: "dream"; key: string; item: DreamItem }
   | { kind: "library"; key: string; item: MediaItem }

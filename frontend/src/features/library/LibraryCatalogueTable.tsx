@@ -139,7 +139,6 @@ export function LibraryCatalogueTable({
   onCheckUpdates,
   onTest,
   onUpdateAll,
-  updateNote,
   inventoryError,
   onEdit,
   onDelete,
@@ -160,8 +159,6 @@ export function LibraryCatalogueTable({
   onTest?: (item: LibraryItem) => void;
   /** Applies every free update, models and LoRAs alike; absent when there are none. */
   onUpdateAll?: () => void;
-  /** What the last update check or update did. */
-  updateNote?: string;
   onEdit?: (item: LibraryItem) => void;
   onDelete?: (item: LibraryItem) => void;
   updatePending?: boolean;
@@ -262,11 +259,6 @@ export function LibraryCatalogueTable({
           }
         />
       </SectionHeader>
-      {updateNote && (
-        <Text c="dimmed" size="xs">
-          {updateNote}
-        </Text>
-      )}
       {inventoryError && <Alert color="red">{inventoryError}</Alert>}
       {unclassified > 0 && (
         <Text c="dimmed" size="xs">
@@ -390,7 +382,7 @@ export function LibraryCatalogueTable({
           {
             key: "status",
             header: "Status",
-            width: 130,
+            width: 160,
             sortValue: (item) => statusOf(item).label,
             cell: (item) => (
               <Badge color={statusOf(item).color} miw="max-content">

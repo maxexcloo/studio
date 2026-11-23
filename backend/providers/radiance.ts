@@ -167,7 +167,7 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
 }
 
 /** The node's LoRA stack (a JSON list of {name, strength}) as Radiance's `loras` field. */
-export function radianceLoras(value: unknown) {
+function radianceLoras(value: unknown) {
   const stack = JSON.parse(String(value || "[]"));
   if (!Array.isArray(stack)) throw new Error("The LoRA stack must be a JSON list.");
   return stack.map((item: Values) => ({
