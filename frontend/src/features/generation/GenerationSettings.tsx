@@ -9,7 +9,6 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { Dices } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import { isCloudVideoProfile } from "../../../../shared/profiles";
@@ -114,7 +113,7 @@ export function GenerationSettings({
                   aria-label="Use a Random Seed"
                   onClick={() => onChange({ seed: "" })}
                 >
-                  <Dices size={16} />
+                  <icons.seed size={16} />
                 </ActionIcon>
               </Tooltip>
             )
