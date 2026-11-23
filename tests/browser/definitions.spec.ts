@@ -465,8 +465,8 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
     const menu = page.getByRole("menu", { name: `Actions for ${row}`, exact: true });
     const entries =
       part === "Profiles"
-        ? ["Copy ID", "Download", "Duplicate…", "Edit", "Delete"]
-        : ["Copy ID", "Download", "Edit", "Delete"];
+        ? ["Edit", "Copy ID", "Download", "Duplicate…", "Delete"]
+        : ["Edit", "Copy ID", "Download", "Delete"];
     await expect(menu.getByRole("menuitem")).toHaveText(entries);
     const download = page.waitForEvent("download");
     await page.getByRole("menuitem", { name: item, exact: true }).click();
@@ -507,7 +507,7 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
   await openNav(page, "Library");
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
-  const names = table.getByRole("row").locator("td:first-child > p:first-child");
+  const names = table.getByRole("button", { name: /^Edit / });
   await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
   await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
   await expect(names).toHaveText(["Cinematic Camera", "Candid", "Bold Uncensored"]);

@@ -596,7 +596,7 @@ test("Custom Animation edits and submits in one dialog with its text tools", asy
   }
   await more.click();
   const tools = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
-  await expect(tools.getByText("Suggestions", { exact: true })).toBeVisible();
+  await expect(tools.getByRole("menuitem", { name: "Suggestions", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -1784,7 +1784,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect(page.getByRole("menuitem", { name: /Back & Forth/ })).toHaveCount(0);
 });
 
-test("Details keep the caption, run notes and source ahead of model and prompts", async ({
+test("Details keep the caption, run notes and source ahead of LoRAs and prompts", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -1860,7 +1860,7 @@ test("Details keep the caption, run notes and source ahead of model and prompts"
     details.getByRole("heading", {
       name: /^(Caption|Lineage|Model|LoRAs|Prompt|Negative Prompt)$/,
     }),
-  ).toHaveText(["Caption", "Lineage", "Model", "LoRAs", "Prompt", "Negative Prompt"]);
+  ).toHaveText(["Caption", "Lineage", "LoRAs", "Prompt", "Negative Prompt"]);
   await expect(details.getByText(notes, { exact: true })).toBeVisible();
   await expect(details.getByText(runCaption, { exact: true })).toBeVisible();
   await expect(details.getByRole("link", { name: "Original Bird", exact: true })).toHaveAttribute(

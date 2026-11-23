@@ -302,7 +302,16 @@ export async function fixtures(page: Page) {
           textModels: ["cloud/auto", "local/auto"],
           profiles: [],
         },
-        catalogue: [],
+        catalogue: [
+          {
+            key: "STUDIO_GALLERY_CAPTIONS",
+            label: "Gallery Captions",
+            description: "Caption images for search.",
+            value: true,
+            source: "default",
+            locked: false,
+          },
+        ],
         dream: deploymentDream,
       });
     }

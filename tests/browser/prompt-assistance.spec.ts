@@ -339,8 +339,9 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
     await expect(tools.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
     await expect(tools.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
   }
+  // Suggestions greys with its reason until it has options.
   await expect(menu.getByRole("menuitem")).toHaveText([
-    "Suggestions",
+    /^Suggestions/,
     "Templates",
     "Custom…",
     "Refresh",
@@ -405,16 +406,23 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(dialog).toBeHidden();
   await expect(prompt).toHaveValue("A castle at night");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
-  expect(asked).toEqual([
-    {
-      surface: "draft",
-      kind: "image",
-      profileId: "image:test",
-      prompt: "A castle at noon",
-      request: "make it night",
-      actions: ["recreate"],
-    },
-  ]);
+  // Opening the AI menu asked for the draft's suggestions before Custom… sent its request.
+  const suggestionsAsked = {
+    surface: "draft",
+    kind: "image",
+    profileId: "image:test",
+    prompt: "A castle at noon",
+    fresh: false,
+  };
+  const night = {
+    surface: "draft",
+    kind: "image",
+    profileId: "image:test",
+    prompt: "A castle at noon",
+    request: "make it night",
+    actions: ["recreate"],
+  };
+  expect(asked).toEqual([suggestionsAsked, night]);
   // Undo restores the draft; Custom… keeps the request for the next time.
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A castle at noon");
@@ -423,20 +431,16 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(request).toHaveValue("make it night");
   await request.press("Enter");
   await expect(prompt).toHaveValue("A castle at night");
-  // A suggestion fits the draft as it was before the proposal and asks at once.
+  // A suggestion fits the draft as it was before the proposal, reusing the menu's answer, and asks
+  // at once.
   await assist(page, "Custom…");
-  await promptMenu(dialog, "Change");
+  const change = await promptMenu(dialog, "Change");
+  await expandAssistantMenu(change, "Suggestions");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => asked.length).toBe(4);
   expect(asked.slice(2)).toEqual([
-    {
-      surface: "draft",
-      kind: "image",
-      profileId: "image:test",
-      prompt: "A castle at noon",
-      fresh: false,
-    },
+    night,
     {
       surface: "draft",
       kind: "image",

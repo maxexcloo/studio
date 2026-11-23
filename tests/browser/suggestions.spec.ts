@@ -126,7 +126,10 @@ test("The composer groups ideas and draft suggestions in its compact and expande
       .getByRole("combobox", { name: "Suggestions", exact: true }),
   ).toHaveCount(0);
   await prompt.click();
-  expect(asked).toHaveLength(0);
+  // The AI menu asks for its suggestions as it opens, and the answer serves both menus.
+  expect(asked).toEqual([
+    { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
+  ]);
   let menu = await promptMenu(page, "Prompt");
   await expandAssistantMenu(menu, "Suggestions");
   const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
@@ -276,6 +279,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
     .getByRole("button", { name: "AI Instruction Actions", exact: true })
     .click();
   const menu = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
+  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" }]);
   await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(

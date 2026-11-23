@@ -599,7 +599,7 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
   await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
 });
 
-test("LoRA row actions end with Edit and Delete, and deletion requires confirmation", async ({
+test("LoRA row actions start with Edit and end with Delete, and deletion requires confirmation", async ({
   page,
 }) => {
   await fixtures(page);
@@ -624,9 +624,9 @@ test("LoRA row actions end with Edit and Delete, and deletion requires confirmat
   const actions = page.getByRole("button", { name: "Actions for Soft Texture", exact: true });
   await actions.click();
   await expect(page.getByRole("menuitem")).toHaveText([
+    "Edit",
     "Copy File Name",
     "Test LoRA",
-    "Edit",
     "Delete",
   ]);
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
@@ -721,7 +721,9 @@ test("Bulk accepting visible substitutes keeps the failed choice selected for re
     releaseFirst();
   }
   await expect(
-    page.getByText("The catalogue is temporarily unavailable.", { exact: true }),
+    page.getByText("Couldn't accept substitutes: The catalogue is temporarily unavailable.", {
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(first).toBeHidden();
   await expect(second).toBeChecked();
@@ -767,7 +769,7 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await page.goto("/library#files");
   const table = page.getByRole("table", { name: "Library Files", exact: true });
   await expect(table.getByRole("row")).toHaveCount(3);
-  const names = table.getByRole("row").locator("td:first-child > p:first-child");
+  const names = table.getByRole("button", { name: /^Edit / });
   await expect(names).toHaveText(["Flux Base", "XL Base"]);
   const name = table.getByRole("columnheader", { name: "Name", exact: true });
   await expect(name).toHaveAttribute("aria-sort", "ascending");
