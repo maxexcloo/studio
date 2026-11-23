@@ -68,7 +68,9 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("cinematic"), /camera move the subject's action motivates/);
   assert.match(theme("living"), /keeps rolling as if the photo were a candid video/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
-  assert.match(theme("dialogue"), /the people in the frame talk/);
+  assert.match(theme("atmosphere"), /hold the opening composition.*surroundings move/);
+  assert.match(theme("dialogue"), /one brief line and leave time for a visible reaction/);
+  assert.match(theme("reaction"), /gaze, ears or posture.*readable final pose/);
   assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it must be 18 or older/);
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
 });
@@ -105,8 +107,11 @@ test("quiet source motion and explicit dialogue keep their own scope within a sh
     assert.match(system.content, /shortening it for physical action and pauses/);
     assert.match(system.content, /only 5 seconds long/);
   }
-  assert.match(requests[0][0].content, /No big action or new events/);
-  assert.match(requests[1][0].content, /one or two short spoken lines/);
+  assert.match(requests[0][0].content, /activity already under way through its next ordinary step/);
+  assert.match(
+    requests[1][0].content,
+    /A second line needs an established listener and enough clip time/,
+  );
   assert.match(requests[2][0].content, /Preserve requested filmmaking and camera moves/);
   assert.ok(requests[2][1].content.includes(`Instruction: ${instruction}`));
   assert.match(requests[3][0].content, /energetic action that this frame sets up/);

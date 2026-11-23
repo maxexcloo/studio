@@ -1,6 +1,6 @@
 // The built-in styles that seed Library › Prompt Styles (prompt-styles.js) in a data folder that has
-// none: Improve Prompt's rewrite styles, Animate's themes (prompt-animate.js), then the viewer's
-// fixed AI changes, each asked for as a suggestion's request is. An Improve
+// none: Improve Prompt's rewrite styles, Animate's themes (prompt-animate.js), then Edit and
+// Recreate's fixed AI changes, each asked for as a suggestion's request is. An Improve
 // Prompt style is an instruction block added after the profile's guide; a guide may replace one
 // with its own `presets.<id>` text. Each sets only the tone; the content rule
 // (domain/writing-standard.ts) decides how explicit it may be, and an `uncensored` style is only
@@ -15,16 +15,16 @@ export const seedStyles = Object.freeze([
     label: "Candid",
     description: "Natural, unposed photography of real life.",
     instruction:
-      "Candid: make it a natural, unposed photograph of real life. Everyday light that fits the place and time, real skin texture and small imperfections, believable lived-in surroundings, people absorbed in what they are doing rather than posing, and simple eye-level framing. Keep it a clear, well-exposed photograph: no blur, grain or accidental-shot effects, no phone-snapshot look unless asked, and no studio polish or glamour words.",
+      "Candid: show an unposed moment at eye level in the available light. Use a candid photograph when no other medium is specified. Choose a gesture or point of attention that fits what the subject is already doing, and show texture in the surfaces and surroundings already present. Keep faces and materials natural and the subject clear. Avoid snapshot artifacts and stock props. For video, let the existing action play out at a natural pace.",
   },
   {
     id: "cinematic",
     kind: "improve",
     enabled: true,
     label: "Cinematic",
-    description: "A film still: framing, grade and mood.",
+    description: "A story beat shaped by framing, light and color.",
     instruction:
-      "Cinematic: write it as a still from a film, a moment caught mid-story. Name the framing and camera angle, dramatic motivated light, the color grade and the atmosphere, as a cinematographer would.",
+      "Cinematic: frame the scene as a story beat. Use the subject's position in the frame, light direction from a plausible source, and a deliberate contrast between foreground and background to direct attention to the event. For a video, carry the event through an opening action and a visible payoff in the guide's format.",
   },
   {
     id: "concise",
@@ -42,7 +42,7 @@ export const seedStyles = Object.freeze([
     label: "Enhance",
     description: "Richer detail in the guide's own style.",
     instruction:
-      "Enhance: keep the prompt's own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
+      "Enhance: retain the prompt's medium, subject and intent. Make the details already stated or implied more visible: shape, placement, material, the light falling on them, or a specific sequence of movement for video. Use the detail and structure the guide recommends.",
   },
   {
     id: "spicy",
@@ -61,7 +61,7 @@ export const seedStyles = Object.freeze([
     label: "Fix Issues",
     description: "Prevents glitches: anatomy, text and muddled scenes.",
     instruction:
-      "Fix Issues: rewrite it so the model makes it cleanly, without changing what is asked for. Resolve contradictions and vague or overloaded phrases, give every person and object one clear place and count, describe hands, faces and bodies plainly and naturally, keep any rendered text short and quoted, and drop crowded details that compete for the same space. Keep the subject, style and framing.",
+      "Fix Issues: untangle unclear placement, counts, conflicting directions and which subject is doing what. Specify spatial relationships, contacts and readable silhouettes in positive terms. Keep quoted text verbatim. In video, put the motions in order and resolve conflicting camera moves. Preserve the requested appearance, style and framing.",
   },
   {
     id: "guide",
@@ -73,40 +73,67 @@ export const seedStyles = Object.freeze([
       "Follow Guide: rewrite it strictly in the format, order, length and wording the prompting guide sets for this model, keeping every subject, detail and style the prompt asks for and adding nothing new.",
   },
   {
+    id: "graphic-poster",
+    kind: "improve",
+    enabled: true,
+    label: "Graphic Poster",
+    description: "Bold silhouettes and an arranged, limited palette.",
+    instruction:
+      "Graphic Poster: arrange the existing subjects as distinct silhouettes at deliberate scales, with a limited set of flat colors and purposeful negative space. Place any requested lettering clearly and preserve its exact wording. Leave the layout purely pictorial when the request has no text. For video, retain the requested action and describe how the shapes move through the composition.",
+  },
+  {
     id: "illustration",
     kind: "improve",
     enabled: true,
     label: "Illustration",
     description: "Artwork in one specific medium and style.",
     instruction:
-      "Illustration: make it artwork, not a photograph. Use the medium the prompt names, or choose one that suits the subject (such as watercolor, ink, gouache, flat vector, cel-shaded animation or oil paint), and describe its linework, palette, texture and composition. No camera, lens or photographic words.",
+      "Illustration: render the scene in one chosen art medium. Use the medium the prompt names or choose one that suits the subject. Describe the marks and surfaces that distinguish it, such as ink contours and paper grain or opaque gouache strokes. For video, keep that rendering consistent as the requested action plays out.",
+  },
+  {
+    id: "monochrome",
+    kind: "improve",
+    enabled: true,
+    label: "Monochrome",
+    description: "Grayscale tones that separate shapes and textures.",
+    instruction:
+      "Monochrome: keep the original medium and use grayscale tonal separation. State which existing surfaces catch the highlights, which read as midtones and where the shadows define shape. Where a named color carries story information or identifies an object, preserve its role with a clearly distinguishable tone. For video, keep moving subjects readable against their backgrounds.",
   },
   {
     id: "photographic",
     kind: "improve",
     enabled: true,
     label: "Photographic",
-    description: "A polished photograph: lens, light and composition.",
+    description: "Deliberate photographic light, perspective and focus.",
     instruction:
-      "Photographic: make it a polished, professional photograph of whatever the subject is. Name the kind of shot and a plausible camera and lens (such as a wide-angle landscape, a macro close-up or a 50mm street scene), deliberate light and its direction, a considered composition and crisp, true-to-life materials and textures. No painterly, illustrated or film-still words.",
+      "Photographic: give the scene an intentional photographic treatment. Describe the working distance, perspective, focus and source and direction of light that show the subject clearly. Use visible material texture and restrained color. Name a lens only if it explains a visible effect and the guide uses that language. For video, retain the action and apply the look consistently through the shot.",
   },
   {
     id: "portrait",
     kind: "improve",
     enabled: true,
     label: "Portrait",
-    description: "A person in focus: face, expression and light.",
+    description: "An identity-led study of the subject's face and expression.",
     instruction:
-      "Portrait: make the person the clear focus of a portrait photograph. Describe the face, expression, hair and clothing specifically, the pose and where they look, flattering light and its direction, a portrait lens with shallow depth of field and a simple background that suits them. Keep real skin texture.",
+      "Portrait: make the person the clear focus when the scene already has one. Use the existing face, expression, eye line and pose, with a light direction and depth of field that separate them from the existing background. Preserve distinctive facial features, age, build and visible marks. For a nonhuman subject, work with the features and pose it has. In video, retain the requested action within a readable portrait framing.",
   },
   {
     id: "action",
     kind: "animate",
     enabled: true,
     label: "Action",
-    description: "One energetic physical action, with the camera following it.",
+    description: "One energetic physical action and a readable follow-through.",
     instruction:
-      "Action: the subject does one clear, physical, energetic action that this frame sets up, from their pose, the props and the place (spinning, leaping, running, throwing, striking, dancing), with a quick wind-up, a peak that lands by the middle of the clip and a follow-through, the kind of thing this person would do here. Momentum shows in the body and its secondary motion (hair whipping, fabric snapping, splashes, sparks, dust or debris), and the camera moves with it: tracking alongside, whip-panning, a handheld follow or a fast push-in on the impact, at a pace that keeps the motion readable.",
+      "Action: choose one energetic action that this frame sets up. Begin at the established pose, state how the subject shifts or makes contact, and carry that momentum into one visible follow-through. Keep any secondary motion tied to that action. Use a fixed frame or one follow move that keeps the hands, feet or point of contact readable. Match the action's scale to the available space, clip length and frame rate.",
+  },
+  {
+    id: "atmosphere",
+    kind: "animate",
+    enabled: true,
+    label: "Atmosphere",
+    description: "Visible movement in the surroundings, seen from a fixed frame.",
+    instruction:
+      "Atmosphere: hold the opening composition and make one established part of the surroundings move. Describe where the movement starts, what path it takes and what changes in the frame as it passes or settles. Choose something this setting can already support, such as a shifting reflection, water running off an edge or a draft moving loose fabric. Keep the subject's movement secondary and make the change readable without sound.",
   },
   {
     id: "cinematic",
@@ -115,16 +142,16 @@ export const seedStyles = Object.freeze([
     label: "Cinematic Camera",
     description: "A camera move the subject's action motivates.",
     instruction:
-      "Cinematic Camera: a camera move the subject's action motivates carries the shot. The subject does something (turns to look, steps forward, rises, reaches, reacts to someone) and the camera answers it: tracking alongside a walk, arcing around a turn, craning up as they rise, pushing in on a reaction, pulling out to reveal where they are. The move has a speed that matches the action (medium speed while the subject moves, slow only for a held emotional beat) starts with the action and lands on a different framing than it began. The world moves around them: parallax between foreground and background, passers-by, weather and light.",
+      "Cinematic Camera: use one camera move the subject's action motivates. Begin at the opening angle and distance. Give the move a direction and a specific destination, such as tracking alongside the subject until the doorway they approach comes into view. Describe how shapes overlap or separate as the framing changes and keep the subject's placement continuous.",
   },
   {
     id: "dialogue",
     kind: "animate",
     enabled: true,
     label: "Dialogue",
-    description: "The people in the frame talk, with lips in sync.",
+    description: "A brief line or exchange with a visible reaction.",
     instruction:
-      "Dialogue: the people in the frame talk. Give one or two short spoken lines, or a quick exchange between two people in the frame, that fit who they are, where they are and what they are doing, each with who says it and how. Speech comes with the body language of talking: lips in sync, a nod, a shrug, a hand lifting to make a point, eyes meeting, and the listener reacting. The camera covers the conversation: a push-in on the speaker, a handheld over-the-shoulder reframe, or a small arc from one speaker to the other. The first line starts within the first couple of seconds, and the clip ends on a reaction: the listener's answer, a laugh or a look. Where no one in the frame can speak, a short voiceover that fits the scene speaks instead.",
+      "Dialogue: when someone in the frame can speak, start with one brief line and leave time for a visible reaction. A second line needs an established listener and enough clip time. Frame the speaker so their mouth is readable. For silent models, show the communication in mouth movement, gaze and gesture. Where there is no plausible speaker, use a visible exchange or response supported by the frame.",
   },
   {
     id: "spicy",
@@ -143,7 +170,16 @@ export const seedStyles = Object.freeze([
     label: "Living Photo",
     description: "The moment keeps rolling like a candid video.",
     instruction:
-      "Living Photo: the moment keeps rolling as if the photo were a candid video. Each person carries on with what they are doing in real time, with natural, unposed movement that goes somewhere (a laugh that breaks into a glance away, a sip, brushing hair back, turning to someone, a few steps), and the surroundings keep moving: passers-by, traffic, wind, water, steam, flickering light. Something small but clearly visible changes early (a laugh breaking, a turn, a sip) and the moment settles into a new beat by the end. The camera is handheld with a light natural sway or makes a small reframe as someone moves. No big action or new events.",
+      "Living Photo: the moment keeps rolling as if the photo were a candid video. Carry the activity already under way through its next ordinary step and let it settle. Describe how one visible detail responds to the subject's movement, such as a cup tilting with the wrist. Keep the original shot size, with a steady frame or a slight handheld reframe only if it helps keep the activity visible.",
+  },
+  {
+    id: "reaction",
+    kind: "animate",
+    enabled: true,
+    label: "Reaction",
+    description: "One visible response to something established in the frame.",
+    instruction:
+      "Reaction: pick a person or animal and something already present that could draw their attention. Show what changes first in their gaze, ears or posture, then the expression or weight shift that follows. Settle on a readable final pose. Hold the framing on the subject and keep the response small. Where there is no living subject, show one visible physical response between elements already present.",
   },
   {
     id: "closer",
@@ -152,7 +188,7 @@ export const seedStyles = Object.freeze([
     label: "Closer Crop",
     description: "Frame the subject tighter.",
     instruction:
-      "Closer Crop: frame the main subject much closer, filling more of the picture, and drop the surroundings the tighter framing leaves out.",
+      "Closer Crop: keep the original viewpoint and let the main subject fill more of the frame. Describe what the new frame includes and retain the identity, pose, light and any relevant point of contact.",
   },
   {
     id: "wider",
@@ -161,7 +197,7 @@ export const seedStyles = Object.freeze([
     label: "Wider Shot",
     description: "Pull back to show more of the scene.",
     instruction:
-      "Wider Shot: pull back to a wider shot that shows the whole subject and more of the place around them, adding the surroundings it would plausibly reveal.",
+      "Wider Shot: keep the viewing angle and show the subject with more of the established surroundings. Describe the new shot size and where the subject sits in it. Extend the existing space and keep the same people, objects and activity.",
   },
   {
     id: "warmer",
@@ -170,7 +206,7 @@ export const seedStyles = Object.freeze([
     label: "Warmer Light",
     description: "Golden, warm-toned light.",
     instruction:
-      "Warmer Light: change the light to warm, golden tones, as in late afternoon sun or lamplight, with warmer colors and softer shadows.",
+      "Warmer Light: give the existing light a warm cast. Name its source or direction if established and where the amber highlights fall. Retain the time of day, materials, framing and shadow softness.",
   },
   {
     id: "cooler",
@@ -179,7 +215,7 @@ export const seedStyles = Object.freeze([
     label: "Cooler Light",
     description: "Cool, blue-toned light.",
     instruction:
-      "Cooler Light: change the light to cool, blue tones, as in overcast daylight or early morning, with cooler colors and crisper shadows.",
+      "Cooler Light: give the existing light a cool cast. Name its source or direction if established and where the blue-gray highlights fall. Retain the time of day, materials, framing and shadow softness.",
   },
   {
     id: "night",
@@ -188,7 +224,7 @@ export const seedStyles = Object.freeze([
     label: "Night Version",
     description: "The same scene at night.",
     instruction:
-      "Night Version: make it the same scene at night, lit by the moon and the light sources that would be there, such as street lamps, windows or a fire.",
+      "Night Version: set the established scene after dark. Use one plausible source of light for this place and describe the surfaces it reaches and the shadows it leaves. Keep the subject, activity, composition and location.",
   },
   {
     id: "detail",
@@ -197,16 +233,43 @@ export const seedStyles = Object.freeze([
     label: "Add Detail",
     description: "Richer textures and small details.",
     instruction:
-      "Add Detail: add rich, specific detail to the subject, materials and surroundings, such as textures, small objects and fine surface wear, without changing what the picture shows.",
+      "Add Detail: make two or three existing surfaces or materials more tactile through visible texture, seams, grain or finish. Keep the subject's appearance and the existing objects, composition and action.",
   },
   {
     id: "simple-background",
     kind: "change",
     enabled: true,
     label: "Simplify Background",
-    description: "A plain, uncluttered background.",
+    description: "Reduce visual clutter within the established setting.",
     instruction:
-      "Simplify Background: replace the background with a plain, uncluttered one in colors that suit the subject, keeping the subject and its light unchanged.",
+      "Simplify Background: clear or soften secondary details behind the subject. Retain the features that establish the location and any objects the subject uses. Keep the foreground, light and framing the same.",
+  },
+  {
+    id: "colour-accent",
+    kind: "change",
+    enabled: true,
+    label: "Colour Accent",
+    description: "A single colour accent on an existing object or garment.",
+    instruction:
+      "Color Accent: change the color of one already visible garment or object to draw the eye. Name the item and its new color. Retain its shape and material, any identity-defining colors, the surrounding palette and the light.",
+  },
+  {
+    id: "new-angle",
+    kind: "change",
+    enabled: true,
+    label: "New Angle",
+    description: "A new viewpoint at the same shot size.",
+    instruction:
+      "New Angle: choose a plausible change in viewing height or position that reveals something already in the scene. Name the viewpoint and what is visible from it. Retain the established shot size, subject, pose, setting and light.",
+  },
+  {
+    id: "shift-focus",
+    kind: "change",
+    enabled: true,
+    label: "Shift Focus",
+    description: "Guide attention with sharpness and depth of field.",
+    instruction:
+      "Shift Focus: place sharp focus on one established detail that matters to the scene and let the other planes soften. Name the subject or object in focus and what remains legible around it. Keep the existing viewpoint, framing, light and action.",
   },
 ]);
 

@@ -71,7 +71,7 @@ const same = (a: PromptStyle, b: PromptStyle) => a.id === b.id && a.kind === b.k
 /** Each kind's menu, in the order the section lists them. */
 const kinds: { value: Kind; label: string }[] = [
   { value: "animate", label: "Animate" },
-  { value: "change", label: "Edit" },
+  { value: "change", label: "Edit & Recreate" },
   { value: "improve", label: "Improve Prompt" },
 ];
 
