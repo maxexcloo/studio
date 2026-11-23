@@ -9,6 +9,7 @@ import {
   Stack,
   Table,
   Text,
+  Tooltip,
   UnstyledButton,
   VisuallyHidden,
 } from "@mantine/core";
@@ -60,35 +61,44 @@ export const compareNames = new Intl.Collator(undefined, {
 
 /**
  * A record's name and detail in its table's main cell; with `onOpen` the name opens the record
- * (its row menu's first action, named by `openLabel`).
+ * (its row menu's first action, named by `openLabel`) and shows any `tooltip` on hover or focus.
  */
 export function TableRecord({
   name,
   detail,
   onOpen,
   openLabel,
+  tooltip,
 }: {
   name: ReactNode;
   detail?: ReactNode;
   onOpen?: () => void;
   openLabel?: string;
+  tooltip?: ReactNode;
 }) {
   return (
     <>
       {onOpen ? (
-        <Anchor
-          component="button"
-          type="button"
-          size="sm"
-          fw={500}
-          maw="100%"
-          ta="start"
-          className={classes.recordText}
-          aria-label={openLabel}
-          onClick={onOpen}
+        <Tooltip
+          label={tooltip}
+          // Undefined keeps the theme's touch default.
+          disabled={tooltip ? undefined : true}
+          events={{ hover: true, focus: true, touch: false }}
         >
-          {name}
-        </Anchor>
+          <Anchor
+            component="button"
+            type="button"
+            size="sm"
+            fw={500}
+            maw="100%"
+            ta="start"
+            className={classes.recordText}
+            aria-label={openLabel}
+            onClick={onOpen}
+          >
+            {name}
+          </Anchor>
+        </Tooltip>
       ) : (
         <Text size="sm" fw={500} className={classes.recordText}>
           {name}

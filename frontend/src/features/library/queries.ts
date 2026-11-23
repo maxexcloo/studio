@@ -22,7 +22,7 @@ export interface ProfileRow {
   id: string;
   name?: string;
   family?: string;
-  kind?: string;
+  kind: "image" | "video";
   version: number;
   aiDrafted?: boolean;
   /** A combined profile's current backend. */
