@@ -380,12 +380,12 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     ["Accept", "four"],
   ]) {
     await bar.getByRole("button", { name, exact: true }).click();
-    await expect(current(page)).toContainText(`Dream prompt ${next}`);
+    await expect(current(page).getByRole("img", { name: `Dream prompt ${next}` })).toBeVisible();
   }
   // Each Undo brings back the card before, newest first, until nothing is left to undo.
   for (const back of ["three", "two", "one"]) {
     await undo.click();
-    await expect(current(page)).toContainText(`Dream prompt ${back}`);
+    await expect(current(page).getByRole("img", { name: `Dream prompt ${back}` })).toBeVisible();
   }
   await expect(undo).toBeDisabled();
   const sent = () =>
@@ -458,7 +458,7 @@ test("Projects show what is new in each since the last visit, and the viewer jud
   await expect(viewer.getByRole("img", { name: "Dream prompt street" })).toBeVisible();
   await dreamAction(page, "Like");
   await expect(viewer).toBeHidden();
-  await expect(page.getByText("Nothing new since your last visit", { exact: true })).toBeVisible();
+  await expect(beach.getByText(/ New$/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^View Dream prompt/ })).toHaveCount(0);
   expect(verdicts(dream)).toEqual([
     "POST /api/dream/wave/keep",
@@ -1140,7 +1140,7 @@ test("The preview swipes between comparison sides and Super Likes the shown imag
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Both", "Suggestions"]);
   await answers.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
