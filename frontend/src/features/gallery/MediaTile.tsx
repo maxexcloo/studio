@@ -209,6 +209,7 @@ export function MediaTile({
   onSelectionMenu?: (x: number, y: number) => void;
   onTryAgain?: (item: MediaItem) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  /** In view now: its thumbnail loads ahead of those placed just outside the view. */
   eager?: boolean;
 }) {
   // Touch holds use Studio's menu or selection instead of a native drag lift.
@@ -334,7 +335,7 @@ export function MediaTile({
             alt=""
             width={media.width || 1024}
             height={media.height || 1024}
-            loading={eager ? "eager" : "lazy"}
+            fetchPriority={eager ? "high" : undefined}
             decoding="async"
             draggable={false}
             onLoad={(event) => {
