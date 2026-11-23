@@ -204,7 +204,7 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const requests = state.comparisons[0].requests;
   expect(requests.map((variant: any) => variant.input.prompt)).toEqual(
-    Array(3).fill("A silver fox"),
+    Array(3).fill("A golden fox"),
   );
   expect(new Set(requests.map((variant: any) => variant.input.seed)).size).toBe(3);
   expect(requests.every((variant: any) => /^Seed \d+$/.test(variant.label))).toBe(true);
