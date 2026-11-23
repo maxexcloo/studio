@@ -3,6 +3,7 @@ import { type ReactNode, useId } from "react";
 
 import type { MediaItem } from "../../types";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
@@ -36,10 +37,12 @@ export function ViewerDetails({
   const id = useId();
   const closeSheet = closeWhenTop(id, close);
   const swipe = useSwipeClose("down", closeSheet);
-  const details = (
+  // The desktop panel stays mounted, so it loads an item's details only while it shows them.
+  const shown = useLastWhileClosing(opened ? item : null);
+  const details = (of: MediaItem) => (
     <>
       {children}
-      <MediaDetails item={item} related={related} open={follow} />
+      <MediaDetails item={of} related={related} open={follow} />
     </>
   );
   if (phone)
@@ -79,7 +82,7 @@ export function ViewerDetails({
               pt="md"
               pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))"
             >
-              {details}
+              {details(item)}
             </Stack>
           </Drawer.Body>
         </Drawer.Content>
@@ -101,7 +104,7 @@ export function ViewerDetails({
         <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
             <ViewerTitle item={item} title={title} fw={600} lineClamp={2} lh={1.2} />
-            {details}
+            {shown && details(shown)}
           </Stack>
         </ScrollArea>
       </aside>

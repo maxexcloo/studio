@@ -88,7 +88,6 @@ export function SettingsPage() {
           studio: [deploymentQuery],
           users: [accountAdminQuery],
           "where-work-runs": [assistantQuery, dreamQuery, preferencesQuery],
-          workers: [runtimeStatusQuery],
         }}
         content={{
           account: <OwnAccount />,
