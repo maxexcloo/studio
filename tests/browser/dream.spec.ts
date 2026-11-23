@@ -1487,8 +1487,8 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
   if (isMobile) await name.click();
   await name.fill("Harbour Study");
   if (isMobile) await editor.getByRole("button", { name: "Done", exact: true }).click();
-  await editor.getByRole("button", { name: "AI Styles Actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Suggest", exact: true }).click();
+  // A single AI option runs at once; the menu returns with Undo while the proposal stands.
+  await editor.getByRole("button", { name: "Suggest Styles", exact: true }).click();
   await expect(editor.getByRole("status")).toHaveText("Suggested");
   await expect(editor.getByRole("textbox", { name: "Styles", exact: true })).toHaveValue(
     "Soft morning light by the harbour.",

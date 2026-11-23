@@ -224,7 +224,9 @@ recur across features.
   Clear are left to the browser, and a box starting from its own text shows
   Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
-  marks prompt assistance. The viewer keeps its prompt send beside the text.
+  marks prompt assistance. An AI tool with a single option runs it on
+  click, named by that option, and is a menu only while a proposal adds
+  Undo. The viewer keeps its prompt send beside the text.
   Composer fields edit in place: at rest the phone Generate sheet's prompt,
   and its Negative Prompt when shown, share the room between its heading and
   the chips, which wrap onto as many rows as they need; each box shows only

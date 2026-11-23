@@ -332,8 +332,7 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   await expect(fix).toBeDisabled();
   await report.getByText("Hands", { exact: true }).click();
   await expect(report.getByRole("checkbox", { name: "Hands", exact: true })).toBeChecked();
-  await promptMenu(report, "Details");
-  await page.getByRole("menuitem", { name: "Inspect Image", exact: true }).click();
+  await report.getByRole("button", { name: "Inspect Image", exact: true }).click();
   // The finding fills the details in place, with Undo.
   const details = report.getByRole("textbox", { name: "Details", exact: true });
   await expect(details).toHaveValue("six toes");
