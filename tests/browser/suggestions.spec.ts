@@ -134,7 +134,9 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(suggestions.getByRole("menuitem").first()).toHaveText(sorted[0]);
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
-  expect(asked).toEqual([{ surface: "composer", kind: "image", fresh: false }]);
+  expect(asked).toEqual([
+    { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
+  ]);
   await backToActionMenu(menu);
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
@@ -149,7 +151,13 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(
     suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }),
   ).toBeVisible();
-  expect(asked.at(-1)).toEqual({ surface: "draft", kind: "image", prompt: "A fox", fresh: false });
+  expect(asked.at(-1)).toEqual({
+    surface: "draft",
+    kind: "image",
+    profileId: "image:test",
+    prompt: "A fox",
+    fresh: false,
+  });
   await suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
   await expect(prompt).toHaveValue(steps[0].prompt);
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");

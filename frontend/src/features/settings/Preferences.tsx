@@ -93,10 +93,7 @@ export function Preferences() {
         </SettingRow>
       </SettingGroup>
       {data && access.length > 0 && (
-        <SettingGroup
-          title="Model Access"
-          description="These preferences apply within the access your group grants."
-        >
+        <SettingGroup title="Model Access">
           {access.map(({ key, label, description }) => (
             <SettingRow key={key} label={label} description={description}>
               <Switch

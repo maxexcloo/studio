@@ -11,6 +11,8 @@ export interface NextStep {
 }
 /** The number of distinct ideas requested for a generated suggestion picker. */
 export const maxSuggestions = 10;
+/** Maximum reference images supplied to a composer suggestion. */
+export const maxSuggestionReferences = 4;
 /** How a requested change is carried out; a composer draft has nothing to upscale. */
 export const changeActions = ["edit", "recreate", "animate", "upscale"] as const;
 export type ChangeAction = (typeof changeActions)[number];

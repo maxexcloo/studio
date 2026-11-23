@@ -90,9 +90,11 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
   assert.deepEqual(ids("animate"), [
     "action",
     "atmosphere",
+    "body-bounce",
     "cinematic",
     "dialogue",
     "spicy",
+    "hip-sway",
     "living",
     "reaction",
     "custom",

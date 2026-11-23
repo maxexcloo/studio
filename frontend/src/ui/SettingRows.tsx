@@ -13,30 +13,21 @@ import classes from "./SettingRows.module.css";
  */
 export function SettingGroup({
   title,
-  description,
   danger = false,
   fill = false,
   toolbar,
   children,
 }: {
   title: string;
-  description?: string;
   danger?: boolean;
   fill?: boolean;
   toolbar?: ReactNode;
   children: ReactNode;
 }) {
   const heading = (
-    <Stack gap={2}>
-      <Text component="h4" size="sm" fw={600} c={danger ? "red" : "dimmed"}>
-        {title}
-      </Text>
-      {description && (
-        <Text size="xs" c="dimmed">
-          {description}
-        </Text>
-      )}
-    </Stack>
+    <Text component="h4" size="sm" fw={600} c={danger ? "red" : "dimmed"}>
+      {title}
+    </Text>
   );
   return (
     <Stack

@@ -8,13 +8,13 @@ import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useGroupFeature } from "../auth/AccountGate";
 import { appliedCardIds } from "../characters/cardParts";
-import { promptIdeasQuery } from "../taste/suggestions";
+import { draftSuggestionContext, promptIdeasQuery } from "../taste/suggestions";
 import { UndoButton, suggested } from "./AskChange";
 import { assistantQuery } from "./PromptAssistant";
 
 /** Taste-led ideas for an empty prompt or a draft with cards, applied only on selection. */
 export function usePromptIdeas({
-  input: { kind, prompt, cardParts },
+  input,
   references,
   onChange,
   enabled,
@@ -25,6 +25,8 @@ export function usePromptIdeas({
   enabled: boolean;
 }) {
   const client = useQueryClient();
+  const { prompt, cardParts } = input;
+  const context = draftSuggestionContext(input, references);
   const [picked, setPicked] = useState<{ before: string; after: string; label: string } | null>(
     null,
   );
@@ -37,10 +39,10 @@ export function usePromptIdeas({
   const mayUseCards = useGroupFeature("characters");
   const cardIds = mayUseCards ? appliedCardIds(cardParts, base, references) : [];
   const cards = cardIds.length ? { cardIds, prompt: base } : undefined;
-  const query = promptIdeasQuery(kind, cards);
+  const query = promptIdeasQuery(context, cards);
   const ideas = useQuery({ ...query, enabled: false });
   function load(fresh = false) {
-    const options = promptIdeasQuery(kind, cards, fresh);
+    const options = promptIdeasQuery(context, cards, fresh);
     void client.fetchQuery({ ...options, ...(fresh && { staleTime: 0 }) }).catch(() => {});
   }
   const list = [...(ideas.data?.suggestions ?? [])]

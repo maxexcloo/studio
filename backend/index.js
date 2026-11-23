@@ -899,10 +899,21 @@ const suggestions = createSuggestions({
   save: (item, field, steps) => updateGalleryJob(galleryKey(item), { [field]: steps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
+  draftReferences: async (ownerId, ids) => {
+    if (!ids.length) return [];
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    const vision = await assistantEngine?.supportsVision(textWriter(ownerId));
+    return Promise.all(
+      ids.map(async (id) => {
+        const image = vision ? await assistant.image(account, id).catch(() => null) : null;
+        return image ? { image } : { caption: assistant.caption(account, id) };
+      }),
+    );
+  },
   target: (ownerId, item, profileId) =>
     assistant.target(
       ownerId ? accountAccessForId(ownerId) : undefined,
-      profileId ?? (item.settings?.profileId || ""),
+      profileId ?? (item?.settings?.profileId || ""),
     ),
   promptWriter: textWriter,
   fixed: (kind) =>
