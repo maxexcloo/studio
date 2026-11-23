@@ -680,6 +680,7 @@ export class GenerationQueue {
             }
             // Paused while its eligibility was checked: the next tick marks it Paused.
             if (this.held()(job)) {
+              this.adapter.releaseAdmission?.(job);
               skipped.push(job);
               continue;
             }
