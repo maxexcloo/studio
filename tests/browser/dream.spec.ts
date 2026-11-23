@@ -405,7 +405,7 @@ test("Dream Library shows result details and preloads the next five Suggestions 
   await page.goto("/dream/library");
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card.getByText("Library Result 0", { exact: true })).toBeVisible();
-  await expect(card.getByText("Archipelago", { exact: true })).toBeVisible();
+  await expect(card.getByText(/^Archipelago( · |$)/)).toBeVisible();
   await expect(card.locator("time")).toHaveAttribute("datetime", stamp);
   await expect.poll(() => asked).toEqual(library.slice(1, 6).map(({ id }) => id));
 
@@ -413,7 +413,7 @@ test("Dream Library shows result details and preloads the next five Suggestions 
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
   await expect(header.getByText("Library Result 0", { exact: true })).toBeVisible();
-  await expect(header.getByText("Archipelago", { exact: true })).toBeVisible();
+  await expect(header.getByText(/^Archipelago( · |$)/)).toBeVisible();
   await expect(header.locator("time")).toHaveAttribute("datetime", stamp);
   await preview.getByRole("button", { name: "Accept", exact: true }).click();
 

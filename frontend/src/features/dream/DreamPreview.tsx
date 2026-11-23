@@ -29,7 +29,7 @@ import { mediaTitle } from "../gallery/mediaLabels";
 import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
-import { ViewerChrome, ViewerMetadata } from "../gallery/ViewerChrome";
+import { ViewerChrome, ViewerMetadata, ViewerTitle } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
 import { zoomImage } from "../gallery/zoomImage";
@@ -96,10 +96,8 @@ function LibraryCaption({ item, full }: { item: MediaItem; full: boolean }) {
   const prompt = item.prompt?.trim();
   return (
     <div className={classes.caption}>
-      <Text fw={600} lineClamp={full ? undefined : 1}>
-        {title}
-      </Text>
-      <ViewerMetadata item={item} title={title} />
+      <ViewerTitle item={item} title={title} fw={600} lineClamp={full ? undefined : 2} />
+      <ViewerMetadata item={item} />
       {prompt && prompt.toLowerCase() !== title.toLowerCase() && (
         <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
           {prompt}
