@@ -123,7 +123,7 @@ export interface DreamOrigin {
   state?: "draft";
 }
 /**
- * A series: Dream follows a liked or kept image's character through one night, a later time
+ * A series: Dream follows a liked or kept image's character through one night or day, a later time
  * and a new place each result, on its profile with its LoRAs, size and references, grouped as one
  * result set.
  */
@@ -132,7 +132,7 @@ interface DreamSeries {
   /** The liked or kept image it follows. */
   itemId: string;
   title: string;
-  /** Each result's place and time of night, in order. */
+  /** Each result's place and time of night or day (`night`), in order. */
   stops: { title: string; place: string; night: string }[];
   /** The next result's position in the set. */
   index: number;
@@ -306,7 +306,7 @@ interface DreamWriting {
   /** A prompt to continue, changing only `vary` (a `continueAxes` key) or a series' place and time. */
   seed?: string;
   vary?: string;
-  /** A series' next result, following `seed`: its set, place and time of night (DreamSeries). */
+  /** A series' next result, following `seed`: its set, place and time of night or day (DreamSeries). */
   series?: {
     id: string;
     place: string;
@@ -471,6 +471,31 @@ const seriesNights: [string, string][] = [
   ["Midnight", "midnight"],
   ["Small Hours", "the small hours"],
   ["Before Dawn", "just before dawn"],
+];
+const seriesDayPlaces: [string, string][] = [
+  ["Farmers Market", "a busy farmers market"],
+  ["Hiking Trail", "a hiking trail above a lake"],
+  ["Park", "a sunny city park"],
+  ["Boardwalk", "a seaside boardwalk"],
+  ["Botanical Garden", "a botanical garden glasshouse"],
+  ["Cafe Terrace", "a sidewalk cafe terrace"],
+  ["Sailboat", "a small sailboat on open water"],
+  ["Flower Field", "a field of wildflowers"],
+  ["Old Town Square", "an old town square"],
+  ["Beach", "a bright beach at midday"],
+];
+const seriesDays: [string, string][] = [
+  ["Early Morning", "early morning, soft low sun"],
+  ["Morning", "mid-morning"],
+  ["Midday", "midday"],
+  ["Afternoon", "early afternoon"],
+  ["Late Afternoon", "late afternoon"],
+  ["Golden Hour", "golden hour"],
+];
+/** A series spends one night out or one day out, each through its own places and times. */
+const seriesOutings = [
+  { title: "Night Out", places: seriesPlaces, times: seriesNights },
+  { title: "Day Out", places: seriesDayPlaces, times: seriesDays },
 ];
 /**
  * Projects share Dream's turns by how their results fare (`turnShares`). Stats read the newest
@@ -1156,7 +1181,7 @@ export function createDream(options: {
   }
   /**
    * The series to continue, or for a share of images a new one following a drawn liked or kept
-   * image (`seedPick`) through a night: from a drawn time on, through places from the account's
+   * image (`seedPick`) through a night or a day (`seriesOutings`): from a drawn time on, through places from the account's
    * scene cards and drawn ones. Null otherwise; a series whose image is no longer liked or kept,
    * or whose profile is gone, ends.
    */
@@ -1174,6 +1199,7 @@ export function createDream(options: {
     }
     const seed = await seedPick(ownerId, record, profiles);
     if (!seed || !chance(seriesShare)) return null;
+    const outing = pick(seriesOutings);
     const scenes = suggestedCards(options.cards(ownerId)?.scenes || []).filter(
       (scene) => scene.description,
     );
@@ -1184,20 +1210,18 @@ export function createDream(options: {
     const favourites = scenes.filter((scene) => scene.rating === "liked").map(placeOf);
     const places = [
       ...scenes.filter((scene) => scene.rating !== "liked").map(placeOf),
-      ...seriesPlaces,
+      ...outing.places,
     ];
-    const first = random(seriesNights.length - dreamSeriesLength + 1);
-    const stops = seriesNights
-      .slice(first, first + dreamSeriesLength)
-      .map(([nightTitle, night]) => {
-        const pool = favourites.length ? favourites : places;
-        const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
-        return { title: `${placeTitle}, ${nightTitle}`, place, night };
-      });
+    const first = random(outing.times.length - dreamSeriesLength + 1);
+    const stops = outing.times.slice(first, first + dreamSeriesLength).map(([timeTitle, night]) => {
+      const pool = favourites.length ? favourites : places;
+      const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
+      return { title: `${placeTitle}, ${timeTitle}`, place, night };
+    });
     const series: DreamSeries = {
       id: randomUUID(),
       itemId: String(seed.item.id),
-      title: seed.item.title ? `${seed.item.title} · Night Out`.slice(0, 80) : "Night Out",
+      title: seed.item.title ? `${seed.item.title} · ${outing.title}`.slice(0, 80) : outing.title,
       stops,
       index: 0,
       length: dreamSeriesLength,
@@ -1831,7 +1855,7 @@ export function createDream(options: {
             ...(loras.length ? [`It loads these LoRAs: ${loras.join(", ")}`] : []),
             ...ruleLines,
             `Place: ${series.place}`,
-            `Time of night: ${series.night}`,
+            `Time: ${series.night}`,
             "Results so far:",
             ...(shots.length ? shots.map((shot) => `- ${clean(shot, 300)}`) : ["(none yet)"]),
           ].join("\n"),

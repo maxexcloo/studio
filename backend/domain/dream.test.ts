@@ -3095,12 +3095,9 @@ test("A series follows a Super Liked concept, visiting liked scene cards first",
   assert.match(written[0].system, /result 1 of 4 in a series/);
   assert.match(
     written[0].user,
-    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: Pier: a pier over dark water\nTime of night: dusk/,
+    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: Pier: a pier over dark water\nTime: dusk/,
   );
-  assert.match(
-    written[1].user,
-    /Place: a rooftop bar above the city\nTime of night: early evening/,
-  );
+  assert.match(written[1].user, /Place: a rooftop bar above the city\nTime: early evening/);
   assert.ok(written.every(({ user }) => !user.includes("a corrugated iron shed")));
   assert.match(written[3].user, /Results so far:\n- dream 1\n- dream 2\n- dream 3/);
   assert.match(
