@@ -22,9 +22,8 @@
 }
 
 *:hover > .actions .control,
-*:focus-within > .actions .control,
-.actions[data-opened] .control,
-.control[aria-pressed="true"] {
+*:has(:focus-visible) > .actions .control,
+.actions[data-opened] .more {
   opacity: 1;
 }
 

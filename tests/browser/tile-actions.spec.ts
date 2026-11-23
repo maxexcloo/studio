@@ -86,6 +86,10 @@ test("A tile can be liked and read back without opening the viewer", async ({ pa
   await page.getByRole("button", { name: "Like Copper Bird", exact: true }).click();
   const liked = page.getByRole("button", { name: "Unlike Copper Bird", exact: true });
   await expect(liked).toHaveAttribute("aria-pressed", "true");
+  if (!testInfo.project.use.isMobile) {
+    await page.mouse.move(0, 0);
+    await expect(liked).toHaveCSS("opacity", "0");
+  }
   await expect.poll(() => state.gallery[0].rating).toBe("liked");
   await expect(page).toHaveURL(/\/images$/);
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();

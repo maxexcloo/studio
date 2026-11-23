@@ -1,9 +1,10 @@
-import { Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
+import { ActionIcon, Alert, Button, Chip, Group, Modal, Stack, Text, Tooltip } from "@mantine/core";
 import { useRef, useState } from "react";
 
 import type { ImageInspection } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { askChange, inspectImage } from "../taste/suggestions";
@@ -64,7 +65,7 @@ export function useReportIssue(
   });
 }
 
-/** Report's Custom…: the issue as toggle chips and words. */
+/** Report's Other Issue…: the issue as toggle chips and words. */
 export function ReportIssueDialog({
   item,
   onQueued,
@@ -84,6 +85,7 @@ export function ReportIssueDialog({
     meta: { inlineError: true },
     mutationFn: () => inspectImage(item.jobId!, item.id, upscaled),
   });
+  const canInspect = item.type === "image" && Boolean(item.jobId);
   const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
     <Modal opened onClose={onClose} title="Report Issue" size="sm" fullScreen={phone}>
@@ -104,28 +106,45 @@ export function ReportIssueDialog({
               ))}
             </Group>
           </Chip.Group>
-          {item.type === "image" && item.jobId && (
+          <TextBox
+            label="Details"
+            placeholder="What's wrong, like “six fingers on the left hand”"
+            autosize
+            minRows={2}
+            inline
+            value={details}
+            onChange={setDetails}
+            rightSection={
+              canInspect && (
+                <Tooltip label="Inspect Image">
+                  <ActionIcon
+                    aria-label="Inspect Image"
+                    variant="subtle"
+                    color="gray"
+                    loading={inspect.isPending}
+                    disabled={fix.isPending}
+                    onClick={() => inspect.mutate(undefined, { onSuccess: setFinding })}
+                  >
+                    <icons.assistant size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              )
+            }
+            rightSectionWidth={canInspect ? 44 : undefined}
+            rightSectionPointerEvents="all"
+            rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 4 } }}
+          />
+          {canInspect && !inspect.isPending && (inspect.error || finding) && (
             <Stack gap="xs" align="start">
-              <Button
-                variant="default"
-                size="compact-sm"
-                loading={inspect.isPending}
-                disabled={fix.isPending}
-                onClick={() => inspect.mutate(undefined, { onSuccess: setFinding })}
-              >
-                Inspect Image
-              </Button>
-              {!inspect.isPending && (inspect.error || finding) && (
-                <Text size="sm" role="status">
-                  {inspect.error?.message ||
-                    (finding?.status === "issue"
-                      ? finding.issue
-                      : finding?.status === "clear"
-                        ? "The model found no clear visual issue."
-                        : finding?.reason)}
-                </Text>
-              )}
-              {!inspect.isPending && !inspect.error && finding?.status === "issue" && (
+              <Text size="sm" role="status">
+                {inspect.error?.message ||
+                  (finding?.status === "issue"
+                    ? finding.issue
+                    : finding?.status === "clear"
+                      ? "The model found no clear visual issue."
+                      : finding?.reason)}
+              </Text>
+              {!inspect.error && finding?.status === "issue" && (
                 <Button
                   variant="subtle"
                   size="compact-sm"
@@ -139,15 +158,6 @@ export function ReportIssueDialog({
               )}
             </Stack>
           )}
-          <TextBox
-            label="Details"
-            placeholder="What's wrong, like “six fingers on the left hand”"
-            autosize
-            minRows={2}
-            inline
-            value={details}
-            onChange={setDetails}
-          />
           {fix.error && (
             <Alert color="red" title="Couldn't Fix">
               {fix.error.message}

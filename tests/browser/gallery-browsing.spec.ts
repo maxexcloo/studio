@@ -2163,7 +2163,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     await page.keyboard.press("Space");
     await expect.poll(() => state.gallery[1].rating).toBe("disliked");
     await saved;
-    await expect(viewer.getByRole("button", { name: "Restore", exact: true })).toBeFocused();
+    await expect(viewer.getByRole("button", { name: "Undo Dislike", exact: true })).toBeFocused();
     await expect(
       page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
     ).toHaveCount(0);

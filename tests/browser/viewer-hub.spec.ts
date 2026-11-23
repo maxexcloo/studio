@@ -319,7 +319,7 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
     inspected.push(route.request().postDataJSON());
     return route.fulfill({ json: { status: "issue", issue: "six toes" } });
   });
-  await viewerAction(page, "Report", "Custom…");
+  await viewerAction(page, "Report", "Other Issue…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
   await expect(fix).toBeDisabled();
@@ -2663,7 +2663,7 @@ test("Phone viewer shows Report beside Delete and Similar under AI", async ({ pa
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   await expect(bar.getByRole("button", { name: "Report", exact: true })).toBeVisible();
-  await viewerAction(page, "Report", "Custom…");
+  await viewerAction(page, "Report", "Other Issue…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();

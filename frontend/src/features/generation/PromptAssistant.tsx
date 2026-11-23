@@ -454,7 +454,6 @@ export function usePromptAssistant({
               label: "Refresh",
               icon: icons.refresh,
               disabled: disabled || assistance.isPending,
-              loading: negativeLoading,
               keepOpen: true,
               onClick: loadNegative,
             },
