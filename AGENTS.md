@@ -192,7 +192,8 @@ recur across features.
 - Outside click and Escape close only the topmost layer; nothing beneath
   reacts. On phones the first outside tap consumes the pointer and click,
   leaving the control beneath for the next tap. A closing layer no longer
-  counts while it fades out.
+  counts while it fades out. In the viewer, Escape first leaves a text box,
+  keeping its edit, and only the next Escape closes the viewer.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
   and dialogs that can have another dialog above use `closeWhenTop`.
 - A trigger's tooltip is a `PopupTooltip` wrapping `Popover.Target` or

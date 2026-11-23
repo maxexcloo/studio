@@ -88,6 +88,7 @@ function nearControl(event: React.MouseEvent<HTMLElement>) {
   });
 }
 
+const textField = 'input:not([type="radio"]),textarea,[contenteditable="true"]';
 // One key runs a viewer action, as its bar would (Settings › Studio lists them).
 const viewerShortcuts: Record<string, string> = {
   e: "edit-image",
@@ -497,9 +498,7 @@ export function MediaViewer({
             !deleting &&
             !layerAbove(stage.current, event) &&
             event.currentTarget.contains(target) &&
-            !target.closest(
-              'input:not([type="radio"]),textarea,select,[aria-haspopup][aria-expanded="true"]',
-            )
+            !target.closest(`${textField},select,[aria-haspopup][aria-expanded="true"]`)
           ) {
             event.preventDefault();
             close();
@@ -516,7 +515,10 @@ export function MediaViewer({
             return;
           if (event.key === "Escape" && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            close();
+            // The first Escape leaves a text box, keeping its edit; the next one closes the viewer.
+            if ((event.target as Element).closest(textField))
+              stage.current?.focus({ preventScroll: true });
+            else close();
             return;
           }
           if (

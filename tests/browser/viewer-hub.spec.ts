@@ -1910,6 +1910,21 @@ test("The gallery viewer opens without desktop Details", async ({ page }, testIn
   await expect(details).toBeHidden();
 });
 
+test("Escape leaves the prompt, keeping its edit, then closes the viewer", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones edit the prompt in a sheet.");
+  const { viewer } = await seed(page);
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await field.fill("An amber bird at dusk");
+  await page.keyboard.press("Escape");
+  await expect(field).not.toBeFocused();
+  await expect(field).toHaveValue("An amber bird at dusk");
+  await expect(viewer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+});
+
 test("Phone Details hides the viewer actions and swipes closed", async ({
   page,
   isMobile,

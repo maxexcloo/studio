@@ -172,7 +172,7 @@ export function ViewerPrompt({
       event.preventDefault();
       if (!submit.disabled) submit.onSubmit();
     } else if (event.key === "Escape" && change) {
-      // Undoing the proposal comes first; a second Escape closes the viewer.
+      // Undoing the proposal comes first; a second Escape leaves the box.
       event.preventDefault();
       ask.undo();
     }
