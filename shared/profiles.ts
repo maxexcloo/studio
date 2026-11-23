@@ -155,15 +155,19 @@ export function loraCompatibility(
   return unknown || !matchedTarget ? "unknown" : "fits";
 }
 
-/** Radiance needs a verified target for user-selected adapters. */
+/**
+ * Why submitting refuses a LoRA, or "". Radiance maps a LoRA onto the model's own layout and skips
+ * modules it lacks, so a LoRA of the profile's family runs on an unlisted base, but one whose family
+ * is unknown could load as a silent no-op.
+ */
 export function loraRejection(
   info: LoraCompatibilityInfo | null | undefined,
   profile: LoraCompatibilityProfile | null | undefined,
 ) {
   const fit = loraCompatibility(info, profile);
-  return fit === "other" || (fit === "unknown" && profile?.loraAdapter === "radiance-tags-v1")
-    ? fit
-    : "";
+  if (fit !== "unknown" || profile?.loraAdapter !== "radiance-tags-v1")
+    return fit === "other" ? fit : "";
+  return loraCompatibility({ families: info?.families }, profile) === "fits" ? "" : fit;
 }
 
 /**

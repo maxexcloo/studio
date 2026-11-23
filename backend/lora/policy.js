@@ -2,7 +2,7 @@ import { loraRejection } from "../../shared/profiles.ts";
 
 /**
  * A LoRA stack without the entries that cannot run on this profile ('other': trained for another
- * family, a variant its publisher excludes, or an unverified Radiance adapter). `infos` maps a
+ * family, a variant its publisher excludes, or a Radiance adapter of unknown family). `infos` maps a
  * LoRA name to its info, or is a function from name to info. Entries keep their shape and order.
  * For reused settings: the server refuses 'other' LoRAs on submit, so drop them first and say how many.
  */
