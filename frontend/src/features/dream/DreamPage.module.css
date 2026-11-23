@@ -61,16 +61,6 @@
 :where(:root:not([data-phone])) .stage > .card[data-pair] {
   max-width: 96rem;
 }
-:where(:root:not([data-phone])) .stage[data-fitted] {
-  container-type: size;
-}
-/* Stack the waiting cards behind the top result at its fitted size. */
-:where(:root:not([data-phone])) .stage[data-fitted] > .card {
-  width: min(100cqw, 100cqh * var(--card-aspect));
-  height: min(100cqh, 100cqw / var(--card-aspect));
-  max-width: none;
-  margin: auto;
-}
 .card[data-depth="1"] {
   transform: translateY(var(--mantine-spacing-sm)) scale(0.975);
   opacity: 0.66;
