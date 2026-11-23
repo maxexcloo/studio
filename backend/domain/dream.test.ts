@@ -26,6 +26,7 @@ import {
   type DreamLoraLibrary,
   type DreamProfile,
   createDream,
+  deckOrder,
   dreamRequest,
   turnShares,
 } from "./dream.ts";
@@ -579,10 +580,13 @@ test("Dream fills every free worker in one tick: images beside running work, vid
   const bob = store.enqueue("bob", session.id, { prompt: "mine" }, "image");
   store.save({ ...bob, status: "running" });
   await dream.tick();
-  // The third image of the day is a comparison, two jobs at once.
+  // After two new ideas the deck wants a comparison, two jobs at once.
   assert.deepEqual(
-    live("alice").map((job) => job.input.kind),
-    ["image", "image", "image"],
+    live("alice").map((job) => [job.input.kind, Boolean(job.dream?.pair)]),
+    [
+      ["image", true],
+      ["image", true],
+    ],
   );
   for (const job of live("alice")) finish("alice", job.id);
   store.save({ ...store.job("bob", bob.id)!, status: "completed" });
@@ -1121,7 +1125,25 @@ test("Dream rotates a liked Gallery image through size, model and LoRA recreatio
     settings: { seed: "17" },
   };
   state.items.push({ ...liked, id: "at-native-limit", jobId: fullSize.id }, liked);
-  const nineImages = () => {
+  // Nine of the day's Dream images, as new ideas and comparisons the deck has shown, with `existing`
+  // cards of existing work.
+  let cards = 0;
+  const nineImages = (existing = 0) => {
+    const card = (dream: Partial<NonNullable<DreamItem["dream"]>>) =>
+      state.items.push({
+        id: `card-${cards++}`,
+        ownerId: "alice",
+        type: "image",
+        status: "done",
+        dream: { prompt: "p", why: "", at: "", state: "kept", ...dream },
+      });
+    for (let index = 0; index < 4; index++) card({ arm: "exploit" });
+    for (let index = 0; index < 3; index++)
+      card({
+        arm: "explore:steps",
+        pair: { id: `pair-${cards}`, side: 0, question: "", axis: "steps", label: "", value: 1 },
+      });
+    for (let index = 0; index < existing; index++) card({ arm: "continue:scene" });
     for (let index = 0; index < 9; index++) {
       const image = store.enqueue(
         "alice",
@@ -1179,7 +1201,8 @@ test("Dream rotates a liked Gallery image through size, model and LoRA recreatio
   assert.deepEqual(lora?.input.referenceAssets, input.referenceAssets);
   assert.deepEqual([lora?.input.prompt, lora?.input.seed], [input.prompt, "17"]);
   assert.equal(state.calls.length, 0);
-  nineImages();
+  // With existing work at its share, the next card is a new idea.
+  nineImages(6);
   const next = await dreamOnce();
   assert.ok(next?.dream && next.dream.arm !== "recreate");
   assert.equal(state.calls.length, 1);
@@ -1490,6 +1513,25 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
+test("The deck converges on 40% new ideas, 30% comparisons and 30% existing work, and recovers from a skew", () => {
+  const deal = (counts: Record<"new" | "comparison" | "existing", number>, cards: number) => {
+    for (let index = 0; index < cards; index++) counts[deckOrder(counts)[0]]++;
+    return counts;
+  };
+  assert.deepEqual(deal({ new: 0, comparison: 0, existing: 0 }, 100), {
+    new: 40,
+    comparison: 30,
+    existing: 30,
+  });
+  // A deck of only new ideas catches up on the others first.
+  assert.deepEqual(deckOrder({ new: 20, comparison: 0, existing: 0 }).at(-1), "new");
+  assert.deepEqual(deal({ new: 60, comparison: 0, existing: 0 }, 90), {
+    new: 60,
+    comparison: 45,
+    existing: 45,
+  });
+});
+
 test("Projects share turns by how their results fare, with a floor for new ones; paused ones take none", () => {
   const stats = new Map([
     ["strong", { kept: 18, liked: 6, discarded: 2, review: 8.5 }],
@@ -1638,7 +1680,22 @@ test("Three independent likes, in the gallery or Super Likes, seed a concept and
   const fx = fixture(t);
   const { dream, state, store, dreamOnce, taste } = fx;
   state.owners = ["alice"];
-  state.draws[5] = Array(20).fill(1);
+  // The deck has shown its share of comparisons, so new ideas and variations take turns.
+  for (let index = 0; index < 6; index++)
+    state.items.push({
+      id: `compared-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      dream: {
+        state: "discarded",
+        prompt: "p",
+        why: "",
+        at: "",
+        arm: "explore:steps",
+        pair: { id: `pair-${index}`, side: 0, question: "", axis: "steps", label: "", value: 1 },
+      },
+    });
   await dream.save("alice", { enabled: true });
   const prompt = "A fox repairing a clockwork boat in a sunlit workshop";
   const session = store.createSession("alice", "Gallery").id;
@@ -2209,7 +2266,8 @@ test("Dream mostly compares models and LoRAs, rarely steps or guidance, and step
       ratings: { "film.safetensors": "disliked", "ink.safetensors": "disliked" },
     };
     await dream.save("alice", { enabled: true, dailyImages: 10 });
-    for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+    // After one new idea, the deck wants a comparison.
+    assert.ok(await dreamOnce());
     // The comparison's draw, in millionths of the offered kinds' total weight.
     state.draws[1_000_000] = [roll];
     await dream.tick();
@@ -2257,7 +2315,8 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
     settings: { profileId: "flux" },
   });
   await dream.save("alice", { enabled: true, dailyImages: 6 });
-  for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+  // After one new idea, the deck wants a comparison.
+  assert.ok(await dreamOnce());
   state.draws[4] = [0, 3];
   await dream.tick();
   const jobs = live("alice").sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
@@ -2345,7 +2404,7 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
   assert.equal(items.find(({ id }) => id === surviving[0].id)!.dream?.pair?.size, 3);
 });
 
-test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
+test("A comparison varies one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
   const fx = fixture(t);
   const { dream, state, store, taste, finish, live, dreamOnce } = fx;
   // A kept image alice generated with FLUX: the comparison's starting point.
@@ -2368,7 +2427,8 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
     settings: { profileId: "flux" },
   });
   await dream.save("alice", { enabled: true, dailyImages: 10 });
-  for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+  // After one new idea, the deck wants a comparison.
+  assert.ok(await dreamOnce());
   await dream.tick();
   const [a, b] = live("alice");
   assert.deepEqual(

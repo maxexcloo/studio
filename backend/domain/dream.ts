@@ -412,7 +412,24 @@ interface DreamRecord {
 type Kind = "image" | "video";
 
 /**
- * Shares of Dream's ideas, in percent. Comparisons (`pairEvery`) and More Like This are separate.
+ * Dream's image deck mix, in percent of its latest `window` cards (a comparison or set is one
+ * card): new ideas (exploring or exploiting by `exploreShare`), comparisons of a liked or kept
+ * image's prompt, and existing work (recreations, variations and series of liked results). The
+ * kind furthest below its share goes next (`deckOrder`), falling back to the next where it can't.
+ */
+const deckMix = { new: 40, comparison: 30, existing: 30, window: 50 };
+type DeckKind = "new" | "comparison" | "existing";
+/** The deck's kinds, furthest below their share (`deckMix`) first, given its latest cards. */
+export function deckOrder(counts: Record<DeckKind, number>): DeckKind[] {
+  const total = counts.new + counts.comparison + counts.existing;
+  const deficit = (kind: DeckKind) => deckMix[kind] / 100 - (total ? counts[kind] / total : 0);
+  return (["new", "comparison", "existing"] as const)
+    .slice()
+    .sort((a, b) => deficit(b) - deficit(a) || deckMix[b] - deckMix[a]);
+}
+
+/**
+ * Shares of Dream's ideas, in percent. The deck mix (`deckMix`) and More Like This are separate.
  * - inspiration: of fresh image concepts, those seeded from a Library import or Inspiration image,
  *   adapted, never copied; prompt-only exploration uses its ready profile and LoRAs, while
  *   equipment experiments retain their chosen profile and LoRAs
@@ -551,7 +568,6 @@ const featuredLikes = 3;
  * sometimes includes Dream's own results and keeps.
  */
 const seedSample = 9;
-const recreateEvery = 10;
 const recreationAxes = ["size", "profile", "lora"] as const;
 const ownSeedEvery = 4;
 /** Recent automatic variants block their source concepts from being picked again. */
@@ -579,14 +595,7 @@ const recentDays = 30;
 const failStreak = 3;
 const failWindowMs = 6 * 3_600_000;
 const judgedLimit = 2000;
-/**
- * Every fourth image of the day is a comparison, when a kept or liked image can start one, and
- * every sixth once the account has judged enough results for comparisons to matter less.
- */
-const pairEvery = 4;
-const pairEveryJudged = 6;
-const pairJudgedAt = 30;
-const pairDraw = 5;
+/** One comparison in this many compares three variants, where the base and quota allow. */
 const tripleEvery = 4;
 /** How often each kind of comparison is drawn, where the base offers it, in percent. */
 const pairWeights: Record<PairAxis, number> = {
@@ -982,6 +991,36 @@ export function createDream(options: {
       const set = dreamSet(item);
       return !set || !pendingSets.has(set.id) ? [item] : [];
     });
+  }
+  /**
+   * The kinds of Dream's latest image cards (`deckMix`), and how many of the existing ones were
+   * recreations.
+   */
+  function deckCounts(ownerId: string) {
+    const cards = new Map<string, DeckKind>();
+    let recreated = 0;
+    for (const item of options.gallery(ownerId, {
+      dreamState: poolStates,
+      type: "image",
+      limit: deckMix.window * 3,
+    })) {
+      const key = item.dream?.pair?.id ?? dreamSet(item)?.id ?? String(item.id);
+      if (cards.has(key)) continue;
+      if (cards.size === deckMix.window) break;
+      const arm = item.dream?.arm ?? "";
+      cards.set(
+        key,
+        item.dream?.pair
+          ? "comparison"
+          : arm === "recreate" || arm === "series" || arm.startsWith("continue:")
+            ? "existing"
+            : "new",
+      );
+      if (arm === "recreate") recreated++;
+    }
+    const counts = { new: 0, comparison: 0, existing: 0, recreated };
+    for (const kind of cards.values()) counts[kind]++;
+    return counts;
   }
   /** The series Dream is still adding to, whose results wait until it ends; none once images stop. */
   const openSeries = ({ series, settings }: DreamRecord) =>
@@ -2336,8 +2375,6 @@ export function createDream(options: {
     const writer = options.writer;
     if (!writer)
       return { status: "unavailable", reason: "The prompt assistant is not configured." };
-    const judged = options.count(ownerId, { dreamState: ["kept", "discarded"] });
-    const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
     const allowUncensored = record.settings.uncensored && access.uncensored;
     let checkText = !allowUncensored;
     let reason = "";
@@ -2437,22 +2474,6 @@ export function createDream(options: {
         reason = "The source image's model isn't ready.";
         continue;
       }
-      if (
-        kind === "image" &&
-        !steer &&
-        counts.today.images % every === every - 1 &&
-        counts.usage.images + 2 <= record.settings.dailyImages &&
-        random(pairDraw) === 0
-      ) {
-        const pair = await comparison(
-          ownerId,
-          record,
-          access,
-          catalogue.profiles,
-          counts.usage.images + 3 <= record.settings.dailyImages,
-        );
-        if (pair) return pair;
-      }
       const next = steer ? null : await seriesNext(ownerId, record, catalogue.profiles);
       if (next) {
         const refused = await seriesJob(ownerId, record, access, next);
@@ -2460,22 +2481,36 @@ export function createDream(options: {
         reason = refused;
         continue;
       }
-      const limit = record.settings.dailyImages;
-      const lastSmallSlot = limit < recreateEvery && counts.usage.images === limit - 1;
-      const dayOffset =
-        limit < recreateEvery * recreationAxes.length ? Math.floor(now() / 86_400_000) : 0;
-      if (!steer && (lastSmallSlot || counts.usage.images % recreateEvery === recreateEvery - 1)) {
-        if (
-          await recreate(
+      // The deck mix decides the card; existing work recreates or varies a liked result, taking
+      // turns, and a liked concept or handed-off project to vary is written below.
+      let existing: Awaited<ReturnType<typeof seedPick>> = null;
+      let familiar = false;
+      const deck = steer ? null : deckCounts(ownerId);
+      for (const card of deck ? deckOrder(deck) : []) {
+        if (card === "new") break;
+        if (card === "comparison") {
+          if (counts.usage.images + 2 > record.settings.dailyImages) continue;
+          const pair = await comparison(
             ownerId,
             record,
             access,
             catalogue.profiles,
-            lastSmallSlot ? (limit * 100) / recreateEvery : 100,
-            Math.floor(counts.usage.images / recreateEvery) + dayOffset,
-          )
-        )
-          return { status: "generating" };
+            counts.usage.images + 3 <= record.settings.dailyImages,
+          );
+          if (pair) return pair;
+          continue;
+        }
+        const recreateFirst = deck!.recreated * 2 <= deck!.existing;
+        const recreated = () =>
+          recreate(ownerId, record, access, catalogue.profiles, deck!.recreated);
+        if (recreateFirst && (await recreated())) return { status: "generating" };
+        existing = await seedPick(ownerId, record, catalogue.profiles);
+        const turns = turnProjects(ownerId);
+        familiar =
+          Boolean(existing) ||
+          turns.projects.some((project) => !project.cards && turns.handedOff(project));
+        if (familiar) break;
+        if (!recreateFirst && (await recreated())) return { status: "generating" };
       }
       const taste = options.taste.read(ownerId);
       const judged = judgement(ownerId);
@@ -2498,7 +2533,8 @@ export function createDream(options: {
       const made = (arm: string) =>
         options.count(ownerId, { dreamState: poolStates, dreamArm: arm, dreamPair: false });
       const share = Math.round(exploring(ownerId) * 100);
-      let axis = !steer && !chance(100 - share) ? open[made("explore:") % open.length] : "";
+      let axis =
+        !steer && !familiar && !chance(100 - share) ? open[made("explore:") % open.length] : "";
       const { projects, handedOff } = turnProjects(ownerId);
       // A proposed project's sample comes before the projects' turns.
       const draft = !steer ? draftWanted(ownerId, catalogue.profiles) : null;
@@ -2518,13 +2554,12 @@ export function createDream(options: {
       const cards = target && projectCards(ownerId, target.cards);
       // Familiar images continue a handed-off project's chat work, else a drawn liked or kept
       // image, changing one thing in turn.
-      const familiar = !axis && !steer && !draft && kind === "image";
+      familiar &&= !draft;
       const chatSeed =
         familiar && project && !project.cards && handedOff(project)
           ? await seedFor(ownerId, project, record)
           : null;
-      const likedSeed =
-        familiar && !project ? await seedPick(ownerId, record, catalogue.profiles) : null;
+      const likedSeed = familiar && !project ? existing : null;
       const seed = chatSeed ?? likedSeed;
       const varied = Object.keys(continueAxes);
       const vary = seed ? varied[made("continue:") % varied.length] : "";
@@ -2857,7 +2892,6 @@ export function createDream(options: {
     record: DreamRecord,
     access: DreamAccess,
     profiles: DreamProfile[],
-    probability: number,
     turn: number,
   ) {
     const axisStart = turn % recreationAxes.length;
@@ -2976,8 +3010,6 @@ export function createDream(options: {
           };
         }
         if (!variant) continue;
-        if (probability < 100 && !chance(probability)) return false;
-        probability = 100;
         const result = await options.admit(
           {
             ...variant.input,
