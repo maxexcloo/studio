@@ -11,11 +11,8 @@ import os from "node:os";
 export function systemName({
   platform = process.platform,
   release = os.release(),
-  version = typeof os.version === "function" ? os.version() : "",
   readFile = (file) => fs.readFileSync(file, "utf8"),
 } = {}) {
-  if (platform === "win32") return `${version || "Windows"} (${release})`;
-  if (platform === "darwin") return `macOS (Darwin ${release})`;
   if (platform === "linux") {
     try {
       const pretty = readFile("/etc/os-release").match(/^PRETTY_NAME="?([^"\n]+)"?/m)?.[1];
@@ -37,7 +34,6 @@ const gigabytes = (bytes) =>
  */
 export function diagnostics({
   version = "",
-  install = "",
   stats = null,
   comfyBusy = false,
   comfyLocal = true,
@@ -47,7 +43,7 @@ export function diagnostics({
   const system = stats?.system || {};
   const devices = Array.isArray(stats?.devices) ? stats.devices : [];
   return {
-    studio: { version, install },
+    studio: { version },
     node: process.versions.node,
     system: { name: systemName({ platform }), platform, arch, memoryBytes: os.totalmem() },
     comfy: stats
@@ -57,7 +53,6 @@ export function diagnostics({
           version: String(system.comfyui_version || ""),
           python: String(system.python_version || "").split(" ")[0],
           pytorch: String(system.pytorch_version || ""),
-          embeddedPython: Boolean(system.embedded_python),
           devices: devices.map((device) => ({
             name: String(device.name || ""),
             type: String(device.type || ""),
@@ -73,7 +68,7 @@ export function diagnostics({
 export function diagnosticsText(report) {
   const { studio, node, system, comfy } = report;
   const lines = [
-    `Studio ${studio.version || "development"}${studio.install ? ` (${studio.install})` : ""}`,
+    `Studio ${studio.version || "development"}`,
     `Node.js ${node}`,
     `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`,
   ];
@@ -89,7 +84,6 @@ export function diagnosticsText(report) {
   const runtime = [
     comfy.python && `Python ${comfy.python}`,
     comfy.pytorch && `PyTorch ${comfy.pytorch}`,
-    comfy.embeddedPython && "portable",
   ]
     .filter(Boolean)
     .join(", ");

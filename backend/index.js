@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 import express from "express";
+import sharp from "sharp";
 
 import { cardKinds, characterImageIds } from "../shared/characters.ts";
 import {
@@ -209,7 +210,6 @@ import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { servesText } from "./runtime/controller.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
-import { loadSharp } from "./sharp-loader.js";
 import { installShutdown } from "./shutdown.js";
 import { registerStatusRoutes } from "./status-routes.js";
 import { registerUpscaleRoutes } from "./upscale/routes.js";
@@ -235,6 +235,8 @@ let drainServer = async () => {};
 installShutdown({ drain: () => drainServer() });
 
 watchEventLoop();
+// libvips' operation cache keeps recent images for reuse Studio's one-off resizes never get.
+sharp.cache(false);
 const app = express();
 const stopping = new AbortController();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
@@ -1123,10 +1125,8 @@ function promptWriterOwner(ownerId) {
   if (!multiUserEnabled) return true;
   return Boolean(ownerId && mayUseFeature(accountAccessForId(ownerId), "promptAssistant"));
 }
-/** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
+/** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model. */
 async function smallImage(item, upscaled = false) {
-  const sharp = await loadSharp();
-  if (!sharp) return null;
   const version = upscaled ? item.upscale : undefined;
   if (upscaled && (version?.status !== "done" || !version.url)) return null;
   const buffer = version

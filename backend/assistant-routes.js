@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 import { cardKinds } from "../shared/characters.ts";
 import { runBackend } from "../shared/profiles.ts";
 import { maxProjectBrief, projectBriefTextFields } from "../shared/projects.ts";
@@ -29,7 +31,6 @@ import { americanEnglish, contentRule } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
-import { loadSharp } from "./sharp-loader.js";
 import { runProfile } from "./workflow-modes.js";
 
 const maxReferences = 4;
@@ -61,14 +62,12 @@ export function imageFromDataUrl(value) {
   return { mime: match[1], data };
 }
 
-/** References downscaled (longest edge 1024 px, JPEG) so a vision call stays small; unresized without sharp. */
+/** References downscaled (longest edge 1024 px, JPEG) so a vision call stays small. */
 export async function downscaleReferences(values) {
   const images = (Array.isArray(values) ? values : [])
     .slice(0, maxReferences)
     .map(imageFromDataUrl)
     .filter(Boolean);
-  const sharp = images.length ? await loadSharp() : null;
-  if (!sharp) return images;
   return Promise.all(
     images.map(async (image) => {
       try {

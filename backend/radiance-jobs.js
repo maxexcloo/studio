@@ -1,5 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 
+import sharp from "sharp";
+
 import { accountAccessForId } from "./account-store.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { logEvent } from "./crash-log.js";
@@ -23,7 +25,6 @@ import {
   videoRequest,
 } from "./providers/radiance.ts";
 import { preparedReference } from "./references.js";
-import { loadSharp } from "./sharp-loader.js";
 import { generationEstimate, recordGeneration } from "./timings.js";
 import { workerById } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
@@ -66,12 +67,11 @@ export function orderedRadianceReferences(body) {
 /** The run's references as PNGs with their slots' roles, in order, sized as ComfyUI's staging would size them. */
 async function referenceImages(body) {
   const account = body.ownerId ? accountAccessForId(body.ownerId) : undefined;
-  const sharp = await loadSharp();
   const images = [];
   for (const reference of orderedRadianceReferences(body)) {
     if (!reference?.assetId) continue;
     const prepared = await preparedReference(account, reference.assetId, body);
-    const bytes = sharp ? await sharp(prepared.buffer).rotate().png().toBuffer() : prepared.buffer;
+    const bytes = await sharp(prepared.buffer).rotate().png().toBuffer();
     images.push({ bytes, role: reference.role });
   }
   return images;
@@ -80,9 +80,6 @@ async function referenceImages(body) {
 /** The run's painted mask as Radiance takes it, over its first picture. */
 async function paintedMask(body, references) {
   if (!body.inpaint?.mask || !references.length) return null;
-  const sharp = await loadSharp();
-  if (!sharp)
-    throw new Error("Inpainting needs image resizing, which is off: sharp could not load.");
   return radianceMask(sharp, references[0].bytes, maskBufferFromDataUrl(body.inpaint.mask));
 }
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
 import Busboy from "busboy";
+import sharp from "sharp";
 
 import { recordBelongsToAccount } from "./account-ownership.js";
 import { comfy, comfyFile } from "./comfy/comfy.js";
@@ -26,7 +27,6 @@ import {
 } from "./media-paths.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { imageMimes, mimeExtension, referenceInputName } from "./reference-names.js";
-import { loadSharp } from "./sharp-loader.js";
 import { uploadedGalleryItem } from "./uploads.js";
 import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.js";
 
@@ -195,29 +195,8 @@ export async function readMultipartUpload(req) {
   });
 }
 
-/**
- * What the file's first bytes say it is, for when sharp is missing. Only PNG
- * carries its size this plainly; the others report 0 × 0 like gallery items do.
- */
-function sniffImage(buffer) {
-  if (buffer.length > 24 && buffer.readUInt32BE(0) === 0x89504e47)
-    return { format: "png", width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
-  if (buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff)
-    return { format: "jpeg", width: 0, height: 0 };
-  if (
-    buffer.length > 12 &&
-    buffer.toString("latin1", 0, 4) === "RIFF" &&
-    buffer.toString("latin1", 8, 12) === "WEBP"
-  )
-    return { format: "webp", width: 0, height: 0 };
-  return {};
-}
-
 async function inspectImage(buffer, declaredMime = "") {
-  const sharp = await loadSharp();
-  const metadata = sharp
-    ? await sharp(buffer, { limitInputPixels: maxPixels }).metadata()
-    : sniffImage(buffer);
+  const metadata = await sharp(buffer, { limitInputPixels: maxPixels }).metadata();
   const mime =
     metadata.format === "jpeg"
       ? "image/jpeg"
@@ -231,7 +210,7 @@ async function inspectImage(buffer, declaredMime = "") {
     throw new Error("That file isn't the type of image its name says.");
   const width = Number(metadata.width || 0);
   const height = Number(metadata.height || 0);
-  if ((sharp || metadata.format === "png") && (!width || !height || width * height > maxPixels))
+  if (!width || !height || width * height > maxPixels)
     throw new Error("That image is too large, or its size can't be read.");
   return { mime, width, height };
 }
@@ -520,14 +499,13 @@ export function referenceAssetMetadataForAccount(account, id) {
  * the original's size, since an image-to-image start image is encoded at its
  * own size and a 4x one would make a 4x render (slow, and often out of GPU
  * memory). Decided when a run is staged, so switching the upscale off in the
- * viewer goes back to the original for the next run. Without sharp, or when
- * anything about the upscale is off, the original is used.
+ * viewer goes back to the original for the next run. When anything about the
+ * upscale is off, the original is used.
  */
 async function preferUpscale(original, readUpscale) {
   try {
     const upscaled = await readUpscale();
-    const sharp = upscaled && (await loadSharp());
-    if (!sharp) return original;
+    if (!upscaled) return original;
     const { width, height } = await sharp(original.buffer, {
       limitInputPixels: maxPixels,
     }).metadata();
