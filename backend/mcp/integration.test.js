@@ -3543,6 +3543,20 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   );
   await ask(await conversation("conversation-b"), {});
   assert.equal(f.submitted.at(-1).count, 1);
+  // A preview teaches nothing; the call that confirms it keeps the preview's reference.
+  const third = await conversation("conversation-c");
+  const { asset } = data(await call(third, "upload", { content_base64: png.toString("base64") }));
+  const preview = await ask(third, { count: 5, preview: true, reference_asset_ids: [asset.id] });
+  assert.match(texts(preview), new RegExp(`References: ${asset.id}\\.`));
+  const confirmed = await ask(third, {});
+  assert.match(texts(confirmed), /Kept from earlier: references/);
+  assert.deepEqual(
+    f.submitted.at(-1).referenceAssets.map((item) => item.assetId),
+    [asset.id],
+  );
+  assert.notEqual(f.submitted.at(-1).count, 5);
+  await ask(third, { reference_asset_ids: [] });
+  assert.deepEqual(f.submitted.at(-1).referenceAssets, []);
 });
 
 test("a chat picks a profile that takes its photo when the remembered profile can't", async (t) => {

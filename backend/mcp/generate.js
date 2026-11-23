@@ -719,6 +719,8 @@ export function registerGenerateTools({
       args.reference_asset_ids = await Promise.all(
         args.reference_asset_ids.map((id) => referenceAsset(id, signal)),
       );
+    if (Array.isArray(input.reference_asset_ids))
+      chatChoices.rememberReferences(owner, conversation, args.reference_asset_ids);
     const sheet = args.character_sheet === true;
     delete args.character_sheet;
     if (sheet && !args.character)
@@ -977,12 +979,8 @@ export function registerGenerateTools({
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)
       throw new Error(`Compare at least ${compareVariants.min} models.`);
-    chatChoices.remember(
-      owner,
-      conversation,
-      input,
-      input.profile_id !== undefined && targets.length === 1 ? targets[0].profile.id : undefined,
-    );
+    const namedProfile =
+      input.profile_id !== undefined && targets.length === 1 ? targets[0].profile.id : undefined;
     // Each target as the backend its run uses, whose sizes and slots then apply; a combined
     // profile's reply names it for a run with LoRAs or one that leaves the default backend.
     targets = targets.map((target) => {
@@ -1027,7 +1025,8 @@ export function registerGenerateTools({
         `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxSplitJobs}. Lower count, pass fewer profile_ids, or name a tier.`,
       );
     // A preview's prompts run as shown when the same call follows without preview.
-    const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;
+    // Keyed by what the call runs, so references a preview named carry into the call that confirms it.
+    const previewKey = `${refs || owner}\n${stableJson({ ...remembered.args, preview: undefined })}`;
     const previewed = previews.get(previewKey);
     if (!preview) previews.delete(previewKey);
     const plans =
@@ -1191,11 +1190,13 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `${projectNote}Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
+            text: `${projectNote}Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.${args.reference_asset_ids?.length ? ` References: ${args.reference_asset_ids.join(", ")}.` : ""}\n\n${lines.join("\n")}`,
           },
         ],
       };
     }
+    // Only a call that queues teaches the chat's later calls (a refused or previewed one doesn't).
+    chatChoices.remember(owner, conversation, input, namedProfile);
     // A call of several results, or one the chat titled or described, is one titled set, with the
     // character it was made with and the chat's context; the gallery titles each prompt's results
     // by titles, by a one-prompt call's title, or by its prompt where they are missing.

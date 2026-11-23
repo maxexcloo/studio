@@ -16,6 +16,7 @@ const tierWords = {
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const maxChats = 500;
+const keptReferencesMs = 30 * 60_000;
 
 /**
  * Each conversation's own choices, which a summarised chat forgets: LoRAs off, the model or tier
@@ -47,6 +48,19 @@ export function createChatChoices({ dataDir, now = Date.now }) {
       for (const old of keys.slice(0, Math.max(0, keys.length - maxChats))) delete saved[old];
       writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
     },
+    /**
+     * Remembers the references a generate call named (attached images arrive on their own turn
+     * only), or forgets them for an empty list.
+     */
+    rememberReferences(owner, chat, ids) {
+      if (!chat) return;
+      const saved = all();
+      const choices = { ...saved[key(owner, chat)] };
+      if (ids.length) choices.references = { ids, at: now() };
+      else delete choices.references;
+      saved[key(owner, chat)] = { ...choices, at: now() };
+      writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
+    },
   };
 }
 
@@ -54,9 +68,22 @@ export function createChatChoices({ dataDir, now = Date.now }) {
  * A generate call with the chat's earlier choices filled in where it left them out (the model is
  * generate's, as a model named in the request wins), and what it kept.
  */
-export function keptChoices(choices, input) {
+export function keptChoices(choices, input, at = Date.now()) {
   const next = { ...input };
   const kept = [];
+  // A follow-up ("go" after a preview) keeps the chat's recent references unless it names its own.
+  const references = choices.references;
+  if (
+    input.reference_asset_ids === undefined &&
+    !input.character &&
+    references?.ids.length &&
+    at - references.at < keptReferencesMs
+  ) {
+    next.reference_asset_ids = references.ids;
+    kept.push(
+      `references ${references.ids.join(", ")} (pass reference_asset_ids: [] to leave them out)`,
+    );
+  }
   if (input.title === undefined && choices.title) next.title = choices.title;
   if (input.loras === undefined && choices.loras === false) {
     next.loras = [];
