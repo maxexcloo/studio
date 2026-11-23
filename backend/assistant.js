@@ -1260,9 +1260,11 @@ Prompt: ${context}`
 
   /**
    * One read of a finished image for every gallery task it still needs (domain/enrich.ts): its
-   * caption, a title from its `prompt`, a review against `brief` and a suggested `prompt` for one
-   * without its own (`describe`), each by its own instructions. Answers the tasks whose replies were
-   * usable; throws AssistantError when none was. The caller checks the model reads images.
+   * caption, a title from its `prompt`, a review against `brief`, a suggested `prompt` for one
+   * without its own (`describe`) and the viewer's next `steps` (the caller's instructions and
+   * context, its reply left to the caller), each by its own instructions. Answers the tasks whose
+   * replies were usable; throws AssistantError when none was. The caller checks the model reads
+   * images.
    */
   async function enrich({
     image,
@@ -1273,6 +1275,7 @@ Prompt: ${context}`
     describe = false,
     sourceTitle = "",
     explicit = false,
+    steps,
     signal,
     writer,
   } = {}) {
@@ -1285,6 +1288,7 @@ Prompt: ${context}`
         describeInstructions({ vision: true, explicit }),
         '{"prompt": "...", "negative": "", "profile": "", "loras": []}',
       ],
+      steps && ["steps", steps.instructions, '{"steps": [{"label": "...", "request": "..."}]}'],
     ].filter(Boolean);
     const model = await modelFor("enrich", explicit && Boolean(brief || describe), writer);
     const context = one(prompt, maxPromptCharacters);
@@ -1306,6 +1310,7 @@ Prompt: ${context}`
               context && `Prompt: ${context}`,
               brief && `Brief:\n${brief}`,
               describe && sourceTitle && `It was posted with the title: ${one(sourceTitle, 300)}`,
+              steps && `For the steps:\n${steps.context}`,
               "Do each task for this image.",
             ]
               .filter(Boolean)
@@ -1338,6 +1343,7 @@ Prompt: ${context}`
       );
       if (written && !minorAgeRefusal(written)) read.prompt = written;
     }
+    if (steps && parsed.steps) read.steps = parsed.steps;
     if (Object.keys(read).length === 1) throw new AssistantError("unusable reply");
     return read;
   }

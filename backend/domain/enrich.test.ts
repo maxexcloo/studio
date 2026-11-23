@@ -16,7 +16,24 @@ const task = (wants: (item: EnrichItem) => boolean, held: Set<string>) => ({
   },
 });
 
-function enricher({ caption = true, title = true, brief = "", describe = false, titled = "" }) {
+/** The next steps work, whose task keeps whatever the reply gave. */
+const steps = (wants: () => boolean, held: Set<string>) => ({
+  ...task(wants, held),
+  task: () => ({
+    instructions: "Suggest changes.",
+    context: "Taste profile: barns",
+    keep: (reply: unknown) => (reply ? { steps: reply } : undefined),
+  }),
+});
+
+function enricher({
+  caption = true,
+  title = true,
+  brief = "",
+  describe = false,
+  next = false,
+  titled = "",
+}) {
   const asked: Record<string, unknown>[] = [];
   const saved: [string, Enriched][] = [];
   const held = new Set<string>();
@@ -29,6 +46,7 @@ function enricher({ caption = true, title = true, brief = "", describe = false, 
           ...(request.caption ? { caption: { text: "A barn.", tags: ["barn"] } } : {}),
           ...(request.title ? { title: "Red Barn" } : {}),
           ...(request.brief ? { review: { score: 3, miss: "no sea" } } : {}),
+          ...(request.steps ? { steps: [{ label: "Snow", request: "add snow" }] } : {}),
         };
       },
     },
@@ -36,6 +54,7 @@ function enricher({ caption = true, title = true, brief = "", describe = false, 
     titles: task(() => title, held),
     reviews: { ...task(() => Boolean(brief), held), brief: () => brief },
     prompts: task(() => describe, held),
+    steps: steps(() => next, held),
     titled: () => titled || undefined,
     explicit: () => false,
     text: () => ({ side: "cloud", uncensored: false }),
@@ -48,13 +67,19 @@ function enricher({ caption = true, title = true, brief = "", describe = false, 
 }
 const item: EnrichItem = { id: "barn", type: "image", status: "done", prompt: "A red barn" };
 
-test("a finished image is read once for its caption, title and review, each saved as the gallery keeps it", async () => {
-  const { work, asked, saved, held } = enricher({ brief: "Subjects: the sea" });
+test("a finished image is read once for its caption, title, review and next steps, each saved as the gallery keeps it", async () => {
+  const { work, asked, saved, held } = enricher({ brief: "Subjects: the sea", next: true });
   const done = await work.completed([item]);
   assert.equal(asked.length, 1);
   assert.deepEqual(
-    [asked[0].caption, asked[0].title, asked[0].brief, asked[0].describe],
-    [true, true, "Subjects: the sea", false],
+    [asked[0].caption, asked[0].title, asked[0].brief, asked[0].describe, asked[0].steps],
+    [
+      true,
+      true,
+      "Subjects: the sea",
+      false,
+      { instructions: "Suggest changes.", context: "Taste profile: barns" },
+    ],
   );
   const caption = {
     text: "A barn.",
@@ -66,7 +91,11 @@ test("a finished image is read once for its caption, title and review, each save
   assert.equal(saved.length, 1);
   const [[id, { review, ...rest }]] = saved;
   assert.equal(id, "barn");
-  assert.deepEqual(rest, { caption, title: "Red Barn" });
+  assert.deepEqual(rest, {
+    caption,
+    title: "Red Barn",
+    nextSteps: { steps: [{ label: "Snow", request: "add snow" }] },
+  });
   assert.deepEqual(
     [review?.score, review?.miss, review?.model, review?.at],
     [3, "no sea", "vision", caption.at],
@@ -97,6 +126,7 @@ test("the caption work's read fails without a caption, leaving the item to retry
     titles: task(() => true, new Set()),
     reviews: { ...task(() => false, new Set()), brief: () => "" },
     prompts: task(() => false, new Set()),
+    steps: steps(() => false, new Set()),
     titled: () => undefined,
     explicit: () => false,
     text: () => ({ side: "cloud", uncensored: false }),

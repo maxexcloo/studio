@@ -25,6 +25,8 @@ interface EnrichWriter {
     describe: boolean;
     sourceTitle?: string;
     explicit: boolean;
+    /** The viewer's next steps task, with its context beside the image and prompt. */
+    steps?: { instructions: string; context: string };
     signal?: AbortSignal;
     writer?: PromptWriter;
   }): Promise<{
@@ -33,6 +35,7 @@ interface EnrichWriter {
     title?: string;
     review?: { score: number; miss: string };
     prompt?: string;
+    steps?: unknown;
   }>;
 }
 /** What one read saved on the item, as the gallery keeps it. */
@@ -41,14 +44,17 @@ export interface Enriched {
   title?: string;
   review?: Review;
   suggestedPrompt?: string;
+  /** The viewer's next steps, as domain/suggestions.ts keeps them. */
+  nextSteps?: object;
 }
 
 /**
  * Reads a finished image once for every Background AI task it still needs: its caption, title,
- * self-review and, without a prompt of its own, a suggested prompt. Each task's own idle work
- * (captions, titles, review, suggested prompts) decides whether the item needs it, under that
- * task's switch, and does whatever this leaves undone. A read happens only for a caption or a
- * review, the tasks that need the image; a title or prompt alone stays with its own work.
+ * self-review, an image's next steps and, without a prompt of its own, a suggested prompt. Each
+ * task's own idle work (captions, titles, review, next steps, suggested prompts) decides whether
+ * the item needs it, under that task's switch, and does whatever this leaves undone. A read
+ * happens only for a caption or a review, the tasks that need the image; a title, next steps or
+ * prompt alone stays with its own work.
  */
 export function createEnricher<Item extends EnrichItem>(options: {
   writer: EnrichWriter | null;
@@ -56,6 +62,14 @@ export function createEnricher<Item extends EnrichItem>(options: {
   titles: Task<Item>;
   reviews: Task<Item> & { brief(item: Item): string };
   prompts: Task<Item>;
+  /** The next steps work (domain/suggestions.ts) and the read's task for them. */
+  steps: Task<Item> & {
+    task(item: Item): {
+      instructions: string;
+      context: string;
+      keep(reply: unknown): object | undefined;
+    };
+  };
   /** The title the item's owner already has for the same prompt, if any (domain/titles.ts). */
   titled(item: Item): string | undefined;
   /** Whether the owner's results may be read and worded with the uncensored model. */
@@ -77,9 +91,11 @@ export function createEnricher<Item extends EnrichItem>(options: {
       options.titles.take([item]),
       options.reviews.take([item]),
       options.prompts.take([item]),
+      // Only an image's steps come from the picture the read sends.
+      options.steps.take(item.type === "image" ? [item] : []),
     ]);
     try {
-      const [caption, title, review, describe] = claims.map(
+      const [caption, title, review, describe, steps] = claims.map(
         (claim) => !claim || claim.items.length > 0,
       );
       const done: Enriched = {};
@@ -91,6 +107,7 @@ export function createEnricher<Item extends EnrichItem>(options: {
         if (signal.aborted) return done;
         if (!image) throw new Error("no image to read");
         const ownerId = item.ownerId || "";
+        const stepsTask = steps ? options.steps.task(item) : undefined;
         const reply = await writer.enrich({
           image,
           prompt: item.prompt,
@@ -100,6 +117,9 @@ export function createEnricher<Item extends EnrichItem>(options: {
           describe,
           sourceTitle: item.source?.title,
           explicit: options.explicit(ownerId),
+          ...(stepsTask && {
+            steps: { instructions: stepsTask.instructions, context: stepsTask.context },
+          }),
           signal,
           writer: options.text(ownerId),
         });
@@ -109,6 +129,8 @@ export function createEnricher<Item extends EnrichItem>(options: {
         if (reply.title) done.title = reply.title;
         if (reply.review) done.review = reviewRecord({ ...reply.review, model }, brief, now());
         if (reply.prompt) done.suggestedPrompt = reply.prompt;
+        const nextSteps = stepsTask?.keep(reply.steps);
+        if (nextSteps) done.nextSteps = nextSteps;
       }
       if (Object.keys(done).length) options.save(item, done);
       return done;
