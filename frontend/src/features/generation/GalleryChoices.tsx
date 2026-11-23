@@ -209,15 +209,7 @@ export function GalleryChoices({
       ) : listing.error && !listing.data && !leadingTile ? (
         <Alert color="red">{listing.error.message}</Alert>
       ) : !items.length && !leadingTile ? (
-        <EmptyState
-          fill
-          action={
-            <>
-              {uploads && !search && <Text size="xs">Upload, paste or drop images.</Text>}
-              {morePages}
-            </>
-          }
-        >
+        <EmptyState fill action={morePages}>
           {search ? "No Matches" : "No Images"}
         </EmptyState>
       ) : (
