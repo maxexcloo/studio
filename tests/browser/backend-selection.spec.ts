@@ -13,6 +13,7 @@ import {
   openReferenceChoices,
   pressGenerate,
   serveProfiles,
+  showReferenceStack,
   showUploads,
 } from "./fixtures";
 
@@ -80,6 +81,24 @@ test("Switching image backends changes reference capacity and preserves an overs
   const generate = page.getByRole("button", { name: "Generate Image", exact: true });
   await expect(generate).toHaveAttribute("aria-disabled", "true");
   await expect(generate).toHaveAttribute("aria-description", /at most 4 reference images/);
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showReferenceStack(page);
+  await expect(page.getByLabel("4 of 4 References", { exact: true })).toBeVisible();
+  const unused = page.getByRole("region", { name: "Unused References", exact: true });
+  await expect(unused.getByRole("button", { name: /^Remove Reference/ })).toHaveCount(6);
+  const first = "Reference 1 · Reference Image";
+  await page.getByRole("button", { name: first, exact: true }).click();
+  await page
+    .getByRole("menu", { name: first, exact: true })
+    .getByRole("menuitem", {
+      name: "Preview",
+      exact: true,
+    })
+    .click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  await expect(preview.getByRole("img", { name: first, exact: true })).toBeVisible();
+  await preview.getByRole("button", { name: "Close Preview", exact: true }).click();
+  await closeReferences(page);
   await backend.click();
   await page.getByRole("option", { name: "ComfyUI", exact: true }).click();
   await generate.click();

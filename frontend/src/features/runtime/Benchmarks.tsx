@@ -1,19 +1,4 @@
-import {
-  Alert,
-  Badge,
-  Button,
-  Checkbox,
-  Divider,
-  FocusTrap,
-  Group,
-  Loader,
-  Menu,
-  Modal,
-  Paper,
-  ScrollArea,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Alert, Badge, Button, FocusTrap, Loader, Menu, Modal, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
@@ -31,6 +16,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { SelectionList } from "../../ui/SelectionList";
 import { SettingGroup } from "../../ui/SettingRows";
 import { LogDialog, PodLog, useRequester } from "./RuntimeLogs";
 
@@ -99,7 +85,6 @@ export function BenchmarkDialog({
       onClose();
     },
   });
-  const all = chosen.length === models.length;
   const error = start.error || inventory.error;
   const close = () => {
     if (start.isPending) return;
@@ -124,43 +109,13 @@ export function BenchmarkDialog({
         {inventory.isPending ? (
           <LoadingState label="Loading Models" fill />
         ) : models.length ? (
-          <Paper withBorder p="sm" radius="md">
-            <Stack gap="sm">
-              <Group justify="space-between" wrap="nowrap">
-                {models.length > 1 ? (
-                  <Checkbox
-                    label="Select All"
-                    checked={all}
-                    indeterminate={!all && chosen.length > 0}
-                    disabled={start.isPending}
-                    onChange={(event) => setSelected(event.currentTarget.checked ? ids : [])}
-                  />
-                ) : (
-                  <Text size="sm" fw={500}>
-                    Model
-                  </Text>
-                )}
-                <Text size="xs" c="dimmed" aria-live="polite">
-                  {chosen.length} of {models.length} selected
-                </Text>
-              </Group>
-              <Divider />
-              <ScrollArea.Autosize mah="min(42dvh, 22rem)">
-                <Checkbox.Group
-                  label="Text Models"
-                  labelProps={{ style: { display: "none" } }}
-                  value={chosen}
-                  onChange={setSelected}
-                >
-                  <Stack gap="sm">
-                    {models.map(({ id, label }) => (
-                      <Checkbox key={id} value={id} label={label} disabled={start.isPending} />
-                    ))}
-                  </Stack>
-                </Checkbox.Group>
-              </ScrollArea.Autosize>
-            </Stack>
-          </Paper>
+          <SelectionList
+            label="Text Models"
+            groups={[{ items: models.map(({ id, label }) => ({ value: id, label })) }]}
+            value={chosen}
+            onChange={setSelected}
+            disabled={start.isPending}
+          />
         ) : inventory.isSuccess ? (
           <EmptyState fill>No Text Models Available</EmptyState>
         ) : null}

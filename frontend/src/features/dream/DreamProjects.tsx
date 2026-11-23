@@ -1,4 +1,4 @@
-import { Alert, Button, ScrollArea, Stack, getDefaultZIndex } from "@mantine/core";
+import { Alert, Stack, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -6,10 +6,9 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import type { Project } from "../../../../shared/projects";
 import { api } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
-import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup } from "../../ui/SettingRows";
 import { type SheetTyping, TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
 import { CardDialog } from "../characters/CardImages";
@@ -53,7 +52,13 @@ function ProjectEditor({
  * Project cards show what is new since the last visit. The viewer moves through results in
  * project order, and the Inbox follows the project list.
  */
-export function DreamProjects() {
+export function DreamProjects({
+  creating,
+  onCloseCreate,
+}: {
+  creating: boolean;
+  onCloseCreate: () => void;
+}) {
   const client = useQueryClient();
   const phone = usePhone();
   const navigate = useNavigate();
@@ -62,14 +67,15 @@ export function DreamProjects() {
   const projects = useQuery(projectsQuery);
   const inbox = useQuery(inboxQuery);
   const models = useQuery(modelsQuery);
-  const [editing, setEditing] = useState<{ project?: Project }>();
-  const closeEditor = () => setEditing(undefined);
-  const editorTitle = editing?.project ? "Edit Project" : "New Project";
+  const [editing, setEditing] = useState<Project>();
+  const closeEditor = () => (editing ? setEditing(undefined) : onCloseCreate());
+  const editorOpened = creating || editing !== undefined;
+  const editorTitle = editing ? "Edit Project" : "New Project";
   const editor = (typing?: SheetTyping) =>
-    editing && (
+    editorOpened && (
       <ProjectEditor
-        key={editing.project?.id || "new"}
-        project={editing.project}
+        key={editing?.id || "new"}
+        project={editing}
         onClose={closeEditor}
         typing={typing}
       />
@@ -97,7 +103,7 @@ export function DreamProjects() {
   });
   const profileLabel = (id: string) =>
     models.data?.profiles.find((profile) => profile.id === id)?.label || id;
-  const list = projects.data?.projects || [];
+  const list = [...(projects.data?.projects || [])].sort((a, b) => compareNames(a.name, b.name));
   // Each project's single results waiting for a verdict, newest first; comparisons stay in the deck.
   const unseen = (projectId: string) =>
     (dream.data?.unseen ?? [])
@@ -130,47 +136,31 @@ export function DreamProjects() {
       ) : !list.length && inbox.isPending ? (
         <LoadingState fill label="Loading Inbox" />
       ) : (
-        <ScrollArea flex={1} mih={0}>
-          <Stack w="100%" maw={760} mx="auto" gap="lg" pb="md">
-            <SettingGroup
-              title="Projects"
-              toolbar={
-                <Button
-                  size="compact-sm"
-                  variant="default"
-                  leftSection={<icons.add size={14} />}
-                  onClick={() => setEditing({})}
-                >
-                  New Project
-                </Button>
-              }
-            >
-              {list.length > 0 ? (
-                <Stack gap="sm">
-                  {list.map((project) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      stats={projects.data.stats?.[project.id]}
-                      unseen={unseen(project.id)}
-                      fresh={fresh(unseen(project.id))}
-                      profileLabel={profileLabel}
-                      onView={(item) => setViewing(item.id)}
-                      onEdit={() => setEditing({ project })}
-                      onDelete={() => {
-                        deletion.reset();
-                        setDeleting(project);
-                      }}
-                    />
-                  ))}
-                </Stack>
-              ) : (
-                <EmptyState>No Projects</EmptyState>
-              )}
-            </SettingGroup>
-            <ProjectInbox projects={list} />
-          </Stack>
-        </ScrollArea>
+        <>
+          {list.length > 0 ? (
+            <Stack gap="sm">
+              {list.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  stats={projects.data.stats?.[project.id]}
+                  unseen={unseen(project.id)}
+                  fresh={fresh(unseen(project.id))}
+                  profileLabel={profileLabel}
+                  onView={(item) => setViewing(item.id)}
+                  onEdit={() => setEditing(project)}
+                  onDelete={() => {
+                    deletion.reset();
+                    setDeleting(project);
+                  }}
+                />
+              ))}
+            </Stack>
+          ) : (
+            <EmptyState>No Projects</EmptyState>
+          )}
+          <ProjectInbox projects={list} />
+        </>
       )}
       {current && (
         <MediaViewer
@@ -187,7 +177,7 @@ export function DreamProjects() {
         projectId={projectId}
         projects={list}
         profileLabel={profileLabel}
-        onEdit={(project) => setEditing({ project })}
+        onEdit={setEditing}
         onClose={() =>
           location.state?.fromProjects
             ? navigate(-1)
@@ -195,11 +185,11 @@ export function DreamProjects() {
         }
       />
       {phone ? (
-        <TextEntrySheet opened={editing !== undefined} onClose={closeEditor} title={editorTitle}>
+        <TextEntrySheet opened={editorOpened} onClose={closeEditor} title={editorTitle}>
           {editor}
         </TextEntrySheet>
       ) : (
-        <CardDialog opened={editing !== undefined} onClose={closeEditor} title={editorTitle}>
+        <CardDialog opened={editorOpened} onClose={closeEditor} title={editorTitle}>
           {editor()}
         </CardDialog>
       )}

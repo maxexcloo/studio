@@ -36,6 +36,7 @@ export function GalleryToolbar({
   extraChips,
   chipTools,
   toggles,
+  view,
   count,
   actions,
 }: {
@@ -49,6 +50,7 @@ export function GalleryToolbar({
   extraChips: FilterChip[];
   chipTools?: ReactNode;
   toggles: ReactNode;
+  view: ReactNode;
   count?: number;
   actions: ReactNode;
 }) {
@@ -61,7 +63,7 @@ export function GalleryToolbar({
     if (query && phone) setSearching(true);
   }, [query, phone]);
   const chips = useActiveFilters({ kind, value, onChange }, extraChips);
-  // The toolbar's own toggles (Liked, Uploads) stay on.
+  // Keep the current view and the toolbar's Liked toggle on.
   const clear = () => {
     onChange({
       ...emptyGalleryFilters,
@@ -127,6 +129,7 @@ export function GalleryToolbar({
   if (phone && searching)
     return (
       <Group key="search" ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
+        {view}
         {search}
         {actions}
       </Group>
@@ -138,6 +141,7 @@ export function GalleryToolbar({
   );
   const row = (
     <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
+      {view}
       {phone ? (
         <Tooltip label="Search Gallery">
           <Button
@@ -156,6 +160,7 @@ export function GalleryToolbar({
       )}
       <ChipPopup
         title="Filters"
+        spacious={false}
         opened={filtering}
         onOpenedChange={setFiltering}
         width={340}
@@ -187,12 +192,6 @@ export function GalleryToolbar({
         onToggle={() =>
           onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
         }
-      />
-      <FilterToggle
-        label="Uploads"
-        icon={icons.uploads}
-        on={value.uploads}
-        onToggle={() => onChange({ ...value, uploads: !value.uploads, rating: "" })}
       />
       {/* Desktop chips fill the row's free width; either way the actions end the row. */}
       {phone || !chips.length ? <div className={classes.chips} /> : filterChips}

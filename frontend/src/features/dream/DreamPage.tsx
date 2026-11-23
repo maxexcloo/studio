@@ -3,7 +3,6 @@ import {
   Alert,
   Button,
   Group,
-  Menu,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -12,8 +11,7 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown } from "lucide-react";
-import { Fragment, type SetStateAction, useEffect, useId, useRef, useState } from "react";
+import { type SetStateAction, useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { dreamCardCounts } from "../../../../shared/dream";
@@ -21,8 +19,8 @@ import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
+import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { TasteReflection } from "../taste/TasteReflection";
@@ -41,6 +39,7 @@ import {
   libraryReviewQuery,
 } from "./queries";
 
+import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "./DreamPage.module.css";
 
 /** The Dream deck once every card is judged or while Dream is off. */
@@ -99,12 +98,16 @@ function Empty({ dream }: { dream: Dream }) {
 }
 
 const views = [
-  ["dream", "Dream"],
-  ["library", "Library"],
-  ["projects", "Projects"],
-  ["taste", "Taste"],
-  ["history", "History"],
-  ["discarded", "Discards"],
+  [
+    { value: "dream", label: "Dream" },
+    { value: "library", label: "Library" },
+    { value: "projects", label: "Projects" },
+    { value: "taste", label: "Taste" },
+  ],
+  [
+    { value: "history", label: "History" },
+    { value: "discarded", label: "Discards" },
+  ],
 ] as const;
 const mediaLabels = { image: "Images", video: "Videos" };
 
@@ -126,12 +129,15 @@ export function DreamPage() {
   const [libraryDecided, setLibraryDecided] = useState<Set<string>>(() => new Set());
   const [returned, setReturned] = useState<DreamItem[]>([]);
   const [histories, setHistories] = useState<Partial<Record<string, Judgement[]>>>({});
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [tasteActions, setTasteActions] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
   const params = useParams();
   const param = params.projectId ? "projects" : params.view;
-  const [view, label] = views.find(([name]) => name === param) ?? views[0];
+  const view = views.flat().find(({ value }) => value === param)?.value ?? "dream";
+  if (view !== "projects" && creatingProject) setCreatingProject(false);
   const navigate = useNavigate();
   const reviewing = view === "library";
   const imageReview = useLibraryReview(seed, "image", libraryDecided, reviewing);
@@ -201,86 +207,75 @@ export function DreamPage() {
   );
   return (
     <div className={classes.page}>
-      <Group className={classes.toolbar} gap={phone ? 4 : "sm"} wrap={phone ? "wrap" : "nowrap"}>
-        <Menu position="bottom-start">
-          <PopupTooltip label="Dream View">
-            <Menu.Target>
-              <Button
-                size={phone ? "compact-sm" : "compact-md"}
-                variant="subtle"
-                color="gray"
-                aria-label="Dream View"
-                aria-describedby={waiting ? waitingId : undefined}
-                rightSection={<ChevronDown size={14} />}
-              >
-                {label}
-              </Button>
-            </Menu.Target>
-          </PopupTooltip>
+      <div className={toolbarClasses.band}>
+        <Group
+          role="group"
+          aria-label="Dream Toolbar"
+          gap="xs"
+          mih={44}
+          wrap={phone ? "wrap" : "nowrap"}
+        >
+          <ViewMenu
+            label="Dream View"
+            value={view}
+            groups={views}
+            describedBy={waiting ? waitingId : undefined}
+            onChange={(name) => navigate(name === "dream" ? "/dream" : `/dream/${name}`)}
+          />
           {waiting && <VisuallyHidden id={waitingId}>{waiting}</VisuallyHidden>}
-          <Menu.Dropdown>
-            {views.map(([name, title]) => (
-              <Fragment key={name}>
-                {name === "history" && <Menu.Divider />}
-                <Menu.Item
-                  rightSection={view === name ? <Check size={14} /> : undefined}
-                  onClick={() => navigate(name === "dream" ? "/dream" : `/dream/${name}`)}
-                >
-                  {title}
-                </Menu.Item>
-              </Fragment>
-            ))}
-          </Menu.Dropdown>
-        </Menu>
-        {selector}
-        {view !== "projects" && (
-          <Group gap={4} wrap="nowrap" ml="auto">
-            {data?.settings.enabled && (
-              <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
-                  loading={save.isPending}
-                  onClick={() => save.mutate({ paused: !data.settings.paused })}
-                >
-                  {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
-                </ActionIcon>
-              </Tooltip>
-            )}
-            {data && <DreamAllocation dream={data} />}
-          </Group>
-        )}
-      </Group>
+          {selector}
+          {view === "projects" ? (
+            <Button
+              size="compact-sm"
+              variant="default"
+              ml="auto"
+              leftSection={<icons.add size={14} />}
+              onClick={() => setCreatingProject(true)}
+            >
+              New Project
+            </Button>
+          ) : view === "taste" ? (
+            <Group ml="auto" ref={setTasteActions} />
+          ) : (
+            <Group gap={4} wrap="nowrap" ml="auto">
+              {data?.settings.enabled && (
+                <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
+                    loading={save.isPending}
+                    onClick={() => save.mutate({ paused: !data.settings.paused })}
+                  >
+                    {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              {data && <DreamAllocation dream={data} />}
+            </Group>
+          )}
+        </Group>
+      </div>
       {view === "discarded" ? (
         <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (
         <DreamHistory media={media} />
-      ) : view === "projects" ? (
-        <DreamProjects />
-      ) : view === "taste" ? (
-        phone ? (
-          <ScrollArea flex={1} mih={0} w="100%">
-            <Stack gap="lg">
-              <TasteProfile />
-              <TasteReflection />
-            </Stack>
-          </ScrollArea>
-        ) : (
-          <ScrollArea
-            flex={1}
-            mih={0}
-            w="100%"
-            maw={760}
-            mx="auto"
-            classNames={{ viewport: classes.taste }}
-          >
-            <Stack gap="lg">
-              <TasteProfile />
-              <TasteReflection />
-            </Stack>
-          </ScrollArea>
-        )
+      ) : view === "projects" || view === "taste" ? (
+        <ScrollArea flex={1} mih={0} classNames={{ viewport: classes.workspace }}>
+          <Stack flex={1} gap="lg" pb="md">
+            {view === "projects" ? (
+              <DreamProjects
+                creating={creatingProject}
+                onCloseCreate={() => setCreatingProject(false)}
+              />
+            ) : (
+              <>
+                <TasteProfile toolbar={tasteActions} />
+                <TasteReflection />
+              </>
+            )}
+          </Stack>
+        </ScrollArea>
       ) : !reviewing && dream.isPending ? (
         <LoadingState fill label="Loading Dream" />
       ) : !reviewing && dream.isError ? (

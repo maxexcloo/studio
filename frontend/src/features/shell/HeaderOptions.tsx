@@ -2,6 +2,7 @@ import { ActionIcon, Menu } from "@mantine/core";
 import { Library } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
+import { motionTransition } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -18,7 +19,7 @@ export function HeaderOptions() {
     <Menu
       position="bottom-end"
       shadow="md"
-      transitionProps={{ transition: "pop-top-right", duration }}
+      transitionProps={{ ...motionTransition(duration), transition: "pop-top-right" }}
     >
       <PopupTooltip label="More Options">
         <Menu.Target>

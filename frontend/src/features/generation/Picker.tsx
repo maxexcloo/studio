@@ -136,6 +136,7 @@ export function ChipPopup({
   trap = true,
   withinPortal = true,
   floating = false,
+  spacious = !floating,
   leading,
   onClear,
   clearDisabled,
@@ -161,6 +162,8 @@ export function ChipPopup({
   withinPortal?: boolean;
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
+  /** Reserves a minimum body height when anchored, including if floating on a phone. */
+  spacious?: boolean;
   leading?: ReactNode;
   onClear?: () => void;
   clearDisabled?: boolean;
@@ -255,7 +258,7 @@ export function ChipPopup({
           <div className={aside ? classes.columns : undefined}>
             <Stack gap="sm">
               <PopupHeading title={title} detail={detail} name={name} actions={actions} />
-              {children}
+              {spacious ? <div className={classes.popupBody}>{children}</div> : children}
             </Stack>
             {aside && <div className={classes.aside}>{aside}</div>}
           </div>
@@ -371,6 +374,7 @@ export function PickerHeader<Tab extends string>({
           {filters && (
             <ChipPopup
               title="Filters"
+              spacious={false}
               opened={filtering}
               onOpenedChange={setFiltering}
               width={340}
@@ -417,12 +421,14 @@ export function dragPicture(data: DataTransfer, picture: HTMLImageElement) {
 export function PickerGrid({
   label,
   rows = false,
+  fixedThumbnails = false,
   ref,
   style,
   children,
 }: {
   label: string;
   rows?: boolean;
+  fixedThumbnails?: boolean;
   ref?: Ref<HTMLDivElement>;
   style?: CSSProperties;
   children: ReactNode;
@@ -432,6 +438,7 @@ export function PickerGrid({
       ref={ref}
       className={classes.grid}
       data-rows={rows || undefined}
+      data-fixed-thumbnails={fixedThumbnails || undefined}
       role="list"
       aria-label={label}
       style={style}

@@ -39,7 +39,10 @@ const start = async (page: Page) => {
   await setup.getByRole("button", { name: "Add Variant", exact: true }).click();
   await expect(setup).toBeHidden();
 };
-const variants = (page: Page) => page.getByRole("radiogroup", { name: "Variant", exact: true });
+const variants = (page: Page) =>
+  page
+    .getByRole("group", { name: "Generation Inputs", exact: true })
+    .getByRole("radiogroup", { name: "Variant", exact: true });
 const variantSelect = (page: Page) => page.getByRole("combobox", { name: "Variant", exact: true });
 const submitCompare = (page: Page) =>
   page
@@ -228,11 +231,7 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   await compareMenu(page, "Clear");
   const models = await axis(page, "Model");
   await expect(models.getByRole("button", { name: "Add Variant", exact: true })).toBeDisabled();
-  const search = models.getByRole("combobox", { name: "Models", exact: true });
-  await search.fill("Fast");
-  await page.getByRole("option", { name: "Image Fast", exact: true }).click();
-  await search.press("Escape");
-  await expect(models).toBeVisible();
+  await models.getByRole("checkbox", { name: "Image Fast", exact: true }).check();
   await start(page);
   await runComparison(page);
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
@@ -266,24 +265,17 @@ test("Compare searches a long model list, reaches its last choice and retains th
   await create(page);
   await prompt(page).fill("A copper fox");
   const setup = await axis(page, "Model");
-  const search = setup.getByRole("combobox", { name: "Models", exact: true });
+  const search = setup.getByRole("textbox", { name: "Search Models", exact: true });
   if (testInfo.project.use.isMobile) await expect(search).not.toBeFocused();
-  await search.click();
   const scrollY = await page.evaluate(() => window.scrollY);
-  const last = page.getByRole("option", { name: "Candidate 39 · Quality", exact: true });
+  const options = setup.getByRole("group", { name: "Models", exact: true });
+  const last = options.getByRole("checkbox", { name: "Candidate 39 · Quality", exact: true });
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport();
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
   await search.fill("Quality");
-  await expect(page.getByRole("option")).toHaveText(["Candidate 39 · Quality"]);
-  await last.click();
-  if (testInfo.project.use.isMobile) {
-    await setup.getByRole("button", { name: "Add Variant", exact: true }).tap();
-    await expect(page.getByRole("listbox")).toBeHidden();
-    await expect(setup).toBeVisible();
-    await expectVariantCount(page, 0);
-  } else await search.press("Escape");
-  await expect(setup).toBeVisible();
+  await expect(options.getByRole("checkbox")).toHaveCount(1);
+  await last.check();
   await start(page);
   await runComparison(page);
   await expect.poll(() => state.comparisons.length).toBe(1);
@@ -310,23 +302,17 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   await create(page);
   await prompt(page).fill("A copper fox");
   const loras = await axis(page, "LoRA");
-  const choices = loras.getByRole("combobox", { name: "LoRAs", exact: true });
-  await choices.fill("Detail");
-  await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
-  await choices.fill("Soft");
-  await page.getByRole("option", { name: "Soft Style", exact: true }).click();
-  await choices.press("Escape");
+  await loras.getByRole("checkbox", { name: "Detail Slider", exact: true }).check();
+  await loras.getByRole("checkbox", { name: "Soft Style", exact: true }).check();
   await start(page);
   await expectVariantCount(page, 3);
   await pickVariant(page, "B");
   await compareMenu(page, "Clear");
   const resolutions = await axis(page, "Resolution");
-  const sizes = resolutions.getByRole("combobox", { name: "Resolutions", exact: true });
-  await resolutions.locator(".mantine-MultiSelect-input").click();
-  await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
-  await page.getByRole("option", { name: "1K", exact: true }).click();
-  await page.getByRole("option", { name: "2K", exact: true }).click();
-  await sizes.press("Escape");
+  const sizes = resolutions.getByRole("group", { name: "Resolutions", exact: true });
+  await expect(sizes.getByRole("checkbox")).toHaveCount(2);
+  await sizes.getByRole("checkbox", { name: "1K", exact: true }).check();
+  await sizes.getByRole("checkbox", { name: "2K", exact: true }).check();
   await start(page);
   await runComparison(page);
   await expect.poll(() => state.comparisons.length).toBe(1);
@@ -351,12 +337,10 @@ test("Compare preserves provider resolution enum values without converting them 
   await create(page);
   await prompt(page).fill("A copper fox");
   const setup = await axis(page, "Resolution");
-  const choices = setup.getByRole("combobox", { name: "Resolutions", exact: true });
-  await setup.locator(".mantine-MultiSelect-input").click();
-  await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
-  await page.getByRole("option", { name: "1K", exact: true }).click();
-  await page.getByRole("option", { name: "2K", exact: true }).click();
-  await choices.press("Escape");
+  const choices = setup.getByRole("group", { name: "Resolutions", exact: true });
+  await expect(choices.getByRole("checkbox")).toHaveCount(2);
+  await choices.getByRole("checkbox", { name: "1K", exact: true }).check();
+  await choices.getByRole("checkbox", { name: "2K", exact: true }).check();
   await start(page);
   await runComparison(page);
   await expect.poll(() => state.comparisons.length).toBe(1);

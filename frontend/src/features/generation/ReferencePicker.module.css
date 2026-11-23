@@ -42,8 +42,8 @@
   transition:
     border-color var(--studio-motion-duration) var(--studio-ease-enter),
     opacity var(--studio-motion-duration) var(--studio-ease-enter);
-  width: 64px;
-  height: 64px;
+  width: var(--picker-thumbnail-size);
+  height: var(--picker-thumbnail-size);
   color: var(--mantine-color-dimmed);
 }
 
@@ -77,9 +77,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-:where(:root[data-phone]) .cell:global(.mantine-UnstyledButton-root) {
-  width: 72px;
-  height: 72px;
 }

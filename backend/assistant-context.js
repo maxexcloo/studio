@@ -1,4 +1,4 @@
-import { isCloudProfile } from "../shared/profiles.ts";
+import { isCloudProfile, runBackend } from "../shared/profiles.ts";
 import { ownedQuery, recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
 import { logWarning } from "./crash-log.js";
@@ -9,6 +9,7 @@ import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catal
 import { livePrompting } from "./profile/store.js";
 import { bytesForReferenceAccount, captionForReferenceAccount } from "./references.js";
 import { defaultWorkerId } from "./workers.js";
+import { runProfile } from "./workflow-modes.js";
 
 /**
  * What the prompt assistant reads for an account: its profiles, their prompting guides, its LoRAs,
@@ -90,26 +91,44 @@ export function createAssistantContext({ catalogueModels, installedLoras }) {
   /** What a reference image shows in words (its gallery caption), for a writer that can't see it; or "". */
   const caption = (account, id) => (id ? captionForReferenceAccount(account, id) : "");
   /**
-   * The profile a result was made with as a suggestion writer needs it (domain/suggestions.ts
-   * WritingTarget), or null where the account can't use it: an edit model (references, or a
-   * cloud model) takes edits as instructions, plain image-to-image as a full description.
+   * The prompt guide for a result's profile or a selected editor's reference mode.
    */
-  async function target(account, profileId) {
-    const profile = (await profiles({ studioAccount: account })).find(
+  async function target(account, profileId, edit = false) {
+    const listed = (await profiles({ studioAccount: account })).find(
       (item) => item.id === profileId,
     );
-    if (!profile) return null;
+    if (!listed) return null;
+    const backend = edit
+      ? runBackend(listed.backendOptions || [], listed.backend, undefined, true)
+      : undefined;
+    const selected = backend ? runProfile(listed, backend) : listed;
+    const option = backend && listed.backendOptions?.find(({ id }) => id === backend);
+    const ready = option?.profile ? option.ready : selected.ready;
+    if (
+      edit &&
+      (selected.kind !== "image" ||
+        ready === false ||
+        !(
+          selected.mediaInputs?.length ||
+          selected.capabilities?.img2img ||
+          selected.capabilities?.imageInput
+        ))
+    )
+      return null;
+    const mode = edit && selected.imageModes?.reference;
+    const profile = mode ? { ...selected, ...mode } : selected;
     const family = families[String(profile.family || "").replaceAll("-", "_")];
     const edits =
-      isCloudProfile(profile) || family?.references
+      isCloudProfile(profile) || profile.editReferences || family?.references
         ? "instruction"
-        : family?.img2img
+        : edit || family?.img2img
           ? "description"
           : undefined;
     return {
       label: profile.label || profile.id,
       guide: guide(profile),
       ...(edits ? { edits } : {}),
+      ...(option?.profile ? { profileBackend: option.id } : {}),
     };
   }
   return { caption, guide, image, liked, loras, profiles, target };

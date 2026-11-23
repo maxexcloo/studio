@@ -16,6 +16,7 @@ import {
 } from "./references";
 import { StrengthControl } from "./StrengthControl";
 
+import pickerClasses from "./Picker.module.css";
 import classes from "./ReferencePicker.module.css";
 
 /** A placed reference dragged onto another slot moves there. */
@@ -90,7 +91,11 @@ export function ReferenceSlots({
   }
   const startImage = start && references.find((asset) => asset.slot === start.slot);
   return (
-    <div className={classes.slots} role="group" aria-label="Reference Slots">
+    <div
+      className={`${classes.slots} ${pickerClasses.thumbnailSize}`}
+      role="group"
+      aria-label="Reference Slots"
+    >
       {referenceCells(references, profile).map((group) => (
         <div key={group.slot} className={classes.group}>
           <div className={classes.cells}>
