@@ -156,6 +156,7 @@ export function DeckButtons({
           <Tooltip key={id} label={description ?? title}>
             <ActionIcon
               className={classes.answer}
+              data-touch-target
               variant="light"
               color={side ? "blue" : looks[id].color}
               radius="50%"
