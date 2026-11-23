@@ -7,7 +7,7 @@
 .control {
   pointer-events: auto;
   opacity: 0;
-  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+  transition: opacity var(--studio-motion-exit) var(--studio-ease-exit);
   box-shadow: var(--mantine-shadow-xs);
 }
 
@@ -21,10 +21,11 @@
   visibility: hidden;
 }
 
-*:hover > .actions .control,
-*:has(:focus-visible) > .actions .control,
+/* Revealed as the tile's other overlays are (MediaTile.module.css). */
+:is(:hover, :has(:focus-visible)) > .actions .control,
 .actions[data-opened] .more {
   opacity: 1;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 @media (hover: none) {
