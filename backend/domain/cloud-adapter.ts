@@ -329,7 +329,7 @@ export function createCloudQueueAdapter({
       try {
         input = await resolve(job);
       } catch (error) {
-        return { status: "failed", reason: (error as Error).message };
+        return { status: "failed", reason: (error as Error).message, permanent: true };
       }
       const { reference: _reference, lastFrame: _lastFrame, ...request } = input;
       return send(

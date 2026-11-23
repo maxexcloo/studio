@@ -44,6 +44,8 @@ export type OwnedJob = Omit<QueueJob, "dream"> &
     cancelRequested?: boolean;
     cleared?: boolean;
     replacementJobId?: string;
+    /** Its failure won't change on a retry (`JobObservation.permanent`). */
+    permanent?: true;
     /** Radiance refused to load this job until its pod frees host memory. */
     memoryRecovery?: string;
     /** Queued again automatically after its first run failed (queue.ts `again`); it isn't again. */
@@ -929,6 +931,7 @@ export function publicJob({
   cleared: _cleared,
   replacementJobId: _replacementJobId,
   memoryRecovery: _memoryRecovery,
+  permanent: _permanent,
   admittedAt: _admittedAt,
   savingAt: _savingAt,
   priority,
