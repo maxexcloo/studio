@@ -841,7 +841,6 @@ registerCompareRoutes(app, {
     const max = limit && limit * 3;
     const sides = galleryItems({
       ownerId: ownerIdForRequest(req),
-      type: "image",
       dreamState: ["kept", "discarded"],
       dreamPair: true,
       limit: max,

@@ -28,12 +28,13 @@ test("compare runs queue one seeded set, read back per owner and record the star
   let gallery: Record<string, unknown>[] = [
     { id: "old-a-0", jobId: "old-a", ownerId: "alice", type: "image", status: "done", prompt: "p" },
   ];
-  // Answered Dream comparisons: one kept side, one discarded outright, and another account's.
-  const side = (pair: string, side: number, state: string, ownerId = "alice") => ({
+  // Answered Dream comparisons: one of videos with a kept side, one discarded outright, and
+  // another account's.
+  const side = (pair: string, side: number, state: string, ownerId = "alice", type = "image") => ({
     id: `${pair}-${side}`,
     jobId: `${pair}-job-${side}`,
     ownerId,
-    type: "image",
+    type,
     status: "done",
     createdAt: "2026-01-02T00:00:00.000Z",
     settings: { seed: 5 },
@@ -43,8 +44,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
     },
   });
   const dreamSides = [
-    side("kept", 1, "kept"),
-    side("kept", 0, "discarded"),
+    side("kept", 1, "kept", "alice", "video"),
+    side("kept", 0, "discarded", "alice", "video"),
     side("neither", 0, "discarded"),
     side("neither", 1, "discarded"),
     side("foreign", 0, "kept", "bob"),

@@ -111,13 +111,16 @@ export function registerCompareRoutes(
   },
 ) {
   const { store } = options;
-  /** The variant's saved image (`itemId` when chosen), else a placeholder from its queue record. */
+  /**
+   * The variant's saved image, or a Dream pair's video (`itemId` when chosen), else a placeholder
+   * from its queue record.
+   */
   function variantItem(ownerId: string, items: GalleryItem[], jobId: string, itemId?: string) {
     const saved = items.find(
       (item) =>
         item.jobId === jobId &&
         (!itemId || item.id === itemId) &&
-        item.type === "image" &&
+        (item.type === "image" || item.type === "video") &&
         item.status !== "cancelled",
     );
     if (saved) return saved;

@@ -207,7 +207,7 @@ export function ComparePage() {
                 />
               ) : (
                 <Text size="sm" c="dimmed" className={classes.missing}>
-                  Image Unavailable
+                  Unavailable
                 </Text>
               )}
               {item?.status === "done" && (
