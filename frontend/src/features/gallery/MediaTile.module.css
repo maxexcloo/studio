@@ -80,12 +80,12 @@
 /* Hovering or keyboard focus reveals a tile's overlays, as it does its actions
    (MediaTileActions.module.css): they fade in at the motion speed and out at the exit speed. */
 .caption,
-.timestamp,
+.metadata,
 .videoPreview {
   transition: opacity var(--studio-motion-exit) var(--studio-ease-exit);
 }
 
-.tile:is(:hover, :has(:focus-visible)) :is(.caption, .timestamp, .videoPreview) {
+.tile:is(:hover, :has(:focus-visible)) :is(.caption, .metadata, .videoPreview) {
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
@@ -203,13 +203,30 @@
   pointer-events: none;
 }
 
-.timestamp {
+.metadata {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
   max-inline-size: 100%;
-  overflow: hidden;
+}
+
+.sourceBadge,
+.timestamp {
   padding: 2px 6px;
   border-radius: var(--mantine-radius-sm);
   background: rgb(0 0 0 / 0.72);
   color: white;
+}
+
+.sourceBadge {
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+
+.timestamp {
+  min-inline-size: 0;
+  overflow: hidden;
   font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;
   line-height: 1.25;
@@ -217,7 +234,7 @@
   white-space: nowrap;
 }
 
-:where(:root[data-phone]) .timestamp {
+:where(:root[data-phone]) :is(.sourceBadge, .timestamp) {
   padding: 1px 4px;
   background: rgb(0 0 0 / 0.62);
 }
@@ -227,7 +244,7 @@
 }
 
 @media (hover: hover) {
-  :where(:root:not([data-phone])) .tile:not(:hover, :has(:focus-visible)) .timestamp {
+  :where(:root:not([data-phone])) .tile:not(:hover, :has(:focus-visible)) .metadata {
     opacity: 0;
   }
 }

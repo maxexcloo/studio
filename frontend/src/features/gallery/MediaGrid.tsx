@@ -25,6 +25,7 @@ import classes from "./MediaGrid.module.css";
 
 interface GalleryViewProps {
   items: MediaItem[];
+  comparisonMembers: { items: ReadonlySet<string>; jobs: ReadonlySet<string> };
   /** The search, filters and mode the items answer: new results lay out afresh. */
   results: string;
   open: (item: MediaItem) => void;
@@ -183,6 +184,7 @@ const gridTop = (host: HTMLElement) => host.getBoundingClientRect().top + window
  */
 export function MediaGrid({
   items,
+  comparisonMembers,
   results,
   open,
   selection,
@@ -316,6 +318,10 @@ export function MediaGrid({
             <GridCell
               key={mediaIdentity(item)}
               item={item}
+              inComparison={
+                comparisonMembers.items.has(item.id) ||
+                Boolean(item.jobId && comparisonMembers.jobs.has(item.jobId))
+              }
               index={index}
               left={tile.left}
               top={tile.top}
@@ -379,6 +385,7 @@ const GridCell = memo(function GridCell({
   "open" | "caption" | "detail" | "renderActions" | "onSelectionMenu" | "onTryAgain"
 > & {
   item: MediaItem;
+  inComparison: boolean;
   index: number;
   left: number;
   top: number;

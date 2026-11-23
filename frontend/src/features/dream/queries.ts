@@ -22,6 +22,7 @@ export type DreamItem = MediaItem & {
     /** One side of a comparison: alike but for what `question` asks about. */
     pair?: { id: string; side: 0 | 1 | 2; size?: 3; question: string; label: string };
     projectId?: string;
+    arm?: string;
   };
 };
 /** A comparison's answer: a side, all or none. */

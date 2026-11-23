@@ -2429,7 +2429,11 @@ test("Comparisons lists each comparison and kept Dream comparison as a card that
   page,
 }) => {
   const state = await fixtures(page);
-  state.gallery.push(...results(4).map((item, index) => ({ ...item, jobId: `job-${index}` })));
+  const items = results(5).map((item, index) => ({ ...item, jobId: `job-${index}` }));
+  state.gallery.push(...items.slice(0, 4), {
+    ...items[4],
+    dream: { state: "kept" },
+  });
   state.comparisons.push(
     {
       id: "dream-pair",
@@ -2459,6 +2463,12 @@ test("Comparisons lists each comparison and kept Dream comparison as a card that
     },
   );
   await page.goto("/images");
+  const dream = page.getByRole("button", { name: "Open image: Browse Result 4", exact: true });
+  await expect(dream).toHaveAccessibleDescription("From Dream");
+  await expect(dream.getByTitle("From Dream")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toHaveAccessibleDescription("In Comparison");
   await showGalleryView(page, "Comparisons");
   // A kept Dream comparison opens read-only, its kept side as the winner.
   await page.getByRole("button", { name: "Open Comparison: Which Steps?", exact: true }).click();
