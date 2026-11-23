@@ -131,3 +131,15 @@ test("a Radiance LoRA refusal shows its own sentence, not a generic failure", ()
     "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)",
   );
 });
+
+test("missing parts fail for good; a dropped connection or a full GPU may not", () => {
+  const permanent = (message) => describeFailure({ message }).permanent;
+  assert.equal(
+    permanent("Node 'FancySampler' not found. The custom node may not be installed."),
+    true,
+  );
+  assert.equal(permanent("Value not in list: ckpt_name: 'gone.safetensors'"), true);
+  assert.equal(permanent("fetch failed"), false);
+  assert.equal(permanent("torch.OutOfMemoryError: CUDA out of memory"), false);
+  assert.equal(permanent("RuntimeError: something odd"), false);
+});

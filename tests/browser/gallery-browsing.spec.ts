@@ -1074,6 +1074,35 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await expect(queue.getByText("Empty Queue", { exact: true })).toBeVisible();
 });
 
+test("Retry All retries every failed job in the queue", async ({ page }) => {
+  const state = await fixtures(page);
+  for (const [id, status] of [
+    ["failed-a", "failed"],
+    ["waiting-job", "waiting"],
+    ["failed-b", "failed"],
+  ])
+    state.jobs.push({
+      id,
+      jobId: id,
+      sessionId: "s",
+      operation: "image",
+      status,
+      input: { prompt: id },
+      items: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+  await serveRetries(page, state, (ids) => ids.map((id) => ({ id, replacement: `${id}-again` })));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+  const retried = page.waitForRequest("**/api/queue/retry");
+  await queue.getByRole("button", { name: "Retry All", exact: true }).click();
+  expect((await retried).postDataJSON()).toEqual({ ids: ["failed-a", "failed-b"] });
+  await expect(queue.getByRole("button", { name: "Retry All", exact: true })).toHaveCount(0);
+  await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
+});
+
 test("Gallery selection stars, downloads and deletes only selected finished records", async ({
   page,
 }) => {
