@@ -207,13 +207,7 @@ export function AnimateDialog({
       {() => content}
     </TextEntrySheet>
   ) : (
-    <Modal
-      opened
-      id={id}
-      onClose={closeWhenTop(id, onClose)}
-      title={title}
-      size={asking ? "sm" : "md"}
-    >
+    <Modal opened id={id} onClose={closeWhenTop(id, onClose)} title={title} size="md">
       {content}
     </Modal>
   );
