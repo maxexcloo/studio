@@ -15,9 +15,7 @@ export async function prepareInputImage(bytes, { pixels, step = 1 } = {}) {
   if (!pixels) return bytes;
   const sharp = await loadSharp();
   if (!sharp)
-    throw new Error(
-      "Automatic input resizing is unavailable. Repair the Studio installation, or turn off automatic input resizing in Settings › Generation.",
-    );
+    throw new Error("Automatic input resizing is unavailable. Repair the Studio installation.");
   const metadata = await sharp(bytes.buffer, { limitInputPixels: 80_000_000 }).metadata();
   if (metadata.pages > 1) throw new Error("Use a still image as a start or reference image.");
   const oriented =

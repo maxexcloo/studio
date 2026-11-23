@@ -30,7 +30,7 @@ interface PromptDescriber {
  * own prompt. Only for owners `allowed` to use the prompt assistant.
  */
 export function createPromptSuggester(options: {
-  /** The Settings › Maintenance switch (STUDIO_SUGGESTED_PROMPTS). */
+  /** The Settings › Studio switch (STUDIO_SUGGESTED_PROMPTS). */
   enabled(): boolean;
   writer: PromptDescriber | null;
   idle(): boolean;

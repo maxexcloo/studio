@@ -3,7 +3,6 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
-import { icons } from "../../ui/icons";
 import { SettingRow } from "../../ui/SettingRows";
 
 type PassScope = "all" | "outdated" | "missing";
@@ -53,8 +52,9 @@ const scopeLabels: Record<PassScope, string> = {
 };
 
 /**
- * A Settings › Maintenance row that starts or stops a pass at `route` and follows it; with
- * `scopeLabel` it also chooses the pass's scope (All, Missing or Out of Date, the default).
+ * A Settings › Studio row for a background feature (`children`, its switch) that also starts or
+ * stops its catch-up pass at `route` and follows it; with `scopeLabel` it also chooses the pass's
+ * scope (All, Missing or Out of Date, the default).
  */
 export function GalleryPass({
   route,
@@ -63,6 +63,7 @@ export function GalleryPass({
   remaining,
   progressLabel,
   scopeLabel,
+  children,
 }: {
   route: string;
   label: string;
@@ -72,6 +73,7 @@ export function GalleryPass({
   progressLabel: string;
   /** The scope selector's accessible name; without it every pass is Out of Date. */
   scopeLabel?: string;
+  children: ReactNode;
 }) {
   const client = useQueryClient();
   const query = passQuery(route);
@@ -133,7 +135,7 @@ export function GalleryPass({
         <Button
           size="compact-sm"
           variant="default"
-          leftSection={<icons.stop size={16} />}
+          aria-label={`Stop ${label}`}
           loading={change.isPending}
           onClick={() => change.mutate("stop")}
         >
@@ -143,14 +145,15 @@ export function GalleryPass({
         <Button
           size="compact-sm"
           variant="default"
-          leftSection={<icons.resume size={16} />}
+          aria-label={`Catch Up ${label}`}
           loading={change.isPending}
           disabled={!data || data.state === "unavailable" || !data.scopes[scope]}
           onClick={() => change.mutate("start")}
         >
-          Start
+          Catch Up
         </Button>
       )}
+      {children}
     </SettingRow>
   );
 }

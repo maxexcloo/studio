@@ -20,7 +20,7 @@ import { mediaDefaultProfileKeys } from "./generation-defaults.js";
 import { requireAdmin } from "./route-access.js";
 
 /**
- * Settings › Deployment. `mediaModels` and `unavailableModels` are model/catalogue.js's;
+ * Settings › Studio and Dream. `mediaModels` and `unavailableModels` are model/catalogue.js's;
  * `assistantEngine` is the prompt assistant, or undefined without one.
  */
 export function registerDeploymentRoutes(

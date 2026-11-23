@@ -36,9 +36,8 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Preferences",
     "Where Work Runs",
     "Dream",
-    "Generation",
     "Groups",
-    "Maintenance",
+    "Studio",
     "Users",
     "Workers",
     "About",
@@ -55,7 +54,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
     ).toHaveText(order.slice(4, -1));
-  await section(page, "Settings", "Generation");
+  await section(page, "Settings", "Studio");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
   await page.getByRole("option", { name: "member@example.test", exact: true }).click();
@@ -78,7 +77,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect.poll(() => statusReads).toBeGreaterThan(before);
 });
 
-test("Caption Gallery in Settings › Maintenance starts a pass, shows its progress and stops", async ({
+test("Gallery Captions in Settings › Studio catches up, shows its progress and stops", async ({
   page,
 }) => {
   await fixtures(page);
@@ -116,22 +115,20 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
     if (action !== "captions") actions.push([action, route.request().postDataJSON()]);
     return route.fulfill({ json: status });
   });
-  await page.goto("/settings#maintenance");
-  const row = page.getByRole("region", { name: "Gallery", exact: true });
+  await page.goto("/settings#studio");
+  const row = page.getByRole("region", { name: "Background AI", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
   await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
   await expect(row.getByText("Ready · 7,000 to caption", { exact: true })).toBeVisible();
-  // Index Gallery (Image Search) is the same kind of pass.
-  await expect(row.getByText("Index Gallery", { exact: true })).toBeVisible();
-  // Caption Gallery comes first; Index Gallery has its own Start.
-  const start = row.getByRole("button", { name: "Start", exact: true }).first();
+  // Each feature's catch-up shares its row and name.
+  const start = row.getByRole("button", { name: "Catch Up Gallery Captions", exact: true });
   await start.click();
   await expect(
     row.getByText("Running · 120 of 7,000 · 30 a minute · about 3 h 49 min left", { exact: true }),
   ).toBeVisible();
   await expect(row.getByRole("progressbar", { name: "Caption Progress" })).toBeVisible();
-  await row.getByRole("button", { name: "Stop", exact: true }).click();
+  await row.getByRole("button", { name: "Stop Gallery Captions", exact: true }).click();
   await expect(row.getByText("Stopped · 120 of 7,000", { exact: true })).toBeVisible();
   await expect(start).toBeEnabled();
   expect(actions).toEqual([
@@ -394,7 +391,9 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   await signIn(page, { id: "account-a", role: "administrator" });
   await page.goto("/settings");
   await expect(
-    page.getByRole("region", { name: "Your Account" }).getByText("Administrator", { exact: true }),
+    page
+      .getByRole("region", { name: "Settings: Account", exact: true })
+      .getByText("Administrator", { exact: true }),
   ).toBeVisible();
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Settings: Workers", exact: true })).toBeVisible();
@@ -910,7 +909,7 @@ test("Status counts running workers, reads a parked service as Stopped and offer
   await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 
-test("Settings › Maintenance switches follow at once and settle back after a failed save", async ({
+test("Settings › Studio switches follow at once and settle back after a failed save", async ({
   page,
 }) => {
   await fixtures(page);
@@ -955,9 +954,9 @@ test("Settings › Maintenance switches follow at once and settle back after a f
       },
     });
   });
-  await page.goto("/settings#maintenance");
+  await page.goto("/settings#studio");
   const toggle = page
-    .getByRole("region", { name: "Gallery", exact: true })
+    .getByRole("region", { name: "Background AI", exact: true })
     .getByRole("switch", { name: "Gallery Captions", exact: true });
   await expect(toggle).toBeChecked();
   await toggle.click({ force: true });
@@ -1001,10 +1000,10 @@ test("Administration Dream saves shared queue delays and hands an override back 
   await expect(choice(spicy, "Per Account")).toBeChecked();
 });
 
-test("Settings › Generation saves and clears the default Text Profile", async ({ page }) => {
+test("Settings › Studio saves and clears the default Text Profile", async ({ page }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  await page.goto("/settings#generation");
+  await page.goto("/settings#studio");
   const text = page.getByRole("combobox", { name: "Text Profile", exact: true });
   await expect(text).toHaveText("Gateway Default");
   await text.click();

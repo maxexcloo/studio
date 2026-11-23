@@ -7,7 +7,7 @@ import { Link, useLocation } from "react-router";
 import { post } from "../../api";
 import { icons } from "../../ui/icons";
 
-/** The account heading and Account, then workspace links and the final Sign Out action. */
+/** The account heading and Account (multi-user), then workspace links and the final Sign Out action. */
 export function AccountMenuContent({
   name,
   multi,
@@ -29,14 +29,16 @@ export function AccountMenuContent({
   return (
     <>
       <Menu.Label>{name}</Menu.Label>
-      <Menu.Item
-        component={Link}
-        to="/settings#account"
-        state={{ backgroundLocation: location }}
-        leftSection={<icons.account size={16} />}
-      >
-        Account
-      </Menu.Item>
+      {multi && (
+        <Menu.Item
+          component={Link}
+          to="/settings#account"
+          state={{ backgroundLocation: location }}
+          leftSection={<icons.account size={16} />}
+        >
+          Account
+        </Menu.Item>
+      )}
       {children}
       {multi && (
         <>

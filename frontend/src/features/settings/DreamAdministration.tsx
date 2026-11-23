@@ -71,7 +71,7 @@ export function DreamAdministration() {
   };
   return (
     <Stack gap="lg">
-      <SettingGroup title="Queue">
+      <SettingGroup title="Delays">
         {delay(
           "imageIdleMinutes",
           "Image Idle Delay",

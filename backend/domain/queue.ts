@@ -1002,7 +1002,7 @@ export class GenerationQueue {
   }
 
   /**
-   * Settings › Maintenance: ends an unfinished job for good. It is cancelled as usual; one whose
+   * Settings › Studio: ends an unfinished job for good. It is cancelled as usual; one whose
    * provider never confirms (a lost worker, a recording nothing can recover) is marked cancelled
    * anyway, so it stops holding its place.
    */
