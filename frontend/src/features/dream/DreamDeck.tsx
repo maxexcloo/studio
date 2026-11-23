@@ -1,7 +1,6 @@
 import { ActionIcon, Badge, Box, Button, Modal, Radio, Stack, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  type CSSProperties,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
@@ -571,18 +570,9 @@ export function DreamDeck({
         </Box>
       </>
     );
-  const source = top.kind === "pair" ? undefined : mediaSource(top.item);
-  const aspect = source?.width && source.height ? source.width / source.height : undefined;
   return (
     <>
-      <div
-        className={classes.stage}
-        style={aspect ? ({ "--card-aspect": aspect } as CSSProperties) : undefined}
-        data-fitted={aspect ? true : undefined}
-        ref={stage}
-        aria-hidden={!!viewing}
-        inert={!!viewing}
-      >
+      <div className={classes.stage} ref={stage} aria-hidden={!!viewing} inert={!!viewing}>
         {[...cards].reverse().map(swipeCard)}
       </div>
       <DeckButtons

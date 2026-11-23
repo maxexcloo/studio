@@ -2,6 +2,7 @@
    toolbars are short of room, size it to the current name. */
 .labels {
   display: inline-grid;
+  text-align: start;
 }
 .labels > * {
   grid-area: 1 / 1;
@@ -12,4 +13,7 @@
 }
 :where([data-phone]) .labels > [data-label] {
   display: none;
+}
+.count {
+  font-variant-numeric: tabular-nums;
 }

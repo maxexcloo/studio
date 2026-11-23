@@ -14,7 +14,7 @@ import {
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ratingSortLabels } from "../../../../shared/gallery-sort";
 import {
@@ -38,7 +38,7 @@ import { SortMenu, nameSortLabels } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "./chip";
-import { useGeneration } from "./GenerationProvider";
+import { useDraft, useGeneration } from "./GenerationProvider";
 import { type LoraLibrary, loraLibraryQuery } from "./loraLibrary";
 import { modelFamilyLabel } from "./modelFamily";
 import { isProfile, profileForLoras } from "./payload";
@@ -120,19 +120,22 @@ export function useLoraPicker() {
   // The preset the stack was loaded from or saved as, and its name field's state.
   const [presetId, setPresetId] = useState<string>();
   const naming = useNaming();
-  return {
-    opened,
-    setOpened,
-    family,
-    setFamily,
-    query,
-    setQuery,
-    loraSort,
-    setLoraSort,
-    presetId,
-    setPresetId,
-    naming,
-  };
+  return useMemo(
+    () => ({
+      opened,
+      setOpened,
+      family,
+      setFamily,
+      query,
+      setQuery,
+      loraSort,
+      setLoraSort,
+      presetId,
+      setPresetId,
+      naming,
+    }),
+    [opened, family, query, loraSort, setLoraSort, presetId, naming],
+  );
 }
 export type LoraPickerState = ReturnType<typeof useLoraPicker>;
 interface LoraPickerProps {
@@ -153,8 +156,8 @@ export function LoraPicker({
   picker,
   suggestions,
 }: LoraPickerProps & { suggestions?: LoraSuggestions }) {
-  const context = useGeneration();
-  const input = value || context.input;
+  const draft = useDraft();
+  const input = value || draft.input;
   const phone = usePhone();
   const [adding, setAdding] = usePickerChoices(phone && picker.opened, !input.loras.length);
   const { update } = useLoraDraft({ value, onChange });
@@ -324,7 +327,8 @@ export function LoraRatings({ file, title }: { file: string; title: string }) {
 /** The draft, profile and catalogue the LoRA choices and stack share. */
 function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   const context = useGeneration();
-  const input = value || context.input;
+  const draft = useDraft();
+  const input = value || draft.input;
   const profile = profileForLoras(
     value
       ? context.profiles.find((profile) => isProfile(profile, value.profileId))
@@ -440,7 +444,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
         const reason =
           unavailableFor(profile, metadata[file]) ||
           (rejection === "unknown"
-            ? "Unverified on Radiance"
+            ? "Unknown family: set it in Library › LoRAs"
             : rejection === "other"
               ? "Doesn't fit this model"
               : "");

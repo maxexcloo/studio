@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { type GalleryFilterValues, emptyGalleryFilters } from "../gallery/GalleryFilters";
 import type { ReferenceTarget } from "./references";
@@ -22,6 +22,6 @@ export function useReferenceBrowser() {
     originalsOnly: false,
   });
   const scroll = useRef(0);
-  return { state, setState, scroll };
+  return useMemo(() => ({ state, setState, scroll }), [state]);
 }
 export type ReferenceBrowser = ReturnType<typeof useReferenceBrowser>;

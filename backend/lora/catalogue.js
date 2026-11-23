@@ -195,7 +195,7 @@ export function optionalLoraPolicyIssue(item, info, profile) {
   if (unavailable) return `${info?.title || item.name}: ${unavailable}`;
   const rejection = loraRejection(info, { ...profile, loraAdapter });
   if (rejection === "unknown")
-    return `${info?.title || item.name} has no verified compatibility with this Radiance model. Remove it from the optional LoRA stack to generate.`;
+    return `${info?.title || item.name} has no known model family, so Radiance can't tell whether it fits. Set its family in Library › LoRAs, or remove it from the optional LoRA stack to generate.`;
   if (rejection === "other") {
     // Another family entirely, or a variant the publisher excludes within this family.
     const family =

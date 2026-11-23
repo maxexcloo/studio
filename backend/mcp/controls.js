@@ -639,7 +639,7 @@ export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
         const otherFamily = loraCompatibility({ families: info?.families }, profile) === "other";
         notes.push(
           loraRejection(info, profile) === "unknown"
-            ? `Left out ${value}: its compatibility with ${label}'s Radiance base is unverified.`
+            ? `Left out ${value}: its model family is unknown; an administrator can set it in Library › LoRAs.`
             : otherFamily
               ? `Left out ${value}: it is for ${info?.base || "another model family"} and ${label} has no equivalent.`
               : `Left out ${value}: it does not support ${label}'s base model or conditioning.`,

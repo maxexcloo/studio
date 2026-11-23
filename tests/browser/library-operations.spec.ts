@@ -493,7 +493,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   expect(attempts).toBe(2);
 });
 
-test("Imports group by what they need: Download All Missing, substitutes to accept or reject, Clear Stale and Delete", async ({
+test("Imports switch views by what they need: Download All Missing, substitutes to accept or reject, Clear Stale and Delete", async ({
   page,
 }) => {
   await fixtures(page);
@@ -578,10 +578,8 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  // Each row says what the import gave and where it went.
-  const installed = page.getByRole("region", { name: "Installed · 1", exact: true });
-  await expect(installed).toContainText("LoRA · Flux.1 D · loras/kept.safetensors");
-  await expect(installed.getByText("Installed", { exact: true })).toBeVisible();
+  // Needs Action opens first, grouped by what each import needs.
+  await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
   const needs = page.getByRole("region", { name: "Missing Files · 1", exact: true });
   await expect(needs).toContainText("missing.safetensors: Not downloaded yet");
   await needs.getByRole("button", { name: "Download All Missing", exact: true }).click();
@@ -608,6 +606,12 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
     .click();
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Clear Stale", exact: true })).toBeHidden();
+  // Each row says what the import gave and where it went.
+  await chooseView(page, "Imports", "Installed");
+  const installed = page.getByRole("table", { name: "Installed Imports", exact: true });
+  await expect(installed).toContainText("LoRA · Flux.1 D · loras/kept.safetensors");
+  await expect(installed).toContainText("Close Recipe");
+  await expect(page.getByText("Missing Model", { exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page

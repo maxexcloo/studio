@@ -28,10 +28,11 @@ const comfyIsLocal = (comfyUrl) => {
 
 /**
  * Health, service status, estimates, stats and diagnostics. `observeServices` is
- * runtime/services.ts's observer; `queue` the generation queue, for the workers its jobs wait on
- * and how long its waiting work takes.
+ * runtime/services.ts's observer; `cloudUsage` reads cloud accounts' usage when a cloud provider is
+ * configured; `queue` the generation queue, for the workers its jobs wait on and how long its
+ * waiting work takes.
  */
-export function registerStatusRoutes(app, { observeServices, queue }) {
+export function registerStatusRoutes(app, { cloudUsage, observeServices, queue }) {
   app.get("/api/services/status", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const waitingWorkers = queue.store
@@ -54,8 +55,8 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
           : [],
       ),
     );
-    res.json(
-      await observeServices({
+    const [status, cloud] = await Promise.all([
+      observeServices({
         allowed: ["image", "video", "text"],
         administrator,
         waitingWorkers,
@@ -63,7 +64,9 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
         // Each worker's jobs, loaded model and free memory are for administrators only.
         ...(administrator ? { loads: workerLoads(queue) } : {}),
       }),
-    );
+      cloudUsage?.(),
+    ]);
+    res.json({ ...status, ...(cloud?.length ? { cloud } : {}) });
   });
 
   // Liveness, for the container health check and the test servers.

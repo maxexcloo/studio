@@ -47,8 +47,20 @@ export interface ServiceStatus {
   endpoints: ServiceEndpoint[];
 }
 
+/** A cloud account's use of its current quota window; `used` is absent while unreadable. */
+export interface CloudUsage {
+  label: string;
+  /** Percent of the window used. */
+  used?: number;
+  /** When the window resets. */
+  resetsAt?: string;
+  reason: string;
+}
+
 export interface ServicesStatus {
   services: Partial<Record<ServiceKind, ServiceStatus>>;
+  /** Each configured cloud provider account's usage. */
+  cloud?: CloudUsage[];
   /** Each media worker, for administrators only. */
   workers?: WorkerStatus[];
   runtime: {

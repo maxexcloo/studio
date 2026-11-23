@@ -140,10 +140,41 @@ const serviceDetail = (kind: ServiceKind, service: ServiceStatus) => {
         );
   return [plural(live.length, "worker"), ...state].join(" · ");
 };
+function SummaryLine({
+  label,
+  detail,
+  colour,
+  hollow = false,
+  reason,
+}: {
+  label: string;
+  detail: string;
+  colour: string;
+  hollow?: boolean;
+  reason: string;
+}) {
+  return (
+    <Group gap="xs" wrap="nowrap" aria-label={`${label}: ${detail}`}>
+      <Circle
+        size={10}
+        strokeWidth={2.5}
+        fill={hollow ? "none" : "currentColor"}
+        style={{ flexShrink: 0, color: `var(--mantine-color-${colour}-6)` }}
+      />
+      <Text size="sm" miw={56}>
+        {label}
+      </Text>
+      <Text size="sm" c="dimmed" title={reason} ml="auto" ta="right">
+        {detail}
+      </Text>
+    </Group>
+  );
+}
 /**
  * The status panel's quiet summary, one line per kind: its health dot, then how many workers
- * can serve it and their state. Text without a local worker runs in the cloud. Read-only and the
- * same for everyone; Settings › Workers holds the controls.
+ * can serve it and their state. Text without a local worker runs in the cloud. Then each cloud
+ * provider account's use of its quota window. Read-only and the same for everyone;
+ * Settings › Workers holds the controls.
  */
 export function ServiceHealthSummary() {
   const status = useQuery(servicesStatusQuery);
@@ -154,6 +185,7 @@ export function ServiceHealthSummary() {
       </Text>
     );
   const available = services.filter(({ kind }) => status.data?.services[kind]);
+  const cloud = status.data?.cloud;
   return (
     <Stack gap={4} component="section" aria-label="Service Status">
       {status.isPending && (
@@ -164,27 +196,42 @@ export function ServiceHealthSummary() {
       {available.map(({ kind, label }) => {
         const service = status.data!.services[kind]!;
         const cloud = kind === "text" && !service.endpoints.length;
-        const detail = cloud ? "Cloud only" : serviceDetail(kind, service);
         return (
-          <Group key={kind} gap="xs" wrap="nowrap" aria-label={`${label}: ${detail}`}>
-            <Circle
-              size={10}
-              strokeWidth={2.5}
-              fill={cloud ? "none" : "currentColor"}
-              style={{
-                flexShrink: 0,
-                color: `var(--mantine-color-${cloud ? "gray" : healthColour(service.state)}-6)`,
-              }}
-            />
-            <Text size="sm" w={56}>
-              {label}
-            </Text>
-            <Text size="sm" c="dimmed" title={service.reason} ml="auto" ta="right">
-              {detail}
-            </Text>
-          </Group>
+          <SummaryLine
+            key={kind}
+            label={label}
+            detail={cloud ? "Cloud only" : serviceDetail(kind, service)}
+            colour={cloud ? "gray" : healthColour(service.state)}
+            hollow={cloud}
+            reason={service.reason}
+          />
         );
       })}
+      {cloud && (
+        <SummaryLine
+          label="Cloud Providers"
+          detail={cloud
+            .map(
+              (usage) =>
+                `${usage.label} · ${usage.used === undefined ? "Unknown" : `${Math.round(usage.used)}% Used`}`,
+            )
+            .join(", ")}
+          colour={
+            cloud.some((usage) => usage.used === undefined)
+              ? healthColour("unknown")
+              : cloud.some((usage) => usage.used! >= 100)
+                ? healthColour("offline")
+                : healthColour("healthy")
+          }
+          reason={cloud
+            .map((usage) =>
+              usage.resetsAt
+                ? `${usage.reason} Resets ${new Date(usage.resetsAt).toLocaleString()}.`
+                : usage.reason,
+            )
+            .join(" ")}
+        />
+      )}
       {status.data && !available.length && <EmptyState fill>No Services</EmptyState>}
     </Stack>
   );

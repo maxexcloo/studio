@@ -11,7 +11,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px var(--mantine-spacing-md);
+  gap: var(--mantine-spacing-sm) var(--mantine-spacing-md);
 }
 .header > :first-child:not(:last-child) {
   flex: 1 0 min(100%, 13rem);

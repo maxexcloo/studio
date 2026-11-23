@@ -40,7 +40,7 @@ import { TitleSelect } from "../../ui/TitleSelect";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useDraft, useGeneration } from "../generation/GenerationProvider";
 import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { profileForBackend, profileForLoras, profileName } from "../generation/payload";
 import { profileOptions } from "../generation/ProfilePicker";
@@ -74,7 +74,8 @@ const modelName = (name: string) =>
 
 /** Chooses one comparison axis and its values, then stages editable variants in the composer. */
 export function CompareMenu({ labels }: { labels: string[] }) {
-  const { draft, setDraft, profiles, profile } = useGeneration();
+  const { setDraft, profiles, profile } = useGeneration();
+  const draft = useDraft();
   const phone = usePhone();
   const metadata = useQuery(loraInfoQuery);
   const info = metadata.data?.loras ?? {};
@@ -164,7 +165,7 @@ export function CompareMenu({ labels }: { labels: string[] }) {
           : withResolution({ ...input, resolutionTier: size as Resolution }, effective),
       );
     else if (axis === "Seed") inputs = seedInputs(input, Number(seeds));
-    else inputs = promptInputs({ ...input, prompt: text });
+    else inputs = promptInputs({ ...input, prompt: prompts ?? input.prompt });
     setDraft((previous) => compareInputs(previous, inputs));
     close();
   };
@@ -382,7 +383,8 @@ function VariantOverview({ labels }: { labels: string[] }) {
 
 /** The variant picker beside Generate in the phone sheet's header. */
 export function GenerateVariantSelect() {
-  const { draft, setDraft } = useGeneration();
+  const { setDraft } = useGeneration();
+  const draft = useDraft();
   if (!draft.compare) return null;
   return (
     <TitleSelect
@@ -402,7 +404,8 @@ export function GenerateVariantSelect() {
 
 /** Which variant the composer edits; each one's tooltip names what sets it apart. */
 function VariantStrip({ labels }: { labels: string[] }) {
-  const { draft, setDraft } = useGeneration();
+  const { setDraft } = useGeneration();
+  const draft = useDraft();
   const active = draft.compare?.active ?? 0;
   return (
     <SegmentedControl

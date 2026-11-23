@@ -45,38 +45,22 @@ interface GuideBindings {
   families: Record<string, Record<string, string>>;
   profiles: Record<string, { pack?: string }>;
 }
-const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
+const kindLabels = { image: "Image", video: "Video" };
 
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
 
-/** Runs, failures, likes and typical time; Failing when most recent runs failed. */
-function ProfileUse({ stats }: { stats?: ProfileStats }) {
-  if (!stats)
-    return (
-      <Text size="xs" c="dimmed">
-        No Runs
-      </Text>
-    );
+/** The last 30 days' runs, failures, likes and typical time. */
+function profileUse(stats?: ProfileStats) {
+  if (!stats) return "No Runs in 30 Days";
   const done = stats.runs - stats.failed;
-  return (
-    <Group gap="xs" wrap="nowrap">
-      {stats.failing && (
-        <Badge color="red" size="sm">
-          Failing
-        </Badge>
-      )}
-      <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-        {[
-          `${stats.runs} ${stats.runs === 1 ? "Run" : "Runs"}`,
-          stats.failed && `${percent(stats.failed, stats.runs)} Failed`,
-          done > 0 && `${percent(stats.liked, done)} Liked`,
-          stats.medianRunMs && `${Math.round(stats.medianRunMs / 1000)} s`,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </Text>
-    </Group>
-  );
+  return [
+    `${stats.runs} ${stats.runs === 1 ? "Run" : "Runs"} in 30 Days`,
+    stats.failed && `${percent(stats.failed, stats.runs)} Failed`,
+    done > 0 && `${percent(stats.liked, done)} Liked`,
+    stats.medianRunMs && `${Math.round(stats.medianRunMs / 1000)} s`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean }) {
@@ -116,7 +100,7 @@ function useDefinitions() {
   // Guide bindings record the runtime id, `custom:` plus the definition's id.
   const guideIdOf = (entry: ProfileRow) =>
     bindings?.profiles[`custom:${entry.id}`]?.pack ??
-    (entry.family ? bindings?.families[entry.family]?.[entry.kind || "image"] : undefined);
+    (entry.family ? bindings?.families[entry.family]?.[entry.kind] : undefined);
   const guideNames = new Map(guides.map((entry) => [entry.packId, entry.name]));
   const guideOf = (entry: ProfileRow) => {
     const id = guideIdOf(entry);
@@ -230,6 +214,7 @@ function DeleteDefinition({ deleting, close }: { deleting: Deleting | null; clos
 /** Library › Profiles: generation profiles under the section's toolbar; each keeps its saved versions. */
 export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const phone = usePhone();
+  const touch = useTouch();
   const [profileQuery, setProfileQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -341,7 +326,13 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
         ) : (
           <DataTable
             label="Editable Profiles"
-            rows={profileRows}
+            // Sorted by type, family and name first, so the stable Type sort keeps that order within it.
+            rows={[...profileRows].sort(
+              (a, b) =>
+                compareNames(kindLabels[a.kind], kindLabels[b.kind]) ||
+                compareNames(modelFamilyLabel(a.family), modelFamilyLabel(b.family)) ||
+                compareNames(a.name || a.id, b.name || b.id),
+            )}
             rowKey={(entry) => entry.id}
             rowName={(entry) => entry.name || entry.id}
             loading={profileList.isPending && "Loading Profiles"}
@@ -349,12 +340,33 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             searchText={(entry) => [
               entry.name,
               entry.id,
+              kindLabels[entry.kind],
               entry.family && modelFamilyLabel(entry.family),
               guideOf(entry),
             ]}
-            initialSort={{ key: "name", descending: false }}
+            initialSort={{ key: "kind", descending: false }}
             empty={profiles.length ? "No Matches" : "No Profiles"}
             columns={[
+              {
+                key: "kind",
+                header: "Type",
+                sortValue: (entry) => kindLabels[entry.kind],
+                cell: (entry) => (
+                  <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                    {kindLabels[entry.kind]}
+                  </Text>
+                ),
+              },
+              {
+                key: "family",
+                header: "Family",
+                sortValue: (entry) => modelFamilyLabel(entry.family),
+                cell: (entry) => (
+                  <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                    {modelFamilyLabel(entry.family)}
+                  </Text>
+                ),
+              },
               {
                 key: "name",
                 header: "Name",
@@ -363,17 +375,21 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 cell: (entry) => (
                   <>
                     <TableRecord
-                      name={entry.name || entry.id}
+                      name={
+                        <>
+                          {entry.name || entry.id}{" "}
+                          {statsOf(entry.id)?.failing && (
+                            <Badge component="span" size="sm" color="red">
+                              Failing
+                            </Badge>
+                          )}
+                        </>
+                      }
                       openLabel={`Edit ${entry.name || entry.id}`}
                       onOpen={() => setEditing({ kind: "profile", id: entry.id })}
-                      detail={
-                        [
-                          entry.family && modelFamilyLabel(entry.family),
-                          entry.kind && kindLabels[entry.kind],
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || (entry.name ? entry.id : undefined)
-                      }
+                      // Touch screens show no tooltips, so they list the figures below instead.
+                      tooltip={touch ? undefined : profileUse(statsOf(entry.id))}
+                      detail={entry.name ? entry.id : undefined}
                     />
                     {phone && (
                       <Group gap="xs" wrap="nowrap">
@@ -382,6 +398,11 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                         </Text>
                         {entry.aiDrafted && <Badge color="orange">AI</Badge>}
                       </Group>
+                    )}
+                    {touch && (
+                      <Text size="xs" c="dimmed">
+                        {profileUse(statsOf(entry.id))}
+                      </Text>
                     )}
                   </>
                 ),
@@ -403,13 +424,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 hideOnPhone: true,
                 sortValue: (entry) => entry.version,
                 cell: (entry) => <Version {...entry} />,
-              },
-              {
-                key: "use",
-                header: "Last 30 Days",
-                hideOnPhone: true,
-                sortValue: (entry) => statsOf(entry.id)?.runs,
-                cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
               },
             ]}
             rowActions={(entry) => (

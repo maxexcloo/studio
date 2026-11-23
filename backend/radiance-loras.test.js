@@ -252,7 +252,7 @@ test("Radiance checks catalogue families and exact base constraints against the 
       /Remove it from the optional LoRA stack/,
     );
   assert.throws(() => sanitizeGenerateBody(body(wrongBase), info), /does not support this model/);
-  assert.throws(() => sanitizeGenerateBody(body(unknown), info), /no verified compatibility/);
+  assert.throws(() => sanitizeGenerateBody(body(unknown), info), /no known model family/);
   const listed = inferModels(info).profiles.find((entry) => entry.id === id);
   const notes = [];
   assert.deepEqual(prepareLoras(listed, infos, [{ name: wrongBase }], notes), []);
