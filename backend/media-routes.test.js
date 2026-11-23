@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
+import { listedRecord } from "./gallery/records.js";
+
 // The real server with Studio media storage: how long a browser may keep each kind of media.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-routes-"));
@@ -169,7 +171,9 @@ test(
   "a video's thumbnail address gives its poster, so small views show a picture",
   { skip: !canEncode },
   async () => {
-    const response = await fetch(address("thumb", "clip.mp4", "&v=abc"));
+    const video = new URL(address("view", "clip.mp4", "&v=abc"));
+    const item = listedRecord({ type: "video", url: video.pathname + video.search });
+    const response = await fetch(new URL(item.thumbnailUrl, video));
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("content-type"), "image/jpeg");
     assert.equal(

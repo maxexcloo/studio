@@ -525,13 +525,15 @@ export function ProjectInbox({ projects }: { projects: Project[] }) {
           toolbar={
             <Button
               size="compact-sm"
-              variant="default"
+              variant="subtle"
+              color="gray"
+              aria-label="Clear Inbox"
               onClick={() => {
                 clear.reset();
                 setClearing(true);
               }}
             >
-              Clear Inbox
+              Clear
             </Button>
           }
         >

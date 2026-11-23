@@ -214,7 +214,8 @@ export function MediaTile({
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
   const selected = selection?.selected.has(item.id) ?? false;
   const media = mediaSource(item);
-  const source = media.thumbnailUrl || item.preview || media.url;
+  const video = item.type === "video";
+  const source = media.thumbnailUrl || item.preview || (video ? undefined : media.url);
   // A failed load (Studio restarting, say) tries again a few times, waiting longer each time.
   const [retry, setRetry] = useState({ source, count: 0 });
   const attempt = retry.source === source ? retry.count : 0;
@@ -252,7 +253,12 @@ export function MediaTile({
             ?.play()
             .catch(() => {});
       }}
-      onPointerLeave={(event) => event.currentTarget.querySelector("video")?.load()}
+      onPointerLeave={(event) => {
+        const preview = event.currentTarget.querySelector("video");
+        if (!preview) return;
+        preview.pause();
+        delete preview.dataset.previewing;
+      }}
       onContextMenu={(event) => {
         if (hold.held.current === item.id || openMenu(event.clientX, event.clientY))
           event.preventDefault();
@@ -296,20 +302,23 @@ export function MediaTile({
           onOpen();
         }}
       >
-        {source && item.type === "video" ? (
+        {video && media.url && (
           <video
-            className={classes.media}
+            className={`${classes.media} ${classes.videoPreview}`}
             data-loaded
             // A mouse over the tile plays Studio's short preview; leaving returns to the poster.
-            src={media.url?.replace("/comfy/view?", "/comfy/video-preview?") || undefined}
-            poster={media.thumbnailUrl}
+            src={media.url.replace("/comfy/view?", "/comfy/video-preview?")}
             preload="none"
             muted
             loop
             playsInline
             aria-hidden
+            onPlaying={(event) => {
+              event.currentTarget.dataset.previewing = "";
+            }}
           />
-        ) : source ? (
+        )}
+        {source && (
           <img
             key={`${source}#${attempt}`}
             ref={(element) => {
@@ -333,7 +342,7 @@ export function MediaTile({
               else event.currentTarget.dataset.failed = "";
             }}
           />
-        ) : null}
+        )}
         {item.status === "done" && !upscaleShown
           ? caption !== "none" && (
               <div className={classes.caption} data-pinned={caption === "pinned" || undefined}>
