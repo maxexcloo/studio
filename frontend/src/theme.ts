@@ -595,8 +595,15 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-default": "#ffffff",
       "--mantine-color-default-hover": "#f4f4f5",
       "--mantine-color-dimmed": "var(--mantine-color-gray-7)",
-      // Links take the primary's text shade, as its light buttons do; the filled shade is too pale.
+      // Coloured text and links take the text shade of light buttons; the filled shade is too pale
+      // to read on a light surface.
       "--mantine-color-anchor": "var(--mantine-primary-color-light-color)",
+      ...Object.fromEntries(
+        Object.keys(theme.colors).map((name) => [
+          `--mantine-color-${name}-text`,
+          `var(--mantine-color-${name}-light-color)`,
+        ]),
+      ),
       ...glassTokens("light", transparency),
     },
   };
