@@ -29,6 +29,7 @@ import {
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
+import { ChipPopup, PopupHeading } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -44,11 +45,9 @@ import { modelFamilyLabel } from "./modelFamily";
 import { isProfile, profileForLoras } from "./payload";
 import {
   ChipContent,
-  ChipPopup,
   PickerGrid,
   PickerHeader,
   PickerTile,
-  PopupHeading,
   SavedName,
   useNaming,
   usePickerChoices,

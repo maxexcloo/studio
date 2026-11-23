@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -13,7 +14,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { iconChipProps } from "./chip";
 import { defaultProfile, initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { generationInput } from "./payload";
-import { ChipPopup, SavedName, useNaming } from "./Picker";
+import { SavedName, useNaming } from "./Picker";
 import {
   type Preset,
   type PresetPart,

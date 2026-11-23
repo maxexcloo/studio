@@ -19,6 +19,7 @@ import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
@@ -26,7 +27,6 @@ import { chipProps, iconChipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
-import { ChipPopup } from "../generation/Picker";
 
 import classes from "./GalleryFilters.module.css";
 

@@ -3,10 +3,11 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useState } from "react";
 
 import type { MediaItem } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
 import { FilterChoices } from "../../ui/SectionToolbar";
 import { DreamDeck, type Judgement } from "../dream/DreamDeck";
-import { ChipPopup, FilterButton } from "../generation/Picker";
+import { FilterButton } from "../generation/Picker";
 import { type GalleryListing, type GalleryReviewRating, galleryReviewQuery } from "./queries";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";

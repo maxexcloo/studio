@@ -30,6 +30,7 @@ import {
   withResolution,
 } from "../../../../shared/resolution";
 import type { GenerationInput } from "../../types";
+import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
@@ -42,7 +43,6 @@ import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
 import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { profileForBackend, profileForLoras, profileName } from "../generation/payload";
-import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
 import {
   letter,

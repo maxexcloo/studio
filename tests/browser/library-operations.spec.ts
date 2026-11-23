@@ -362,7 +362,7 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await section(page, "Library", "LoRAs");
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  const filters = page.getByRole("dialog", { name: "Filter LoRAs", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
   // Families are inline choices, All until one is chosen.
   const family = filters.getByRole("radiogroup", { name: "Family", exact: true });
   await expect(family.getByRole("radio", { name: "All", exact: true })).toBeChecked();
@@ -784,12 +784,12 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("XL Base");
   await page
-    .getByRole("dialog", { name: "Filter Files", exact: true })
+    .getByRole("dialog", { name: "Filters", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
     .click();
   await expect(table.getByRole("row")).toHaveCount(3);
   await page.getByRole("button", { name: "Filter Files", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Filter Files", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Filters", exact: true })).toBeHidden();
   await (await toolbarSearch(page, "Files")).fill("flux");
   await expect(table.getByRole("row")).toHaveCount(2);
   // Escape leaves search, keeping the query and the Library open.
