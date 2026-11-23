@@ -45,6 +45,12 @@
   flex-direction: column;
 }
 
+.popupBody {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--studio-panel-min-height);
+}
+
 /* A popup's aside: a column beside the rest, divided from it to the top, whose own content never
    sets the popup's height. */
 .columns {

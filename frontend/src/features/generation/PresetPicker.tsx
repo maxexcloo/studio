@@ -222,6 +222,7 @@ export function PresetPicker({
       position="top-end"
       width={400}
       floating
+      spacious
       opened={opened}
       onOpenedChange={setOpened}
       target={
@@ -306,7 +307,7 @@ export function PresetPicker({
         )
       }
     >
-      <Stack mih="5rem" justify="center">
+      <Stack flex={1} justify="center">
         {presets.isPending ? (
           <LoadingState label="Loading Presets" fill />
         ) : presets.error ? (

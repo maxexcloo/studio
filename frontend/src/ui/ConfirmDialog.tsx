@@ -132,6 +132,7 @@ export function ConfirmDialog({
       onClose={closeWhenTop(id, close)}
       title={title}
       size="md"
+      variant="compact"
       zIndex={zIndex}
       closeOnClickOutside={!pending}
       closeOnEscape={!pending}

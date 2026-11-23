@@ -337,7 +337,16 @@ export function studioTheme({
         },
         classNames: (_theme, props) => ({
           content: classes.dialogContent,
-          body: classes.dialogBody,
+          body: [
+            classes.dialogBody,
+            !props.fullScreen &&
+              props.size !== "xs" &&
+              props.size !== "sm" &&
+              props.variant !== "compact" &&
+              classes.roomyDialogBody,
+          ]
+            .filter(Boolean)
+            .join(" "),
           ...(props.fullScreen && { overlay: classes.fullScreenOverlay }),
         }),
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
@@ -356,7 +365,6 @@ export function studioTheme({
           },
           body: {
             flex: "1 1 auto",
-            minHeight: 0,
             overflowY: "auto",
             overscrollBehavior: "contain",
           },
@@ -535,6 +543,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
     variables: {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "820px",
+      "--studio-panel-min-height": "min(12rem, 35dvh)",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,

@@ -72,18 +72,34 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* A phone's full-screen dialog keeps its footer (DialogFooter) at the bottom of the screen, in
-   sight while the body scrolls: everything holding the footer fills the body's height. */
+.dialogBody {
+  min-height: 0;
+}
+
+:where(:root:not([data-phone])) .roomyDialogBody {
+  min-height: var(--studio-panel-min-height);
+}
+
+/* Full-screen sheets and desktop dialog bodies fill any space above their footers. */
+:where(:root:not([data-phone]) .roomyDialogBody):has([data-dialog-footer]),
 :where([data-phone]) .dialogContent[data-full-screen] .dialogBody:has([data-dialog-footer]) {
   display: flex;
   flex-direction: column;
+}
+
+:where([data-phone]) .dialogContent[data-full-screen] .dialogBody:has([data-dialog-footer]) {
   padding-bottom: 0;
 }
 
+:where(:root:not([data-phone]) .roomyDialogBody) :has([data-dialog-footer]),
 :where([data-phone]) .dialogContent[data-full-screen] .dialogBody :has([data-dialog-footer]) {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
+}
+
+:where(:root:not([data-phone]) .roomyDialogBody) [data-dialog-footer] {
+  margin-top: auto;
 }
 
 :where([data-phone]) .dialogContent[data-full-screen] [data-dialog-footer] {
@@ -146,10 +162,6 @@
 
 .segmentLabel:where(:not([data-active], [data-disabled], :hover, :active)) {
   color: var(--mantine-color-dimmed);
-}
-
-.segmentLabel[data-active] {
-  font-weight: var(--mantine-font-weight-semibold);
 }
 
 /* A banner keeps its message, its action and Close on one centred line. Only a coloured one (a
