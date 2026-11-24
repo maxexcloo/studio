@@ -223,7 +223,7 @@ test("the assistant is for every account, and only for profiles the account may 
   );
   assert.equal(
     JSON.stringify(calls.at(-1).messages[1].content).includes(
-      "Prompt: a cabin\\nTheir guidance: Keep it photographic.\\nNever include: smoking",
+      "Prompt: a cabin\\nTheir guidance: Keep it photographic.\\nNever include these or anything equivalent: smoking",
     ),
     true,
     "the writing taste follows the prompt",

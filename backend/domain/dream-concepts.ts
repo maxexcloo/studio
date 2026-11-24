@@ -17,12 +17,8 @@ const generalMotifWords = new Set(
     " ",
   ),
 );
-/**
- * Look terms over Dream's latest `window` prompts: one in at least `share` of them (and `least`
- * times) is in fashion, and an idea reusing more than `reuse` of those repeats the look. Words in
- * at least `boilerplate` of the recent prompts are a fixed style clause, not the idea.
- */
-export const looks = { window: 30, share: 0.25, least: 3, reuse: 2, boilerplate: 0.5 };
+/** Words in at least this share of the recent prompts are a fixed style clause, not the idea. */
+const boilerplateShare = 0.5;
 
 /** An idea sharing more than this share of its content words with a recent one is a repeat. */
 const repeatOverlap = 0.6;
@@ -36,272 +32,6 @@ export const normalised = (prompt: string) => prompt.toLowerCase().replace(/\s+/
 export const phraseWords = (text: string) =>
   normalised(text.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " "));
 
-/** Independent starting points for a new concept; explicit tastes and briefs take precedence. */
-const axes: Record<string, string[]> = {
-  action: [
-    "a chase or race",
-    "a quiet exchange",
-    "an interrupted everyday ritual",
-    "balancing or climbing",
-    "building or repairing something",
-    "discovering an unexpected place",
-    "exploring an unfamiliar environment",
-    "performing for an audience",
-    "preparing for a celebration",
-    "resting after a journey",
-    "sheltering from the weather",
-    "transforming or unfolding",
-  ],
-  genre: [
-    "a documentary moment",
-    "a fashion editorial",
-    "film noir",
-    "a heist",
-    "a road trip",
-    "a romantic comedy",
-    "science fiction",
-    "a sports story",
-    "a thriller",
-    "travel photography",
-    "a western",
-    "wildlife photography",
-  ],
-  interaction: [
-    "a game or contest",
-    "a performer and their audience",
-    "a reunion",
-    "a rivalry",
-    "a shared secret",
-    "making up after an argument",
-    "helping a stranger",
-    "sharing a meal",
-    "strangers meeting by chance",
-    "teaching someone a skill",
-    "a quiet moment alone",
-    "working side by side",
-  ],
-  subject: [
-    "an animal",
-    "a lone figure",
-    "a crowd",
-    "an everyday object",
-    "a machine",
-    "a building",
-    "a plant or flower",
-    "food and drink",
-    "a vehicle",
-    "a mythical creature",
-    "a pair of people",
-    "a still life",
-  ],
-  setting: [
-    "a city street at street level",
-    "a desert",
-    "deep forest",
-    "underwater",
-    "a cramped interior",
-    "a rooftop",
-    "a coastline",
-    "high mountains",
-    "outer space",
-    "a market",
-    "a ruin",
-    "a snowfield",
-    "a train carriage",
-    "a ferry deck",
-    "a greenhouse",
-    "a stadium",
-    "a library",
-    "a workshop or garage",
-  ],
-  outfit: [
-    "everyday casualwear",
-    "tailored formalwear",
-    "sportswear",
-    "a work uniform",
-    "traditional dress",
-    "vintage clothing",
-    "streetwear",
-    "evening wear",
-    "swimwear",
-    "outdoor gear",
-    "layered winter clothing",
-    "loungewear",
-  ],
-  look: [
-    "short cropped hair",
-    "long loose hair",
-    "braided hair",
-    "curly hair",
-    "an unusual hair color",
-    "freckles",
-    "glasses",
-    "tattoos",
-    "bold makeup",
-    "a bare, natural face",
-    "a different build",
-    "striking jewelry",
-  ],
-  "medium or style": [
-    "35mm film photograph",
-    "oil painting",
-    "watercolor",
-    "ink drawing",
-    "3D render",
-    "papercraft",
-    "woodblock print",
-    "claymation",
-    "pixel art",
-    "studio portrait photography",
-    "comic book art",
-    "charcoal sketch",
-  ],
-  lighting: [
-    "golden hour",
-    "blue hour",
-    "harsh midday sun",
-    "neon",
-    "candlelight",
-    "overcast softness",
-    "a single hard spotlight",
-    "backlit silhouette",
-    "moonlight",
-    "fog-diffused light",
-  ],
-  era: [
-    "ancient",
-    "medieval",
-    "the 1920s",
-    "the 1960s",
-    "the 1980s",
-    "present day",
-    "near future",
-    "far future",
-    "Victorian",
-  ],
-  mood: [
-    "serene",
-    "eerie",
-    "playful",
-    "melancholic",
-    "triumphant",
-    "tense",
-    "dreamy",
-    "cozy",
-    "chaotic",
-    "lonely",
-  ],
-  capture: [
-    "a candid phone snapshot",
-    "direct on-camera flash",
-    "35mm color film",
-    "black-and-white film",
-    "medium-format film",
-    "a disposable camera",
-    "soft window light",
-    "a long-lens street candid",
-    "an instant photo",
-    "a crisp digital editorial shot",
-    "a high-speed sports frame",
-    "a medium-format studio portrait",
-    "a security or webcam still",
-    "a tilt-shift miniature look",
-    "infrared film",
-    "a wet-plate or tintype portrait",
-  ],
-  "camera or composition": [
-    "extreme close-up",
-    "wide establishing shot",
-    "bird's-eye view",
-    "low angle",
-    "symmetrical framing",
-    "shallow depth of field",
-    "long exposure",
-    "fisheye lens",
-    "rule of thirds with negative space",
-    "Dutch angle",
-  ],
-};
-/**
- * The looks Dream drifts towards: colors, garments, light, expressions and camera quirks. Plain
- * black, white, grey and brown describe hair and everyday things too often to tell a look.
- */
-const lookTerms: Record<string, string[]> = {
-  color:
-    "amber apricot beige blush burgundy camel caramel charcoal chocolate cobalt coral cream crimson emerald espresso fuchsia gold ivory khaki lavender lilac magenta maroon mauve mint mocha mustard navy ochre olive orange peach pink plum purple red rust saffron sage scarlet silver tan taupe teal terracotta turquoise violet wine yellow".split(
-      " ",
-    ),
-  garment: [
-    ..."blazer bodysuit bomber boots bralette bustier camisole cardigan corduroy corset denim fishnet halter heels hoodie jeans knit lace latex leather leggings linen lingerie mesh miniskirt overalls puffer ribbed satin sequin sheer silk stockings sundress sweater sweatshirt turtleneck velvet".split(
-      " ",
-    ),
-    "cargo pants",
-    "crop top",
-    "pleated skirt",
-    "slip dress",
-    "tank top",
-    "trench coat",
-    "tube top",
-    "zip-front",
-  ],
-  light: [
-    ..."backlit candlelight dappled dusk fluorescent halogen lamplight moonlight neon overcast sodium spotlight strobe sunset tungsten twilight".split(
-      " ",
-    ),
-    "blue hour",
-    "fairy lights",
-    "golden hour",
-    "on-camera flash",
-    "ring light",
-    "string lights",
-    "window light",
-  ],
-  expression: [
-    ..."bored calm coy deadpan dreamy grin laughing mischievous pensive playful pout serene sly smirk sultry wistful wry".split(
-      " ",
-    ),
-    "closed-lip smile",
-    "knowing look",
-    "soft smile",
-  ],
-  camera: [
-    ..."grain grainy halation off-level overexposed underexposed vignette".split(" "),
-    "lens flare",
-    "light leak",
-    "motion blur",
-    "soft focus",
-    "tilted horizon",
-  ],
-};
-const lookPatterns = Object.values(lookTerms)
-  .flat()
-  .map((term) => [term, ` ${phraseWords(term)} `, ` ${phraseWords(term)}s `] as const);
-/** The look terms a prompt uses. */
-export function lookTermsIn(prompt: string) {
-  const words = ` ${phraseWords(prompt)} `;
-  return lookPatterns
-    .filter(([, one, more]) => words.includes(one) || words.includes(more))
-    .map(([term]) => term);
-}
-/**
- * The look terms in fashion over the latest prompts, most used first, leaving out those the fixed
- * brief or rules use.
- */
-export function fashionableLooks(prompts: string[], fixed = "") {
-  const latest = prompts.slice(0, looks.window);
-  const required = new Set(lookTermsIn(fixed));
-  const counts = new Map<string, number>();
-  for (const prompt of latest)
-    for (const term of lookTermsIn(prompt)) counts.set(term, (counts.get(term) || 0) + 1);
-  return [...counts]
-    .filter(
-      ([term, count]) =>
-        !required.has(term) && count >= looks.least && count / latest.length >= looks.share,
-    )
-    .sort((a, b) => b[1] - a[1])
-    .map(([term]) => term);
-}
-
 const stopWords = new Set(
   "a an and are as at be by for from in into is it its of on or over the their there these this to under while with without".split(
     " ",
@@ -311,7 +41,7 @@ const contentWords = (text: string) =>
   new Set(
     (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter((word) => !stopWords.has(word)),
   );
-/** Words in at least `looks.boilerplate` of several recent prompts: a fixed clause, not the idea. */
+/** Words in at least `boilerplateShare` of several recent prompts: a fixed clause, not the idea. */
 export function boilerplate(prompts: string[]) {
   if (prompts.length < 4) return new Set<string>();
   const counts = new Map<string, number>();
@@ -319,7 +49,7 @@ export function boilerplate(prompts: string[]) {
     for (const word of contentWords(prompt)) counts.set(word, (counts.get(word) || 0) + 1);
   return new Set(
     [...counts]
-      .filter(([, count]) => count / prompts.length >= looks.boilerplate)
+      .filter(([, count]) => count / prompts.length >= boilerplateShare)
       .map(([word]) => word),
   );
 }
@@ -366,18 +96,6 @@ export const recentOpenings = (prompts: string[], count: number) => [
 export const subjectOf = (title: unknown, prompt: unknown) =>
   clean(title, 80) || clean(prompt, 400).split(" ").slice(0, 6).join(" ");
 
-const motifAliases = [
-  [
-    "laundry",
-    /\b(?:laundry|laundromats?|launderettes?|washing machines?|clotheslines?|wash(?:ing|es) clothes)\b/i,
-  ],
-  ["wet", /\b(?:wet|damp|soaked|soaking|drenched|dripping)\b/i],
-  [
-    "smoking",
-    /\b(?:smoking|cigarettes?|cigars?|ashtrays?|tobacco pipes?|smok(?:e[sd]?|ing) (?:an? |the )?(?:joint|hookah))\b/i,
-  ],
-] as const;
-
 const motifNegation =
   /\b(?:avoid(?:ing)?|omit|exclude|no|never|without|free of|do not|don['\u2019]t|not(?! just\b| only\b))\b/i;
 const conditionalMotif = /\b(?:except|if|only|unless|when|where|while)\b/i;
@@ -398,23 +116,15 @@ function motifClauses(text: string) {
     });
 }
 
-const aliasMotifs = (text: string) =>
-  motifAliases.filter(([, pattern]) => pattern.test(text)).map(([motif]) => motif);
-const shownMotifs = (clauses: string[]) => [...new Set(clauses.flatMap(aliasMotifs))];
-const promptMotifs = (prompt: string) =>
-  shownMotifs(motifClauses(prompt).map(({ shown }) => shown));
-
-export function mentionsMotif(text: string, motif: string) {
-  const alias = motifAliases.find(([name]) => name === motif)?.[1];
-  return alias?.test(text) || ` ${phraseWords(text)} `.includes(` ${motif} `);
-}
+export const mentionsMotif = (text: string, motif: string) =>
+  ` ${phraseWords(text)} `.includes(` ${phraseWords(motif)} `);
 
 /** The first excluded motif a prompt names at all: an image model draws what it names, even after "no". */
 export const namedMotif = (prompt: string, forbidden: string[]) =>
   forbidden.find((motif) => mentionsMotif(prompt, motif));
 
 /**
- * Explicit avoids and negative rules. For unrecognised concepts use only short, literal phrases.
+ * Explicit avoids and negative rules, as short literal phrases.
  * `unasked` (Dream, which takes no requests) keeps a rule's exclusion before "unless".
  */
 export function forbiddenMotifs(avoids: string[], rules: string[], unasked = false) {
@@ -430,8 +140,6 @@ export function forbiddenMotifs(avoids: string[], rules: string[], unasked = fal
         .flatMap((text) =>
           // "black and white photos" is one phrase, so "and" never separates items; "or" does.
           text.split(/[,;\n]+|\bor\b/gi).flatMap((part) => {
-            const aliases = aliasMotifs(part);
-            if (aliases.length) return aliases;
             const phrase = phraseWords(part.replace(motifNegation, "")).replace(
               /^(?:any|an?|the) /,
               "",
@@ -484,14 +192,13 @@ export function ideaMotifs(value: unknown, prompt = "") {
         .slice(0, 5)
         .map((motif) => phraseWords(clean(motif, 48)))
         .filter(Boolean)
-        .map((label) => aliasMotifs(label)[0] ?? label)
         .filter(
           (label) =>
             shown.some((part) => mentionsMotif(part, label)) ||
             !clauses.some(({ excluded }) => mentionsMotif(excluded, label)),
         )
     : [];
-  return [...new Set([...shownMotifs(shown), ...labels])].slice(0, 5);
+  return [...new Set(labels)];
 }
 
 /** Labels in at least two ideas, and their words in at least three (as "amber" in "amber glow"). */
@@ -518,19 +225,13 @@ function recurringMotifs(history: string[][]) {
  * passed as too similar (`paused`), unless the fixed brief or rules show them.
  */
 export function cooledMotifs(
-  { motifs = [], recent }: { motifs?: string[][]; recent: string[] },
+  { motifs = [] }: { motifs?: string[][] },
   fixed = "",
   forbidden: string[] = [],
   paused: string[] = [],
 ) {
   const shown = motifClauses(fixed).map((clause) => clause.shown);
-  return [
-    ...new Set([
-      ...recurringMotifs(motifs.slice(0, motifWindow)),
-      ...recurringMotifs(recent.map(promptMotifs)),
-      ...paused,
-    ]),
-  ].filter(
+  return [...new Set([...recurringMotifs(motifs.slice(0, motifWindow)), ...paused])].filter(
     (motif) => forbidden.includes(motif) || !shown.some((part) => mentionsMotif(part, motif)),
   );
 }
@@ -544,70 +245,20 @@ export function repeatedMotif(prompt: string, cooling: string[], motifs: string[
 }
 
 /** What an idea changes first, in turn, so successive ideas differ along different lines. */
-const varied = [
-  "palette: the colors and tones",
-  "garments: what people wear and its fabrics",
-  "light: the light source, its direction and color",
-  "expression: faces and mood",
-  "setting: where it happens",
-  "framing: the camera's distance, angle and lens",
-];
-
 /**
- * Draw away from recently used anchors as well as asking for a different concept, never towards
- * what is excluded (`forbidden`). With a taste profile, the photographic capture stands in for
- * medium, and for subject too unless the idea explores fresh ground; `vary` is the dimension the
- * idea changes first. A project's idea (`briefed`) keeps the brief's subjects and styles, so it
- * varies only what the brief leaves open.
+ * How a new idea moves away from the recent ones. A project's idea (`briefed`) keeps the brief's
+ * subjects and styles, so it varies only what the brief leaves open.
  */
-export function direction(
+export const direction = (
   { explore, feature }: { explore?: boolean; feature?: string },
-  recent: string[],
-  used: string[],
-  hasTaste: boolean,
-  random: (size: number) => number,
-  briefed = false,
-  forbidden: string[] = [],
-) {
-  const words = recent.slice(0, diversity.results).map(contentWords);
-  const available = Object.entries({ ...axes, ...(briefed ? {} : { vary: varied }) }).filter(
-    ([axis]) =>
-      briefed
-        ? !["capture", "medium or style", "subject"].includes(axis)
-        : hasTaste
-          ? axis !== "medium or style" && (explore || axis !== "subject")
-          : axis !== "capture",
-  );
-  const draws = available.flatMap(([axis, all]) => {
-    const values = all.filter((value) => !forbidden.some((motif) => mentionsMotif(value, motif)));
-    if (!values.length) return [];
-    const unused = values.filter((value) => !used.includes(`${axis}: ${value}`));
-    const candidates = unused.length
-      ? unused
-      : [...values]
-          .sort((a, b) => used.indexOf(`${axis}: ${b}`) - used.indexOf(`${axis}: ${a}`))
-          .slice(0, 1);
-    const scores = candidates.map((value) =>
-      words.reduce((sum, used) => sum + overlap(contentWords(value), used), 0),
-    );
-    const least = Math.min(...scores);
-    const best = candidates.filter((_, index) => scores[index] === least);
-    return [`${axis}: ${best[random(best.length)]}`];
-  });
-  const drawn = draws.filter((anchor) => !anchor.startsWith("vary: "));
-  const vary = draws.find((anchor) => anchor.startsWith("vary: "));
-  return {
-    anchors: vary ? [...drawn, vary] : drawn,
-    vary: vary?.slice("vary: ".length),
-    text: briefed
-      ? promptInstruction("project-diversity", { startingPoints: drawn.join("; ") })
-      : promptInstruction("dream-diversity", {
-          tasteDirection: promptInstruction(explore ? "explore-dream-taste" : "follow-dream-taste"),
-          featuredTaste: feature ? promptInstruction("feature-dream-taste", { feature }) : "",
-          startingPoints: drawn.join("; "),
-        }),
-  };
-}
+  briefed: boolean,
+) =>
+  briefed
+    ? promptInstruction("project-diversity")
+    : promptInstruction("dream-diversity", {
+        tasteDirection: promptInstruction(explore ? "explore-dream-taste" : "follow-dream-taste"),
+        featuredTaste: feature ? promptInstruction("feature-dream-taste", { feature }) : "",
+      });
 
 export function similarPrompt(a: unknown, b: unknown) {
   return (
@@ -627,7 +278,6 @@ export function freshConceptProblem(
   noveltyPrompts: string[],
   subjects: string[],
   fixed = "",
-  fashionable: string[] = [],
 ) {
   const shared = new Set([...contentWords(fixed), ...boilerplate(recent)]);
   const varying = (text: string) =>
@@ -637,9 +287,6 @@ export function freshConceptProblem(
   return (prompt: string, title: string, motifs: string[], cooling: string[]) => {
     const repeat = repeatedMotif(prompt, cooling, motifs);
     if (repeat) return `The optional motif "${repeat}" has appeared in several recent ideas.`;
-    const reused = lookTermsIn(prompt).filter((term) => fashionable.includes(term));
-    if (reused.length > looks.reuse)
-      return `It reuses ${reused.join(", ")}, as many recent ideas do; choose other colors, garments, light, expressions and camera details.`;
     // Compared as remembered: shortened, as each recent prompt is.
     const head = clean(prompt, recentPromptCharacters);
     const words = varying(head);

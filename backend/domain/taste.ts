@@ -483,7 +483,8 @@ export const tasteLines = (taste: AreaTaste) =>
     taste.guidance && `Their guidance: ${taste.guidance}`,
     taste.prefer && `Their preferences: ${taste.prefer}`,
     taste.learnt && `Their taste, as Studio learnt it: ${taste.learnt}`,
-    taste.exclusions.length && `Never include: ${taste.exclusions.join(", ")}`,
+    taste.exclusions.length &&
+      `Never include these or anything equivalent: ${taste.exclusions.join(", ")}`,
   ].filter((line): line is string => Boolean(line));
 /** The learnt taste in plain sentences, with the three models and LoRAs that scored best. */
 function summaryOf({ learnt, loraScores }: TasteRecord) {

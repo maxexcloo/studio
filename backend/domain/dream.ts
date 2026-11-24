@@ -67,7 +67,6 @@ import {
   direction,
   diversity,
   explicitExclusions,
-  fashionableLooks,
   forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
@@ -413,8 +412,6 @@ interface DreamRecord {
   seeds?: string[];
   /** Inspiration prompts used most recently, so saved ideas take turns. */
   inspirations?: string[];
-  /** Creative starting points used most recently, independent of the writer's wording. */
-  anchors?: string[];
   /** Each compared image's rating (`elo`), by item id. */
   ratings?: Record<string, number>;
   /** Images Dream animated and videos it extended, newest first, so each is used once. */
@@ -494,7 +491,7 @@ const lastVideoModelWeight = 0.25;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
- * Verdicts adapt the share of new ground without letting familiar anchors dominate again.
+ * Verdicts adapt the share of new ground without letting familiar concepts dominate again.
  */
 const exploreShare = { start: 0.95, low: 0.45, high: 0.98, window: 100 };
 /** A chat keeps its project this long after its latest request, then hands it to Dream. */
@@ -2081,7 +2078,7 @@ export function createDream(options: {
       (job.input.writing as DreamWriting).uncensored &&
       record.settings.uncensored &&
       access.uncensored;
-    const { recent, subjects = [], anchors = [] } = record;
+    const { recent, subjects = [] } = record;
     const learntTaste = options.taste.read(ownerId);
     const taste = options.taste.area(ownerId, "dream", learntTaste);
     const { exclusions } = taste;
@@ -2097,7 +2094,7 @@ export function createDream(options: {
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
     const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
-      ...(exclusions.length ? [`Exclude: ${exclusions.join(", ")}`] : []),
+      ...(exclusions.length ? [`Exclude, with anything equivalent: ${exclusions.join(", ")}`] : []),
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
       ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
       ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),
@@ -2162,11 +2159,8 @@ export function createDream(options: {
     const similar = like ? [] : similarPasses(ownerId);
     const paused = pausedMotifs(similar);
     const cooling = newConcept ? cooledMotifs(record, fixed, forbidden, paused) : [];
-    // A project's brief may set its look, so only other ideas cool what is in fashion.
-    const fashionable = newConcept && !brief.length ? fashionableLooks(recent, fixed) : [];
     const common = boilerplate(recent);
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}. ${language}`;
-    let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
     const shots = series
       ? store
@@ -2285,16 +2279,7 @@ export function createDream(options: {
           : [];
       const concept = like
         ? undefined
-        : direction(
-            job.input.writing as DreamWriting,
-            recent,
-            anchors,
-            Boolean(likes.length || styles.length || liked.length),
-            random,
-            Boolean(brief.length),
-            [...forbidden, ...forbiddenMotifs(avoid, [], true)],
-          );
-      drawnAnchors = concept?.anchors || [];
+        : direction(job.input.writing as DreamWriting, Boolean(brief.length));
       noveltyPrompts.push(...liked);
       // More Like This follows its source; other ideas move away from what repeats.
       const repeats = like ? [] : lookalikes(ownerId);
@@ -2323,8 +2308,8 @@ export function createDream(options: {
             inspiration: (like
               ? [promptInstruction("dream-more-like-this")]
               : inspiration
-                ? [promptInstruction("dream-from-inspiration"), concept!.text]
-                : [concept!.text]
+                ? [promptInstruction("dream-from-inspiration"), concept!]
+                : [concept!]
             ).join("\n"),
             novelty: (newConcept
               ? [
@@ -2382,12 +2367,6 @@ export function createDream(options: {
             ...(cooling.length
               ? [`Recently repeated optional motifs to leave out this time: ${cooling.join(", ")}.`]
               : []),
-            ...(fashionable.length
-              ? [
-                  `Colors, garments, light, expressions and camera details many recent ideas share; pick others this time: ${fashionable.join(", ")}.`,
-                ]
-              : []),
-            ...(concept?.vary ? [`Change first this time: ${concept.vary}.`] : []),
             ...(passed.length
               ? ["Disliked subjects to avoid:", ...passed.map((subject) => `- ${subject}`)]
               : []),
@@ -2412,7 +2391,7 @@ export function createDream(options: {
         },
       ];
     }
-    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed, fashionable);
+    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed);
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
@@ -2489,11 +2468,6 @@ export function createDream(options: {
           likedUsed.map(({ id }) => id),
         );
         if (latest) {
-          if (drawnAnchors.length)
-            latest.anchors = [
-              ...drawnAnchors,
-              ...(latest.anchors || []).filter((anchor) => !drawnAnchors.includes(anchor)),
-            ].slice(0, usedLimit);
           if (newConcept)
             latest.motifs = [chosenMotifs, ...(latest.motifs || [])].slice(0, motifWindow);
           latest.recent = [clean(idea, recentPromptCharacters), ...latest.recent].slice(

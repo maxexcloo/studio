@@ -262,7 +262,7 @@ export function registerManageTools({
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings changes any setting status shows. discarded lists discards.",
+    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings changes any on/off or number setting status shows. discarded lists discards.",
     {
       action: z.enum([
         "status",
@@ -467,9 +467,9 @@ export function registerManageTools({
     server,
     "taste",
     "taste & lora ratings",
-    "The user's taste, when asked: read lists their exclusions, refresh or reset. rate_lora: a LoRA from models, like, dislike or none. note: context for Dream.",
+    "The user's taste, when asked: read lists their exclusions; reset relearns their taste from their ratings, keeping their preferences and exclusions. rate_lora: a LoRA from models, like, dislike or none. note: context for Dream.",
     {
-      action: z.enum(["read", "refresh", "reset", "rate_lora", "note"]).default("read"),
+      action: z.enum(["read", "reset", "rate_lora", "note"]).default("read"),
       lora: z.string().trim().min(1).max(400).optional(),
       rating: z.enum(["like", "dislike", "none"]).optional(),
       note: z.string().optional(),
@@ -500,9 +500,7 @@ export function registerManageTools({
       const answer =
         action === "read"
           ? await api("GET", "/api/taste", undefined, signal)
-          : action === "refresh"
-            ? await api("POST", "/api/taste/refresh", {}, signal)
-            : await api("DELETE", "/api/taste", undefined, signal);
+          : await api("POST", "/api/taste/reset", {}, signal);
       return mcpJson({ exclusions: answer.preferences?.exclusions ?? [] });
     },
   );
