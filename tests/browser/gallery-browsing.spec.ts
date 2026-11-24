@@ -1710,7 +1710,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.goto("/images");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
   await expect(filter).toHaveAttribute("aria-expanded", "false");
-  // Liked and Disliked are Rating choices in the panel, not toolbar buttons.
+  // Liked and Disliked are ratings in the view menu, not toolbar buttons.
   await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
   await expect(

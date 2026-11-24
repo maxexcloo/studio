@@ -47,7 +47,12 @@ import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { preferencesQuery } from "../settings/accountPreferences";
 import { ChatSetPicker } from "./ChatSetPicker";
-import { ShowToggles, emptyGalleryFilters } from "./GalleryFilters";
+import {
+  type GalleryFilterValues,
+  ShowToggles,
+  emptyGalleryFilters,
+  ratingChoices,
+} from "./GalleryFilters";
 import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
@@ -139,9 +144,7 @@ export function GalleryPage() {
   const location = useLocation();
   const comparisonRating =
     galleryRouteView(location.pathname) === "comparisons" &&
-    ["?rating=liked", "?rating=unrated", "?rating=disliked", "?rating=all"].includes(
-      location.search,
-    );
+    ["?rating=liked", "?rating=unrated", "?rating=disliked"].includes(location.search);
   if ((location.search && !comparisonRating) || location.pathname === "/video") {
     const { pathname, state } = cleanLocation(location);
     return <Navigate to={pathname} state={state} replace />;
@@ -855,6 +858,19 @@ function Gallery() {
         ...(saved.choices.length ? [saved.choices] : []),
       ]}
       actions={routeView ? [] : saved.actions}
+      rating={
+        routeView
+          ? undefined
+          : {
+              value: filters.rating || "all",
+              choices: ratingChoices,
+              onChange: (rating) =>
+                setFilters({
+                  ...filters,
+                  rating: rating === "all" ? "" : (rating as GalleryFilterValues["rating"]),
+                }),
+            }
+      }
       onChange={showView}
     />
   );

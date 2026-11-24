@@ -336,7 +336,6 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
           ...(window && { beforeCursor: String(query.beforeCursor || "") }),
           selection,
           includeFailed,
-          includeDisliked: finished && query.includeDisliked === "1",
           uploads: query.uploads === "1",
           query: {
             ...owned,

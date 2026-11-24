@@ -108,7 +108,6 @@ export function galleryPage(
   if (review) {
     params.set("unreviewed", "1");
     if (review.rating === "unrated") params.set("unrated", "1");
-    if (review.rating === "all") params.set("includeDisliked", "1");
     if (review.since) params.set("since", new Date(review.since).toISOString());
   }
   return api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
