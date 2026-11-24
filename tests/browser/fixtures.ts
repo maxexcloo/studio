@@ -1770,6 +1770,7 @@ export async function serveDream(
       });
     }
     if (path === "/api/dream/notes") return route.fulfill({ json: { notes: [] } });
+    if (path === "/api/chat-choices") return route.fulfill({ json: { chats: [] } });
     // As the backend: Accept applies a rule or a brief edit (as edited), Dismiss and Clear drop.
     const inbox = () => ({ proposals: state.proposals });
     if (path === "/api/dream/inbox") return route.fulfill({ json: inbox() });
