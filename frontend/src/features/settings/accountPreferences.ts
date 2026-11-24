@@ -54,10 +54,14 @@ export const preferencesQuery = queryOptions({
   queryFn: () => api<PreferencesStatus>("/api/preferences"),
 });
 
-/** Saves preferences at once; a failure refetches the saved ones and reports through the default notification. */
-export function useSavePreferences(previousGalleryViews?: SavedGalleryView[]) {
+/**
+ * Saves preferences at once; a failure refetches the saved ones and reports through the default
+ * notification, or `inlineError` where a dialog shows it.
+ */
+export function useSavePreferences(previousGalleryViews?: SavedGalleryView[], inlineError = false) {
   const client = useQueryClient();
   return useMutation({
+    meta: { inlineError },
     mutationFn: (patch: Partial<Preferences>) =>
       api<PreferencesStatus>("/api/preferences", {
         method: "PATCH",

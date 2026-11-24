@@ -24,7 +24,12 @@ test("tasteSimplify plans each account's move, applies it once, and a conflict a
     preferences: {
       avoid: ["Smoking"],
       exclusions: ["smoking", "laundry rooms"],
-      rules: ["never CGI", "always photographic, never CGI", "no people unless asked"],
+      rules: [
+        "no CGI",
+        "always photographic, never CGI",
+        "no people unless asked",
+        "Never show feet",
+      ],
       likes: ["lighthouses"],
       note: "Moody evenings.",
       models: ["flux"],
@@ -40,6 +45,7 @@ test("tasteSimplify plans each account's move, applies it once, and a conflict a
         preferences: [
           "always photographic, never CGI",
           "no people unless asked",
+          "Never show feet",
           "Likes: lighthouses.",
           "Moody evenings.",
         ],
@@ -56,7 +62,7 @@ test("tasteSimplify plans each account's move, applies it once, and a conflict a
     preferences: {
       exclusions: ["smoking", "laundry rooms", "cgi"],
       prefer:
-        "always photographic, never CGI\nno people unless asked\nLikes: lighthouses.\nMoody evenings.",
+        "always photographic, never CGI\nno people unless asked\nNever show feet\nLikes: lighthouses.\nMoody evenings.",
       favourites: { models: ["flux"] },
     },
   });

@@ -218,8 +218,15 @@ test("the assistant is for every account, and only for profiles the account may 
   );
   assert.match(
     calls.at(-1).messages[0].content,
-    /a liked prompt[\s\S]*Their guidance: Keep it photographic\.\nNever include: smoking/,
-    "liked prompts are style examples, with the account's writing taste",
+    /a liked prompt/,
+    "liked prompts are style examples",
+  );
+  assert.equal(
+    JSON.stringify(calls.at(-1).messages[1].content).includes(
+      "Prompt: a cabin\\nTheir guidance: Keep it photographic.\\nNever include: smoking",
+    ),
+    true,
+    "the writing taste follows the prompt",
   );
 });
 

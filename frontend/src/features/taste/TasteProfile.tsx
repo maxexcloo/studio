@@ -72,7 +72,7 @@ const areaLabels: Record<TasteArea, string> = {
   dream: "Dream",
   suggestions: "Suggestions",
   writing: "Prompt Writing",
-  chats: "Chats (MCP)",
+  chats: "Chats",
 };
 /** What an area receives besides Learnt and My Preferences while it uses taste, and always. */
 const areaExtras: Record<TasteArea, { taste?: string; note: string }> = {
@@ -120,10 +120,11 @@ const without = (marks: TasteMarks | undefined, kind: TasteMarkKind, value: stri
   [kind]: (marks?.[kind] ?? []).filter((entry) => entry !== value),
 });
 
-/** Saves the person's own taste; each key replaces its whole value. */
-function useTasteChange() {
+/** Saves the person's own taste; each key replaces its whole value. A dialog shows its own error. */
+function useTasteChange(inlineError = false) {
   const client = useQueryClient();
   return useMutation({
+    meta: { inlineError },
     mutationFn: (preferences: TastePreferenceChanges) =>
       api<Taste>("/api/taste", { method: "PUT", body: JSON.stringify({ preferences }) }),
     onSuccess: (next) => {
@@ -241,10 +242,12 @@ function TextForm({
 function WhereTasteApplies() {
   const status = useQuery(preferencesQuery).data;
   const save = useSavePreferences();
+  const saveGuidance = useSavePreferences(undefined, true);
   const [editing, setEditing] = useState<TasteArea | null>(null);
   const areas = tasteAreasOf(status?.preferences.tasteAreas);
-  const change = (area: TasteArea, setting: Partial<TasteAreaSetting>) =>
-    save.mutateAsync({ tasteAreas: { ...areas, [area]: { ...areas[area], ...setting } } });
+  const changed = (area: TasteArea, setting: Partial<TasteAreaSetting>) => ({
+    tasteAreas: { ...areas, [area]: { ...areas[area], ...setting } },
+  });
   return (
     <SettingGroup title="Where Taste Applies">
       {tasteAreas.map((area) => (
@@ -253,15 +256,16 @@ function WhereTasteApplies() {
             size="compact-sm"
             variant="default"
             disabled={!status}
+            aria-label={`Edit ${areaLabels[area]} Guidance`}
             onClick={() => setEditing(area)}
           >
-            Guidance
+            Edit
           </Button>
           <Switch
             aria-label={`Use My Taste in ${areaLabels[area]}`}
             checked={areas[area].taste}
             disabled={!status}
-            onChange={(event) => void change(area, { taste: event.currentTarget.checked })}
+            onChange={(event) => save.mutate(changed(area, { taste: event.currentTarget.checked }))}
           />
         </SettingRow>
       ))}
@@ -273,7 +277,7 @@ function WhereTasteApplies() {
         initial={editing && areas[editing].guidance}
         maxLength={maxTasteGuidance}
         onClose={() => setEditing(null)}
-        save={(guidance) => change(editing!, { guidance })}
+        save={(guidance) => saveGuidance.mutateAsync(changed(editing!, { guidance }))}
       />
     </SettingGroup>
   );
@@ -503,6 +507,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
   const keepRates = useQuery(keepRatesQuery);
   const nameOf = useValueNames();
   const change = useTasteChange();
+  const dialogChange = useTasteChange(true);
   const [clearing, setClearing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [editingPrefer, setEditingPrefer] = useState(false);
@@ -660,6 +665,20 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
                 />
               }
             />
+            <SettingRow
+              label="Less Of"
+              description={
+                <OwnPills
+                  values={less}
+                  name="Less Of"
+                  pending={change.isPending}
+                  remove={(key) => {
+                    const { kind, value } = less.find((entry) => entry.key === key)!;
+                    change.mutate({ less: without(own.less, kind, value) });
+                  }}
+                />
+              }
+            />
           </SettingGroup>
           <SettingGroup title="Exclusions">
             <SettingRow
@@ -736,22 +755,6 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
             />
           </SettingGroup>
           {rates && ratedTables(data, rates)}
-          {less.length > 0 && (
-            <SettingGroup title="Less Of">
-              {less.map(({ key, kind, value, label }) => (
-                <SettingRow key={key} label={label}>
-                  <Button
-                    size="compact-sm"
-                    variant="default"
-                    disabled={change.isPending}
-                    onClick={() => change.mutate({ less: without(own.less, kind, value) })}
-                  >
-                    Undo
-                  </Button>
-                </SettingRow>
-              ))}
-            </SettingGroup>
-          )}
         </>
       )}
       <TasteReflection />
@@ -794,13 +797,13 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
         initial={editingPrefer ? (own.prefer ?? "") : null}
         maxLength={maxTastePrefer}
         onClose={() => setEditingPrefer(false)}
-        save={(prefer) => change.mutateAsync({ prefer: prefer || null })}
+        save={(prefer) => dialogChange.mutateAsync({ prefer: prefer || null })}
       />
       <ExclusionsDialog
         opened={editingExclusions}
         exclusions={exclusions}
         onClose={() => setEditingExclusions(false)}
-        save={(next) => change.mutateAsync({ exclusions: next })}
+        save={(next) => dialogChange.mutateAsync({ exclusions: next })}
       />
       <ConfirmDialog
         opened={clearing}

@@ -186,6 +186,8 @@ export interface DreamInputs {
   notes?: string[];
   guidance?: string;
   preferences?: string;
+  /** The rules older results were given, before My Preferences replaced them. */
+  rules?: string[];
   /** Why it runs on its model and LoRAs. */
   choice?: string;
   /** How its seed relates to other results, such as a comparison's shared seed. */

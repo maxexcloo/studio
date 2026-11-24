@@ -12,7 +12,7 @@ export interface IssueItem {
   thumbnailUrl?: string;
   review?: { miss?: string };
 }
-/** Where a complaint came from: a Report, self-review against the rules, or a chat's request. */
+/** Where a complaint came from: a Report, self-review against a project's brief, or a chat's request. */
 type Source = "report" | "review" | "chat";
 /** One recurring problem: its name, a suggested rule ("" where no prompt prevents it) and evidence. */
 export interface Issue {
@@ -54,7 +54,7 @@ const failure = (message: string, status: number) => Object.assign(new Error(mes
  * Per-account recurring issues in the runtime document store, as `issues:<ownerId>`: the text model
  * groups the last two weeks' Reports, review misses and chat requests, and suggests a rule for each.
  * They rewrite on a read when older than `staleMs` while `updates` allows. Dream's Inbox
- * (domain/inbox.ts) proposes their rules; nothing becomes a rule until the person accepts one.
+ * (domain/inbox.ts) proposes their rules; nothing joins Taste until the person accepts one.
  */
 export function createIssues({
   dataDir,

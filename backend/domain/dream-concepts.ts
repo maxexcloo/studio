@@ -392,8 +392,9 @@ function motifClauses(text: string) {
         ? {
             shown: part.slice(0, negative.index),
             excluded: part.slice(negative.index + negative[0].length),
+            negation: negative[0],
           }
-        : { shown: part, excluded: "" };
+        : { shown: part, excluded: "", negation: "" };
     });
 }
 
@@ -447,9 +448,12 @@ export const explicitExclusions = (entries: string[]) => [
   ...new Set(entries.map(phraseWords).filter(Boolean)),
 ];
 
+/** Negations that take a thing ("no CGI"), where "never" and "don't" usually take an action. */
+const thingNegation = /^(?:avoid(?:ing)?|omit|exclude|no|without|free of)$/i;
 /**
- * A rule's bans where it does nothing but ban ("never CGI", "no smoking or tattoos"), else null:
- * a rule that also asks for something, or makes an exception, is a preference.
+ * A rule's bans where it does nothing but ban things ("no smoking or tattoos", "without CGI"), else
+ * null: a rule that also asks for something, makes an exception or bans an action ("never show
+ * feet") is a preference.
  */
 export function ruleBans(rule: string) {
   const clauses = motifClauses(rule).filter(
@@ -457,7 +461,10 @@ export function ruleBans(rule: string) {
   );
   if (
     !clauses.length ||
-    clauses.some(({ shown, excluded }) => phraseWords(shown) || conditionalMotif.test(excluded))
+    clauses.some(
+      ({ shown, excluded, negation }) =>
+        phraseWords(shown) || !thingNegation.test(negation) || conditionalMotif.test(excluded),
+    )
   )
     return null;
   const bans = clauses.flatMap(({ excluded }) =>

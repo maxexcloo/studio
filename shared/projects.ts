@@ -84,7 +84,7 @@ export const maxProjectProfiles = 20;
 export const maxProjectLoras = 8;
 export const maxProjectChanges = 20;
 
-/** How a result keeps its owner's rules and any project's brief, from 1 to 10 (backend/domain/review.ts). */
+/** How a result keeps its project's brief, from 1 to 10 (backend/domain/review.ts). */
 export interface Review {
   score: number;
   /** What misses the brief; empty when the result fits it. */

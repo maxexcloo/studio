@@ -522,7 +522,6 @@ function rewriteInstructions({
   vision,
   stack,
   examples,
-  taste,
   negative,
 }) {
   const label = profile.label || profile.displayName || profile.id;
@@ -571,7 +570,6 @@ function rewriteInstructions({
           likedPrompts: examples.map((example) => JSON.stringify(one(example, 400))).join(" "),
         })
       : "",
-    taste: taste.length ? promptInstruction("use-writing-taste", { taste: taste.join("\n") }) : "",
     guide: writerGuide(guide) || "(none; write a clear, specific natural-language prompt)",
     style: override || preset.instruction,
     customInstruction: preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
@@ -940,7 +938,9 @@ export function createAssistant(
       system = edit ? upsampler.edit : upsampler.text;
       if (edit)
         user = `Reference images follow in order (the first image, the second image, ...).\nUser request: ${original}\nOutput the caption.`;
-    } else
+    } else {
+      // The person's writing taste (Settings › Taste) follows the prompt, as Animate's does.
+      if (taste.length) user = [`Prompt: ${original}`, ...taste].join("\n");
       system = rewriteInstructions({
         profile,
         guide,
@@ -952,9 +952,9 @@ export function createAssistant(
         vision,
         stack,
         examples: examples.slice(0, maxExamples),
-        taste,
         negative,
       });
+    }
     const base = {
       preset: preset.id,
       model,
@@ -1244,8 +1244,8 @@ Prompt: ${context}`
   }
 
   /**
-   * How a result keeps its brief, its owner's rules and any project's (domain/review.ts); the
-   * caller checks the model reads images. Throws AssistantError on a reply without a score.
+   * How a result keeps its project's brief (domain/review.ts); the caller checks the model reads
+   * images. Throws AssistantError on a reply without a score.
    */
   async function review({ image, brief, explicit = false, signal, writer } = {}) {
     const model = await modelFor("review", explicit, writer);

@@ -36,7 +36,7 @@ import type { DreamItem } from "./dream.ts";
 import type { Issue } from "./issues.ts";
 import { type Projects, projectPatch, stylesWithChoice } from "./projects.ts";
 import { type ReflectionItem, samenessOf } from "./reflection.ts";
-import type { PromptWriter, Taste } from "./taste.ts";
+import type { Adoption, PromptWriter, Taste } from "./taste.ts";
 import { americanEnglish } from "./writing-standard.ts";
 
 /** A proposal as stored: its evidence by result id, and what it proposes as a key to snooze. */
@@ -58,6 +58,8 @@ interface AcceptedRecord {
     change?: string;
     revision?: string;
     rule?: string;
+    /** What accepting the rule added to Taste. */
+    adoption?: Adoption;
     card?: { kind: CardKind; id: string };
   };
 }
@@ -886,8 +888,7 @@ export function createInbox(options: {
     }
     if (proposal.kind === "rule") {
       const rule = change.rule!;
-      options.taste.adopt(ownerId, rule);
-      return { rule };
+      return { rule, adoption: options.taste.adopt(ownerId, rule) };
     }
     const { kind, name, description } = change.card!;
     const owned = options.cards(ownerId);
@@ -1087,7 +1088,7 @@ export function createInbox(options: {
         const record = load(ownerId);
         const accepted = record.accepted.find((entry) => entry.id === id);
         if (!accepted) throw failure("There is nothing to undo.", 409);
-        const { projectId, change, revision, rule, card, chat } = accepted.undo;
+        const { projectId, change, revision, rule, adoption, card, chat } = accepted.undo;
         if (projectId && change) {
           if (projectOf(ownerId, projectId)?.previous?.change !== change)
             throw failure("A later change replaced it; undo that in the project first.", 409);
@@ -1103,8 +1104,9 @@ export function createInbox(options: {
             throw failure("Detach the project's chats before undoing it.", 409);
           options.dream.detachProject(ownerId, projectId);
           projects.remove(ownerId, projectId);
-        } else if (rule) options.taste.unadopt(ownerId, rule);
-        else if (card) {
+        } else if (rule) {
+          if (adoption) options.taste.unadopt(ownerId, adoption);
+        } else if (card) {
           const current = options.cards(ownerId)?.[card.kind].find((entry) => entry.id === card.id);
           if (!current || revisionOf(current) !== revision)
             throw failure("Undo can only remove a card unchanged since it was accepted.", 409);

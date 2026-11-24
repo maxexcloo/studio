@@ -373,20 +373,28 @@ test("More and Less Like This steer what Studio learnt, and each area receives o
   assert.equal(taste.area("alice", "dream").learnt, "");
 });
 
-test("an adopted rule that only bans joins Exclusions; any other joins My Preferences", (t) => {
+test("an adopted rule that only bans things joins Exclusions; any other joins My Preferences", (t) => {
   const taste = tasteFixture(t);
-  taste.adopt("alice", "Never CGI or tattoos");
-  taste.adopt("alice", "Always photographic, never CGI");
+  taste.edit("alice", { exclusions: ["tattoos"] });
+  const banned = taste.adopt("alice", "No CGI or tattoos");
+  const preferred = taste.adopt("alice", "Always photographic, never CGI");
+  // An action to avoid is a preference, not a thing to exclude.
+  taste.adopt("alice", "Never show feet");
+  assert.deepEqual(banned, { excluded: ["cgi"] });
   assert.deepEqual(taste.read("alice").preferences, {
-    exclusions: ["cgi", "tattoos"],
-    prefer: "Always photographic, never CGI",
+    exclusions: ["tattoos", "cgi"],
+    prefer: "Always photographic, never CGI\nNever show feet",
   });
-  assert.equal(taste.adopted("alice", "never CGI or tattoos"), true);
+  assert.equal(taste.adopted("alice", "no CGI or tattoos"), true);
   assert.equal(taste.adopted("alice", "Always photographic, never CGI"), true);
   assert.equal(taste.adopted("alice", "No people unless asked"), false);
-  taste.unadopt("alice", "Never CGI or tattoos");
-  taste.unadopt("alice", "Always photographic, never CGI");
-  assert.deepEqual(taste.read("alice").preferences, { exclusions: [], prefer: "" });
+  // Undo takes back only what adopting added, never an Exclusion the person already had.
+  taste.unadopt("alice", banned);
+  taste.unadopt("alice", preferred);
+  assert.deepEqual(taste.read("alice").preferences, {
+    exclusions: ["tattoos"],
+    prefer: "Never show feet",
+  });
 });
 
 test("Clear during a manual refresh wins even with no new signals", async (t) => {

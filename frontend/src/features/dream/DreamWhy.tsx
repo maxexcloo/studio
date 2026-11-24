@@ -82,7 +82,9 @@ export function DreamWhy({ item, question }: { item: DreamItem; question?: strin
       )}
       {inputs.notes && <Row label="Chat Notes">{inputs.notes.join(" · ")}</Row>}
       {inputs.guidance && <Row label="Guidance">{inputs.guidance}</Row>}
-      {inputs.preferences && <Row label="My Preferences">{inputs.preferences}</Row>}
+      {(inputs.preferences || inputs.rules) && (
+        <Row label="My Preferences">{inputs.preferences ?? inputs.rules!.join(" · ")}</Row>
+      )}
       {inputs.choice && <Row label="Model">{inputs.choice}</Row>}
       {inputs.seed && <Row label="Seed">{inputs.seed}</Row>}
     </Stack>

@@ -460,6 +460,11 @@ const ownedBy =
     [...(favourites[kind] ?? []), ...(less[kind] ?? []), ...exclusions].some((entry) =>
       sameWord(entry, value),
     );
+/** What adopting a rule added: the bans it excluded, or the line it added to My Preferences. */
+export interface Adoption {
+  excluded?: string[];
+  preferred?: string;
+}
 /** A person's view of an area of taste (Settings › Taste › Where Taste Applies). */
 export interface AreaTaste {
   /** Whether the area uses what Studio learnt and My Preferences. */
@@ -998,22 +1003,26 @@ export function createTaste({
     },
     exclusions: (ownerId: string) => load(ownerId).preferences.exclusions ?? [],
     /**
-     * Adopts a rule an issue suggests (domain/inbox.ts): one that only bans adds its bans to
-     * Exclusions, any other joins My Preferences on its own line.
+     * Adopts a rule an issue suggests (domain/inbox.ts): one that only bans things adds those not
+     * yet excluded to Exclusions, any other joins My Preferences on its own line. Returns what it
+     * added, which `unadopt` takes back.
      */
-    adopt(ownerId: string, rule: string) {
+    adopt(ownerId: string, rule: string): Adoption {
       const { preferences } = load(ownerId);
       const bans = ruleBans(rule);
       if (bans) {
-        const exclusions = [...new Set([...(preferences.exclusions ?? []), ...bans])];
-        if (exclusions.length > tasteLimits.exclusions)
+        const had = preferences.exclusions ?? [];
+        const excluded = bans.filter((ban) => !had.some((entry) => sameWord(entry, ban)));
+        if (had.length + excluded.length > tasteLimits.exclusions)
           throw failure(`Exclusions are full at ${tasteLimits.exclusions}: remove one first.`, 400);
-        return edit(ownerId, { exclusions });
+        edit(ownerId, { exclusions: [...had, ...excluded] });
+        return { excluded };
       }
       const prefer = [preferences.prefer, rule].filter(Boolean).join("\n");
       if (prefer.length > maxTastePrefer)
         throw failure("My Preferences are full: shorten them first.", 400);
-      return edit(ownerId, { prefer });
+      edit(ownerId, { prefer });
+      return { preferred: rule };
     },
     /** Whether a rule is already adopted: its bans all excluded, or its line in My Preferences. */
     adopted(ownerId: string, rule: string) {
@@ -1024,21 +1033,16 @@ export function createTaste({
         ? bans.every((ban) => has(preferences.exclusions ?? [], ban))
         : has((preferences.prefer ?? "").split("\n"), rule);
     },
-    /** Takes back an adopted rule. */
-    unadopt(ownerId: string, rule: string) {
+    /** Takes back only what adopting a rule added. */
+    unadopt(ownerId: string, { excluded = [], preferred }: Adoption) {
       const { preferences } = load(ownerId);
-      const bans = ruleBans(rule);
-      if (bans)
-        return edit(ownerId, {
-          exclusions: (preferences.exclusions ?? []).filter(
-            (entry) => !bans.some((ban) => sameWord(ban, entry)),
-          ),
-        });
+      const lines = (preferences.prefer ?? "").split("\n");
+      const line = preferred === undefined ? -1 : lines.lastIndexOf(preferred);
       return edit(ownerId, {
-        prefer: (preferences.prefer ?? "")
-          .split("\n")
-          .filter((line) => !sameWord(line, rule))
-          .join("\n"),
+        ...(excluded.length && {
+          exclusions: (preferences.exclusions ?? []).filter((entry) => !excluded.includes(entry)),
+        }),
+        ...(line >= 0 && { prefer: lines.filter((_, index) => index !== line).join("\n") }),
       });
     },
     edit,

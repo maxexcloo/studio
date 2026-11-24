@@ -831,7 +831,7 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   const mine = page.getByRole("region", { name: "My Preferences", exact: true });
   await expect(mine.getByText("Model: Image Quality", { exact: true })).toBeVisible();
 
-  // Learnt words are steered from their menus: Less Like This waits under Less Of with Undo.
+  // Learnt words are steered from their menus: Less Like This waits under Less Of until removed.
   await learnt.getByRole("button", { name: "foxes in snow", exact: true }).click();
   await page.getByRole("menuitem", { name: "Less Like This", exact: true }).click();
   await expect
@@ -842,8 +842,9 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
         less: { words: ["foxes in snow"] },
       },
     });
-  const lessOf = page.getByRole("region", { name: "Less Of", exact: true });
-  await lessOf.getByRole("button", { name: "Undo", exact: true }).click();
+  await mine
+    .getByRole("button", { name: "Remove Word: foxes in snow from Less Of", exact: true })
+    .click();
   await expect.poll(() => dream.requests.at(-1)?.body?.preferences.less).toEqual({ words: [] });
   await learnt.getByRole("button", { name: "crowds", exact: true }).click();
   await page.getByRole("menuitem", { name: "Never", exact: true }).click();
