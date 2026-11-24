@@ -45,16 +45,14 @@ import { findCard } from "./manage.js";
 import { aboutTime, assertJobCount, mcpJson, readyIn, scopeMarkdown, setItems } from "./media.js";
 import { namedInTier, referenceCount, registerModelTool, tier } from "./models.js";
 import {
-  accountTaste,
+  accountExclusions,
   assertAvoided,
   assertProjectReuse,
   assertTasteExclusions,
   briefLine,
-  converging,
   keptChoices,
   projectArgs,
   projectTargets,
-  rulesLine,
 } from "./project.js";
 import {
   exactPromptInstructions,
@@ -741,12 +739,10 @@ export function registerGenerateTools({
     );
   };
   const generateOnce = async (input, signal, accepted) => {
-    const [project, taste, alike] = await Promise.all([
+    const [project, exclusions] = await Promise.all([
       attachedProject(signal),
-      accountTaste(media, owner, signal),
-      converging(media, owner, signal),
+      accountExclusions(media, owner, signal),
     ]);
-    const { rules, exclusions, avoid } = taste;
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -1032,14 +1028,8 @@ export function registerGenerateTools({
     }
     if (remembered.kept.length)
       projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
-    // The rules come back with a chat's first generate, when they change, and again as a guide would.
-    if (rules.length && review(`rules:${JSON.stringify(rules)}`))
-      projectNote = `${rulesLine(rules)}${projectNote}`;
-    const avoided = [...new Set([...exclusions, ...avoid])];
-    if (avoided.length && review(`exclusions:${JSON.stringify(avoided)}`))
-      projectNote = `The user excludes these subjects, props or settings: ${avoided.join(", ")}. Leave them out of positive prompts. Keep the user's own wording and vary only details they left open. If an explicit request conflicts with an exclusion, tell the user before changing it. ${projectNote}`;
-    if (alike && review("converging"))
-      projectNote = `Recent results are converging on one look. Vary the open choices in setting, light, framing, action or styling. Keep identities and details fixed by the user's instructions or references. ${projectNote}`;
+    if (exclusions.length && review(`exclusions:${JSON.stringify(exclusions)}`))
+      projectNote = `The user excludes these subjects, props or settings: ${exclusions.join(", ")}. Leave them out of positive prompts. Keep the user's own wording and vary only details they left open. If an explicit request conflicts with an exclusion, tell the user before changing it. ${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)
@@ -1194,7 +1184,7 @@ export function registerGenerateTools({
           );
     for (const { plan } of plans) {
       if (project) assertAvoided(project, plan.prompts);
-      assertTasteExclusions(taste, plan.prompts);
+      assertTasteExclusions(exclusions, plan.prompts);
       if (
         !plan.reference_asset_ids?.length &&
         !plan.prompt_references?.some((refs) => refs.length)
@@ -1436,12 +1426,12 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const [project, taste] = await Promise.all([
+    const [project, exclusions] = await Promise.all([
       attachedProject(signal),
-      accountTaste(media, owner, signal),
+      accountExclusions(media, owner, signal),
     ]);
     if (project) assertAvoided(project, checked);
-    assertTasteExclusions(taste, checked);
+    assertTasteExclusions(exclusions, checked);
     // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
     const all = await media.profiles("all", owner);
     const seed = crypto.randomInt(2 ** 31);
@@ -1787,12 +1777,12 @@ export function registerGenerateTools({
       }
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
-      const [project, taste] = await Promise.all([
+      const [project, exclusions] = await Promise.all([
         attachedProject(signal),
-        accountTaste(media, owner, signal),
+        accountExclusions(media, owner, signal),
       ]);
       if (project) assertAvoided(project, plan.args.prompts);
-      assertTasteExclusions(taste, plan.args.prompts);
+      assertTasteExclusions(exclusions, plan.args.prompts);
       const known = project?.constraints.profiles.length
         ? (await media.catalogue(owner)).profiles
         : [];

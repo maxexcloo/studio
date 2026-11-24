@@ -8401,34 +8401,24 @@ test("MCP preserves supplied prompts and stops at explicit exclusions", async (t
     texts(await call(await f.client(), "generate", { prompts: ["A cotton coat"] })),
     /The user's brief/,
   );
-  // Rules are the exception: limits a chat hears with its first generate and again when they
-  // change, while the prompts still run as written.
-  taste.rules = ["always photographic, never CGI"];
-  const submitted = f.submitted.length;
-  const ruled = await call(client, "generate", { prompts: ["A linen coat"], preview: true });
-  assert.match(texts(ruled), /The user's rules[^:]*: always photographic, never CGI\./);
-  assert.match(
-    texts(ruled),
-    /Studio runs the submitted prompts as written\. If a preview misses a rule/,
-  );
-  assert.equal(f.submitted.length, submitted);
-  await call(client, "generate", { prompts: ["A linen coat"] });
-  assert.equal(f.submitted.at(-1).prompt, "A linen coat");
-  assert.doesNotMatch(
-    texts(await call(client, "generate", { prompts: ["A silk coat"] })),
-    /The user's rules/,
-  );
-  taste.rules = ["no visible text"];
-  assert.match(
-    texts(await call(client, "generate", { prompts: ["A wax coat"] })),
-    /The user's rules[^:]*: no visible text\./,
-  );
-  // Converging results ask the chat for variety, once.
-  f.app.get("/api/taste/reflection", (req, res) => {
-    assert.equal(req.query.view, "convergence");
+  taste.rules = ["always photographic", "no visible text"];
+  taste.preferences = { avoid: ["wool", "buttons"] };
+  let reflectionRequests = 0;
+  f.app.get("/api/taste/reflection", (_req, res) => {
+    reflectionRequests++;
     res.json({ converging: true });
   });
-  const varied = /Recent results are converging on one look/;
-  assert.match(texts(await call(client, "generate", { prompts: ["A tweed coat"] })), varied);
-  assert.doesNotMatch(texts(await call(client, "generate", { prompts: ["A suede coat"] })), varied);
+  const prompt = "A CGI coat with a visible text label and wool buttons";
+  const submitted = f.submitted.length;
+  const preview = await call(client, "generate", { prompts: [prompt], preview: true });
+  assert.equal(preview.isError, undefined);
+  assert.doesNotMatch(
+    texts(preview),
+    /always photographic|converging on one look|your Taste Profile avoids/,
+  );
+  assert.equal(f.submitted.length, submitted);
+  const outcome = await call(client, "generate", { prompts: [prompt] });
+  assert.equal(outcome.isError, undefined);
+  assert.equal(f.submitted.at(-1).prompt, prompt);
+  assert.equal(reflectionRequests, 0);
 });

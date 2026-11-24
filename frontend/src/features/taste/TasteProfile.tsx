@@ -222,7 +222,7 @@ function TasteEditor({
       return (
         <TagsInput
           label={label}
-          description='Limits every prompt keeps in Dream and chats, such as "always photographic, never CGI". Not a look to aim for.'
+          description='Limits for Dream prompts, such as "always photographic, never CGI".'
           value={draft.rules}
           onChange={set("rules")}
           maxTags={tasteLimits.rules}
@@ -539,9 +539,8 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
               </Text>
               <Text size="sm">
                 Dream and suggestion menus use your likes, dislikes and styles to guide new ideas.
-                Your exclusions and rules also guide MCP. MCP uses learnt taste when you ask and
-                runs your prompt as written. If it finds an exclusion, it asks for a revision before
-                queuing.
+                Rules apply to Dream. MCP uses the Exclusions list and otherwise runs your prompt as
+                written. If it finds an exclusion, it asks for a revision before queuing.
               </Text>
               <SettingRow
                 label={label("note")}
