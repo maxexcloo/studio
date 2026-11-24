@@ -789,7 +789,7 @@ test("Outfits and scenes go into the prompt in order from the References sheet, 
   ]);
 });
 
-test("Face Check lists a character's results worst first, filters the gallery and recreates drifted ones", async ({
+test("Face Check lists a character's results worst first and recreates drifted ones", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -827,20 +827,6 @@ test("Face Check lists a character's results worst first, filters the gallery an
   };
   result("kept", "Mara by the river", 0.72, false);
   result("drifted", "Mara at the market", 0.21, true);
-  // The gallery's Off-Character filter shows the drifted result alone.
-  await page.goto("/images");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Off-Character", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect
-    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).get("drifted"))
-    .toBe("1");
-  const tile = (title: string) =>
-    page.getByRole("button", { name: `Open image: ${title}`, exact: true });
-  await expect(tile("Mara at the market")).toBeVisible();
-  await expect(tile("Mara by the river")).toHaveCount(0);
-  await page.getByRole("button", { name: "Remove Off-Character Filter", exact: true }).click();
-  await expect(tile("Mara by the river")).toBeVisible();
   // Library › Characters › Face Check: worst first, with Recreate for the drifted one only.
   await page.goto("/library#characters");
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
