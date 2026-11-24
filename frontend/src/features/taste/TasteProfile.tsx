@@ -203,7 +203,7 @@ function TextForm({
   return (
     <Stack>
       <TextBox
-        label={label}
+        aria-label={label}
         description={description}
         value={text}
         onChange={setText}
