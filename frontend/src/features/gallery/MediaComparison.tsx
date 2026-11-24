@@ -1,5 +1,5 @@
-import { Group, Slider, Text } from "@mantine/core";
-import { type PointerEvent, useRef, useState } from "react";
+import { Group, Text } from "@mantine/core";
+import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 
 import { icons } from "../../ui/icons";
@@ -50,6 +50,22 @@ export function MediaComparison({
       : (event.clientX - bounds.left) / bounds.width;
     setPosition(Math.round(Math.max(0, Math.min(1, fraction)) * 100));
   };
+  const steps: Record<string, (value: number) => number> = {
+    ArrowDown: (value) => value - 1,
+    ArrowLeft: (value) => value - 1,
+    ArrowRight: (value) => value + 1,
+    ArrowUp: (value) => value + 1,
+    End: () => 100,
+    Home: () => 0,
+    PageDown: (value) => value - 10,
+    PageUp: (value) => value + 10,
+  };
+  const keyDivider = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = steps[event.key];
+    if (!step) return;
+    event.preventDefault();
+    setPosition((value) => Math.max(0, Math.min(100, step(value))));
+  };
 
   return (
     <div className={classes.layout} data-vertical={vertical || undefined}>
@@ -61,93 +77,92 @@ export function MediaComparison({
           {name(second.label)}
         </Group>
       )}
-      <div className={classes.stage}>
-        <div
-          ref={zoom.viewport}
-          className={classes.viewport}
-          aria-label="Comparison Viewport"
-          data-zoom-mode={zoom.mode}
-          data-allow-scroll={allowScroll || undefined}
-          onPointerDownCapture={(event) => {
-            if (
-              event.isPrimary &&
-              event.button === 0 &&
-              (event.target as Element).closest("[data-comparison-divider]")
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              dividing.current = event.pointerId;
-              dragged.current = true;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              return;
-            }
-            pointer.current = { x: event.clientX, y: event.clientY };
-            dragged.current = false;
-          }}
-          onPointerMoveCapture={(event) => {
-            if (dividing.current === event.pointerId) {
-              moveDivider(event);
-              return;
-            }
-            if (
-              pointer.current &&
-              Math.hypot(event.clientX - pointer.current.x, event.clientY - pointer.current.y) > 5
-            )
-              dragged.current = true;
-          }}
-          onPointerUpCapture={(event) => {
-            if (dividing.current === event.pointerId) moveDivider(event);
-            pointer.current = null;
-          }}
-          onPointerCancelCapture={() => {
-            pointer.current = null;
+      <div
+        ref={zoom.viewport}
+        className={classes.viewport}
+        aria-label="Comparison Viewport"
+        data-zoom-mode={zoom.mode}
+        data-allow-scroll={allowScroll || undefined}
+        onPointerDownCapture={(event) => {
+          if (
+            event.isPrimary &&
+            event.button === 0 &&
+            (event.target as Element).closest("[data-comparison-divider]")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            dividing.current = event.pointerId;
             dragged.current = true;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            return;
+          }
+          pointer.current = { x: event.clientX, y: event.clientY };
+          dragged.current = false;
+        }}
+        onPointerMoveCapture={(event) => {
+          if (dividing.current === event.pointerId) {
+            moveDivider(event);
+            return;
+          }
+          if (
+            pointer.current &&
+            Math.hypot(event.clientX - pointer.current.x, event.clientY - pointer.current.y) > 5
+          )
+            dragged.current = true;
+        }}
+        onPointerUpCapture={(event) => {
+          if (dividing.current === event.pointerId) moveDivider(event);
+          pointer.current = null;
+        }}
+        onPointerCancelCapture={() => {
+          pointer.current = null;
+          dragged.current = true;
+        }}
+        onLostPointerCapture={(event) => {
+          if (dividing.current === event.pointerId) dividing.current = null;
+        }}
+        onClickCapture={(event) => {
+          if (dragged.current && event.detail !== 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            dragged.current = false;
+          }
+        }}
+      >
+        <TransformWrapper
+          ref={zoom.transform}
+          minScale={0.0001}
+          maxScale={1000}
+          limitToBounds
+          centerZoomedOut
+          disablePadding
+          doubleClick={{ disabled: true }}
+          panning={{ disabled: allowScroll, velocityDisabled: true, excluded: [classes.divider] }}
+          wheel={inPage ? { activationKeys: ["Control"] } : undefined}
+          zoomAnimation={{ disabled: zoom.duration === 0, animationTime: zoom.duration }}
+          autoAlignment={{ animationTime: zoom.duration, velocityAlignmentTime: zoom.duration }}
+          onWheelStart={zoom.manualZoom}
+          onWheel={zoom.revealControls}
+          onPinchStart={() => {
+            dragged.current = true;
+            zoom.manualZoom();
           }}
-          onLostPointerCapture={(event) => {
-            if (dividing.current === event.pointerId) dividing.current = null;
-          }}
-          onClickCapture={(event) => {
-            if (dragged.current && event.detail !== 0) {
-              event.preventDefault();
-              event.stopPropagation();
-              dragged.current = false;
-            }
+          onPinch={zoom.revealControls}
+          onTransform={(reference, state) => {
+            zoom.onTransform(reference, state);
+            zoom.viewport.current?.style.setProperty("--comparison-scale", String(state.scale));
           }}
         >
-          <TransformWrapper
-            ref={zoom.transform}
-            minScale={0.0001}
-            maxScale={1000}
-            limitToBounds
-            centerZoomedOut
-            disablePadding
-            doubleClick={{ disabled: true }}
-            panning={{ disabled: allowScroll, velocityDisabled: true, excluded: [classes.divider] }}
-            wheel={inPage ? { activationKeys: ["Control"] } : undefined}
-            zoomAnimation={{ disabled: zoom.duration === 0, animationTime: zoom.duration }}
-            autoAlignment={{ animationTime: zoom.duration, velocityAlignmentTime: zoom.duration }}
-            onWheelStart={zoom.manualZoom}
-            onWheel={zoom.revealControls}
-            onPinchStart={() => {
-              dragged.current = true;
-              zoom.manualZoom();
-            }}
-            onPinch={zoom.revealControls}
-            onTransform={(reference, state) => {
-              zoom.onTransform(reference, state);
-              zoom.viewport.current?.style.setProperty("--comparison-scale", String(state.scale));
-            }}
+          <TransformComponent
+            wrapperStyle={{ width: "100%", height: "100%", overflow: "clip" }}
+            contentStyle={{ width: size.width, height: size.height }}
           >
-            <TransformComponent
-              wrapperStyle={{ width: "100%", height: "100%", overflow: "clip" }}
-              contentStyle={{ width: size.width, height: size.height }}
-            >
+            <div className={classes.frame} style={{ width: size.width, height: size.height }}>
               <button
                 ref={zoom.picture}
                 type="button"
                 className={classes.picture}
                 aria-label="Change Comparison Zoom"
-                style={{ width: size.width, height: size.height }}
                 onClick={(event) => {
                   event.stopPropagation();
                   zoom.cycle();
@@ -184,34 +199,29 @@ export function MediaComparison({
                     }}
                   />
                 </div>
-                <div
-                  aria-hidden
-                  data-comparison-divider
-                  className={classes.divider}
-                  style={vertical ? { top: `${100 - position}%` } : { left: `${position}%` }}
-                >
-                  <span className={classes.handle}>
-                    <icons.compareSideBySide size={16} />
-                  </span>
-                </div>
               </button>
-            </TransformComponent>
-          </TransformWrapper>
-          <MediaZoomControls zoom={zoom} />
-        </div>
-        <div className={classes.slider} onClick={(event) => event.stopPropagation()}>
-          <Slider
-            orientation={vertical ? "vertical" : "horizontal"}
-            h={vertical ? "100%" : undefined}
-            thumbLabel="Comparison Position"
-            value={position}
-            onChange={setPosition}
-            min={0}
-            max={100}
-            // A vertical slider's label would sit past the screen's edge; the divider shows it.
-            label={vertical ? null : (value) => `${value}% ${first.label}`}
-          />
-        </div>
+              <div
+                role="slider"
+                tabIndex={0}
+                aria-label="Comparison Position"
+                aria-orientation={vertical ? "vertical" : "horizontal"}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={position}
+                aria-valuetext={`${position}% ${first.label}`}
+                data-comparison-divider
+                className={classes.divider}
+                style={vertical ? { top: `${100 - position}%` } : { left: `${position}%` }}
+                onKeyDown={keyDivider}
+              >
+                <span className={classes.handle}>
+                  <icons.compareSideBySide size={16} />
+                </span>
+              </div>
+            </div>
+          </TransformComponent>
+        </TransformWrapper>
+        <MediaZoomControls zoom={zoom} />
       </div>
       {vertical && name(first.label)}
     </div>
