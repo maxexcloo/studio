@@ -105,12 +105,12 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   await expect(queue.getByText("Generating – Image Quality", { exact: true })).toBeVisible();
 
   // An administrator's one Pause holds every account's work.
-  await queue.getByRole("button", { name: "Pause Queue", exact: true }).click();
-  await expect(queue.getByRole("button", { name: "Resume Queue", exact: true })).toBeVisible();
+  await queue.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(queue.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
   await expect(queue.getByText("Queued · Paused", { exact: true })).toHaveCount(3);
   expect(state.queuePause).toEqual({ mine: false, all: true });
-  await queue.getByRole("button", { name: "Resume Queue", exact: true }).click();
-  await expect(queue.getByRole("button", { name: "Pause Queue", exact: true })).toBeVisible();
+  await queue.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(queue.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   expect(state.queuePause).toEqual({ mine: false, all: false });
 
   // Only waiting items drag, by their handles: with the pointer, then the keyboard.

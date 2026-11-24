@@ -5,6 +5,7 @@
 }
 
 .count {
+  margin-inline-start: 6px;
   color: var(--mantine-color-text);
   font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;

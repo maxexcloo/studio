@@ -1089,10 +1089,13 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
   await expect(queue.getByText("queued-job", { exact: true })).toBeVisible();
-  for (const action of ["Stop All", "Clear Failed"]) {
+  for (const [action, title] of [
+    ["Stop All", "Stop All Generations"],
+    ["Clear Failed", "Clear Failed Generations"],
+  ]) {
     await queue.getByRole("button", { name: action, exact: true }).click();
     await page
-      .getByRole("dialog", { name: `${action} Generations`, exact: true })
+      .getByRole("dialog", { name: title, exact: true })
       .getByRole("button", { name: action, exact: true })
       .click();
   }
@@ -1130,9 +1133,9 @@ test("Retry All retries every failed job in the queue", async ({ page }) => {
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const retried = page.waitForRequest("**/api/queue/retry");
-  await queue.getByRole("button", { name: "Retry All", exact: true }).click();
+  await queue.getByRole("button", { name: "Retry Failed", exact: true }).click();
   expect((await retried).postDataJSON()).toEqual({ ids: ["failed-a", "failed-b"] });
-  await expect(queue.getByRole("button", { name: "Retry All", exact: true })).toHaveCount(0);
+  await expect(queue.getByRole("button", { name: "Retry Failed", exact: true })).toHaveCount(0);
   await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
 });
 
