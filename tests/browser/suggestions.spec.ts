@@ -261,6 +261,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   page,
 }) => {
   const state = await openViewer(page);
+  state.gallery[0].title = "Original Amber Bird";
   const asked: unknown[] = [];
   const instruction = "Warm the light on the bird, keeping everything else unchanged.";
   await page.route("**/api/suggestions", (route) => {
@@ -279,7 +280,9 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   });
   const showSource = async () => {
     await page.goto("/images");
-    await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Open image: Original Amber Bird", exact: true })
+      .click();
   };
   await showSource();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
