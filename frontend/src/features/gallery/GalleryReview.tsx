@@ -113,7 +113,8 @@ function GalleryReviewDeck({
         review.isError ? (
           <Alert color="red" title="Couldn't Load Results">
             <Button
-              variant="subtle"
+              size="compact-sm"
+              variant="default"
               onClick={() => void (hasNextPage ? fetchNextPage() : review.refetch())}
             >
               Retry

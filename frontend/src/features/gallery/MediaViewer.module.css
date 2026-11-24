@@ -22,6 +22,11 @@
   backdrop-filter: blur(8px) !important;
 }
 
+/* Phones show media alone, so the gallery behind stays out of sight. */
+:where(:root[data-phone]) .overlay.overlay {
+  background: color-mix(in srgb, var(--mantine-color-black) 85%, transparent) !important;
+}
+
 /* The header only names the dialog; the viewer draws its own close action. */
 .header {
   position: absolute;

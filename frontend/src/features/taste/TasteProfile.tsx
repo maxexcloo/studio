@@ -74,31 +74,15 @@ const areaLabels: Record<TasteArea, string> = {
   writing: "Prompt Writing",
   chats: "Chats",
 };
-/** What an area receives besides Learnt and My Preferences while it uses taste, and always. */
-const areaExtras: Record<TasteArea, { taste?: string; note: string }> = {
-  dream: {
-    taste: "Liked Prompts",
-    note: "Models, LoRAs and shapes follow your ratings and Favourites either way.",
-  },
-  suggestions: {
-    taste: "Liked & Disliked Prompts",
-    note: "Ideas in the composer and the viewer's menus.",
-  },
-  writing: {
-    note: "Improve Prompt and Animate. Improve Prompt learns from your liked prompts either way.",
-  },
-  chats: { note: "Excluded words are removed from chat prompts, with a note." },
+/** What each area's switch changes, in plain words; Exclusions apply whatever it says. */
+const areaEffects: Record<TasteArea, string> = {
+  dream:
+    "Dream's ideas follow your taste and liked prompts. Models, LoRAs and shapes follow your ratings either way.",
+  suggestions: "Ideas in the composer and the viewer follow your taste and the prompts you rated.",
+  writing:
+    "Improve Prompt and Animate follow your taste. Improve Prompt learns from your liked prompts either way.",
+  chats: "Prompts written in chats follow your taste.",
 };
-const receives = (area: TasteArea, { taste, guidance }: TasteAreaSetting) =>
-  `Receives: ${[
-    taste && "Learnt",
-    taste && areaExtras[area].taste,
-    taste && "My Preferences",
-    guidance && "Guidance",
-    "Exclusions",
-  ]
-    .filter(Boolean)
-    .join(" · ")}. ${areaExtras[area].note}`;
 
 const markLabels: Record<TasteMarkKind, string> = {
   words: "Word",
@@ -253,7 +237,7 @@ function WhereTasteApplies() {
   return (
     <SettingGroup title="Where Taste Applies">
       {tasteAreas.map((area) => (
-        <SettingRow key={area} label={areaLabels[area]} description={receives(area, areas[area])}>
+        <SettingRow key={area} label={areaLabels[area]} description={areaEffects[area]}>
           <Button
             size="compact-sm"
             variant="default"
@@ -285,44 +269,51 @@ function WhereTasteApplies() {
   );
 }
 
-/** A removable value of the person's own: a Favourite, an Exclusion. */
+/** A removable value of the person's own (a Favourite, an Exclusion), under a line saying how they get there. */
 function OwnPills({
+  hint,
   values,
   name,
   remove,
   pending,
 }: {
+  hint: string;
   values: { key: string; label: string }[];
-  name?: string;
+  name: string;
   remove: (key: string) => void;
   pending: boolean;
 }) {
-  if (!values.length)
-    return (
-      <Text span size="sm" c="text">
-        None
-      </Text>
-    );
   return (
-    <Group component="span" gap={4} mt={4}>
-      {values.map(({ key, label }) => (
-        <Pill
-          key={key}
-          withRemoveButton
-          onRemove={() => remove(key)}
-          // Pills inside an input hide their remove button from keyboards; these stand alone, so
-          // it is the only way to remove a value.
-          removeButtonProps={{
-            "aria-hidden": false,
-            tabIndex: 0,
-            "aria-label": `Remove ${label}${name ? ` from ${name}` : ""}`,
-            disabled: pending,
-          }}
-        >
-          {label}
-        </Pill>
-      ))}
-    </Group>
+    <>
+      <Text span inherit display="block">
+        {hint}
+      </Text>
+      {values.length ? (
+        <Group component="span" gap={4} mt={4}>
+          {values.map(({ key, label }) => (
+            <Pill
+              key={key}
+              withRemoveButton
+              onRemove={() => remove(key)}
+              // Pills inside an input hide their remove button from keyboards; these stand alone, so
+              // it is the only way to remove a value.
+              removeButtonProps={{
+                "aria-hidden": false,
+                tabIndex: 0,
+                "aria-label": `Remove ${label} from ${name}`,
+                disabled: pending,
+              }}
+            >
+              {label}
+            </Pill>
+          ))}
+        </Group>
+      ) : (
+        <Text span size="sm" c="text" display="block">
+          None
+        </Text>
+      )}
+    </>
   );
 }
 
@@ -642,7 +633,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
         <>
           <SettingGroup title="My Preferences">
             <SettingRow
-              label="Preferences"
+              label="In My Words"
               description={
                 <Text span size="sm" c="text" style={{ whiteSpace: "pre-wrap" }}>
                   {own.prefer || "None"}
@@ -657,6 +648,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               label="Favourites"
               description={
                 <OwnPills
+                  hint="Added with More Like This on a learnt value below."
                   values={favourites}
                   name="Favourites"
                   pending={change.isPending}
@@ -671,6 +663,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               label="Less Of"
               description={
                 <OwnPills
+                  hint="Added with Less Like This on a learnt value below."
                   values={less}
                   name="Less Of"
                   pending={change.isPending}
@@ -684,21 +677,19 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
           </SettingGroup>
           <SettingGroup title="Exclusions">
             <SettingRow
-              label="Exclusions"
+              label="Never Use"
               description={
-                <>
-                  Never used anywhere: Dream, suggestions, prompt writing and chats.
-                  <OwnPills
-                    values={exclusions.map((value) => ({ key: value, label: value }))}
-                    name="Exclusions"
-                    pending={change.isPending}
-                    remove={(value) =>
-                      change.mutate({
-                        exclusions: exclusions.filter((entry) => entry !== value),
-                      })
-                    }
-                  />
-                </>
+                <OwnPills
+                  hint="Left out everywhere, whatever the switches above say; chats remove them with a note."
+                  values={exclusions.map((value) => ({ key: value, label: value }))}
+                  name="Exclusions"
+                  pending={change.isPending}
+                  remove={(value) =>
+                    change.mutate({
+                      exclusions: exclusions.filter((entry) => entry !== value),
+                    })
+                  }
+                />
               }
             >
               <Button
@@ -794,7 +785,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
       <TextDialog
         id="taste-preferences"
         title="My Preferences"
-        label="Preferences"
+        label="In My Words"
         description="What you want, in your own words, for every area that uses your taste. Studio never learns over it."
         initial={editingPrefer ? (own.prefer ?? "") : null}
         maxLength={maxTastePrefer}

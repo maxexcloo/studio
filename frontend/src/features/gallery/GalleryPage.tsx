@@ -478,6 +478,17 @@ function Gallery() {
     return () => window.removeEventListener("scroll", join);
   }, [incoming, itemId, refreshFirst]);
   useEffect(() => setIncoming(0), [listingKey]);
+  // Results that arrived while away need no jump once the newest-first top is in view.
+  useEffect(() => {
+    if (!arrivals || sort !== "newest" || date) return;
+    const seen = () => {
+      const top = document.querySelector("[data-gallery-view]")?.getBoundingClientRect().top;
+      if (top !== undefined && top >= 0) acknowledge();
+    };
+    seen();
+    window.addEventListener("scroll", seen, { passive: true });
+    return () => window.removeEventListener("scroll", seen);
+  }, [arrivals, sort, date, acknowledge]);
   // A retry keeps its original's place, which may lie past the first page: its progress rereads
   // every loaded page.
   const seenRetries = useRef(jobs?.retried);
@@ -1042,7 +1053,7 @@ function Gallery() {
         <Alert color="red" title="Couldn't Load the Gallery">
           <Stack gap="sm" align="flex-start">
             {gallery.error.message}
-            <Button variant="subtle" onClick={() => void gallery.refetch()}>
+            <Button size="compact-sm" variant="default" onClick={() => void gallery.refetch()}>
               Retry
             </Button>
           </Stack>
@@ -1125,7 +1136,12 @@ function Gallery() {
         <Alert color="red" title="Couldn't Update the Gallery">
           <Stack gap="sm" align="flex-start">
             {refresh.error.message}
-            <Button variant="subtle" loading={refresh.isFetching} onClick={refreshFirst}>
+            <Button
+              size="compact-sm"
+              variant="default"
+              loading={refresh.isFetching}
+              onClick={refreshFirst}
+            >
               Retry
             </Button>
           </Stack>
