@@ -119,3 +119,16 @@ export interface DreamDigest<Item> {
     explore: number;
   };
 }
+
+/** Context a chat gave Studio (MCP), which Dream may draw on as a soft hint. */
+export interface ChatNote {
+  id: string;
+  text: string;
+  at: string;
+  /** The project the chat was attached to. */
+  project?: string;
+  /** The jobs of the results it came with. */
+  results?: string[];
+  /** The character card it came with. */
+  card?: string;
+}
