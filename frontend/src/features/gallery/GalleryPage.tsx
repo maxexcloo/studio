@@ -157,7 +157,7 @@ function Gallery() {
   const initialQuery = review ? (state?.reviewQuery ?? "") : "";
   const [query, setQueryText] = useState(initialQuery);
   const [search, setSearch] = useState(initialQuery);
-  const searchAfterTyping = useDebouncedCallback(setSearch, 120);
+  const searchAfterTyping = useDebouncedCallback(setSearch, 250);
   const setQuery = useCallback(
     (value: string) => {
       setQueryText(value);
@@ -372,16 +372,25 @@ function Gallery() {
             !slots.has(mediaIdentity(item)) &&
             !wasCancelled(item) &&
             !(item.status === "pending" && item.jobId && completed.has(item.jobId));
+          const { totalApprox } = first;
           return {
             ...data,
-            pages: data.pages.map((page, index) => ({
-              ...page,
-              ...(!index && !page.items.length && data.pages.length === 1
-                ? { hasMore: first.hasMore, nextCursor: first.nextCursor }
-                : {}),
-              totalApprox: first.totalApprox,
-              items: index ? page.items.filter(keep) : [...first.items, ...page.items.filter(keep)],
-            })),
+            pages: data.pages.map((page, index) => {
+              const items = page.items.filter(keep);
+              // Later pages keep their identity unless the fresh head took one of their items.
+              if (index)
+                return items.length === page.items.length && page.totalApprox === totalApprox
+                  ? page
+                  : { ...page, totalApprox, items };
+              return {
+                ...page,
+                ...(!page.items.length && data.pages.length === 1
+                  ? { hasMore: first.hasMore, nextCursor: first.nextCursor }
+                  : {}),
+                totalApprox,
+                items: [...first.items, ...items],
+              };
+            }),
           };
         },
       );
@@ -449,8 +458,10 @@ function Gallery() {
   const seenJobs = useRef(jobs?.key);
   useEffect(() => {
     if (seenJobs.current === jobs?.key) return;
+    // The queue's first reply arrives with the listing's own first read, so it changes nothing.
+    const arrived = seenJobs.current !== undefined;
     seenJobs.current = jobs?.key;
-    void refreshFirst();
+    if (arrived) void refreshFirst();
   }, [jobs?.key, refreshFirst]);
   // Held new results join when the viewer opens or the gallery's top comes back into view.
   useEffect(() => {

@@ -189,6 +189,7 @@ export function MediaTile({
   onTryAgain,
   onKeyDown,
   eager,
+  large,
 }: {
   item: MediaItem;
   label?: string;
@@ -212,6 +213,8 @@ export function MediaTile({
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
   /** In view now: its thumbnail loads ahead of those placed just outside the view. */
   eager?: boolean;
+  /** Wider than the thumbnail covers: a picture shows its display copy. */
+  large?: boolean;
 }) {
   // Touch holds use Studio's menu or selection instead of a native drag lift.
   const touch = useTouch();
@@ -219,7 +222,10 @@ export function MediaTile({
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
   const media = mediaSource(item);
   const video = item.type === "video";
-  const source = media.thumbnailUrl || item.preview || (video ? undefined : media.url);
+  const source =
+    (large && !video && media.displayUrl !== media.url ? media.displayUrl : media.thumbnailUrl) ||
+    item.preview ||
+    (video ? undefined : media.url);
   // A failed load (Studio restarting, say) tries again a few times, waiting longer each time.
   const [retry, setRetry] = useState({ source, count: 0 });
   const attempt = retry.source === source ? retry.count : 0;

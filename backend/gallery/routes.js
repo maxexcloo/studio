@@ -10,7 +10,6 @@ import {
   recordsForRequest,
 } from "../account-ownership.js";
 import { accountPreferences } from "../account-preferences.js";
-import { logWarning } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { similarThresholds } from "../domain/image-search.ts";
 import { queuePriority } from "../domain/store.ts";
@@ -579,14 +578,7 @@ export function registerGalleryErrorRoutes(app) {
     const cleared = galleryItems({ status: ["failed", "cancelled"] }).filter(owned);
     hideGalleryItems(cleared);
     forgetGalleryItems(cleared);
-    return {
-      status: 200,
-      payload: {
-        ok: true,
-        cleared: cleared.length,
-        outputs: filterVisibleGallery(galleryItems(ownedQuery(account) || {}).filter(mine)),
-      },
-    };
+    return { status: 200, payload: { ok: true, cleared: cleared.length } };
   });
 }
 
@@ -663,24 +655,5 @@ export function registerGalleryDeleteRoute(app, { deleted = () => {} } = {}) {
       status: 200,
       payload: { ok: true, ...deleteRequested({ studioAccount: account }, ids, deleted) },
     };
-  });
-  app.delete("/api/gallery/:id", (req, res) => {
-    // Express has already decoded the ID once; a finished item's ID is its URL, which keeps its own escapes.
-    const id = req.params.id;
-    const { files, removed } = deleteRequested(req, [id], deleted);
-    // Accounts never learn whether another owner's item exists.
-    if (req.studioAccount && !removed.length) {
-      logWarning(`Could not delete gallery item ${id}: not among the account's items`);
-      res.status(404).json({ ok: false, error: "That item was not found." });
-      return;
-    }
-    res.json({
-      ok: true,
-      files,
-      removed: removed.length,
-      outputs: filterVisibleGallery(
-        recordsForRequest(galleryItems(ownedQuery(req.studioAccount) || {}), req),
-      ),
-    });
   });
 }
