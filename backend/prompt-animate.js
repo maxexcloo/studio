@@ -18,6 +18,7 @@ import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
 import {
   americanEnglish,
+  australianEnglish,
   contentRule,
   fidelity,
   filler,
@@ -210,7 +211,9 @@ export async function writeAnimatePrompt({
     messages: [
       {
         role: "system",
-        content: named ? `${system}\n${promptInstruction("name-clip")}` : system,
+        content: named
+          ? `${system}\n${promptInstruction("name-clip", { australianEnglish })}`
+          : system,
       },
       {
         role: "user",

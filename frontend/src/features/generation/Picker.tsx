@@ -739,9 +739,9 @@ export function SavedName<T extends SavedItem>({
         </Combobox>
         <VisuallyHidden role="status">{naming.saved ? "Saved" : ""}</VisuallyHidden>
         <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
-          <PopupTooltip label={`${noun} Actions`}>
+          <PopupTooltip label={`Actions for ${noun}`}>
             <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" aria-label={`${noun} Actions`}>
+              <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${noun}`}>
                 <icons.more size={18} />
               </ActionIcon>
             </Menu.Target>

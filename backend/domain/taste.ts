@@ -28,6 +28,7 @@ import type { DomainResponse } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 import { ruleBans } from "./dream-concepts.ts";
 import { agePools, likeLedger } from "./like-spread.ts";
+import { australianEnglish } from "./writing-standard.ts";
 
 /**
  * What a person did with a result; "like" and "dislike" rate it ("unlike" and "undislike" take a
@@ -216,7 +217,7 @@ const summariseGapMs = 10 * 60_000;
 /** The longest summary of learnt taste a text model reads, in characters. */
 const maxTasteSummary = 1000;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
-const instructions = () => promptInstruction("summarise-taste");
+const instructions = () => promptInstruction("summarise-taste", { australianEnglish });
 const loraText = (lora: TasteLora) =>
   typeof lora === "string"
     ? lora
@@ -418,7 +419,7 @@ const best = (scores: Map<string, TasteScore>, prefix: string) =>
     .sort((a, b) => b[1].score - a[1].score)
     .map(([attribute]) => attribute.slice(prefix.length));
 
-/** Score attributes' prefixes for what More and Less Like This mark. */
+/** Score attributes' prefixes for what Favourites and Less Of mark. */
 const markPrefixes: Record<Exclude<TasteMarkKind, "words">, string> = {
   models: "profile:",
   loras: "lora:",

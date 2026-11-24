@@ -1,4 +1,4 @@
-import { Alert, ScrollArea, Text } from "@mantine/core";
+import { Alert, ScrollArea } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -249,9 +249,9 @@ export function GalleryChoices({
             ) : listing.error && !listing.data ? (
               <Alert color="red">{listing.error.message}</Alert>
             ) : !items.length ? (
-              <Text size="xs" c="dimmed" mt="sm">
-                {search ? "No matching uploads." : "Upload, paste or drop images."}
-              </Text>
+              <EmptyState fill>
+                {search ? "No Matches" : "Upload, paste or drop images."}
+              </EmptyState>
             ) : null)}
           {morePages}
         </ScrollArea.Autosize>

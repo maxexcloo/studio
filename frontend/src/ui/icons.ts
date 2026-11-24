@@ -4,7 +4,10 @@ import {
   ArrowLeftRight,
   Ban,
   Blend,
+  BookOpen,
   Bookmark,
+  Boxes,
+  Brush,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -22,13 +25,17 @@ import {
   Eye,
   EyeOff,
   FastForward,
+  FileCog,
   Files,
+  Fingerprint,
   Flag,
   Flame,
   FolderOpen,
   FolderUp,
   GalleryHorizontalEnd,
   Gauge,
+  Heart,
+  History,
   Image,
   ImageDown,
   ImageOff,
@@ -41,6 +48,7 @@ import {
   Layers,
   LayoutDashboard,
   Library,
+  Lightbulb,
   Link,
   List,
   ListChecks,
@@ -54,12 +62,14 @@ import {
   MessageCircle,
   Minus,
   Moon,
+  Palette,
   PanelsTopLeft,
   Pause,
   PenLine,
   Pencil,
   Pin,
   Play,
+  Plug,
   Plus,
   Puzzle,
   Redo2,
@@ -70,21 +80,26 @@ import {
   Rewind,
   RotateCcw,
   RotateCw,
+  Route,
   Rows2,
   ScanFace,
   ScanSearch,
   ScanText,
   ScrollText,
+  Server,
   Settings,
   Share,
+  Shield,
   ShieldCheck,
   ShieldUser,
   Shirt,
   Shuffle,
   SlidersHorizontal,
+  SlidersVertical,
   Snail,
   Square,
   SquareCheck,
+  SwatchBook,
   TextCursorInput,
   TextQuote,
   ThumbsDown,
@@ -97,6 +112,7 @@ import {
   UserCheck,
   UserRound,
   UserX,
+  UsersRound,
   Video,
   Volume2,
   VolumeX,
@@ -120,6 +136,8 @@ export const icons = {
   /** Making an account an administrator; Make User takes `account`. */
   administrator: ShieldUser,
   animate: Play,
+  /** Appearance: the header's popover of colour scheme, background and motion. */
+  appearance: Palette,
   /** Prompt assistance, including suggestions and templates. */
   assistant: WandSparkles,
   /** Playing a video forwards then backwards (Back & Forth). */
@@ -168,16 +186,24 @@ export const icons = {
   extend: FastForward,
   /** Face Detail: refining faces as part of an upscale. */
   faceDetail: ScanFace,
+  /** Shared model files: checkpoints, diffusion models, text encoders and VAEs. */
+  files: Boxes,
   filter: ListFilter,
+  /** An access group and the grants it holds. */
+  group: Shield,
+  /** A prompting guide (Library › Guides). */
+  guide: BookOpen,
   /** Hiding a revealed secret again, such as the MCP token. */
   hide: EyeOff,
+  /** Prompt History: the prompts an account sent before. */
+  history: History,
   /** Image mode and image work, as against video. */
   image: Image,
   /** Bringing something in from elsewhere: Library › Imports and the gallery's Import ▾. */
   import: Import,
   /** Keeping something: Dream's Accept and a comparison's Both. */
   keep: CircleCheck,
-  /** Less Like This on a learnt value, a soft down-weight in Settings › Taste. */
+  /** Less Of in Settings › Taste: a soft down-weight. */
   less: CircleMinus,
   library: Library,
   like: ThumbsUp,
@@ -186,6 +212,10 @@ export const icons = {
   /** A record's timestamped lines: a runtime change's steps or a workload's log. */
   log: ScrollText,
   loras: Puzzle,
+  /** Painting a mask over a reference. */
+  mask: Brush,
+  /** MCP clients and the work they send. */
+  mcp: Plug,
   more: Ellipsis,
   /** Variations following the direction of an item (More Like This). */
   moreLikeThis: CopyPlus,
@@ -203,7 +233,7 @@ export const icons = {
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: filled(Pause),
-  /** More Like This on a learnt value: a Favourite in Settings › Taste. */
+  /** Favourites in Settings › Taste. */
   pin: Pin,
   /** A saved preset: the Presets chip and Library › Presets. */
   preset: Bookmark,
@@ -211,10 +241,14 @@ export const icons = {
   preview: Maximize2,
   /** Moving to the previous item, as `next`. */
   previous: ChevronLeft,
+  /** A generation profile and its workflow (Library › Profiles). */
+  profile: FileCog,
   /** A Dream project: Dream › Projects and a proposal for a new one. */
   project: FolderOpen,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
+  /** The assistant's styles and templates (Library › Prompt Styles). */
+  promptStyles: SwatchBook,
   queue: List,
   /** Running an item again (Recreate). */
   recreate: Repeat2,
@@ -238,6 +272,8 @@ export const icons = {
   reverse: Rewind,
   /** Showing a written prompt for editing before it runs (Review Prompt). */
   review: ScanText,
+  /** Where work runs: the workers and providers an account's work goes to. */
+  routing: Route,
   /** A rule an issue suggests, as Dream's Inbox proposes one. */
   rule: ShieldCheck,
   /** Running an item again with its own seed (Run Again, Same Seed). */
@@ -264,6 +300,14 @@ export const icons = {
   sort: ArrowDownUp,
   sound: Volume2,
   stop: filled(Square),
+  /** Studio-wide settings an administrator sets (Settings › Studio). */
+  studio: SlidersVertical,
+  /** The instructions behind Suggestions (Library › Suggestion Instructions). */
+  suggestionInstructions: Lightbulb,
+  /** Super Like: accepting a Dream result and rating it Liked. */
+  superLike: Heart,
+  /** Taste: what Studio learnt of an account's preferences, and their own. */
+  taste: Fingerprint,
   templates: PanelsTopLeft,
   /** Explicit content: templates only accounts with Uncensored Models see. */
   uncensored: Flame,
@@ -276,10 +320,14 @@ export const icons = {
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
   uploads: ImageUp,
   upscale: ImageUpscale,
+  /** Accounts as an administrator manages them (Settings › Users). */
+  users: UsersRound,
   versions: Layers,
   /** Video mode and video work, as against image. */
   video: Video,
   winner: Trophy,
+  /** GPU workers and services (Settings › Workers). */
+  workers: Server,
   /** Zooming in, or larger gallery tiles. */
   zoomIn: Plus,
   /** Zooming out, or smaller gallery tiles. */

@@ -179,7 +179,7 @@
 }
 /* A single card's up is Like. */
 .card:not([data-pair]) .hint[data-hint="up"] {
-  color: var(--mantine-color-pink-5);
+  color: var(--studio-like);
 }
 .hint[data-hint="down"] {
   top: 30%;

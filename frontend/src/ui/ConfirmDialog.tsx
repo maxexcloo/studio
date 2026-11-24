@@ -43,12 +43,12 @@ export function DialogFooter({
       {leading && <Box me="auto">{leading}</Box>}
       {phone && secondary.length > 1 ? (
         <Menu position="top-end" width={menuWidth}>
-          <PopupTooltip label="More Actions">
+          <PopupTooltip label="Actions">
             <Menu.Target>
               <Button
                 variant="default"
                 px="xs"
-                aria-label="More Actions"
+                aria-label="Actions"
                 loading={secondary.some((action) => action.loading)}
               >
                 <icons.more size={18} />

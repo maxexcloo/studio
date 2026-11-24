@@ -17,6 +17,7 @@ import type { Project, ProjectStats } from "../../../../shared/projects";
 import { api } from "../../api";
 import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { Thumbnail } from "./DiscardedDreams";
 import { aspectLabel, briefFields } from "./ProjectForm";
 import { type DreamItem, projectPath, projectsQuery } from "./queries";
@@ -189,15 +190,17 @@ export function ProjectCard({
           <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
             <ProjectEnabled project={project} label={`Enable ${project.name}`} />
             <Menu position="bottom-end" width={menuWidth}>
-              <Menu.Target>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label={`Actions for ${project.name}`}
-                >
-                  <icons.more size={16} />
-                </ActionIcon>
-              </Menu.Target>
+              <PopupTooltip label="Actions">
+                <Menu.Target>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label={`Actions for ${project.name}`}
+                  >
+                    <icons.more size={16} />
+                  </ActionIcon>
+                </Menu.Target>
+              </PopupTooltip>
               <Menu.Dropdown>
                 <Menu.Item
                   renderRoot={(props) => <button {...props} role="menuitemcheckbox" />}

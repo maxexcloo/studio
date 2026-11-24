@@ -654,7 +654,7 @@ test("Viewer prompt offers Reset once edited, without a menu, and restores its o
   if (phone) await summary.click();
   const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  const more = surface.getByRole("button", { name: "More Prompt Actions", exact: true });
+  const more = surface.getByRole("button", { name: "Actions for Prompt", exact: true });
   await expect(more).toHaveCount(0);
   const edit = (name: string) => surface.getByRole("button", { name, exact: true });
   await expect(edit("Reset")).toHaveCount(0);

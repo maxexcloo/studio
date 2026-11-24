@@ -107,7 +107,7 @@ const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
   state.requests.map((request) => `${request.method} ${request.path}`);
 
 async function confirmPass(page: Page, reason?: string) {
-  const dialog = page.getByRole("dialog", { name: "Why Pass?", exact: true });
+  const dialog = page.getByRole("dialog", { name: "Pass Reason", exact: true });
   await expect(dialog.getByRole("radio", { name: "Not My Taste", exact: true })).toBeChecked();
   if (reason) await dialog.getByRole("radio", { name: reason, exact: true }).check();
   await dialog.getByRole("button", { name: "Pass", exact: true }).click();
@@ -621,12 +621,12 @@ test("Projects show what is new in each since the last visit, and the viewer jud
   if (!isMobile)
     await expect(
       viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
-    ).toHaveText(["Animate", "Edit", "Recreate", "Dislike", "Like", "Accept"]);
+    ).toHaveText(["Animate", "Edit", "Recreate", "Pass", "Super Like", "Accept"]);
   await dreamAction(page, "Accept");
   await expect(viewer.getByRole("img", { name: "Dream prompt shore" })).toBeVisible();
-  await dreamAction(page, "Dislike");
+  await dreamAction(page, "Pass");
   await expect(viewer.getByRole("img", { name: "Dream prompt street" })).toBeVisible();
-  await dreamAction(page, "Like");
+  await dreamAction(page, "Super Like");
   await expect(viewer).toBeHidden();
   await expect(beach.getByText(/ New$/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^View Dream prompt/ })).toHaveCount(0);
@@ -854,9 +854,9 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   const mine = page.getByRole("region", { name: "My Preferences", exact: true });
   await expect(mine.getByText("Model: Image Quality", { exact: true })).toBeVisible();
 
-  // Learnt words are steered from their menus: Less Like This waits under Less Of until removed.
+  // Learnt words are steered from their menus: Add to Less Of waits under Less Of until removed.
   await learnt.getByRole("button", { name: "foxes in snow", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Less Like This", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Add to Less Of", exact: true }).click();
   await expect
     .poll(() => dream.requests.at(-1)?.body)
     .toEqual({
@@ -870,7 +870,7 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
     .click();
   await expect.poll(() => dream.requests.at(-1)?.body?.preferences.less).toEqual({ words: [] });
   await learnt.getByRole("button", { name: "crowds", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Never", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Add to Exclusions", exact: true }).click();
   await expect.poll(() => dream.requests.at(-1)?.body?.preferences.exclusions).toEqual(["crowds"]);
   await expect(
     page
@@ -948,7 +948,7 @@ test("Taste shows keep rates by model and tag kind, and marks values from their 
   await row("Colours", "golden light")
     .getByRole("button", { name: "Actions for golden light", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "More Like This", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Add to Favourites", exact: true }).click();
   await expect
     .poll(() => dream.requests.at(-1)?.body)
     .toEqual({
@@ -960,11 +960,13 @@ test("Taste shows keep rates by model and tag kind, and marks values from their 
       .getByRole("region", { name: "My Preferences", exact: true })
       .getByText("Tag: golden light", { exact: true }),
   ).toBeVisible();
-  // Never is for words and tags; a model can only be liked more or less.
+  // Exclusions are for words and tags; a model can only be a favourite or less of.
   await row("Models", "Image Quality")
     .getByRole("button", { name: "Actions for Image Quality", exact: true })
     .click();
-  await expect(page.getByRole("menuitem", { name: "Never", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Add to Exclusions", exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
@@ -1495,7 +1497,7 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   await page.mouse.move(pass.x + pass.width / 2, pass.y + pass.height / 2);
   await page.mouse.down();
   try {
-    await expect(page.getByRole("dialog", { name: "Why Pass?", exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Pass Reason", exact: true })).toBeVisible();
   } finally {
     await page.mouse.up();
   }
@@ -1725,7 +1727,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   // Its chats each detach.
   const chats = detail.getByRole("region", { name: "Chats", exact: true });
   await chats.getByRole("button", { name: "Detach", exact: true }).click();
-  await expect(chats).toContainText("No chats attached.");
+  await expect(chats).toContainText("No Chats");
   expect(dream.requests.at(-1)).toMatchObject({
     method: "POST",
     path: "/api/dream/projects/attach",

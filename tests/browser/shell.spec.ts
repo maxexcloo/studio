@@ -154,7 +154,7 @@ test("A phone held sideways keeps the phone layout and an iPad in landscape does
   await fixtures(page);
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto("/images");
-  const more = page.getByRole("button", { name: "More Options", exact: true });
+  const more = page.getByRole("button", { name: "Actions", exact: true });
   await expect(more).toBeVisible();
   await expect(page.locator(":root")).toHaveAttribute("data-phone", "sideways");
   await page.setViewportSize({ width: 1180, height: 820 });
@@ -223,11 +223,11 @@ test("The mode switcher settles on each mode without a render loop", async ({ pa
   expect(errors).toEqual([]);
 });
 
-test("The creative modes leave Status and More Options usable at each layout", async ({ page }) => {
+test("The creative modes leave Status and Actions usable at each layout", async ({ page }) => {
   await fixtures(page);
   await page.goto("/images");
   const modes = page.getByRole("navigation", { name: "Creative Modes" });
-  const more = page.getByRole("button", { name: "More Options", exact: true });
+  const more = page.getByRole("button", { name: "Actions", exact: true });
   for (const width of [375, 844, 1440]) {
     await page.setViewportSize({ width, height: width === 844 ? 390 : 900 });
     await expect(modes).toBeVisible();

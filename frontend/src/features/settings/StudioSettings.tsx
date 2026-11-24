@@ -121,7 +121,7 @@ export function StudioSettings() {
       </SettingGroup>
       <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
       {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
-      <SettingGroup title="Danger Zone" danger>
+      <SettingGroup danger>
         <DeleteFailedItems />
       </SettingGroup>
     </Stack>

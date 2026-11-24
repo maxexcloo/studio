@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { ToolbarAction } from "../../ui/SectionToolbar";
 import { SelectionBar } from "../../ui/SelectionBar";
+import { SelectToggle } from "../../ui/SelectToggle";
 import { showDisliked } from "../gallery/useMediaRating";
 import { charactersQuery, deleteCard, promptCardsQuery, saveCardRating } from "./queries";
 
@@ -111,12 +112,8 @@ export function useCardSelection(
   return {
     active: selection !== null,
     toggle: (
-      <ToolbarAction
-        label="Select"
-        icon={icons.select}
-        iconOnly
-        variant="default"
-        aria-pressed={selection !== null}
+      <SelectToggle
+        selecting={selection !== null}
         disabled={(!selection && !cards?.length) || batch.isPending}
         onClick={() => setSelection(selection ? null : new Set())}
       />

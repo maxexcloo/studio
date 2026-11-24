@@ -1,5 +1,3 @@
-import { Palette, Route, Server, Shield, SlidersVertical, UsersRound } from "lucide-react";
-
 import { icons } from "../../ui/icons";
 import {
   WorkspaceSectionSelect,
@@ -20,14 +18,14 @@ const settingSections = {
   "where-work-runs": {
     label: "Where Work Runs",
     description: "Choose where your work runs and the models and image sizes it starts with.",
-    icon: Route,
+    icon: icons.routing,
     group: "Personal",
   },
   taste: {
     label: "Taste",
     description:
       "Choose where your taste applies, your own preferences and exclusions, and steer what Studio learnt.",
-    icon: Palette,
+    icon: icons.taste,
     group: "Personal",
   },
   dream: {
@@ -45,14 +43,14 @@ const settingSections = {
   workers: {
     label: "Workers",
     description: "Manage worker placement, service health and unfinished jobs.",
-    icon: Server,
+    icon: icons.workers,
     admin: true,
     group: "Administration",
   },
   studio: {
     label: "Studio",
     description: "Set Studio-wide defaults, the AI work Studio does on its own, and failed items.",
-    icon: SlidersVertical,
+    icon: icons.studio,
     admin: true,
     group: "Administration",
   },
@@ -66,14 +64,14 @@ const settingSections = {
   users: {
     label: "Users",
     description: "Manage accounts and linked chat identities.",
-    icon: UsersRound,
+    icon: icons.users,
     admin: true,
     group: "Administration",
   },
   groups: {
     label: "Groups",
     description: "Choose the models and features each access group can use, and the default group.",
-    icon: Shield,
+    icon: icons.group,
     admin: true,
     group: "Administration",
   },

@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
+import { Alert, Button, Group, Stack, VisuallyHidden } from "@mantine/core";
 import { useDebouncedCallback } from "@mantine/hooks";
 import {
   type InfiniteData,
@@ -31,9 +31,9 @@ import type { GallerySort } from "../../../../shared/gallery-sort";
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, MediaKind, QueueJob } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
-import { icons } from "../../ui/icons";
 import { lazyLoaded } from "../../ui/lazyLoaded";
 import { LoadingState } from "../../ui/LoadingState";
+import { SelectToggle } from "../../ui/SelectToggle";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
@@ -1017,19 +1017,13 @@ function Gallery() {
           toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
           select={
             // Select stays in place, pressed while selecting; pressing it again ends selection.
-            <Tooltip label="Select Items" disabled={!phone}>
-              <Button
-                {...(phone ? iconChipProps : chipProps)}
-                ref={selectionButton}
-                aria-label="Select Items"
-                aria-pressed={selection.selecting}
-                leftSection={phone ? undefined : <icons.select size={15} />}
-                disabled={!loaded.length && !selection.selecting}
-                onClick={selection.selecting ? doneSelecting : selection.start}
-              >
-                {phone ? <icons.select size={16} /> : "Select"}
-              </Button>
-            </Tooltip>
+            <SelectToggle
+              {...(phone ? iconChipProps : chipProps)}
+              ref={selectionButton}
+              selecting={selection.selecting}
+              disabled={!loaded.length && !selection.selecting}
+              onClick={selection.selecting ? doneSelecting : selection.start}
+            />
           }
           actions={<GalleryImport upload={upload} />}
         />

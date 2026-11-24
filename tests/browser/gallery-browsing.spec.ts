@@ -4,6 +4,7 @@ import { dayHeading, mediaTitle } from "../../frontend/src/features/gallery/medi
 import {
   closeReferences,
   expandComposer,
+  filterGalleryRating,
   fixtures,
   image,
   openReferenceChoices,
@@ -13,7 +14,6 @@ import {
   showOnly,
   showViewerThumbnails,
   stamp,
-  toggleGalleryFilter,
   toolbarSearch,
   touch,
 } from "./fixtures";
@@ -1710,7 +1710,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.goto("/images");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
   await expect(filter).toHaveAttribute("aria-expanded", "false");
-  // Liked and Disliked are filters in the panel, not toolbar buttons.
+  // Liked and Disliked are Rating choices in the panel, not toolbar buttons.
   await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
   await expect(
@@ -1731,11 +1731,11 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.keyboard.press("Escape");
   const search = await toolbarSearch(page);
   await search.fill("Browse");
-  await toggleGalleryFilter(page, "Liked");
+  await filterGalleryRating(page, "Liked");
   const likedChip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
   await expect(likedChip).toBeVisible();
   // Disliked takes Liked's place.
-  await toggleGalleryFilter(page, "Disliked");
+  await filterGalleryRating(page, "Disliked");
   await expect(likedChip).toHaveCount(0);
   await expect
     .poll(() => {
@@ -1747,21 +1747,31 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   const dislikedChip = page.getByRole("button", { name: "Remove Disliked Filter", exact: true });
   await expect(dislikedChip).toBeVisible();
   await filter.click();
-  await page.getByText("Week", { exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Date", exact: true })
+    .getByText("Week", { exact: true })
+    .click();
   await page.keyboard.press("Escape");
   // Clear All takes every filter, Disliked included.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
   await expect(dislikedChip).toHaveCount(0);
-  await toggleGalleryFilter(page, "Liked");
+  await filterGalleryRating(page, "Liked");
   await filter.click();
-  await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
+  await expect(
+    page
+      .getByRole("radiogroup", { name: "Date", exact: true })
+      .getByRole("radio", { name: "All", exact: true }),
+  ).toBeChecked();
   await page.keyboard.press("Escape");
   await expect(search).toHaveValue("Browse");
   // Filters persist across reloads; the transient search does not.
   await page.reload();
   await expect
     .poll(() => {
-      const query = new URLSearchParams(state.galleryRequests.at(-1));
+      // The page's own request, not the newest-result check that reads from now.
+      const query = new URLSearchParams(
+        state.galleryRequests.filter((request) => !request.includes("finished=1")).at(-1),
+      );
       return [query.get("q"), query.get("rating"), query.has("since"), query.has("comparisons")];
     })
     .toEqual(["", "liked", false, false]);
@@ -1771,7 +1781,7 @@ test("Returning to Gallery resets filters while closing an image keeps them", as
   const state = await fixtures(page);
   state.gallery.push({ ...results(1)[0], rating: "liked" });
   await page.goto("/images");
-  await toggleGalleryFilter(page, "Liked");
+  await filterGalleryRating(page, "Liked");
   const liked = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
   await expect(liked).toBeVisible();
   await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
@@ -1783,7 +1793,7 @@ test("Returning to Gallery resets filters while closing an image keeps them", as
   await showGalleryView(page, "Gallery");
   await expect(liked).toHaveCount(0);
 
-  await toggleGalleryFilter(page, "Liked");
+  await filterGalleryRating(page, "Liked");
   const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
   await modes.getByRole("link", { name: "Videos", exact: true }).click();
   await modes.getByRole("link", { name: "Images", exact: true }).click();

@@ -17,8 +17,6 @@ import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
 import { galleryKey } from "./queries";
 
-const listedFailures = 5;
-
 /** Every file a drop holds, walking into dropped folders; call it inside the drop handler. */
 export async function droppedFiles(data: DataTransfer): Promise<File[]> {
   // Entries must be taken before the handler returns; the walk itself can wait.
@@ -115,22 +113,17 @@ export function useGalleryUpload(onUploaded: () => void) {
     ]
       .filter(Boolean)
       .join(" ");
-    // The uploads show in the gallery; only what didn't arrive needs saying.
+    // The uploads show in the gallery; only what didn't arrive needs saying, with the first reason.
     if (failed.length || skipped)
       notifications.show({
         color: failed.length ? "red" : undefined,
-        autoClose: failed.length ? false : 4000,
+        autoClose: failed.length ? 8000 : 4000,
         message: (
           <Stack gap={2}>
             <Text size="sm">{summary}</Text>
-            {failed.slice(0, listedFailures).map((line) => (
-              <Text key={line} size="xs" c="dimmed">
-                {line}
-              </Text>
-            ))}
-            {failed.length > listedFailures && (
-              <Text size="xs" c="dimmed">
-                and {failed.length - listedFailures} more
+            {failed.length > 0 && (
+              <Text size="xs" c="dimmed" lineClamp={2}>
+                {failed[0]}
               </Text>
             )}
           </Stack>

@@ -14,9 +14,9 @@ export function HeaderOptions() {
   const name = multi ? data.account?.username || "Your Account" : "Single-User Development";
   return (
     <Menu position="bottom-end" width={menuWidth}>
-      <PopupTooltip label="More Options">
+      <PopupTooltip label="Actions">
         <Menu.Target>
-          <ActionIcon aria-label="More Options" variant="subtle" color="gray">
+          <ActionIcon aria-label="Actions" variant="subtle" color="gray">
             <icons.more size={20} />
           </ActionIcon>
         </Menu.Target>

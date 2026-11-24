@@ -520,7 +520,7 @@ function DefinitionForm({
           </Alert>
         )}
         {!creating && (
-          <SettingGroup title="Danger Zone" danger>
+          <SettingGroup danger>
             <SettingRow
               label={`Delete ${noun}`}
               description="Removes it from the Library for everyone."
