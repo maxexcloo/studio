@@ -1,4 +1,4 @@
-import { type LucideIcon, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { letter } from "../../../../shared/compare";
 import type { Action, ActionGroups } from "../../ui/ActionBar";
@@ -46,14 +46,14 @@ export function dreamChoices(
   if (card.kind === "pair" && !singleImageComparison)
     return [
       [
-        { choice: "neither", id: "neither", label: "Pass", icon: X },
+        { choice: "neither", id: "neither", label: "Pass", icon: icons.passAll },
         ...comparisonVotes.slice(0, card.items.length).map((choice, index) => ({
           choice,
           id: choice,
           label: letter(index),
           icon: icons.winner,
         })),
-        { choice: "both", id: "both", label: "Accept", icon: icons.keep },
+        { choice: "both", id: "both", label: "Accept", icon: icons.keepAll },
       ],
     ];
   const labels = verdictLabels(card, quickRating);
@@ -62,9 +62,17 @@ export function dreamChoices(
     { choice: "like", id: "like", label: labels.like, icon: icons.superLike, main: true },
     { choice: "keep", id: "keep", label: labels.keep, icon: icons.keep, main: true, primary: true },
   ];
+  // An image comparison in fullscreen judges the image shown, between Pass and Accept for every
+  // side at the edges.
   if (card.kind === "pair") {
-    const label = card.items.length > 2 ? "All" : "Both";
-    return [[...ratings, { choice: "both", id: "both", label, icon: icons.keep }]];
+    const every = card.items.length > 2 ? "All" : "Both";
+    return [
+      [
+        { choice: "neither", id: "neither", label: `Pass ${every}`, icon: icons.passAll },
+        ...ratings,
+        { choice: "both", id: "both", label: `Accept ${every}`, icon: icons.keepAll },
+      ],
+    ];
   }
   if (card.kind !== "dream" || card.item.type !== "image") return [ratings];
   return [
