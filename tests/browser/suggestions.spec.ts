@@ -263,8 +263,8 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   ]);
 });
 
-test("Viewer prompt suggestions use the selected operation and wait for review", async ({
-  page,
+test("Viewer prompt suggestions use the selected operation and wait for review", async ({ page }, {
+  project,
 }) => {
   const state = await openViewer(page);
   state.gallery[0].title = "Original Amber Bird";
@@ -317,6 +317,12 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   await openSource();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const reopenSource = async () => {
+    if (!project.use.isMobile)
+      await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+    await expect(viewer).toBeHidden();
+    await openSource();
+  };
   const openAI = async () => {
     await viewer.getByRole("button", { name: "AI", exact: true }).click();
     return page.getByRole("menu").first();
@@ -357,9 +363,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
     },
   });
 
-  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await expect(viewer).toBeHidden();
-  await openSource();
+  await reopenSource();
   menu = await openAI();
   await menu.getByText("Edit", { exact: true }).click();
   await expect(menu.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
@@ -392,9 +396,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
     },
   });
 
-  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await expect(viewer).toBeHidden();
-  await openSource();
+  await reopenSource();
   menu = await openAI();
   await menu.getByText("Recreate", { exact: true }).click();
   await review().click();
