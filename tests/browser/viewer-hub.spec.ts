@@ -4,7 +4,6 @@ import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import type { Profile } from "../../frontend/src/types";
 import { formatDateTime } from "../../frontend/src/ui/dates";
 import {
-  backToActionMenu,
   closeLoras,
   closeTextEditor,
   combinedImageProfile,
@@ -1585,7 +1584,7 @@ test("With local video stopped, Animate in Composer pre-selects Grok", async ({ 
   expect(state.jobs).toHaveLength(1);
 });
 
-test("With neither local video nor Grok, Animate's options are disabled", async ({ page }) => {
+test("With neither local video nor Grok, Animate is disabled", async ({ page }) => {
   const reason = "Local video isn't running and cloud video isn't available to this account.";
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) =>
@@ -1593,13 +1592,8 @@ test("With neither local video nor Grok, Animate's options are disabled", async 
     ),
   );
 
-  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  await expandAssistantMenu(page, "Templates");
-  await expect(page.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeDisabled();
-  await backToActionMenu(page);
-  await expect(
-    page.getByRole("menuitem", { name: "Animate in Composer", exact: true }),
-  ).toBeDisabled();
+  // Nothing can animate it, so the whole Animate menu is greyed out.
+  await expect(viewer.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
   expect(state.jobs).toHaveLength(1);
 });
 
