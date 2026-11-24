@@ -105,20 +105,22 @@ test("Every compared variant runs on the composer's settings, changing only the 
       variant.input.count,
     ]),
   ).toEqual([
-    ["Image Quality", "image:test", "A silver fox", ["detail.safetensors"], 1],
-    ["Image Fast", "image:fast", "A silver fox", ["detail.safetensors"], 1],
+    ["Image Quality · 20 Steps", "image:test", "A silver fox", ["detail.safetensors"], 1],
+    ["Image Fast · 4 Steps", "image:fast", "A silver fox", ["detail.safetensors"], 1],
   ]);
   expect(run.requests[0].input.seed).toBe(run.requests[1].input.seed);
   await expect(page.getByRole("heading", { name: "Compare", exact: true })).toBeVisible();
 
   // Picking the winner likes it without touching the composer; Use This takes one there.
-  await page.getByRole("button", { name: "Pick Image Fast as Winner", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Pick Image Fast · 4 Steps as Winner", exact: true })
+    .click();
   await expect(
-    page.getByRole("button", { name: "Clear Winner Image Fast", exact: true }),
+    page.getByRole("button", { name: "Clear Winner Image Fast · 4 Steps", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(run.vote).toBe(run.jobIds[1]);
   expect(state.gallery.find((item) => item.jobId === run.jobIds[1]).rating).toBe("liked");
-  await page.getByRole("button", { name: "Use Image Fast", exact: true }).click();
+  await page.getByRole("button", { name: "Use Image Fast · 4 Steps", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(prompt(page)).toHaveValue("A silver fox");
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
@@ -196,8 +198,8 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
       variant.input.loras.length,
     ]),
   ).toEqual([
-    ["Image Quality", "image:test", "A copper fox", 1],
-    ["Image Fast", "image:fast", "A copper fox", 1],
+    ["Image Quality · 20 Steps", "image:test", "A copper fox", 1],
+    ["Image Fast · 4 Steps", "image:fast", "A copper fox", 1],
   ]);
   expect(requests[0].input.seed).toBe(requests[1].input.seed);
 });

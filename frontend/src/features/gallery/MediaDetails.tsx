@@ -722,14 +722,12 @@ function RelatedLink({
  * ancestors between the original and the source that aren't loaded.
  */
 function LineageFlow({
-  item,
   related,
   source,
   sourcePending,
   changes,
   open,
 }: {
-  item: MediaItem;
   related: ReturnType<typeof derivations>;
   source?: MediaItem;
   sourcePending: boolean;
@@ -787,12 +785,9 @@ function LineageFlow({
       )}
       <li className={classes.step} data-current>
         <span className={classes.marker} />
-        <span>
-          <PartLabel>This Result</PartLabel>
-          <Text size="sm" fw={500}>
-            {mediaTitle(item)}
-          </Text>
-        </span>
+        <Text size="sm" fw={500}>
+          This Result
+        </Text>
       </li>
       {[
         ...versions.map((child) => ["Version", child] as const),
@@ -994,7 +989,6 @@ export function MediaDetails({
           <Stack gap="sm">
             {flow && (
               <LineageFlow
-                item={item}
                 related={related}
                 source={source}
                 sourcePending={parent.isPending}
