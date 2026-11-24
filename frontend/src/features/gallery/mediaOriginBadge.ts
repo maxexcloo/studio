@@ -11,6 +11,7 @@ const badges = {
   import: { icon: icons.import, label: "From Import" },
   mcp: { icon: icons.chat, label: "From MCP" },
   project: { icon: icons.project, label: "From Project" },
+  recreate: { icon: icons.recreate, label: "From Recreate" },
   remaster: { icon: icons.recreate, label: "From Video Remaster" },
   upload: { icon: icons.upload, label: "From Upload" },
 };
@@ -18,10 +19,9 @@ const badges = {
 export function mediaOriginBadge(item: DreamItem, inComparison: boolean) {
   if (inComparison || item.dream?.pair) return badges.comparison;
   if (item.uploaded) return item.source ? badges.import : badges.upload;
-  if (item.type === "video") {
-    if (item.dream?.arm === "extend") return badges.extend;
-    if (item.dream?.arm === "recreate") return badges.remaster;
-  }
+  if (item.dream?.arm === "extend") return badges.extend;
+  if (item.dream?.arm === "recreate") return badges.recreate;
+  if (item.dream?.arm === "remaster") return badges.remaster;
   if (item.dream?.projectId) return badges.project;
   const origin = galleryOrigin(item);
   if (origin) return badges[origin];
