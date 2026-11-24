@@ -100,10 +100,12 @@ test(
   "concurrent image/video submissions, progress and completion stay on their own backends",
   { timeout: 10000 },
   async () => {
-    // Written by the prompt assistant in chat: the record rides in extra_data, so a rebuild from history keeps it.
+    // Written by the prompt assistant in chat: the record and what was typed ride in extra_data, so
+    // a rebuild from history keeps them.
     const imageBody = {
       ...request("primary"),
       assistant: { preset: "cinematic", model: "cloud/text", source: "chat" },
+      originalPrompt: "a cat",
     };
     const videoBody = request("video");
     queue("image-one", imageBody);
@@ -156,7 +158,10 @@ test(
       model: "cloud/text",
       source: "chat",
     });
+    assert.equal(rebuilt?.originalPrompt, "a cat");
+    assert.equal(jobs.get("image-one").outputs[0].originalPrompt, "a cat");
     assert.deepEqual(makePendingItems("x", imageBody)[0].assistant, imageBody.assistant);
+    assert.equal(makePendingItems("x", imageBody)[0].originalPrompt, "a cat");
   },
 );
 

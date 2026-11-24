@@ -576,6 +576,7 @@ async function runJob(id, body, { prepare = null, store } = {}) {
             settings: generationSettings(body),
             ...(body.ownerId ? { ownerId: body.ownerId } : {}),
             ...(body.assistant ? { assistant: body.assistant } : {}),
+            ...(body.originalPrompt ? { originalPrompt: body.originalPrompt } : {}),
             ...(body.writing ? { writing: body.writing } : {}),
             ...(body.chat ? { chat: body.chat } : {}),
             ...(body.resultSet ? { resultSet: body.resultSet } : {}),

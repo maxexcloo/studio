@@ -200,6 +200,7 @@ export function makePendingItems(id, body) {
     settings: generationSettings(body),
     // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
     ...(body.assistant ? { assistant: body.assistant } : {}),
+    ...(body.originalPrompt ? { originalPrompt: body.originalPrompt } : {}),
     // The prompt the queue's writing stage wrote keeps its thinking, under the prompt in Details.
     ...(storedWritingRecord(body.writing) ? { writing: storedWritingRecord(body.writing) } : {}),
     ...(body.chat ? { chat: body.chat } : {}),

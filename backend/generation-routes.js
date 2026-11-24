@@ -312,6 +312,10 @@ export function createGenerationSubmission({
     const assistant = assistantRecord(input.assistant, body.loras);
     if (assistant) body.assistant = assistant;
     else delete body.assistant;
+    // What was typed before the prompt assistant rewrote it, for Details; kept only when it differs.
+    const originalPrompt = String(input.originalPrompt || "").trim();
+    if (originalPrompt && originalPrompt !== body.prompt) body.originalPrompt = originalPrompt;
+    else delete body.originalPrompt;
     // The queue's writing stage wrote the prompt (prompt-stage.js): its results keep the thinking.
     const writing = storedWritingRecord(input.writing);
     if (writing) body.writing = writing;
