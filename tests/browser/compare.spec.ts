@@ -300,7 +300,7 @@ test("Compare preserves provider resolution enum values without converting them 
   expect(state.comparisons[0].requests.map((variant: any) => variant.label)).toEqual(["1K", "2K"]);
 });
 
-test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async ({ page }) => {
+test("Test in the Library LoRA menu sweeps a LoRA's strength in the composer", async ({ page }) => {
   const state = await fixtures(page);
   await page.route("**/api/library/items", (route) =>
     route.fulfill({
@@ -343,7 +343,7 @@ test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async 
   await openNav(page, "Library");
   await section(page, "Library", "LoRAs");
   await page.getByRole("button", { name: "Actions for Detail Slider", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Test LoRA", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Test", exact: true }).click();
   await expect(prompt(page)).toHaveValue("A fox in fine detail");
   await expectVariantCount(page, 4);
   await runComparison(page);

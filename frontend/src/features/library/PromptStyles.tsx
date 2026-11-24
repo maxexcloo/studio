@@ -276,7 +276,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
           <Stack gap="xs" align="start">
             <Text size="sm">These styles were drafted in chat. Review them, then approve.</Text>
             <Button size="compact-sm" loading={approve.isPending} onClick={() => approve.mutate()}>
-              Approve Draft
+              Approve
             </Button>
           </Stack>
         </Alert>

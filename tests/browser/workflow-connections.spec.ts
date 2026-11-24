@@ -214,7 +214,7 @@ test("Workflow inspection retry and save conflicts retain the edited connection 
   const prompt = editor.getByRole("combobox", { name: "Control prompt Node", exact: true });
   await expect(prompt).toBeDisabled();
   await expect(prompt).toHaveValue("text.one");
-  await editor.getByRole("button", { name: "Retry Connections", exact: true }).click();
+  await editor.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(prompt).toBeEnabled();
   await prompt.click();
   await page.getByRole("option", { name: "Target Encoder #text.two", exact: true }).click();

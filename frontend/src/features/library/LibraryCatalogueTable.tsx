@@ -465,7 +465,7 @@ export function LibraryCatalogueTable({
               )}
               {onTest && item.installed && item.folder === "loras" && (
                 <Menu.Item leftSection={<icons.compare size={16} />} onClick={() => onTest(item)}>
-                  Test LoRA
+                  Test
                 </Menu.Item>
               )}
               {onInstall && item.installable && (
