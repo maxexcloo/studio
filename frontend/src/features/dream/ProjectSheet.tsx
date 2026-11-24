@@ -365,7 +365,10 @@ export function ProjectSheet({
         ) : (
           <Group gap="xs" wrap="nowrap" component="span">
             {shown.name}
-            <ProjectFlags project={shown} />
+            {/* The dialog keeps the project's name; its Status group states the same flags. */}
+            <span aria-hidden>
+              <ProjectFlags project={shown} />
+            </span>
           </Group>
         )
       }
