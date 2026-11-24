@@ -199,6 +199,7 @@ export function ViewerPrompt({
                       },
                     ]
                   : []),
+                ...(imageAction === "edit" ? editProfiles : []),
                 {
                   id: "review",
                   label: "Review Prompt",
@@ -208,7 +209,6 @@ export function ViewerPrompt({
                   disabled: ask.pending,
                   onClick: () => setReview(!reviewPrompt),
                 },
-                ...(imageAction === "edit" ? editProfiles : []),
               ],
               suggestions,
               ...changeTemplates(
