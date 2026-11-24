@@ -5,12 +5,7 @@ import { briefSummary } from "../../shared/projects.ts";
 import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { directRoute } from "../domain/direct-route.ts";
-import {
-  explicitExclusions,
-  forbiddenMotifs,
-  mentionsMotif,
-  phraseWords,
-} from "../domain/dream-concepts.ts";
+import { explicitExclusions, mentionsMotif } from "../domain/dream-concepts.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -68,7 +63,7 @@ export function createChatChoices({ dataDir, now = Date.now }) {
       saved[key(owner, chat)] = { ...choices, at: now() };
       writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
     },
-    /** The account's chats with something remembered, newest first, for Taste › Chat Notes. */
+    /** The account's chats with something remembered, newest first, for Settings › Taste › Chat Choices. */
     list(account, at = now()) {
       return Object.entries(all())
         .flatMap(([stored, { references, image, video, loras, count, title, at: used }]) => {
@@ -109,7 +104,7 @@ export function createChatChoices({ dataDir, now = Date.now }) {
   };
 }
 
-/** Taste › Chat Notes' list of what each chat remembers, and Clear. */
+/** Settings › Taste › Chat Choices' list of what each chat remembers, and Clear. */
 export function registerChatChoiceRoutes(app, { dataDir }) {
   const choices = createChatChoices({ dataDir });
   directRoute(app, "GET", "/api/chat-choices", (account) => ({
@@ -209,11 +204,10 @@ export function assertAvoided({ name, brief }, prompts) {
     .map((term) => ({
       term,
       exact: new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu"),
-      motifs: forbiddenMotifs([term], []),
     }));
   for (const [index, prompt] of prompts.entries())
-    for (const { term, exact, motifs } of terms)
-      if (exact.test(prompt) || motifs.some((motif) => mentionsMotif(prompt, motif)))
+    for (const { term, exact } of terms)
+      if (exact.test(prompt))
         throw new Error(
           `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again; never remove an avoid to get past this.`,
         );
@@ -288,7 +282,7 @@ export function assertProjectReuse(project, profile, input, known) {
   }
 }
 
-/** The only Dream Taste constraint on generation submitted through MCP. */
+/** The only Taste constraint on generation submitted through MCP. */
 export async function accountExclusions(media, owner, signal) {
   const taste = await media
     .request("GET", "/api/taste", undefined, owner, { signal })
@@ -361,21 +355,20 @@ const tidied = (text) =>
  * is no longer the request. `excluded` maps each changed prompt to the words removed from it.
  */
 export function withoutTasteExclusions(exclusions, prompts) {
-  const explicit = exclusions.map((entry) => [entry, explicitExclusions([entry])]);
+  const motifs = explicitExclusions(exclusions);
   const excluded = {};
   const removed = [];
   const cleaned = prompts.map((prompt, index) => {
     if (!prompt) return prompt;
     let next = prompt;
     const words = [];
-    for (const [entry, motifs] of explicit)
-      for (const motif of motifs)
-        for (let span = motifSpan(next, motif); span; span = motifSpan(next, motif)) {
-          const [start, end, named] = span;
-          next = `${next.slice(0, start)}${next.slice(end)}`;
-          words.push(named);
-          removed.push({ index, named, entry });
-        }
+    for (const motif of motifs)
+      for (let span = motifSpan(next, motif); span; span = motifSpan(next, motif)) {
+        const [start, end, named] = span;
+        next = `${next.slice(0, start)}${next.slice(end)}`;
+        words.push(named);
+        removed.push({ index, named });
+      }
     if (!words.length) return prompt;
     next = tidied(next);
     if (contentWords(next) < 2)
@@ -388,8 +381,8 @@ export function withoutTasteExclusions(exclusions, prompts) {
   const note = removed.length
     ? `Removed for the user's Taste exclusions: ${removed
         .map(
-          ({ index, named, entry }) =>
-            `"${named}"${prompts.length > 1 ? ` from prompt ${index + 1}` : ""}${phraseWords(named) === phraseWords(entry) ? "" : ` (${entry})`}`,
+          ({ index, named }) =>
+            `"${named}"${prompts.length > 1 ? ` from prompt ${index + 1}` : ""}`,
         )
         .join(", ")}. Tell the user. `
     : "";

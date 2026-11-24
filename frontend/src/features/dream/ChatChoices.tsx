@@ -8,7 +8,7 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type RememberedChat, chatChoicesQuery } from "./queries";
 
-/** Taste › Chat Notes: what each chat's later generate calls keep, each with Clear. */
+/** Settings › Taste › Chat Choices: what each chat's later generate calls keep, each with Clear. */
 export function ChatChoices() {
   const client = useQueryClient();
   const chats = useQuery(chatChoicesQuery);

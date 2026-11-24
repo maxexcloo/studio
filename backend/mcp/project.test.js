@@ -79,7 +79,7 @@ test("a conversation keeps its own LoRAs off, tier and count where a call leaves
   assert.deepEqual(choices.read("alice", "chat-b"), {});
   assert.deepEqual(choices.read("bob", "chat-a"), {});
   assert.deepEqual(choices.read("alice", ""), {});
-  // Taste › Chat Notes lists and clears only the account's own chats.
+  // Settings › Taste › Chat Choices lists and clears only the account's own chats.
   const alice = { userId: "alice" };
   const bob = { userId: "bob" };
   assert.deepEqual(
@@ -96,7 +96,7 @@ test("a conversation keeps its own LoRAs off, tier and count where a call leaves
 test("Taste exclusions leave a prompt with what they name removed, unless little would remain", () => {
   const exclusions = ["smoking", "laundry rooms"];
   const { prompts, excluded, note } = withoutTasteExclusions(exclusions, [
-    "A man with a cigarette, on a bench at dusk",
+    "A man smoking, on a bench at dusk",
     "A sunlit hall, no laundry rooms",
     "A smokestack over the harbour",
   ]);
@@ -106,14 +106,14 @@ test("Taste exclusions leave a prompt with what they name removed, unless little
     "A smokestack over the harbour",
   ]);
   assert.deepEqual(excluded, {
-    "A man, on a bench at dusk": ["cigarette"],
+    "A man, on a bench at dusk": ["smoking"],
     "A sunlit hall": ["laundry rooms"],
   });
-  assert.match(note, /"cigarette" from prompt 1 \(smoking\), "laundry rooms" from prompt 2/);
+  assert.match(note, /"smoking" from prompt 1, "laundry rooms" from prompt 2/);
   assert.deepEqual(withoutTasteExclusions(exclusions, ["A quiet harbour"]).note, "");
   assert.throws(
-    () => withoutTasteExclusions(exclusions, ["A lit cigarette"]),
-    /Prompt 1 is little more than "cigarette"/,
+    () => withoutTasteExclusions(exclusions, ["Smoking"]),
+    /Prompt 1 is little more than "Smoking"/,
   );
 });
 

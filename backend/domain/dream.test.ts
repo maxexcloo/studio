@@ -881,17 +881,12 @@ test("Dream draws from the models and tags a person favours over those it learnt
     /Avoids: surreal props\nLikes: quiet candid portraits\nPreferred Styles: documentary photography/,
   );
   assert.match(system, /Treat recurring props and settings as incidental/);
-  assert.match(system, /Build the idea around one of these starting points/);
-  // Photography stands in for medium; only a fresh concept also draws a subject, and no featured tag.
-  assert.doesNotMatch(
-    state.calls[0].system,
-    /Possible starting points:.*(?:\bsubject:|medium or style:)/,
-  );
-  assert.match(system, /Possible starting points:.*\bsubject:/);
-  assert.doesNotMatch(system, /medium or style:|Keep this taste they like/);
+  assert.match(system, /Choose your own starting point/);
+  // A fresh concept features no tag.
+  assert.doesNotMatch(system, /Keep this taste they like/);
 });
 
-test("Each new idea sees a few drawn tastes and liked prompts from outside Dream, and what to change first", async (t) => {
+test("Each new idea sees a few drawn tastes and liked prompts from outside Dream", async (t) => {
   const { dataDir, dream, state, dreamOnce, generated } = fixture(t);
   learn(dataDir, "alice", {
     likes: ["harbours", "markets", "rain", "bicycles", "kites"],
@@ -923,7 +918,6 @@ test("Each new idea sees a few drawn tastes and liked prompts from outside Dream
   assert.match(user, /\nPreferred Styles: [^,\n]+\n/);
   assert.match(user, /Liked prompts:\n- a kite\n/);
   assert.doesNotMatch(user, /dreamt lantern/);
-  assert.match(user, /Change first this time: palette: the colors and tones\./);
   // What fed the idea stays on it for its Details.
   const inputs = job?.dream?.inputs;
   assert.equal(inputs?.likes?.length, 2);
@@ -940,7 +934,7 @@ test("Each new idea sees a few drawn tastes and liked prompts from outside Dream
   assert.equal(explored?.dream?.inputs?.prompts, undefined);
 });
 
-test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
+test("Fresh concepts rotate inspirations without overriding a model experiment", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   state.access.alice!.uncensored = true;
   state.inspiration = [
@@ -950,14 +944,12 @@ test("Fresh concepts rotate anchors and inspirations without overriding a model 
   ];
   await dream.save("alice", { enabled: true });
   const seen: string[] = [];
-  const anchors: string[][] = [];
   for (let index = 0; index < 13; index++) {
     state.rolls = [99, 0];
     const job = await dreamOnce();
     assert.ok(job);
     assert.equal((job.input.writing as { explore?: boolean }).explore, true);
     seen.push((job.input.writing as { inspiration: string }).inspiration);
-    anchors.push(dream.read("alice").anchors!.slice(0, 20));
     assert.match(state.calls.at(-1)!.system, /change one or two/);
     assert.match(
       state.calls.at(-1)!.system,
@@ -970,18 +962,6 @@ test("Fresh concepts rotate anchors and inspirations without overriding a model 
   }
   assert.notEqual(seen[0], seen[1], "Duplicate catalogue entries do not repeat an inspiration");
   assert.equal(seen[0], seen[2], "Exhausted inspirations return oldest first");
-  for (const axis of ["subject", "action", "setting", "camera or composition"]) {
-    const choices = anchors
-      .slice(0, axis === "camera or composition" ? 10 : 12)
-      .map((draw) => draw.find((value) => value.startsWith(`${axis}:`)));
-    assert.equal(
-      new Set(choices).size,
-      choices.length,
-      `${axis} rotates independently of prompt wording`,
-    );
-  }
-  assert.equal(anchors[0][0], anchors[12][0], "An exhausted axis returns to its oldest choice");
-  assert.equal(dream.read("bob").anchors, undefined);
   assert.equal(dream.read("bob").inspirations, undefined);
   state.inspiration = [{ prompt: "a newly saved concept", loras: [] }];
   state.rolls = [99, 0];
@@ -1052,39 +1032,6 @@ test("Fresh concepts cool down repeated optional motifs across otherwise differe
   assert.match(state.calls[3].user, /The optional motif "paper lantern" has appeared/);
 });
 
-test("Motif cooldowns recognise unlabelled laundry and smoking across different scenes", async (t) => {
-  const { dataDir, dream, state, dreamOnce } = fixture(t);
-  await dream.save("alice", { enabled: true });
-  writeRuntimeDocument(dataDir, "dream:alice", {
-    ...dream.read("alice"),
-    recent: [
-      "Two masked detectives meet after hours in a closed laundromat. A cigarette burns.",
-      "A sailor holding a cigar watches the wind tangle shirts on a mountain clothesline.",
-    ],
-  });
-  const first = "A diver watches a seal circle a kelp forest";
-  const second = "An astronomer watches a snowstorm from a stone observatory";
-  state.replies = [
-    {
-      prompt: "A childproof washing machine hums in the corner of a spaceship",
-      motifs: ["spaceship"],
-    },
-    { prompt: first },
-    { prompt: "A glass ashtray sits on the bank counter beneath a security monitor" },
-    { prompt: second },
-  ];
-  for (const prompt of [first, second]) {
-    state.rolls = [99];
-    assert.equal((await dreamOnce())?.input.prompt, prompt);
-  }
-  assert.match(
-    state.calls[0].user,
-    /Recently repeated optional motifs to leave out this time: laundry, smoking/,
-  );
-  assert.match(state.calls[1].user, /The optional motif "laundry" has appeared/);
-  assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
-});
-
 test("Dream retries explicit exclusions and project avoids without cooling required motifs", async (t) => {
   const { dataDir, dream, projects, state, taste, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -1099,7 +1046,6 @@ test("Dream retries explicit exclusions and project avoids without cooling requi
   writeRuntimeDocument(dataDir, "dream:alice", {
     ...dream.read("alice"),
     motifs: [["paper lantern"], ["paper lantern"]],
-    recent: ["An old laundromat stands empty in a storm.", "A clothesline spans a mountain path."],
   });
 
   const kept = [
@@ -1108,7 +1054,7 @@ test("Dream retries explicit exclusions and project avoids without cooling requi
     { prompt: "A paper lantern leads a night parade across a castle's drawbridge." },
   ];
   state.replies = [
-    { prompt: "A washing machine hums in the corner of a spaceship." },
+    { prompt: "A laundry basket sits in the corner of a spaceship." },
     kept[0],
     { prompt: "A quiet balcony at night, with no smoking allowed." },
     kept[1],
@@ -1120,10 +1066,6 @@ test("Dream retries explicit exclusions and project avoids without cooling requi
     assert.equal((await dreamOnce())?.input.prompt, value.prompt);
   }
 
-  assert.match(
-    state.calls[0].user,
-    /Recently repeated optional motifs to leave out this time: laundry/,
-  );
   assert.match(state.calls[1].user, /"laundry", which their exclusions or brief say to avoid/);
   assert.match(state.calls[3].user, /"smoking", which their exclusions or brief say to avoid/);
   assert.match(state.calls[5].user, /"neon signs", which their exclusions or brief say to avoid/);
