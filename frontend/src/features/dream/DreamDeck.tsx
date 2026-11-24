@@ -581,6 +581,7 @@ export function DreamDeck({
               card={top}
               side={shown}
               onMore={() => void act("more")}
+              onKeep={() => void act("keep")}
               onApplied={onSuggestionApplied}
             />
           )

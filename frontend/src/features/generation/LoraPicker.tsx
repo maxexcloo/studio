@@ -16,6 +16,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { keptLabel } from "../../../../shared/dream";
 import { ratingSortLabels } from "../../../../shared/gallery-sort";
 import {
   type LoraConstraints,
@@ -37,6 +38,7 @@ import { OrderedItems } from "../../ui/OrderedItems";
 import { SortMenu, nameSortLabels } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
+import { keepRatesQuery } from "../dream/queries";
 import { chipProps } from "./chip";
 import { useDraft, useGeneration } from "./GenerationProvider";
 import { type LoraLibrary, loraLibraryQuery } from "./loraLibrary";
@@ -360,6 +362,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   });
   const library = useQuery(loraLibraryQuery);
   const previews = useQuery(loraPreviewsQuery);
+  const keepRates = useQuery(keepRatesQuery);
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];
   // A LoRA the Library hides isn't offered; a stack that has one keeps it.
@@ -460,6 +463,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
                   .map((key) => modelFamilyLabel(key))
                   .join(", "),
                 typeNames[typeOf(file)] || typeOf(file),
+                keptLabel(keepRates.data?.loras[file]),
               ]
                 .filter(Boolean)
                 .join(" · ") ||

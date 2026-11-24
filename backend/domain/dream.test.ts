@@ -3799,3 +3799,36 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     { assetId: "last-frame-clip", source: "gallery", slot: "start" },
   ]);
 });
+
+test("Keep rates count each owner's judged Dream images by profile, LoRA and tag", async (t) => {
+  const fx = fixture(t);
+  const request = await serve(t, fx);
+  for (const [index, ownerId, state, passReason] of [
+    [0, "alice", "kept", undefined],
+    [1, "alice", "discarded", "taste"],
+    [2, "alice", "discarded", "similar"],
+    [3, "bob", "kept", undefined],
+  ] as const)
+    fx.generated({
+      id: `rated-${index}`,
+      ownerId,
+      type: "image",
+      status: "done",
+      prompt: `rated ${index}`,
+      settings: { profileId: "flux", loras: [{ name: "film.safetensors" }] },
+      caption: { text: "", tags: ["Red Dress", "beach"] },
+      dream: { prompt: "", why: "", at: "", state, ...(passReason && { passReason }) },
+    });
+  const oneOfTwo = { kept: 1, total: 2 };
+  assert.deepEqual((await request("/keep-rates")).body, {
+    profiles: { flux: oneOfTwo },
+    loras: { "film.safetensors": oneOfTwo },
+    tags: { "red dress": oneOfTwo, beach: oneOfTwo },
+  });
+  fx.state.access.bob = null;
+  assert.deepEqual((await request("/keep-rates", undefined, "GET", "bob")).body, {
+    profiles: {},
+    loras: {},
+    tags: {},
+  });
+});

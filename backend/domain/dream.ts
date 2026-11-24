@@ -18,6 +18,8 @@ import {
   type DreamPassReason,
   type DreamResultSet,
   type DreamSettings,
+  type KeepCount,
+  type KeepRates,
   type PairAnswer,
   dreamCardCounts,
   dreamDefaults,
@@ -221,7 +223,7 @@ export type DreamItem = QueueMedia & {
   rating?: string;
   createdAt?: string;
   settings?: Record<string, unknown>;
-  caption?: { text?: string };
+  caption?: { text?: string; tags?: unknown };
   resultSet?: DreamResultSet & { context?: ResultContext };
   /** The chat that asked for it. */
   chat?: { conversationId: string };
@@ -1110,7 +1112,7 @@ export function createDream(options: {
    * profile or LoRA starts at one half.
    */
   function judgement(ownerId: string) {
-    const judged = new Map<string, { kept: number; total: number }>();
+    const judged = new Map<string, KeepCount>();
     for (const item of options.gallery(ownerId, {
       dreamState: ["kept", "discarded"],
       type: "image",
@@ -1118,11 +1120,13 @@ export function createDream(options: {
     })) {
       if (item.dream?.passReason === "similar") continue;
       const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
-      for (const key of [
+      const tags = Array.isArray(item.caption?.tags) ? item.caption.tags : [];
+      for (const key of new Set([
         `profile:${item.settings?.profileId}`,
         ...(loras.length ? [`loras:${item.settings?.profileId}`] : []),
         ...loras.map((lora) => `lora:${(lora as { name?: string })?.name}`),
-      ]) {
+        ...tags.map((tag) => `tag:${String(tag).trim().toLowerCase()}`),
+      ])) {
         const entry = judged.get(key) ?? { kept: 0, total: 0 };
         entry.total++;
         if (item.dream?.state === "kept") entry.kept++;
@@ -1131,6 +1135,7 @@ export function createDream(options: {
     }
     const counts = (key: string) => judged.get(key) ?? { kept: 0, total: 0 };
     return {
+      judged,
       counts,
       keepRate(key: string) {
         const { kept, total } = counts(key);
@@ -3964,6 +3969,18 @@ export function createDream(options: {
       return record.visit.since || null;
     },
     unseen,
+    /** The account's keeps by profile, LoRA and caption tag, as Dream weighs them. */
+    keepRates(ownerId: string): KeepRates {
+      const rates: KeepRates = { profiles: {}, loras: {}, tags: {} };
+      const families = { profile: rates.profiles, lora: rates.loras, tag: rates.tags };
+      for (const [key, count] of judgement(ownerId).judged) {
+        const at = key.indexOf(":");
+        const name = key.slice(at + 1);
+        const family = families[key.slice(0, at) as keyof typeof families];
+        if (family && name && name !== "undefined") family[name] = count;
+      }
+      return rates;
+    },
     unseenCount(ownerId: string) {
       const record = read(ownerId);
       const { settings } = record;

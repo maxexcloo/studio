@@ -424,3 +424,34 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   expect(state.presets[0].input.loras).toEqual(portrait);
   expect(state.jobs).toHaveLength(0);
 });
+
+test("Models and LoRAs show their Dream keep rate once enough verdicts back it", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.route("**/api/dream/keep-rates", (route) =>
+    route.fulfill({
+      json: {
+        profiles: { "image:test": { kept: 19, total: 30 }, "image:fast": { kept: 3, total: 4 } },
+        loras: { "soft-style.safetensors": { kept: 8, total: 10 } },
+        tags: {},
+      },
+    }),
+  );
+  await create(page);
+  await page.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await expect(page.getByRole("option", { name: /^Image Quality\b/ })).toContainText(
+    "Studio Image · Image · Local GPU · Kept 63%",
+  );
+  // Four verdicts are too few to say.
+  await expect(page.getByRole("option", { name: /^Image Fast\b/ })).not.toContainText("Kept");
+  await page.keyboard.press("Escape");
+  await openLoraChoices(page);
+  const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
+  await expect(choices.getByRole("listitem").filter({ hasText: "Soft Style" })).toContainText(
+    "Kept 80%",
+  );
+  await expect(
+    choices.getByRole("listitem").filter({ hasText: "Detail Slider" }),
+  ).not.toContainText("Kept");
+});

@@ -682,6 +682,27 @@ test("sets up distinct variations of one owned image in a single writing request
   assert.equal(calls.length, 1);
 });
 
+test("varying one direction alone writes several variations of only that direction", async () => {
+  const poses = ["Seated Low", "Mid Stride", "Arms Crossed", "Looking Back"];
+  let reply = poses.map((label) => ({ label, prompt: `Rae ${label.toLowerCase()} at dawn` }));
+  const { suggestions, calls } = fixture({ reply: () => JSON.stringify({ pose: reply }) });
+  const request = {
+    surface: "change",
+    jobId: "job-a",
+    itemId: "result-a",
+    directions: ["pose"],
+    actions: ["recreate"],
+  };
+  const answer = await suggestions.suggest("alice", request);
+  assert.deepEqual(
+    answer.suggestions.map((option) => [option.label, "request" in option && option.request]),
+    poses.map((label) => [label, "pose"]),
+  );
+  assert.match(calls[0][0].content, /Write 4 pose variations, each unlike the others/);
+  reply = reply.slice(0, 2);
+  assert.match((await suggestions.suggest("alice", request)).reason!, /distinct prompts/);
+});
+
 test("each output supplies its own picture and saved ideas without crossing owners or jobs", async () => {
   const { calls, pictures, suggestions, items } = fixture({ image: true });
   items["alice:second"] = {

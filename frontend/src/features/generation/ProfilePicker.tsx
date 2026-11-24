@@ -3,10 +3,12 @@ import { notifications } from "@mantine/notifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+import { keptLabel } from "../../../../shared/dream";
 import { isCloudProfile } from "../../../../shared/profiles";
 import type { GenerationInput, Models, Profile } from "../../types";
 import { compareNames } from "../../ui/DataTable";
 import { useIsAdmin } from "../auth/AccountGate";
+import { keepRatesQuery } from "../dream/queries";
 import { servicesStatusQuery } from "../runtime/RuntimePanel";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect, type ChipSelectProps } from "./ChipSelect";
@@ -114,6 +116,7 @@ export function ProfileSelect({
   >
 >) {
   const readinessOf = useReadiness();
+  const keepRates = useQuery(keepRatesQuery).data;
   const selected = profiles.find((profile) => isProfile(profile, value ?? undefined));
   const selectedLabel = selected && profileLabel(selected, profiles);
   const readiness = selected && readinessOf(selected);
@@ -134,7 +137,12 @@ export function ProfileSelect({
         return (
           <ChipOption
             label={option.label}
-            description={profile && profileFacts(profile)}
+            description={
+              profile &&
+              [profileFacts(profile), keptLabel(keepRates?.profiles[profile.id])]
+                .filter(Boolean)
+                .join(" · ")
+            }
             checked={checked}
             badges={
               <>

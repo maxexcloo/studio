@@ -11,6 +11,7 @@ import {
   type Suggestions,
   type VariationDirection,
   changeActions,
+  directionVariants,
   maxSuggestionReferences,
   maxSuggestions,
   variationDirections,
@@ -104,10 +105,13 @@ const savedRevision = (field: "nextSteps" | "motionIdeas", item?: SuggestionItem
 const shownIdeas = maxSuggestions;
 const maxRequest = 500;
 const directionRequests: Record<VariationDirection, string> = {
+  light:
+    "Give the same scene distinct lighting: the time of day, light source, direction and color of the light. Keep the subject's identity, pose, outfit, setting and visual style.",
+  outfit:
+    "Give the same subject a distinct outfit suited to the original setting. Keep the subject's identity, pose, setting and visual style.",
+  pose: "Give the same subject a distinct pose, gesture or action suited to the setting. Keep the subject's identity, outfit, setting, lighting and visual style.",
   scene:
     "Give the same subject a distinct setting. Keep the subject's identity, outfit and visual style.",
-  outfit:
-    "Give the same subject a distinct outfit suited to the original setting. Keep the subject's identity, setting and visual style.",
   style:
     "Give the same subject a distinct visual treatment through lighting, color and camera or artistic medium. Keep the subject's identity, setting and outfit.",
 };
@@ -713,6 +717,8 @@ export function createSuggestions({
     const loses = draft ? "" : editLoss(source, editWriting, profileId);
     const instruction = offered.includes("edit") && editing === "instruction";
     const onlyInstruction = instruction && offered.length === 1;
+    // One direction alone gets several variations of it, to compare.
+    const alone = directions?.length === 1 ? directions[0] : undefined;
     const system = promptInstruction("write-change", {
       sourceContext: draft
         ? promptInstruction("change-composer-prompt", { kind })
@@ -723,6 +729,11 @@ export function createSuggestions({
         ? [
             promptInstruction("write-distinct-variations"),
             ...directions.map((direction) => `${direction}: ${directionRequests[direction]}`),
+            ...(alone
+              ? [
+                  `Write ${directionVariants} ${alone} variations, each unlike the others, changing only the ${alone}.`,
+                ]
+              : []),
             promptInstruction("name-each-variation"),
           ]
         : [
@@ -757,11 +768,16 @@ export function createSuggestions({
       contentRule: contentRule(explicit(ownerId)),
       americanEnglish,
       avoidFiller: avoidFiller(),
-      replyFormat: directions
-        ? `Reply with JSON only, keyed by direction: {${directions
-            .map((direction) => `"${direction}": {"label": "<label>", "prompt": "<the prompt>"}`)
-            .join(", ")}}.`
-        : `Reply with JSON only: {"action": "<${offered.join("|")}>", "label": "<label>", "prompt": "<the prompt>"}.`,
+      replyFormat: alone
+        ? `Reply with JSON only: {"${alone}": [${Array.from(
+            { length: directionVariants },
+            () => `{"label": "<label>", "prompt": "<the prompt>"}`,
+          ).join(", ")}]}.`
+        : directions
+          ? `Reply with JSON only, keyed by direction: {${directions
+              .map((direction) => `"${direction}": {"label": "<label>", "prompt": "<the prompt>"}`)
+              .join(", ")}}.`
+          : `Reply with JSON only: {"action": "<${offered.join("|")}>", "label": "<label>", "prompt": "<the prompt>"}.`,
     });
     let text: string;
     try {
@@ -797,13 +813,19 @@ export function createSuggestions({
     const reply = json(text);
     if (directions) {
       const original = promptText(source.prompt);
-      const suggestions = directions.map((direction) => ({
+      const written = alone
+        ? (Array.isArray(reply?.[alone]) ? reply[alone] : [])
+            .slice(0, directionVariants)
+            .map((variation: unknown) => [alone, variation] as const)
+        : directions.map((direction) => [direction, reply?.[direction]] as const);
+      const suggestions = written.map(([direction, variation]) => ({
         action: "recreate" as const,
-        label: shortTitle(clean(reply?.[direction]?.label, 40), 4),
+        label: shortTitle(clean((variation as { label?: unknown })?.label, 40), 4),
         request: direction,
-        prompt: promptText(reply?.[direction]?.prompt),
+        prompt: promptText((variation as { prompt?: unknown })?.prompt),
       }));
       if (
+        suggestions.length !== (alone ? directionVariants : directions.length) ||
         suggestions.some(({ label, prompt }) => !label || !prompt || prompt === original) ||
         new Set(suggestions.map(({ prompt }) => prompt)).size !== suggestions.length
       ) {
@@ -979,13 +1001,20 @@ export function createSuggestions({
       const referenceIds = (references ?? []) as string[];
       if (surface === "change" || (surface === "draft" && body.request !== undefined)) {
         const request = clean(body.request, maxRequest);
+        // In the order asked for, which the variations keep.
         const directions =
           body.directions === undefined
             ? undefined
-            : variationDirections.filter(
-                (direction) =>
-                  Array.isArray(body.directions) && body.directions.includes(direction),
-              );
+            : variationDirections
+                .filter(
+                  (direction) =>
+                    Array.isArray(body.directions) && body.directions.includes(direction),
+                )
+                .sort(
+                  (a, b) =>
+                    (body.directions as unknown[]).indexOf(a) -
+                    (body.directions as unknown[]).indexOf(b),
+                );
         if (
           directions &&
           (surface !== "change" ||
@@ -993,7 +1022,7 @@ export function createSuggestions({
             !directions.length ||
             directions.length !== body.directions.length)
         ) {
-          throw failure("Choose distinct Scene, Outfit or Style directions.", 400);
+          throw failure("Choose distinct Light, Outfit, Pose, Scene or Style directions.", 400);
         }
         // A draft has nothing to upscale yet.
         const actions = changeActions.filter(

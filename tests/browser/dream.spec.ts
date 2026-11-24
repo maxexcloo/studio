@@ -355,6 +355,51 @@ test("Suggest can queue a variation of a library import without a job or prompt"
   ]);
 });
 
+test("Keep & Vary accepts a Dream card and stages four variations of one thing to compare", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const dream = await serveDream(page, { unseen: [dreamItem("harbour"), dreamItem("next")] });
+  const poses = ["Seated Low", "Mid Stride", "Arms Crossed", "Looking Back"].map((label) => ({
+    action: "recreate",
+    request: "pose",
+    label,
+    prompt: `A harbour keeper, ${label.toLowerCase()}`,
+  }));
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "change") return route.fallback();
+    expect(body).toMatchObject({ itemId: "harbour", directions: ["pose"] });
+    return route.fulfill({ json: { suggestions: poses } });
+  });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Keep & Vary", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toContainText([
+    "Vary Light",
+    "Vary Outfit",
+    "Vary Pose",
+    "Vary Scene",
+    "Vary Style",
+    "Explore Three Directions",
+  ]);
+  await page.getByRole("menuitem", { name: "Vary Pose", exact: true }).click();
+  const review = page.getByRole("dialog", { name: "Vary Pose", exact: true });
+  await review.getByRole("button", { name: "Open Composer", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.map(({ path }) => path))
+    .toContain("/api/dream/harbour/keep");
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    poses[0].prompt,
+  );
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  expect(state.jobs.map((job) => job.input.prompt)).toEqual(poses.map(({ prompt }) => prompt));
+});
+
 test("Dream video Suggestions can stage an extension from the current clip", async ({ page }) => {
   const state = await fixtures(page);
   const dream = await serveDream(page, {
@@ -691,11 +736,17 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await history.getByRole("button", { name: "Show Less", exact: true }).click();
   await expect(historyRows).toHaveCount(4);
   const profile = page.getByRole("region", { name: "Taste Profile" });
-  await expect(profile.getByText(/foxes in snow/)).toBeVisible();
-  await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
-  await expect(profile.getByText("Detail Slider 0.8", { exact: true })).toBeVisible();
-  await expect(profile.getByText("Portrait 2:3; Landscape 16:9", { exact: true })).toBeVisible();
-  await expect(profile.getByText("fox; snow", { exact: true })).toBeVisible();
+  await expect(profile.getByText("foxes in snow", { exact: true })).toBeVisible();
+  const favourite = (table: string, row: string) =>
+    page
+      .getByRole("table", { name: table, exact: true })
+      .getByRole("row", { name: row, exact: true });
+  await expect(favourite("Models", "Image Quality")).toContainText("Favourite");
+  await expect(favourite("LoRAs", "Detail Slider 0.8")).toContainText("Favourite");
+  await expect(profile.getByText("Portrait 2:3", { exact: true })).toBeVisible();
+  await expect(profile.getByText("Landscape 16:9", { exact: true })).toBeVisible();
+  await expect(favourite("Tags", "fox")).toBeVisible();
+  await expect(favourite("Scenes", "snow")).toBeVisible();
   const editTaste = page
     .getByRole("group", { name: "Dream Toolbar", exact: true })
     .getByRole("button", { name: "Edit", exact: true });
@@ -731,7 +782,7 @@ test("Taste displays readable preferences and saves explicit edits separately", 
     });
   await expect(editor).toBeHidden();
   await expect(profile.getByText("Summary · Your Edit", { exact: true })).toBeVisible();
-  await expect(profile.getByText("crowds; clowns", { exact: true })).toBeVisible();
+  await expect(profile.getByText("clowns", { exact: true })).toBeVisible();
   await expect(
     profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
   ).toBeVisible();
@@ -748,6 +799,64 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(
     page.getByRole("dialog", { name: "Clear Taste Profile", exact: true }),
   ).toBeVisible();
+});
+
+test("Taste shows keep rates by model and tag kind, and pins or removes values in place", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    taste: {
+      likes: ["misty harbours", "foxes in snow"],
+      models: ["image:test"],
+      tags: ["red dress"],
+    },
+    keepRates: {
+      profiles: { "image:test": { kept: 19, total: 30 }, "image:fast": { kept: 9, total: 10 } },
+      loras: {},
+      tags: {
+        "red dress": { kept: 6, total: 10 },
+        "golden light": { kept: 8, total: 10 },
+        beach: { kept: 2, total: 12 },
+        fox: { kept: 1, total: 3 },
+      },
+    },
+  });
+  await page.goto("/dream");
+  await showView(page, "Taste");
+  const table = (name: string) => page.getByRole("table", { name, exact: true });
+  const row = (name: string, value: string) =>
+    table(name).getByRole("row", { name: value, exact: true });
+  await expect(row("Models", "Image Fast")).toContainText("90% of 10");
+  await expect(row("Models", "Image Quality")).toContainText("63% of 30");
+  await expect(row("Models", "Image Quality")).toContainText("Favourite");
+  await expect(row("Outfits", "red dress")).toContainText("60% of 10");
+  await expect(row("Colours", "golden light")).toContainText("80% of 10");
+  await expect(row("Scenes", "beach")).toContainText("17% of 12");
+  // Three verdicts are too few to say.
+  await expect(table("Tags")).toHaveCount(0);
+  await row("Colours", "golden light")
+    .getByRole("button", { name: "Actions for golden light", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({ preferences: { tags: ["red dress", "golden light"] } });
+  await expect(row("Colours", "golden light")).toContainText("Favourite");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await row("Models", "Image Quality")
+    .getByRole("button", { name: "Actions for Image Quality", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { models: [] } });
+  await expect(row("Models", "Image Quality")).not.toContainText("Favourite");
+  const profile = page.getByRole("region", { name: "Taste Profile" });
+  await profile.getByRole("button", { name: "Remove foxes in snow", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({ preferences: { likes: ["misty harbours"] } });
+  await expect(profile.getByText("Likes · Your Edit", { exact: true })).toBeVisible();
+  await expect(profile.getByText("foxes in snow", { exact: true })).toHaveCount(0);
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
