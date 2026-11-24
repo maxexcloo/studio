@@ -15,6 +15,7 @@ export const maxTasteRule = 160;
 export interface TasteFields {
   likes: string[];
   avoid: string[];
+  exclusions: string[];
   styles: string[];
   note: string;
   rules: string[];
@@ -27,6 +28,7 @@ export type TasteWords = Pick<TasteFields, "likes" | "avoid" | "styles" | "note"
 export const tasteLimits = {
   likes: 12,
   avoid: 40,
+  exclusions: 40,
   styles: 8,
   note: 400,
   rules: 12,
@@ -64,6 +66,28 @@ export function shapeName(shape: string) {
   const orientation = ratio > 1.02 ? "Landscape" : ratio < 0.98 ? "Portrait" : "Square";
   return `${orientation} ${near ? `${near[0]}:${near[1]}` : `${shape}:1`}`;
 }
+
+/**
+ * What a caption tag names, where its words say: clothing first, so "red dress" is an outfit, then
+ * places, then colours.
+ */
+const tagKinds = [
+  [
+    "outfit",
+    /\b(?:apron|armou?r|attire|bikinis?|blazers?|blouses?|boots|bras?|cardigans?|clothing|coats?|corsets?|costumes?|dress(?:es)?|gloves|gowns?|hats?|heels|hoodies?|jackets?|jeans|kimonos?|leggings|leotards?|lingerie|outfits?|pants|robes?|scarf|scarves|shirts?|shorts|skirts?|stockings|suits?|sweaters?|swimsuits?|swimwear|tops?|trousers|underwear|uniforms?|\w*wear)\b/,
+  ],
+  [
+    "scene",
+    /\b(?:alley|backstage|bars?|bathroom|beach|bedroom|bridge|cafe|castle|church|city|cityscape|classroom|club|desert|diner|field|forest|garden|gym|harbou?r|hotel|indoors?|interior|kitchen|lake|landscape|library|market|meadow|mountains?|ocean|office|outdoors?|park|pool|restaurant|river|rooftop|room|ruins?|sea|shore|skyline|snow|space|stage|station|street|studio|subway|underwater|woods)\b/,
+  ],
+  [
+    "colour",
+    /\b(?:amber|beige|black|blue|brown|burgundy|colou?rful|cream|crimson|cyan|emerald|gold(?:en)?|gr[ae]y|green|ivory|lavender|magenta|maroon|monochrome|navy|neon|olive|orange|pastel|pink|purple|red|scarlet|silver|tan|teal|turquoise|violet|white|yellow)\b/,
+  ],
+] as const;
+export type TagKind = (typeof tagKinds)[number][0];
+export const tagKind = (tag: string): TagKind | undefined =>
+  tagKinds.find(([, words]) => words.test(tag.toLowerCase()))?.[0];
 
 /** A retained Dream action, with links only to results still available to its owner. */
 export interface DreamActivity {

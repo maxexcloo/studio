@@ -106,7 +106,7 @@ export function galleryPage(
   if (selection) params.set("select", selection);
   if (windowed) params.set("window", "1");
   if (review) {
-    params.set("finished", "1");
+    params.set("unreviewed", "1");
     if (review.rating === "unrated") params.set("unrated", "1");
     if (review.rating === "all") params.set("includeDisliked", "1");
     if (review.since) params.set("since", new Date(review.since).toISOString());
@@ -159,7 +159,10 @@ export const galleryArrivalsQuery = (listing: GalleryListing, leftAt: number) =>
 async function galleryCount(listing: GalleryListing, signal: AbortSignal, unrated?: boolean) {
   const params = galleryParams(listing);
   params.set("limit", "1");
-  if (unrated) params.set("unrated", "1");
+  if (unrated) {
+    params.set("unrated", "1");
+    params.set("unreviewed", "1");
+  }
   return (await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal })).totalApprox;
 }
 

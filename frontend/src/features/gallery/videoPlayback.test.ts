@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { playVideo } from "./videoPlayback.ts";
+import { playVideo, videoLifecycle } from "./videoPlayback.ts";
 
 test("opened video keeps sound when autoplay is refused, then pauses and releases on close", async (t) => {
   const page = Object.assign(new EventTarget(), { hidden: false });
@@ -21,7 +21,8 @@ test("opened video keeps sound when autoplay is refused, then pauses and release
     },
     load: () => loads++,
   };
-  const close = playVideo(
+  const close = videoLifecycle(media as unknown as HTMLVideoElement);
+  playVideo(
     media as unknown as HTMLVideoElement,
     () => {
       refused = true;

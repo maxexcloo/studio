@@ -476,11 +476,13 @@ export function useMediaActions(
     mode: ViewerChange;
     prompt?: string;
   }>();
-  const suggestionPrompt = suggestions?.id === item.id ? suggestions.prompt : undefined;
+  const requested = suggestions?.id === item.id ? suggestions : undefined;
+  const suggestionPrompt = requested?.prompt;
+  const suggestionAction = requested?.mode;
   const steps = useChangeSuggestions({
-    query: nextStepsQuery(item, suggestionPrompt),
-    fresh: () => askNextSteps(item, true, suggestionPrompt),
-    enabled: assistedChanges && suggestions?.id === item.id,
+    query: nextStepsQuery(item, suggestionPrompt, suggestionAction),
+    fresh: () => askNextSteps(item, true, suggestionPrompt, suggestionAction),
+    enabled: assistedChanges && Boolean(requested),
     disabled: draft?.pending,
     onPick: (request) => {
       if (suggestions && !draft?.pending) pick(suggestions.mode, request);
@@ -492,7 +494,7 @@ export function useMediaActions(
     assistMenu({
       settings: [
         ...(mode === "edit" ? editProfiles : []),
-        ...(mode === "recreate" && countLimit > 1
+        ...(mode === "recreate" && !item.uploaded && countLimit > 1
           ? [
               {
                 id: "recreate-count",
@@ -528,13 +530,12 @@ export function useMediaActions(
             (request) => pick(mode, request),
             () => custom(mode),
             draft?.pending,
+            mode,
           )
         : { templates: [] }),
       others,
       last,
     });
-  // The assistant and the animate offers decide every option, so they show together.
-  const optionsLoading = assistant.isPending || animation.isPending;
   // Discovery from this image, A–Z: More Like This, the gallery ranked by likeness to it
   // (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
@@ -578,7 +579,7 @@ export function useMediaActions(
         note: refusal,
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
-          loading: optionsLoading,
+          loading: assistant.isPending,
           settings: [length, ...animateProfiles, ...reviewItems],
           suggestions: motionsOffered ? motions : undefined,
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
@@ -645,11 +646,13 @@ export function useMediaActions(
       onClick: ready
         ? undefined
         : () => action.mutate({ operation: "image", prompt: changedPrompt }),
-      onOpen: ready && !item.uploaded ? openChanges("recreate") : undefined,
+      onOpen: ready ? openChanges("recreate") : undefined,
       menu: !ready
         ? undefined
         : item.uploaded
-          ? [[recreateAction]]
+          ? image
+            ? changeMenu("recreate", [], [recreateAction])
+            : [[recreateAction]]
           : changeMenu(
               "recreate",
               [

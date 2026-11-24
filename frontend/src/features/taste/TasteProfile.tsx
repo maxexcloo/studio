@@ -1,10 +1,24 @@
-import { Alert, Button, Modal, MultiSelect, Stack, TagsInput, Text } from "@mantine/core";
+import {
+  Alert,
+  Badge,
+  Button,
+  Group,
+  Menu,
+  Modal,
+  MultiSelect,
+  Pill,
+  Stack,
+  TagsInput,
+  Text,
+} from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
+import { type KeepCount, type KeepRates, keepRateMinimum } from "../../../../shared/dream";
 import { loraName } from "../../../../shared/profiles";
 import {
+  type TagKind,
   type TasteFields,
   type TastePreferenceChanges,
   type TastePreferences,
@@ -12,10 +26,12 @@ import {
   maxTastePhrase,
   maxTasteRule,
   shapeName,
+  tagKind,
   tasteLimits,
 } from "../../../../shared/taste";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
+import { DataTable, compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -25,6 +41,7 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { ChatNotes } from "../dream/ChatNotes";
+import { keepRatesQuery } from "../dream/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { isProfile, profileName } from "../generation/payload";
@@ -56,6 +73,7 @@ const fieldLabels: Record<keyof TasteFields, string> = {
   note: "Summary",
   likes: "Likes",
   avoid: "Dislikes",
+  exclusions: "Exclusions",
   loras: "LoRAs",
   models: "Models",
   rules: "Rules",
@@ -64,8 +82,8 @@ const fieldLabels: Record<keyof TasteFields, string> = {
   tags: "Tags",
 };
 const fieldKeys = Object.keys(fieldLabels) as (keyof TasteFields)[];
-/** Rules are only ever the person's: Studio learns none, so they have no learnt version. */
-const own = (key: keyof TasteFields) => key === "rules";
+/** Studio learns neither rules nor exclusions. */
+const own = (key: keyof TasteFields) => key === "rules" || key === "exclusions";
 /** How many of the favourites Studio learnt the profile shows; the person's own show whole. */
 const learntShown: Partial<Record<keyof TasteFields, number>> = {
   models: 3,
@@ -216,8 +234,8 @@ function TasteEditor({
       <TagsInput
         label={label}
         description={
-          key === "avoid"
-            ? "Add subjects, props or settings to exclude from Dream and chat prompts. For example, smoking or laundry."
+          key === "exclusions"
+            ? "Add a subject, prop or setting and press Enter. For example, smoking or laundry rooms."
             : undefined
         }
         value={draft[key]}
@@ -270,16 +288,156 @@ function TasteEditor({
   );
 }
 
+/** The fields shown as removable words; models, LoRAs and tags show with their keep rates. */
+const wordKeys = ["likes", "styles", "avoid", "exclusions", "rules", "shapes"] as const;
+const tagGroups: [TagKind | undefined, string][] = [
+  ["colour", "Colours"],
+  ["outfit", "Outfits"],
+  ["scene", "Scenes"],
+  [undefined, "Tags"],
+];
+/** How many of the best kept values each table adds to the account's favourites. */
+const ratedShown = 10;
+const keepRate = (count?: KeepCount) =>
+  count && count.total >= keepRateMinimum ? count.kept / count.total : undefined;
+interface RatedRow {
+  value: string;
+  name: string;
+  count?: KeepCount;
+  favourite: boolean;
+}
+
+/** One favourites field's values and its best kept ones, with Pin and Remove. */
+function KeepRateTable({
+  title,
+  field,
+  favourites,
+  counts,
+  name,
+  include = () => true,
+  edited,
+  change,
+  pending,
+}: {
+  title: string;
+  field: "models" | "loras" | "tags";
+  favourites: string[];
+  counts: Record<string, KeepCount>;
+  name: (value: string) => string | undefined;
+  include?: (value: string) => boolean;
+  edited: boolean;
+  change: (changes: TastePreferenceChanges) => void;
+  pending: boolean;
+}) {
+  let others = 0;
+  const rows = [
+    ...new Set([
+      ...favourites.filter(include),
+      ...Object.keys(counts).filter(
+        (value) => include(value) && keepRate(counts[value]) !== undefined,
+      ),
+    ]),
+  ]
+    .flatMap((value): RatedRow[] => {
+      const shown = name(value);
+      return shown
+        ? [{ value, name: shown, count: counts[value], favourite: favourites.includes(value) }]
+        : [];
+    })
+    .sort(
+      (a, b) =>
+        (keepRate(b.count) ?? -1) - (keepRate(a.count) ?? -1) || compareNames(a.name, b.name),
+    )
+    .filter((row) => row.favourite || others++ < ratedShown);
+  if (!rows.length) return null;
+  const full = favourites.length >= tasteLimits[field];
+  return (
+    <SettingGroup title={`${title}${edited ? " · Your Edit" : ""}`}>
+      <DataTable
+        label={title}
+        rows={rows}
+        rowKey={(row) => row.value}
+        rowName={(row) => row.name}
+        empty="None"
+        compact
+        columns={[
+          {
+            key: "name",
+            header: "Name",
+            main: true,
+            cell: (row) => (
+              <Group gap="xs" wrap="nowrap">
+                <Text size="sm" truncate>
+                  {row.name}
+                </Text>
+                {row.favourite && (
+                  <Badge size="xs" variant="light">
+                    Favourite
+                  </Badge>
+                )}
+              </Group>
+            ),
+          },
+          {
+            key: "kept",
+            header: "Kept",
+            sortValue: (row) => keepRate(row.count),
+            cell: (row) => {
+              const rate = keepRate(row.count);
+              return (
+                <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                  {rate === undefined
+                    ? "Too few verdicts"
+                    : `${Math.round(rate * 100)}% of ${row.count!.total}`}
+                </Text>
+              );
+            },
+          },
+        ]}
+        rowActions={(row) =>
+          row.favourite ? (
+            <Menu.Item
+              leftSection={<icons.clear size={16} />}
+              disabled={pending}
+              onClick={() => change({ [field]: favourites.filter((value) => value !== row.value) })}
+            >
+              Remove
+            </Menu.Item>
+          ) : (
+            <Menu.Item
+              leftSection={<icons.pin size={16} />}
+              disabled={full || pending}
+              onClick={() => change({ [field]: [...favourites, row.value] })}
+            >
+              Pin
+            </Menu.Item>
+          )
+        }
+      />
+    </SettingGroup>
+  );
+}
+
 /** The taste profile: each field learnt from feedback until the person sets it. */
 export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
   const phone = usePhone();
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
+  const keepRates = useQuery(keepRatesQuery);
   const fields = useTasteFields();
   const loraInfo = useQuery(loraInfoQuery);
+  const saved = (next: Taste) => {
+    client.setQueryData(tasteQuery.queryKey, next);
+    void client.invalidateQueries({ queryKey: ["suggestions"], refetchType: "none" });
+  };
+  // A removed or pinned value makes its field the person's own, as Save in Edit does.
+  const change = useMutation({
+    mutationFn: (preferences: TastePreferenceChanges) =>
+      api<Taste>("/api/taste", { method: "PUT", body: JSON.stringify({ preferences }) }),
+    onSuccess: saved,
+  });
   const [clearing, setClearing] = useState(false);
   const [editing, setEditing] = useState(false);
-  const saved = (next: Taste) => client.setQueryData(tasteQuery.queryKey, next);
   const refresh = useMutation({
     meta: { inlineError: true },
     mutationFn: () => post<Taste>("/api/taste/refresh"),
@@ -294,19 +452,57 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
     },
   });
   const data = taste.data;
-  const error = refresh.error || taste.error;
-  const text = (data: Taste, key: keyof TasteFields) => {
-    const value = fields.current(data, key);
-    if (typeof value === "string") return value;
-    const named = {
-      models: (id: string) => profileName(fields.profileOf(id)!),
-      loras: (name: string) => {
-        const strength = data.loraScores.find((lora) => lora.name === name)?.strength;
-        return `${loraName(name, loraInfo.data?.loras[name])}${strength === undefined ? "" : ` ${strength}`}`;
-      },
-      shapes: shapeName,
-    }[key as "models" | "loras" | "shapes"];
-    return (named ? value.map(named) : value).join("; ");
+  const error = refresh.error || taste.error || keepRates.error;
+  const edited = (key: keyof TasteFields) =>
+    !own(key) && Boolean(data && Object.hasOwn(data.preferences, key));
+  const label = (key: keyof TasteFields) =>
+    `${fieldLabels[key]}${edited(key) ? " · Your Edit" : ""}`;
+  const loraLabel = (data: Taste, name: string) => {
+    const strength = data.loraScores.find((lora) => lora.name === name)?.strength;
+    return `${loraName(name, loraInfo.data?.loras[name])}${strength === undefined ? "" : ` ${strength}`}`;
+  };
+  const rates = keepRates.data;
+  const ratedTables = (data: Taste, rates: KeepRates) => {
+    const tags = fields.current(data, "tags");
+    const shared = { change: change.mutate, pending: change.isPending };
+    return (
+      <>
+        <KeepRateTable
+          {...shared}
+          title="Models"
+          field="models"
+          edited={edited("models")}
+          favourites={fields.current(data, "models")}
+          counts={rates.profiles}
+          name={(id) => {
+            const profile = fields.profileOf(id);
+            return profile && profileName(profile);
+          }}
+        />
+        <KeepRateTable
+          {...shared}
+          title="LoRAs"
+          field="loras"
+          edited={edited("loras")}
+          favourites={fields.current(data, "loras")}
+          counts={rates.loras}
+          name={(name) => loraLabel(data, name)}
+        />
+        {tagGroups.map(([kind, title]) => (
+          <KeepRateTable
+            {...shared}
+            key={title}
+            title={title}
+            field="tags"
+            edited={edited("tags")}
+            favourites={tags}
+            counts={rates.tags}
+            name={(tag) => tag}
+            include={(tag) => tagKind(tag) === kind}
+          />
+        ))}
+      </>
+    );
   };
   return (
     <>
@@ -341,22 +537,65 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
                 {learnt(data) ||
                   "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
               </Text>
-              {fieldKeys.map((key) => (
-                <SettingRow
-                  key={key}
-                  label={`${fieldLabels[key]}${!own(key) && Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
-                  description={
-                    <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
-                      {text(data, key) || "None"}
-                    </Text>
-                  }
-                />
-              ))}
+              <Text size="sm">
+                Dream and suggestion menus use your likes, dislikes and styles to guide new ideas.
+                Your exclusions and rules also guide MCP. MCP uses learnt taste when you ask and
+                runs your prompt as written. If it finds an exclusion, it asks for a revision before
+                queuing.
+              </Text>
+              <SettingRow
+                label={label("note")}
+                description={
+                  <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
+                    {fields.current(data, "note") || "None"}
+                  </Text>
+                }
+              />
+              {wordKeys.map((key) => {
+                const values = fields.current(data, key);
+                const name = key === "shapes" ? shapeName : (value: string) => value;
+                return (
+                  <SettingRow
+                    key={key}
+                    label={label(key)}
+                    description={
+                      values.length ? (
+                        <Group component="span" gap={4} mt={4}>
+                          {values.map((value) => (
+                            <Pill
+                              key={value}
+                              withRemoveButton
+                              onRemove={() =>
+                                change.mutate({ [key]: values.filter((other) => other !== value) })
+                              }
+                              // Pills inside an input hide their remove button from keyboards;
+                              // these stand alone, so it is the only way to remove a value.
+                              removeButtonProps={{
+                                "aria-hidden": false,
+                                tabIndex: 0,
+                                "aria-label": `Remove ${name(value)}`,
+                                disabled: change.isPending,
+                              }}
+                            >
+                              {name(value)}
+                            </Pill>
+                          ))}
+                        </Group>
+                      ) : (
+                        <Text span size="sm" c="text">
+                          None
+                        </Text>
+                      )
+                    }
+                  />
+                );
+              })}
             </>
           )}
           {error && <Alert color="red">{error.message}</Alert>}
         </Stack>
       </SettingGroup>
+      {data && rates && fields.ready && ratedTables(data, rates)}
       <TasteReflection />
       <ChatNotes />
       <SettingGroup title="Danger Zone" danger>

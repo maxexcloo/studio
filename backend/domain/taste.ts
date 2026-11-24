@@ -696,6 +696,7 @@ export function createTaste({
       styles: taste.styles,
       note: taste.note,
       rules: [],
+      exclusions: [],
       models: [...out.profiles.image, ...out.profiles.video]
         .filter((entry) => entry.score > 0)
         .sort(byScore)
@@ -883,6 +884,7 @@ export function createTaste({
       const dropped = taste.signals.length - signals.length;
       if (dropped) write(ownerId, { ...taste, signals, since: Math.max(0, taste.since - dropped) });
     },
+    exclusions: (ownerId: string) => load(ownerId).preferences.exclusions ?? [],
     /** Sets the person's fields, which learning then leaves alone; null hands one back to Studio. */
     edit(ownerId: string, changes: TastePreferenceChanges) {
       const current = load(ownerId);
@@ -911,6 +913,7 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
       preferences: record.preferences,
       likes: record.likes,
       avoid: record.avoid,
+      exclusions: record.exclusions,
       styles: record.styles,
       note: record.note,
       rules: record.rules,

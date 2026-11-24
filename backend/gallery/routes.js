@@ -281,7 +281,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
     const window = !selection && query.window === "1";
     const includeFailed = query.includeFailed !== "0";
     const unrated = query.unrated === "1";
-    const finished = query.finished === "1" || unrated;
+    const unreviewed = query.unreviewed === "1";
+    const finished = query.finished === "1" || unrated || unreviewed;
     const requestedSort = one(query.sort);
     const sort = Object.hasOwn(gallerySortLabels, requestedSort) ? requestedSort : "newest";
     if ((dates || window) && (query.similar || !["newest", "oldest"].includes(sort)))
@@ -350,6 +351,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
             ...(work === "none" && { notStatus: "pending" }),
             ...(finished && { status: "done" }),
             ...(unrated && { unrated }),
+            ...(unreviewed && { unreviewed }),
             ...(Number.isFinite(since) && since && { since }),
             ...(Number.isFinite(before) && { before }),
             ...(words.length && { contains: words, ...(looksLike && { orKeys: looksLike.keys }) }),

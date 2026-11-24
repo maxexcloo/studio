@@ -3,12 +3,15 @@ import { execFileSync } from "node:child_process";
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import {
+  type KeepRates,
   dreamCardCounts,
   dreamDefaults,
   dreamOverrideKeys,
   dreamTimingSettings,
 } from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
+
+const noKeepRates: KeepRates = { profiles: {}, loras: {}, tags: {} };
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
@@ -574,16 +577,12 @@ export async function fixtures(page: Page) {
         jobIds: [source.id, job.id],
         itemIds: [original.id, ""],
         labels: body.labels,
-        variants: [original, ...job.items].map((item, index) => ({
-          jobId: item.jobId,
-          label: body.labels[index],
-          item,
-        })),
+        requests: [original, ...job.items].map((item) => ({ input: { prompt: item.prompt } })),
         createdAt: stamp,
         vote: null,
       };
       comparisons.push(comparison);
-      return respond(comparison);
+      return respond(showComparison(comparison), 201);
     }
     // Compare Selected records chosen gallery images.
     if (path === "/api/comparisons" && method === "POST") {
@@ -678,6 +677,14 @@ export async function fixtures(page: Page) {
         });
       return respond({ ok: true, items });
     }
+    const review = path.match(/^\/api\/gallery\/library-review\/([^/]+)$/);
+    if (review && method === "POST") {
+      const item = gallery.find((item) => item.id === decodeURIComponent(review[1]));
+      if (!item) return respond({ error: "Result not found" }, 404);
+      if (body.reviewed) item.libraryReviewedAt = Date.now();
+      else delete item.libraryReviewedAt;
+      return respond({ ok: true });
+    }
     if (path === "/api/gallery/delete" && method === "POST") {
       const removed = body.ids.filter((id: string) => gallery.some((item) => item.id === id));
       gallery.splice(0, gallery.length, ...gallery.filter((item) => !removed.includes(item.id)));
@@ -725,13 +732,15 @@ export async function fixtures(page: Page) {
       const sort = url.searchParams.get("sort");
       const similar = url.searchParams.get("similar");
       const unrated = url.searchParams.get("unrated") === "1";
-      const finished = unrated || url.searchParams.get("finished") === "1";
+      const unreviewed = url.searchParams.get("unreviewed") === "1";
+      const finished = unrated || unreviewed || url.searchParams.get("finished") === "1";
       const since = url.searchParams.get("since");
       const items = gallery.filter(
         (i) =>
           (url.searchParams.get("select") !== "failed" || i.status === "failed") &&
           (!finished || i.status === "done") &&
           (!unrated || !i.rating) &&
+          (!unreviewed || !i.libraryReviewedAt) &&
           (!since || Date.parse(i.createdAt) >= Date.parse(since)) &&
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
@@ -1004,6 +1013,7 @@ export async function fixtures(page: Page) {
       });
     // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
     if (path === "/api/dream/history") return respond({ items: [] });
+    if (path === "/api/dream/keep-rates") return respond(noKeepRates);
     if (path === "/api/gallery/library-review")
       return respond({ items: [], remaining: 0, nextCursor: "" });
     if (path === "/api/dream/count")
@@ -1555,6 +1565,7 @@ export async function serveDream(
     reason?: string;
     /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
     taste?: Record<string, unknown>;
+    keepRates?: KeepRates;
     /** Dream's projects, which create, edit, Pause, Undo and Delete change. */
     projects?: any[];
     /** Each project's stats, by id. */
@@ -1605,6 +1616,7 @@ export async function serveDream(
   const fields = {
     likes: [],
     avoid: [],
+    exclusions: [],
     styles: [],
     note: "",
     rules: [],
@@ -1684,6 +1696,8 @@ export async function serveDream(
     } catch {}
     if (path === "/api/dream/visit")
       return route.fulfill({ json: { since: options.since ?? null } });
+    if (path === "/api/dream/keep-rates")
+      return route.fulfill({ json: options.keepRates ?? noKeepRates });
     if (method !== "GET") state.requests.push({ method, path, body });
     for (const item of [...state.unseen, ...state.discarded]) state.known.set(item.id, item);
     // As the backend: Undo returns results to unseen.

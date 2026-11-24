@@ -507,6 +507,7 @@ export function registerManageTools({
         summary: answer.summary || "",
         likes: answer.likes,
         dislikes: answer.avoid,
+        exclusions: answer.exclusions,
         styles: answer.styles,
         models: answer.models,
         loras: answer.loras,

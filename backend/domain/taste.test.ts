@@ -121,7 +121,7 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
   assert.equal(taste.read("bob").signals.length, 1);
 });
 
-test("taste routes read, set avoids for and forget only the caller's own profile", async (t) => {
+test("taste routes read, set exclusions for and forget only the caller's own profile", async (t) => {
   const taste = tasteFixture(t);
   const app = express();
   app.use(express.json());
@@ -154,6 +154,7 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   const none = {
     likes: [],
     avoid: [],
+    exclusions: [],
     styles: [],
     note: "",
     rules: [],
@@ -183,6 +184,7 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   const saved = await request("PUT", {
     preferences: {
       avoid: ["  clowns ", "clowns", "", "text"],
+      exclusions: ["laundry rooms"],
       models: ["flux-2"],
       shapes: ["0.666", "0.67"],
       tags: ["Fox"],
@@ -193,6 +195,8 @@ test("taste routes read, set avoids for and forget only the caller's own profile
     [["clowns", "text"], ["flux-2"], ["0.67"], ["fox"]],
   );
   assert.equal(saved.body.summary, "Avoids clowns, text. Liked models: flux-2.");
+  assert.deepEqual(saved.body.exclusions, ["laundry rooms"]);
+  assert.deepEqual(saved.body.learnt.exclusions, []);
   // Editing keeps the signals the summariser has not taken in yet.
   assert.equal(taste.read("alice").since, 2);
   assert.equal((await request("PUT", { preferences: { likes: ["x".repeat(81)] } })).status, 400);
@@ -213,7 +217,9 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   const restored = await request("PUT", { preferences: { likes: null } });
   assert.deepEqual(restored.body.likes, []);
   assert.equal(Object.hasOwn(restored.body.preferences, "likes"), false);
-  assert.equal((await request("GET", undefined, "bob")).body.summary, "");
+  const other = await request("GET", undefined, "bob");
+  assert.equal(other.body.summary, "");
+  assert.deepEqual(other.body.exclusions, []);
   assert.equal((await request("GET", undefined, "")).body.summary, "");
   const cleared = await request("DELETE");
   assert.deepEqual(

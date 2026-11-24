@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import type { ImageChangeAction } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
@@ -24,7 +25,7 @@ import { type Iteration, typedPrompt, useMediaReview } from "./useMediaAction";
 
 import classes from "./MediaViewer.module.css";
 
-export type ViewerChange = "edit" | "recreate";
+export type ViewerChange = ImageChangeAction;
 
 /** A tile's Edit or Recreate request, passed to the viewer that carries it out. */
 export type ViewerAsk = {
@@ -37,7 +38,7 @@ export type ViewerAsk = {
 export interface ViewerDraftActions {
   /** The current prompt, when changed, and the prompt to base suggestions on. */
   changedPrompt?: string;
-  suggestionPrompt: string;
+  suggestionPrompt?: string;
   pending: boolean;
   pick: (action: ViewerChange, request: string, profileId?: string) => void;
   custom: (action: ViewerChange, profileId?: string) => void;
@@ -90,9 +91,10 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
       }
     />
   );
+  const base = ask.typed ?? prompt;
   const draft: ViewerDraftActions = {
     changedPrompt: prompt.trim() !== original.trim() ? prompt.trim() : undefined,
-    suggestionPrompt: ask.typed ?? prompt,
+    suggestionPrompt: base === original ? undefined : base,
     pending: ask.pending,
     pick,
     custom: openCustom,
@@ -112,7 +114,7 @@ export function ViewerPrompt({
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
 }) {
-  const { item, original, prompt, setPrompt, field, ask, custom, openCustom } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom, draft, openCustom } = state;
   const assistant = useQuery(assistantQuery).data;
   const change = ask.proposal;
   const [mode, setMode] = useRemembered<ViewerChange>("viewer-prompt-change", "recreate");
@@ -124,9 +126,17 @@ export function ViewerPrompt({
   const queried = requested?.itemId === item.id && requested;
   const base = queried ? queried.prompt : undefined;
   const pick = (request: string) => state.pick(mode, request, editProfileId, true);
+  const imageAction = item.type === "image" ? mode : undefined;
+  const templates = imageAction
+    ? (assistant?.changes ?? [])
+    : (assistant?.themes ?? []).flatMap((theme) =>
+        theme.id !== "custom" && theme.instruction
+          ? [{ ...theme, instruction: theme.instruction }]
+          : [],
+      );
   const suggestions = useChangeSuggestions({
-    query: nextStepsQuery(item, base),
-    fresh: () => askNextSteps(item, true, base),
+    query: nextStepsQuery(item, base, imageAction),
+    fresh: () => askNextSteps(item, true, base, imageAction),
     enabled: ask.available && Boolean(queried),
     disabled: ask.pending || !queried,
     onPick: pick,
@@ -163,17 +173,17 @@ export function ViewerPrompt({
                   : [],
               suggestions,
               ...changeTemplates(
-                assistant?.changes ?? [],
+                templates,
                 pick,
                 () => openCustom(mode, editProfileId, true),
                 ask.pending,
+                imageAction,
               ),
               last: [],
             }),
           ],
           onOpen: () => {
-            const typed = ask.typed ?? prompt;
-            setRequested({ itemId: item.id, prompt: typed !== original ? typed : undefined });
+            setRequested({ itemId: item.id, prompt: draft.suggestionPrompt });
           },
         },
       ]

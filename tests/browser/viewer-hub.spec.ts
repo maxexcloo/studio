@@ -750,7 +750,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
       const request = route.request().postDataJSON();
-      if (request.surface === "composer") return route.fallback();
+      if (request.surface !== "change") return route.fallback();
       expect(request).toMatchObject({
         itemId: "hub",
         directions: directions.map(({ request }) => request),
@@ -1146,12 +1146,22 @@ test("A rerun whose backend the profile no longer has runs on its current one an
 test("An Animate theme queues a video in one click; the queue item writes its motion prompt", async ({
   page,
 }) => {
-  const { state, viewer } = await seed(page);
+  let release!: () => void;
+  const routePending = new Promise<void>((resolve) => (release = resolve));
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route(/\/api\/animate\/profile(?:\?.*)?$/, async (route) => {
+      await routePending;
+      await route.fallback();
+    }),
+  );
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Uncensored", exact: true })).toHaveCount(0);
   await expandAssistantMenu(page, "Templates");
-  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  const theme = page.getByRole("menuitem", { name: "Living Photo", exact: true });
+  await expect(theme).toBeDisabled();
+  release();
+  await theme.click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "animate",
@@ -2281,13 +2291,21 @@ test("Work still generating and videos take the same swipes as a picture", async
     "Touch input is dispatched through Chromium's protocol.",
   );
   await page.addInitScript(() => {
-    const played: string[] = [];
+    const played: { source: string; muted: boolean }[] = [];
     Object.assign(window, { played });
+    let allowed = false;
+    document.addEventListener(
+      "click",
+      (event) => {
+        if ((event.target as Element).closest('button[aria-label="Unmute"]')) allowed = true;
+      },
+      true,
+    );
     HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
       const source = this.getAttribute("src");
-      if (source === "/test-media/clip-2.mp4" && !this.muted)
+      if (!allowed && source === "/test-media/clip-2.mp4" && !this.muted)
         return Promise.reject(new DOMException("Audio needs a tap", "NotAllowedError"));
-      if (source) played.push(source);
+      if (source) played.push({ source, muted: this.muted });
       return Promise.resolve();
     };
   });
@@ -2345,12 +2363,22 @@ test("Work still generating and videos take the same swipes as a picture", async
   await swipeLeft(status);
   const video = viewer.locator("video");
   await expect(video).toHaveAttribute("src", "/test-media/clip.mp4");
+  await video.evaluate((media) => {
+    media.dataset.currentPlayer = "true";
+  });
   await swipeLeft(video);
   await expect(video).toHaveAttribute("src", "/test-media/clip-2.mp4");
+  await expect(video).toHaveAttribute("data-current-player", "true");
+  await expect(video).toHaveJSProperty("muted", true);
+  await viewer.getByRole("button", { name: "Unmute", exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
-    .toEqual(["/test-media/clip.mp4", "/test-media/clip-2.mp4"]);
-  await expect(video).toHaveJSProperty("muted", true);
+    .toEqual([
+      { source: "/test-media/clip.mp4", muted: false },
+      { source: "/test-media/clip-2.mp4", muted: true },
+      { source: "/test-media/clip-2.mp4", muted: false },
+    ]);
+  await expect(video).toHaveJSProperty("muted", false);
 });
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({

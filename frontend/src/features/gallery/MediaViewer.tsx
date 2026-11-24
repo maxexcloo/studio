@@ -41,9 +41,10 @@ import { setMembers, setPosition } from "./resultSets";
 import type { SwipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
+import { usePrefetchResultSuggestions } from "./usePrefetchResultSuggestions";
 import { useVideoSound } from "./useVideoSound";
-import { playVideo } from "./videoPlayback";
-import { VideoPlayButton } from "./VideoPlayButton";
+import { playVideo, videoLifecycle } from "./videoPlayback";
+import { VideoPlayButton, VideoSoundButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
@@ -118,16 +119,32 @@ function ViewerVideo({
   onTap?: () => void;
   hideControls?: boolean;
 }) {
-  const { muted, onVolumeChange } = useVideoSound();
+  const { muted, setMuted, onVolumeChange } = useVideoSound();
   const player = useRef<HTMLVideoElement>(null);
   const [controls, setControls] = useState(false);
   const [refused, setRefused] = useState(false);
   const [silent, setSilent] = useState(false);
   const silentFallback = useRef(false);
-  const play = useCallback((media: HTMLVideoElement | null) => {
+  const stopPlayback = useRef<() => void>(undefined);
+  const preferredMute = useRef(muted);
+  preferredMute.current = muted;
+  const attach = useCallback((media: HTMLVideoElement | null) => {
     if (!media) return;
     player.current = media;
-    const release = playVideo(
+    const release = videoLifecycle(media);
+    return () => {
+      player.current = null;
+      release();
+    };
+  }, []);
+  const play = useCallback((soundOff = preferredMute.current) => {
+    const media = player.current;
+    if (!media) return;
+    stopPlayback.current?.();
+    silentFallback.current = false;
+    setSilent(false);
+    media.muted = soundOff;
+    stopPlayback.current = playVideo(
       media,
       () => setRefused(true),
       (value) => {
@@ -135,11 +152,13 @@ function ViewerVideo({
         setSilent(value);
       },
     );
-    return () => {
-      player.current = null;
-      release();
-    };
   }, []);
+  // WebKit grants audible playback to the element, so reuse the player when changing clips.
+  useLayoutEffect(() => {
+    setRefused(false);
+    play();
+    return () => stopPlayback.current?.();
+  }, [id, src, play]);
   const hide = useRef(0);
   useEffect(() => () => clearTimeout(hide.current), []);
   const reveal = () => {
@@ -155,8 +174,8 @@ function ViewerVideo({
   return (
     <>
       <video
-        ref={play}
-        muted={muted || silent}
+        ref={attach}
+        muted={muted}
         onVolumeChange={(event) => {
           if (silentFallback.current) {
             if (event.currentTarget.muted) return;
@@ -192,10 +211,16 @@ function ViewerVideo({
         onFocus={reveal}
         onClick={(event) => event.stopPropagation()}
       />
-      {refused && (
-        <VideoPlayButton
-          {...swipe}
-          play={() => void player.current?.play().catch(() => undefined)}
+      {refused && <VideoPlayButton {...swipe} play={play} />}
+      {!hideControls && (
+        <VideoSoundButton
+          muted={muted || silent}
+          toggle={() => {
+            const soundOff = !(muted || silent);
+            setMuted(soundOff);
+            if (!soundOff) play(false);
+            else if (player.current) player.current.muted = true;
+          }}
         />
       )}
     </>
@@ -282,6 +307,7 @@ export function MediaViewer({
   const canNavigate = !!navigate && currentIndex >= 0 && viewable.length > 1;
   const showTogether = together && sideBySide && canNavigate && !phone;
   useNeighbourPrefetch(viewable, currentIndex);
+  usePrefetchResultSuggestions(!bare && !actions ? item : undefined);
   const gestureClick = useRef(false);
   const [compare, setCompare] = useState(false);
   const [localDetails, setLocalDetails] = useState(false);
@@ -712,7 +738,6 @@ export function MediaViewer({
                       </div>
                     ) : item.type === "video" ? (
                       <ViewerVideo
-                        key={`${item.id}:${source.url}`}
                         id={item.id}
                         src={playbackUrl(source.url)}
                         poster={source.thumbnailUrl}
