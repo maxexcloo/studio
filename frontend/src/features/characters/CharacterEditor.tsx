@@ -173,7 +173,7 @@ function CharacterForm({
           loading={save.isPending}
           disabled={!name.trim() || !(images.length || current?.candidates)}
         >
-          Save
+          {character ? "Save" : "Create"}
         </Button>
       </DialogFooter>
     </CardForm>

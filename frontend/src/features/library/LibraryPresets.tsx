@@ -244,7 +244,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
                         setRenaming(preset);
                       }}
                     >
-                      Rename
+                      Rename…
                     </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item

@@ -106,7 +106,9 @@ recur across features.
   menu. An anchored chip popup (desktop, or `floating`)
   whose only button would be Done has no footer and closes on outside click
   or Escape; phone sheets keep Done. A primary is its bare verb (Save,
-  Compare, Create), adding a noun only where the verb alone is ambiguous. Clearing a
+  Compare, Create), adding a noun only where the verb alone is ambiguous. A
+  record's toolbar action is New X, opening a dialog titled New X whose primary
+  is Create; editing it is Edit X with Save. Clearing a
   form or popup is the shared `ClearButton` ✕ immediately before the primary,
   as in the composer's Generate row, never a text action in a heading; no
   other action sits beside or below the primary. Consequential actions sit in
@@ -151,7 +153,9 @@ recur across features.
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
   one label everywhere. Clear and Reset turn into Undo until the text next
-  changes.
+  changes. A menu item that opens a dialog asking for more ends with …
+  (Duplicate…, Rename…, Versions…); Edit, confirmations and toolbar buttons
+  don't.
 - Item actions are the same, in the same groups and order, on tiles, context
   menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.

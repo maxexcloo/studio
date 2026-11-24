@@ -185,7 +185,7 @@ function StyleEditor({
               loading={mutation.isPending}
               disabled={!draft.label.trim() || !draft.instruction.trim()}
             >
-              Save
+              {style ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </Stack>
