@@ -1,7 +1,8 @@
-import { Alert, SegmentedControl, Stack } from "@mantine/core";
+import { Alert, SegmentedControl, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import {
+  type DreamLimit,
   type DreamOverride,
   type DreamTiming,
   maxDreamIdleMinutes,
@@ -41,6 +42,23 @@ export function DreamAdministration() {
       </SettingRow>
     );
   };
+  const limit = (name: DreamLimit, label: string, description: string) => {
+    const setting = deployment.data.dream[`${name}Limit`];
+    return (
+      <SettingRow label={label} description={description + lockedNote(setting)}>
+        <NumberSetting
+          key={setting.value}
+          label={label}
+          value={setting.value}
+          min={0}
+          max={setting.bound}
+          disabled={setting.locked}
+          onSave={(value) => save.mutate({ key: setting.key, value })}
+        />
+      </SettingRow>
+    );
+  };
+  const unseenOff = deployment.data.dream.unseenOff;
   const row = (
     name: DreamOverride,
     label: string,
@@ -106,6 +124,28 @@ export function DreamAdministration() {
           "Model & LoRA Switch Delay",
           "Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.",
         )}
+      </SettingGroup>
+      <SettingGroup title="Limits">
+        {limit("dailyImages", "Daily Images", "The most images a person may let Dream make a day.")}
+        {limit("dailyVideos", "Daily Videos", "The most videos a person may let Dream make a day.")}
+        {limit(
+          "pauseAfterUnseen",
+          "Pause After Unseen",
+          "The most unseen results a person may let Dream wait on before it pauses.",
+        )}
+        <SettingRow
+          label="Allow Pause Off"
+          description={`People may set Pause After Unseen to 0, so Dream never waits.${lockedNote(unseenOff)}`}
+        >
+          <Switch
+            aria-label="Allow Pause Off"
+            checked={unseenOff.value}
+            disabled={unseenOff.locked}
+            onChange={(event) =>
+              save.mutate({ key: unseenOff.key, value: event.currentTarget.checked })
+            }
+          />
+        </SettingRow>
       </SettingGroup>
     </Stack>
   );

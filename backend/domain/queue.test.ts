@@ -1864,23 +1864,26 @@ test("at most two prompts are written at once; the next waits in order", async (
   }
 });
 
-test("a writing failure fails the item with its reason; cancelling stops the writing", async () => {
+test("a writing failure fails the item with its reason, a discard sets it aside; cancelling stops the writing", async () => {
   const { store, adapter, submitted, events } = fixture();
   let aborted = false;
   const queue = new GenerationQueue(store, adapter, (job, { signal }) =>
     job.input.prompt === "fail"
       ? Promise.reject(new Error("unusable reply"))
-      : new Promise((_resolve, reject) =>
-          signal.addEventListener("abort", () => {
-            aborted = true;
-            reject(new Error("cancelled"));
-          }),
-        ),
+      : job.input.prompt === "discard"
+        ? Promise.reject(Object.assign(new Error("unusable idea"), { discard: true }))
+        : new Promise((_resolve, reject) =>
+            signal.addEventListener("abort", () => {
+              aborted = true;
+              reject(new Error("cancelled"));
+            }),
+          ),
   );
   try {
     const session = store.createSession("alice");
     const writing = { kind: "animate" };
     const failing = store.enqueue("alice", session.id, { prompt: "fail", writing }, "animate");
+    const discarded = store.enqueue("alice", session.id, { prompt: "discard", writing }, "animate");
     const cancelled = store.enqueue("alice", session.id, { prompt: "", writing }, "animate");
     await queue.tick();
     await queue.cancel("alice", cancelled.id);
@@ -1891,9 +1894,14 @@ test("a writing failure fails the item with its reason; cancelling stops the wri
       "Writing the prompt failed: unusable reply",
     );
     assert.equal(store.job("alice", cancelled.id)?.status, "cancelled");
+    // A writer's discard sets the job aside without failing it.
+    assert.equal(store.job("alice", discarded.id)?.status, "cancelled");
     assert.ok(aborted);
     assert.deepEqual(submitted, []);
-    assert.deepEqual(events.sort(), [`released:${cancelled.id}`, `released:${failing.id}`].sort());
+    assert.deepEqual(
+      events.sort(),
+      [`released:${cancelled.id}`, `released:${failing.id}`, `released:${discarded.id}`].sort(),
+    );
     // A retry writes the prompt again.
     assert.equal(queue.retry("alice", failing.id)?.status, "writing");
   } finally {

@@ -53,6 +53,7 @@ export function registerDreamRoutes(
     const { today, usage } = daily;
     return {
       settings: record.settings,
+      limits: dream.limits(),
       unseen,
       since: record.visit?.since || null,
       today,
@@ -117,7 +118,7 @@ export function registerDreamRoutes(
     const patch: Partial<DreamSettings> = {};
     for (const key of Object.keys(dreamDefaults) as (keyof DreamSettings)[]) {
       if (body[key] === undefined) continue;
-      const error = dreamSettingError(key, body[key]);
+      const error = dreamSettingError(key, body[key], dream.limits());
       if (error) return { status: 400, payload: { ok: false, error } };
       Object.assign(patch, { [key]: body[key] });
     }

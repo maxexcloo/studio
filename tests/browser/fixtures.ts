@@ -4,10 +4,13 @@ import { type Locator, type Page, expect } from "@playwright/test";
 
 import {
   type KeepRates,
+  defaultDreamLimits,
   dreamCardCounts,
   dreamDefaults,
+  dreamLimitSettings,
   dreamOverrideKeys,
   dreamTimingSettings,
+  dreamUnseenOffKey,
 } from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
 
@@ -1620,6 +1623,7 @@ export async function serveDream(
     today: state.today,
     usage: state.usage,
     uncensoredAvailable: state.uncensoredAvailable,
+    limits: defaultDreamLimits,
     locked: options.locked ?? [],
     status: !state.settings.enabled
       ? "off"
@@ -1950,4 +1954,15 @@ export const dreamPolicyFixture = () =>
       ([name, { key, defaultValue }]) =>
         [name, { key, value: defaultValue, source: "default", locked: false }] as const,
     ),
+    ...Object.entries(dreamLimitSettings).map(
+      ([name, { key, defaultValue, bound }]) =>
+        [
+          `${name}Limit`,
+          { key, value: defaultValue, bound, source: "default", locked: false },
+        ] as const,
+    ),
+    [
+      "unseenOff",
+      { key: dreamUnseenOffKey, value: false, source: "default", locked: false },
+    ] as const,
   ]);
