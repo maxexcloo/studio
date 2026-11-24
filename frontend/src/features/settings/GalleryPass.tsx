@@ -109,7 +109,7 @@ export function GalleryPass({
   return (
     <SettingRow
       label={label}
-      // Beside a scope choice the row's controls keep their own widths.
+      // Beside Whose Images the controls keep their own widths.
       wide={Boolean(scopeLabel) && !ownRoute}
       description={
         <>
