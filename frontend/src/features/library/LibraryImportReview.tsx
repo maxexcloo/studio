@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Alert,
   Anchor,
   Badge,
@@ -11,6 +12,7 @@ import {
   Stack,
   Table,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +31,7 @@ import { useReturnFocus } from "../../ui/useReturnFocus";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
 import { InspirationPreset } from "./InspirationPreset";
+import { FileName } from "./LibraryCatalogueTable";
 import { catalogueQuery, editableProfilesQuery, importsQuery } from "./queries";
 
 interface Availability {
@@ -84,7 +87,7 @@ export interface ImportRecord {
     downloadable?: boolean;
     localName?: string;
     substitute?: { file: string; folder?: string; reason: string; profileId?: string };
-    want?: { file: string; folder: string; source?: { url?: string } };
+    want?: { file: string; folder: string; sha256?: string; source?: { url?: string } };
     progress?: { receivedBytes: number; totalBytes: number };
   }[];
   offers?: {
@@ -270,6 +273,7 @@ export function LibraryImportReview({
           <Alert color="red">{query.error.message}</Alert>
         ) : record ? (
           <>
+            {/* Status, verdict and sources on one compact row under the title. */}
             <Group gap="xs">
               <Badge color={importStatus(record).color ?? "gray"}>
                 {importStatus(record).label}
@@ -279,20 +283,30 @@ export function LibraryImportReview({
                   {stateLabel(record.grade.value)} Match
                 </Badge>
               )}
-              {record.verifying && (
-                <Text size="sm" c="dimmed">
-                  Verifying…
-                </Text>
+              {[...(record.verifying ? ["Verifying…"] : []), ...(record.grade?.reasons || [])].map(
+                (reason) => (
+                  <Text key={reason} size="sm" c="dimmed">
+                    {reason}
+                  </Text>
+                ),
               )}
-              <Button
-                variant="default"
-                size="compact-sm"
-                ml="auto"
-                disabled={query.isFetching}
-                onClick={() => void query.refetch()}
-              >
-                Check Again
-              </Button>
+              {Object.entries(record.links || {}).map(
+                ([name, url]) =>
+                  url && (
+                    <Anchor key={name} size="sm" href={url} target="_blank" rel="noreferrer">
+                      {name === "hf"
+                        ? "Hugging Face"
+                        : name === "civitaiRed"
+                          ? "Civitai Red"
+                          : "Civitai"}
+                    </Anchor>
+                  ),
+              )}
+              {record.input?.url && (
+                <Anchor size="sm" href={record.input.url} target="_blank" rel="noreferrer">
+                  Original Source
+                </Anchor>
+              )}
             </Group>
             {record.error && <Alert color="red">{record.error}</Alert>}
             {canDraft && (
@@ -310,30 +324,6 @@ export function LibraryImportReview({
                 Profile drafted. Review it in Library › Profiles.
               </Text>
             )}
-            {record.grade?.reasons.map((reason) => (
-              <Text size="sm" key={reason}>
-                {reason}
-              </Text>
-            ))}
-            <Group>
-              {Object.entries(record.links || {}).map(
-                ([name, url]) =>
-                  url && (
-                    <Anchor key={name} href={url} target="_blank" rel="noreferrer">
-                      {name === "hf"
-                        ? "Hugging Face"
-                        : name === "civitaiRed"
-                          ? "Civitai Red"
-                          : "Civitai"}
-                    </Anchor>
-                  ),
-              )}
-              {record.input?.url && (
-                <Anchor href={record.input.url} target="_blank" rel="noreferrer">
-                  Original Source
-                </Anchor>
-              )}
-            </Group>
             {record.picture && !preset && (
               <Image
                 src={`/api/library/imports/${encodeURIComponent(id)}/picture`}
@@ -424,9 +414,30 @@ export function LibraryImportReview({
                   <SettingRow
                     key={`${index}:${resource.name}`}
                     label={
-                      <span style={{ overflowWrap: "anywhere" }}>
-                        {resource.want?.file || resource.name}
-                      </span>
+                      <Group component="span" gap={4} wrap="nowrap" miw={0}>
+                        <FileName
+                          size="sm"
+                          c={undefined}
+                          file={resource.want?.file || resource.name}
+                          sha256={resource.want?.sha256}
+                        />
+                        {resource.want?.source?.url && (
+                          <Tooltip label="File Source">
+                            <ActionIcon
+                              component="a"
+                              href={resource.want.source.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              variant="subtle"
+                              color="gray"
+                              size="sm"
+                              aria-label={`File Source for ${resource.want.file || resource.name}`}
+                            >
+                              <icons.external size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      </Group>
                     }
                     description={
                       <Stack gap={4} component="span">
@@ -448,16 +459,6 @@ export function LibraryImportReview({
                           <Text span size="xs" c="red">
                             {resource.downloadError}
                           </Text>
-                        )}
-                        {resource.want?.source?.url && (
-                          <Anchor
-                            size="xs"
-                            href={resource.want.source.url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            File Source
-                          </Anchor>
                         )}
                       </Stack>
                     }
@@ -574,7 +575,19 @@ export function LibraryImportReview({
             )}
           </>
         ) : null}
-        <DialogFooter>
+        <DialogFooter
+          secondary={
+            record
+              ? [
+                  {
+                    label: "Check Again",
+                    disabled: query.isFetching,
+                    onClick: () => void query.refetch(),
+                  },
+                ]
+              : []
+          }
+        >
           <Button onClick={onClose}>Done</Button>
         </DialogFooter>
       </Stack>
