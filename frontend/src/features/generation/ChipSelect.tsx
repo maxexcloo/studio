@@ -244,7 +244,7 @@ function OptionSearch({
   );
 }
 
-/** One ChipSelect option: its name and description, with badges and a check when chosen at the trailing edge. */
+/** One ChipSelect option: its name with any badges after it, its description, and a check when chosen. */
 export function ChipOption({
   label,
   description,
@@ -259,19 +259,19 @@ export function ChipOption({
   return (
     <Group justify="space-between" wrap="nowrap" gap="xs" w="100%">
       <Stack gap={0} miw={0}>
-        <Text size="sm" fw={500} truncate title={label}>
-          {label}
-        </Text>
+        <Group gap={4} wrap="nowrap" miw={0}>
+          <Text size="sm" fw={500} truncate title={label}>
+            {label}
+          </Text>
+          {badges}
+        </Group>
         {description && (
           <Text size="xs" c="dimmed" truncate title={description}>
             {description}
           </Text>
         )}
       </Stack>
-      <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
-        {badges}
-        {checked && <Check size={14} />}
-      </Group>
+      {checked && <Check size={14} style={{ flexShrink: 0 }} />}
     </Group>
   );
 }
