@@ -11,7 +11,7 @@ import {
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ChevronDown, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 
 import { galleryOrigins } from "../../../../shared/gallery-origin";
 import { loraName, profileNameParts } from "../../../../shared/profiles";
@@ -209,8 +209,8 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
     options: {
       model: byName(keys("model"), (key) => modelNames.get(key) || modelKeyName(key)),
       lora: byName(keys("lora"), (key) => loraName(key, loraInfo.data?.loras[key])),
-      size: facets.data?.sizes || [],
-      aspect: facets.data?.aspects || [],
+      size: [...(facets.data?.sizes || [])].sort((a, b) => compareNames(a.label, b.label)),
+      aspect: [...(facets.data?.aspects || [])].sort((a, b) => compareNames(a.label, b.label)),
       tag: facets.data?.tags || [],
       origin: galleryOrigins as GalleryFilterOption[],
     } satisfies Record<Facet, GalleryFilterOption[]>,
@@ -450,8 +450,8 @@ export function ShowToggles({
 }
 
 /**
- * The gallery's Filter popup and the reference picker share the Show toggles, rating, date and
- * facets. Choosing a rating turns Uploads off.
+ * The gallery's Filter popup and the reference picker share the Show toggles, date and facets,
+ * sorted by name; the picker adds a rating, which turns Uploads off.
  */
 export function GalleryFilterPanel({
   kind,
@@ -465,12 +465,12 @@ export function GalleryFilterPanel({
   rating?: boolean;
 }) {
   const { facets, options } = useFacetOptions(kind, value);
-  // Tags list the most used first, each with its count, and keep a chosen tag no longer among them.
+  // Tags list by name, each with its count, and keep a chosen tag no longer among them.
   const counts = new Map(options.tag.map((option) => [option.value, option.count]));
   const lists = {
     ...options,
     tag: [
-      ...[...options.tag].sort((a, b) => (b.count ?? 0) - (a.count ?? 0)),
+      ...[...options.tag].sort((a, b) => compareNames(a.label, b.label)),
       ...value.tag.filter((tag) => !counts.has(tag)).map((tag) => ({ value: tag, label: tag })),
     ],
   };
@@ -539,6 +539,44 @@ export function GalleryFilterPanel({
       </Group>
     </Input.Wrapper>
   );
+  // Sections sort by name; Date keeps its order from Today back.
+  const sections: { key: string; node: ReactNode }[] = [];
+  if (options.aspect.length > 0)
+    sections.push({ key: "Aspect Ratio", node: choices("aspect", "Aspect Ratio") });
+  sections.push({
+    key: "Date",
+    node: (
+      <FilterChoices
+        label="Date"
+        data={galleryDates}
+        value={value.date || null}
+        onChange={(date) => onChange({ ...value, date: (date ?? "") as GalleryDate })}
+      />
+    ),
+  });
+  sections.push({ key: "LoRAs", node: many("lora", "LoRAs") });
+  sections.push({ key: "Models", node: many("model", "Models") });
+  if (rating)
+    sections.push({
+      key: "Rating",
+      node: (
+        <FilterChoices
+          label="Rating"
+          data={ratingChoices.filter((choice) => choice.value !== "all")}
+          value={value.rating || null}
+          onChange={(choice) =>
+            onChange({
+              ...value,
+              rating: (choice ?? "") as GalleryFilterValues["rating"],
+              uploads: false,
+            })
+          }
+        />
+      ),
+    });
+  if (toggles) sections.push({ key: "Show", node: toggles });
+  if (options.size.length > 0) sections.push({ key: "Size", node: choices("size", "Size") });
+  if (lists.tag.length > 0) sections.push({ key: "Tags", node: many("tag", "Tags") });
   return (
     <Stack gap="md">
       {facets.error && (
@@ -553,52 +591,10 @@ export function GalleryFilterPanel({
           Couldn't Load Filters
         </Button>
       )}
-      {toggles && (
-        <>
-          <Stack gap="md">{toggles}</Stack>
-          <Divider />
-        </>
-      )}
-      {rating && (
-        <FilterChoices
-          label="Rating"
-          data={ratingChoices.filter((choice) => choice.value !== "all")}
-          value={value.rating || null}
-          onChange={(choice) =>
-            onChange({
-              ...value,
-              rating: (choice ?? "") as GalleryFilterValues["rating"],
-              uploads: false,
-            })
-          }
-        />
-      )}
-      <FilterChoices
-        label="Date"
-        data={galleryDates}
-        value={value.date || null}
-        onChange={(date) => onChange({ ...value, date: (date ?? "") as GalleryDate })}
-      />
-      {lists.tag.length > 0 && (
-        <>
-          <Divider />
-          {many("tag", "Tags")}
-        </>
-      )}
-      <Divider />
-      <Stack gap="md">
-        {many("model", "Models")}
-        {many("lora", "LoRAs")}
-      </Stack>
-      {(options.aspect.length > 0 || options.size.length > 0) && (
-        <>
-          <Divider />
-          <Stack gap="md">
-            {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
-            {options.size.length > 0 && choices("size", "Size")}
-          </Stack>
-        </>
-      )}
+      {sections.flatMap(({ key, node }, index) => [
+        ...(index > 0 ? [<Divider key={`${key}-divider`} />] : []),
+        <Fragment key={key}>{node}</Fragment>,
+      ])}
     </Stack>
   );
 }

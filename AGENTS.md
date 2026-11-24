@@ -120,7 +120,7 @@ recur across features.
 - Search clears only its query; filters preserve it. Toolbars show search as a
   field when there is room, otherwise open it from an icon. A Library or Settings list's Filter
   popover shows each filter's choices inline as chips (`FilterChoices`), All
-  first, never a dropdown.
+  first, never a dropdown; its sections sort alphabetically.
 - Named controls that open a picker or menu show ▾ (Animate ▾, Copy ▾), small
   beside an action bar's icon; ⋯ already means more, so it never carries one.
   Icon-only controls use accessible names and tooltips.
