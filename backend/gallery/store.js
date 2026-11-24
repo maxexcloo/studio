@@ -139,8 +139,8 @@ const unreviewedMedia = "coalesce(json_extract(value, '$.libraryReviewedAt'), 0)
  * items and `turnId` one turn of a chat; `ids` match items' ids, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
  * pending one, `before` those made by then; `limit` (galleryItems) reads only that many; `prompt` matches the prompt exactly and `titled` keeps
- * items with a title. `characterId` keeps results Face Check compared with that character and
- * `drifted` those it found off-character (domain/face-check.ts).
+ * items with a title. `characterId` keeps results Face Check compared with that character
+ * (domain/face-check.ts).
  */
 function where(query = {}) {
   const terms = [];
@@ -218,7 +218,6 @@ function where(query = {}) {
   if (query.titled) add("json_extract(value, '$.title') IS NOT NULL");
   if (query.characterId)
     add("json_extract(value, '$.identity.characterId') = ?", String(query.characterId));
-  if (query.drifted) add("json_extract(value, '$.identity.drifted') = 1");
   if (query.since) {
     const pending =
       (query.status === undefined || [query.status].flat().includes("pending")) &&

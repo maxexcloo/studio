@@ -77,13 +77,10 @@ export const galleryDates: {
 ];
 
 /**
- * Every gallery filter: the facets (any value matches), a date range, a rating,
- * Off-Character and Uploads.
+ * Every gallery filter: the facets (any value matches), a date range, a rating and Uploads.
  */
 export interface GalleryFilterValues extends Record<Facet, string[]> {
   date: GalleryDate;
-  /** Results Face Check found off their character (backend/domain/face-check.ts). */
-  offCharacter: boolean;
   /** Limit the results to liked, unrated or disliked items; empty is All. */
   rating: Exclude<GalleryReviewRating, "all"> | "";
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
@@ -97,7 +94,6 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   tag: [],
   origin: [],
   date: "",
-  offCharacter: false,
   rating: "",
   uploads: false,
 };
@@ -107,7 +103,6 @@ export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFi
   for (const key of facets) for (const value of filters[key]) params.append(key, value);
   if (filters.rating === "unrated") params.set("unrated", "1");
   else if (filters.rating) params.set("rating", filters.rating);
-  if (filters.offCharacter) params.set("drifted", "1");
   params.set("uploads", filters.uploads ? "1" : "0");
   if (filters.date) params.set("since", dateCutoff(filters.date).toISOString());
   return params;
@@ -241,15 +236,6 @@ export function useActiveFilters(
             key: value.rating,
             label: ratingChoices.find((choice) => choice.value === value.rating)!.label,
             remove: () => onChange({ ...value, rating: "" }),
-          },
-        ]
-      : []),
-    ...(value.offCharacter
-      ? [
-          {
-            key: "off-character",
-            label: "Off-Character",
-            remove: () => onChange({ ...value, offCharacter: false }),
           },
         ]
       : []),
@@ -400,16 +386,17 @@ function FilterToggle({
 }
 
 /**
- * The Show filters the gallery and reference picker share. Off-Character turns Uploads off and
- * shows images Face Check found off their character.
+ * The Show filters the gallery and reference picker share.
  */
 export function ShowToggles({
-  kind,
   value,
   onChange,
   originalsOnly = false,
   onOriginalsOnly,
-}: FilterProps & { originalsOnly?: boolean; onOriginalsOnly?: (on: boolean) => void }) {
+}: Omit<FilterProps, "kind"> & {
+  originalsOnly?: boolean;
+  onOriginalsOnly?: (on: boolean) => void;
+}) {
   return (
     <Input.Wrapper label="Show">
       <Group gap={6} mt={4} role="group" aria-label="Show">
@@ -428,15 +415,6 @@ export function ShowToggles({
             }
           />
         ))}
-        {kind !== "video" && (
-          <FilterToggle
-            label="Off-Character"
-            on={value.offCharacter}
-            onToggle={() =>
-              onChange({ ...value, offCharacter: !value.offCharacter, uploads: false })
-            }
-          />
-        )}
         {onOriginalsOnly && (
           <FilterToggle
             label="Originals Only"

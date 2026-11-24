@@ -1032,7 +1032,7 @@ function Gallery() {
                 ]
               : []),
           ]}
-          toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
+          toggles={<ShowToggles value={filters} onChange={setFilters} />}
           actions={
             <>
               <GalleryImport upload={upload} />
