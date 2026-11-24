@@ -577,16 +577,12 @@ export async function fixtures(page: Page) {
         jobIds: [source.id, job.id],
         itemIds: [original.id, ""],
         labels: body.labels,
-        variants: [original, ...job.items].map((item, index) => ({
-          jobId: item.jobId,
-          label: body.labels[index],
-          item,
-        })),
+        requests: [original, ...job.items].map((item) => ({ input: { prompt: item.prompt } })),
         createdAt: stamp,
         vote: null,
       };
       comparisons.push(comparison);
-      return respond(comparison);
+      return respond(showComparison(comparison), 201);
     }
     // Compare Selected records chosen gallery images.
     if (path === "/api/comparisons" && method === "POST") {
