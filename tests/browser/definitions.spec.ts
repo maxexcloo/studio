@@ -407,7 +407,7 @@ test("Import opens a workflow, and a row's Duplicate copies its profile under a 
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Models");
-  const editor = page.getByRole("dialog", { name: "Create Model", exact: true });
+  const editor = page.getByRole("dialog", { name: "New Model", exact: true });
   const chooser = page.waitForEvent("filechooser");
   await page
     .getByRole("button", { name: "Filter Models", exact: true })

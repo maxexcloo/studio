@@ -872,7 +872,7 @@ test("Workers select local text models to benchmark and list each run's figures"
   const menu = async (label: string) => {
     await table.getByRole("button", { name: `Actions for ${label}`, exact: true }).click();
     await expect(page.getByRole("menuitem", { name: "View Logs", exact: true })).toBeVisible();
-    return page.getByRole("menuitem", { name: "Benchmark", exact: true });
+    return page.getByRole("menuitem", { name: "Benchmark…", exact: true });
   };
   const closeMenu = async () => {
     await page.keyboard.press("Escape");

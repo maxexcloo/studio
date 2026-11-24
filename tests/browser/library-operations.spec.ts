@@ -918,7 +918,7 @@ test("Library › Presets lists what each preset holds, renames with unique name
     await expect(table.getByRole("row", { name: /Heron/ })).toContainText(/\d+ Oct 2026/);
   await expect(table.getByRole("row", { name: /Fine Detail/ })).toContainText("LoRAs");
   await page.getByRole("button", { name: "Actions for Heron", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Rename…", exact: true }).click();
   const rename = page.getByRole("dialog", { name: "Rename Preset", exact: true });
   const name = rename.getByRole("textbox", { name: "Name", exact: true });
   await name.fill("fine detail");

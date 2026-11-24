@@ -264,7 +264,7 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "Uncensored Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "LoRAs", exact: true }).check();
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
   await expect
     .poll(
       () =>
@@ -362,7 +362,7 @@ test("Administrators change roles, reset passwords and delete galleries, account
     .click();
   await expect(page.getByRole("menuitem")).toHaveText([
     "Make Administrator",
-    "Reset Password",
+    "Reset Password…",
     "Reset Learnt Taste",
     /^Delete Gallery/,
     "Disable",
@@ -376,14 +376,14 @@ test("Administrators change roles, reset passwords and delete galleries, account
   await expect(member.getByText("Administrator", { exact: true })).toBeVisible();
   await expect(promote).toBeHidden();
 
-  await menu("Reset Password");
+  await menu("Reset Password…");
   const reset = page.getByRole("dialog", { name: "Reset Password", exact: true });
   await reset.getByLabel("New Password").fill("a new member password");
   await reset.getByRole("button", { name: "Reset Password", exact: true }).click();
   await expect(reset).toBeHidden();
 
   // A generated password resets at once and shows only until Done.
-  await menu("Reset Password");
+  await menu("Reset Password…");
   await reset.getByRole("button", { name: "Generate Password", exact: true }).click();
   const generated = await reset.getByLabel("Generated Password").inputValue();
   expect(generated).toHaveLength(16);

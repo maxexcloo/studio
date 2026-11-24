@@ -569,7 +569,7 @@ export function RuntimeWorkloads({
                 disabled={benchmarking || item.phase !== "running"}
                 onClick={() => setBenchmarkId(item.id)}
               >
-                Benchmark
+                Benchmark…
               </Menu.Item>
             )}
             <Menu.Item

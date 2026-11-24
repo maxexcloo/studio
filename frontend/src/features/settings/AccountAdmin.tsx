@@ -184,7 +184,7 @@ function GroupEditor({
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         <DialogFooter pending={save.isPending} onCancel={onCancel}>
           <Button type="submit" loading={save.isPending}>
-            Save
+            {initial ? "Save" : "Create"}
           </Button>
         </DialogFooter>
       </Stack>
@@ -790,7 +790,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               )}
               {account.passwordSignIn && (
                 <Menu.Item leftSection={<icons.password size={16} />} onClick={act("password")}>
-                  Reset Password
+                  Reset Password…
                 </Menu.Item>
               )}
               {!own && (
