@@ -338,6 +338,11 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                           Uncensored
                         </Badge>
                       )}
+                      {style.censored && (
+                        <Badge component="span" size="sm" color="gray">
+                          Without Uncensored
+                        </Badge>
+                      )}
                     </>
                   }
                   detail={style.description}

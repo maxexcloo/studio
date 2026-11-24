@@ -194,6 +194,11 @@ const answerKinds = new Set<TasteKind>(["preferred", "pair-both", "pair-neither"
 const maxPerCall = 20;
 /** Signals keep each prompt, negative and caption cut to this length. */
 const maxPrompt = 300;
+/**
+ * The summariser also reads this many of the account's gallery likes outside Dream, drawn afresh
+ * each time, so the profile follows what they like rather than what Dream showed them.
+ */
+const galleryLikeSample = 20;
 /** The summariser writes after this many new signals, at most every ten minutes. */
 const summariseAfter = 10;
 const summariseGapMs = 10 * 60_000;
@@ -643,10 +648,13 @@ export function createTaste({
   promptWriter = () => undefined,
   online = async () => true,
   updates = () => true,
+  galleryLikes = () => [],
   now = Date.now,
 }: {
   dataDir: string;
   writer?: (ownerId: string) => TasteWriter | null;
+  /** `count` of the owner's liked gallery items outside Dream, at random. */
+  galleryLikes?: (ownerId: string, count: number) => TasteItem[];
   /** The owner's text writer (account-policy.js `promptWriter`). */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
   updates?: () => boolean;
@@ -714,7 +722,13 @@ export function createTaste({
     if (!(await online()))
       throw failure("The text model is offline. Try again once it is back.", 503);
     const before = load(ownerId);
-    if (!before.signals.length)
+    const liked = galleryLikes(ownerId, galleryLikeSample).map(
+      (item) =>
+        `- gallery like; ${details(tasteChoice(undefined, itemValues(item)))
+          .filter(Boolean)
+          .join("; ")}`,
+    );
+    if (!before.signals.length && !liked.length)
       throw failure("Like, compare or iterate on a few results first.", 400);
     attempted.set(ownerId, now());
     const recent = before.signals.slice(0, Math.min(50, Math.max(before.since, 20)));
@@ -737,7 +751,10 @@ export function createTaste({
               `Note: ${before.note || "(none)"}`,
               "",
               "Recent signals, newest first:",
-              ...recent.map(describe),
+              ...(recent.length ? recent.map(describe) : ["(none)"]),
+              "",
+              "Gallery likes, sampled from their whole history:",
+              ...(liked.length ? liked : ["(none)"]),
             ].join("\n"),
           },
         ],
@@ -769,7 +786,8 @@ export function createTaste({
       throw failure("The text model's reply was unusable. Try again.", 502);
     const current = load(ownerId);
     // A Clear while the model wrote wins over its reply.
-    if (!current.signals.length || current.since < before.since) return read(ownerId);
+    if (current.since < before.since || (before.signals.length && !current.signals.length))
+      return read(ownerId);
     write(ownerId, {
       ...current,
       ...words,

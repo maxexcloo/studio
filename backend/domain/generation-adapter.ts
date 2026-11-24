@@ -77,8 +77,8 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
         return {
           status: "failed",
           reason: String(payload.error || `Generation refused (${status}).`),
-          // A refused request fails the same way again; an unavailable worker may not.
-          ...(status < 500 && { permanent: true }),
+          // Only a refusal that says so fails the same way again; a busy or swapping worker may not.
+          ...(payload.permanent && { permanent: true }),
         };
       return observation(job) || { status: "running", items: payload.items || [] };
     },

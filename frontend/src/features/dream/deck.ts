@@ -1,5 +1,6 @@
 import { dreamSet } from "../../../../shared/dream.ts";
 import type { MediaItem } from "../../types";
+import { mediaSource, playbackUrl } from "../gallery/mediaSource.ts";
 import type { DreamItem, DreamMedia } from "./queries";
 
 /**
@@ -131,4 +132,29 @@ export function deckCards(
     depth - (active ? 1 : 0),
   );
   return active && depth > 0 ? [active, ...unseen] : unseen;
+}
+
+const cardItems = (card: DeckCard): MediaItem[] =>
+  card.kind === "pair" || card.kind === "set" ? card.items : [card.item];
+
+/**
+ * What to load ahead of the deck, the next card first: the pictures of the cards under the top one
+ * (a video's still, every side of a comparison or set), the top set's members its full-screen
+ * preview shows, and the next two videos.
+ */
+export function deckPrefetch([top, ...next]: DeckCard[]) {
+  const picture = (item: MediaItem) =>
+    item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl;
+  const [following, ...rest] = next.map(cardItems);
+  const members =
+    top?.kind === "set" ? top.items.slice(1).filter((item) => item.type === "image") : [];
+  const ahead = (following || []).concat(members, ...rest);
+  return {
+    images: [...new Set(ahead.map(picture).filter((url) => url !== undefined))],
+    videos: next
+      .flatMap(cardItems)
+      .filter((item) => item.type === "video")
+      .slice(0, 2)
+      .map((item) => playbackUrl(mediaSource(item).url)),
+  };
 }

@@ -175,7 +175,8 @@
 }
 
 /* A banner keeps its message, its action and Close on one centred line. Only a coloured one (a
-   failure) shows its colour, as a small dot rather than Mantine's bar. */
+   failure) shows its colour, as a small dot beside the message's first line rather than Mantine's
+   bar. */
 .notification {
   align-items: center;
   min-height: 44px;
@@ -193,19 +194,20 @@
   color: var(--mantine-color-text);
 }
 
-.alert {
-  padding-inline-start: calc(var(--mantine-spacing-md) + 12px);
+.alert :global(.mantine-Notification-description) {
+  position: relative;
+  padding-inline-start: calc(8px + var(--mantine-spacing-xs));
 }
 
-.alert:global(.mantine-Notification-root)::before {
-  display: block;
-  top: 50%;
-  bottom: auto;
-  inset-inline-start: var(--mantine-spacing-md);
+.alert :global(.mantine-Notification-description)::before {
+  content: "";
+  position: absolute;
+  top: calc(0.5lh - 4px);
+  inset-inline-start: 0;
   width: 8px;
   height: 8px;
-  translate: 0 -50%;
   border-radius: 50%;
+  background-color: var(--notification-color);
 }
 
 /* Touch screens show no tooltips (the theme's Tooltip). */
