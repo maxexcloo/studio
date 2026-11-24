@@ -13,6 +13,7 @@ import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout"
 import { ComparisonRatingButtons } from "./ComparisonRatingButtons";
 import { comparisonTitle, comparisonsQuery } from "./queries";
 
+import filterClasses from "../gallery/GalleryFilters.module.css";
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import galleryClasses from "../gallery/GalleryPage.module.css";
 
@@ -60,8 +61,9 @@ export function ComparisonList({ view }: { view: ReactNode }) {
     <Stack gap="sm" className={galleryClasses.page}>
       <VisuallyHidden component="h1">Comparisons</VisuallyHidden>
       <div className={toolbarClasses.band}>
-        <Group gap="xs" mih={44} wrap="nowrap">
+        <Group gap="xs" mih={44} wrap="nowrap" className={filterClasses.mode}>
           {view}
+          <div className={filterClasses.chips} />
           <ViewMenu
             label="Rating"
             value={rating}
