@@ -110,7 +110,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
         <SectionToolbar
           label="Presets"
           query={query}
-          onQueryChange={presets.records.length ? setQuery : undefined}
+          onQueryChange={setQuery}
           actions={
             <SelectToggle
               selecting={selection !== null}

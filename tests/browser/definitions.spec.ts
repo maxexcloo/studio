@@ -358,6 +358,17 @@ test("A combined profile's Backend select is a saved edit that switches what the
 
 test("The Profiles toolbar gives Download All its own link beside Import", async ({ page }) => {
   await fixtures(page);
+  // Two families, so the Family filter has something to narrow.
+  await page.route("**/api/profiles/editable", (route) =>
+    route.fulfill({
+      json: {
+        profiles: [
+          { id: "one", name: "One", kind: "image", family: "sdxl", version: 1 },
+          { id: "two", name: "Two", kind: "image", family: "flux2", version: 1 },
+        ],
+      },
+    }),
+  );
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Models");
@@ -410,8 +421,7 @@ test("Import opens a workflow, and a row's Duplicate copies its profile under a 
   const editor = page.getByRole("dialog", { name: "New Model", exact: true });
   const chooser = page.waitForEvent("filechooser");
   await page
-    .getByRole("button", { name: "Filter Models", exact: true })
-    .locator("xpath=..")
+    .getByRole("region", { name: "Library: Models", exact: true })
     .getByRole("button", { name: "Import", exact: true })
     .click();
   await (
@@ -561,6 +571,7 @@ test("Library edits a background prompt and reads the saved version back", async
     id: "summarise-taste",
     label: "Summarise Taste",
     area: "Dream",
+    usedBy: "the Taste summary",
     text: initial,
     initial,
     hash: "current",
@@ -591,6 +602,8 @@ test("Library edits a background prompt and reads the saved version back", async
   await openNav(page, "Library");
   await section(page, "Library", "Dream");
   const table = page.getByRole("table", { name: "Dream Instructions", exact: true });
+  // Each instruction says where Studio uses it.
+  await expect(table.getByText("Used by the Taste summary", { exact: true })).toBeVisible();
   const open = async () => {
     await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();

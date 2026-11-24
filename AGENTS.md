@@ -129,7 +129,8 @@ recur across features.
 
 ### Actions & Menus
 
-- Search clears only its query; filters preserve it. Toolbars show search as a
+- Search clears only its query; filters preserve it. Every Library section's
+  toolbar has search, even while the section is empty. Toolbars show search as a
   field when there is room, otherwise open it from an icon. A Library or Settings list's Filter
   popover shows each filter's choices inline as chips (`FilterChoices`), All
   first, never a dropdown; its sections sort alphabetically.

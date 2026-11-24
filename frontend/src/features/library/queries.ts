@@ -110,6 +110,8 @@ export interface PromptInstruction {
   label: string;
   area: string;
   suggestions?: true;
+  /** Where Studio uses it, as people know it (backend/prompt-instruction-used-by.js). */
+  usedBy: string;
   text: string;
   initial: string;
   hash: string;
