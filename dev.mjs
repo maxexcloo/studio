@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,30 @@ function freePort(preferred) {
 
 const dataDir =
   process.env.STUDIO_DATA_DIR || path.join(root, "data", values.demo ? "demo" : "development");
+// One instance per data folder: two backends on one folder keep separate in-memory state, such as
+// result numbers, and corrupt it.
+const lock = path.join(dataDir, ".dev.lock");
+fs.mkdirSync(dataDir, { recursive: true });
+try {
+  fs.writeFileSync(lock, String(process.pid), { flag: "wx" });
+} catch (error) {
+  if (error.code !== "EEXIST") throw error;
+  const holder = Number(fs.readFileSync(lock, "utf8"));
+  const running = (() => {
+    try {
+      return process.kill(holder, 0);
+    } catch (problem) {
+      return problem.code === "EPERM";
+    }
+  })();
+  if (running) {
+    console.error(`Another Studio preview (process ${holder}) is using ${dataDir}.`);
+    process.exit(1);
+  }
+  // A preview that crashed left its lock behind.
+  fs.writeFileSync(lock, String(process.pid));
+}
+process.once("exit", () => fs.rmSync(lock, { force: true }));
 const apiPort = await freePort(process.env.STUDIO_DEV_API_PORT || 18787);
 const pagePort = await freePort(process.env.STUDIO_DEV_PORT || 5173);
 // The shell overrides these. Image Search and Face Check download about 950 MB of models.

@@ -1,5 +1,5 @@
 import { Button, NumberInput, SegmentedControl, SimpleGrid, Stack, Text } from "@mantine/core";
-import { ChevronDown, RectangleHorizontal } from "lucide-react";
+import { ChevronDown, RectangleHorizontal, RectangleVertical, Square } from "lucide-react";
 import { useState } from "react";
 
 import { isCloudVideoProfile } from "../../../../shared/profiles";
@@ -114,6 +114,8 @@ export function SizePicker({
       : active
         ? `${active.label} · ${shown.w} × ${shown.h}`
         : `${shown.w} × ${shown.h}`;
+  const [w, h] = framed ? [framed.width, framed.height] : [shown.w, shown.h];
+  const Shape = w > h ? RectangleHorizontal : w < h ? RectangleVertical : Square;
   return (
     <ChipPopup
       title="Size & Aspect"
@@ -125,7 +127,7 @@ export function SizePicker({
           {...chipProps}
           aria-label="Aspect"
           aria-expanded={opened}
-          leftSection={<RectangleHorizontal size={16} />}
+          leftSection={<Shape size={16} />}
           rightSection={<ChevronDown size={14} />}
           onClick={() => {
             if (!opened) setTab(opening);

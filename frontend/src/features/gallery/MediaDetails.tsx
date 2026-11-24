@@ -232,19 +232,9 @@ function generationDetails(
     settings: rows([
       // The backend a combined profile ran on.
       ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
-      // A picture's mode, named as the composer's Reference Role chips name it.
-      [
-        "Mode",
-        video
-          ? ""
-          : !staged.length
-            ? "Generate"
-            : inpaint
-              ? "Inpaint"
-              : guides
-                ? "Reference"
-                : "Edit",
-      ],
+      // A picture's mode, named as the composer's Reference Role chips name it; plain Generate is
+      // left out.
+      ["Mode", video || !staged.length ? "" : inpaint ? "Inpaint" : guides ? "Reference" : "Edit"],
       ["Steps", settings.steps],
       ["CFG", settings.cfg],
       ["Sampler", comfyui(settings.sampler)],
@@ -259,7 +249,7 @@ function generationDetails(
       ["Text Encoder", comfyui(fileStem(settings.textEncoder))],
       ["VAE", comfyui(fileStem(settings.vae))],
       ["CLIP Type", comfyui(settings.clipType)],
-      ["Weight Type", comfyui(settings.weightDtype)],
+      ["Weight Type", settings.weightDtype === "default" ? "" : comfyui(settings.weightDtype)],
     ]),
     output: rows([
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],

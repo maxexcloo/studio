@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { MediaKind } from "../../types";
 import { useRememberedKey } from "../auth/useRemembered";
@@ -44,6 +44,6 @@ export function useGalleryDeparture(kind: MediaKind) {
   return {
     leftAt: visit.key === key ? visit.leftAt : 0,
     acknowledged: visit.acknowledged,
-    acknowledge: () => setVisit((current) => ({ ...current, acknowledged: true })),
+    acknowledge: useCallback(() => setVisit((current) => ({ ...current, acknowledged: true })), []),
   };
 }

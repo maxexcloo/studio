@@ -548,6 +548,27 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     ]);
 });
 
+test("A touch screen says until the first Pass that holding it adds a reason", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Touch hint");
+  await fixtures(page);
+  await serveDream(page, { unseen: ["one", "two"].map((id) => dreamItem(id)) });
+  await page.goto("/dream");
+  const hint = page.getByText("Hold Pass to add a reason", { exact: true });
+  await expect(hint).toBeVisible();
+  await page
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "Pass", exact: true })
+    .tap();
+  await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
+  await expect(hint).toBeHidden();
+  await page.reload();
+  await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
+  await expect(hint).toBeHidden();
+});
+
 test("Projects show what is new in each since the last visit, and the viewer judges it", async ({
   page,
   isMobile,
@@ -640,8 +661,10 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await expect(page.getByText("Dream works when the queue is free", { exact: true })).toBeVisible();
-  await expect(page.getByText("12 of 100 today", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Dream works when the queue is free.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("12/100 images · 1/50 videos today", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
@@ -859,7 +882,7 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   await mine.getByRole("button", { name: "Edit", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "My Preferences", exact: true });
   const text = "Photographic, natural light.";
-  await fillBox(editor, "Preferences", text, Boolean(testInfo.project.use.isMobile));
+  await fillBox(editor, "In My Words", text, Boolean(testInfo.project.use.isMobile));
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { prefer: text } });
   await expect(editor).toBeHidden();
@@ -873,7 +896,7 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   ).toBeVisible();
 });
 
-test("Where Taste Applies switches an area at once and says what it receives", async ({ page }) => {
+test("Where Taste Applies switches an area at once and says what it changes", async ({ page }) => {
   await fixtures(page);
   await serveDream(page);
   await page.goto("/settings#taste");
@@ -881,14 +904,13 @@ test("Where Taste Applies switches an area at once and says what it receives", a
   const writing = areas.getByRole("switch", { name: "Use My Taste in Prompt Writing" });
   await expect(writing).not.toBeChecked();
   await expect(areas.getByRole("switch", { name: "Use My Taste in Dream" })).toBeChecked();
-  await expect(areas.getByText(/^Receives: Exclusions\. Improve Prompt/)).toBeVisible();
+  await expect(areas.getByText(/^Improve Prompt and Animate follow your taste\./)).toBeVisible();
   const saved = page.waitForRequest(
     (request) => request.url().endsWith("/api/preferences") && request.method() === "PATCH",
   );
   await writing.dispatchEvent("click");
   expect((await saved).postDataJSON().tasteAreas.writing).toEqual({ taste: true, guidance: "" });
   await expect(writing).toBeChecked();
-  await expect(areas.getByText(/^Receives: Learnt · My Preferences · Exclusions\./)).toBeVisible();
 });
 
 test("Taste shows keep rates by model and tag kind, and marks values from their rows", async ({
@@ -1004,6 +1026,16 @@ test("Dream says why it can't run in Settings › Dream, not over the deck", asy
       .getByRole("region", { name: "Settings: Dream", exact: true })
       .getByRole("status", { name: "Dream Status" }),
   ).toContainText("The text model is offline.");
+});
+
+test("An empty Dream deck says why nothing is new", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, { reason: "The prompt assistant is not configured." });
+  await page.goto("/dream");
+  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("The prompt assistant is not configured.", { exact: true }),
+  ).toBeVisible();
 });
 
 test("Liking an expanded Dream Set rates the shown member and keeps the set", async ({ page }) => {
@@ -1323,9 +1355,9 @@ test("Discarded Dream results can be viewed and accepted after all, or deleted a
   await expect(
     page.getByRole("heading", { level: 1, name: "Discards", exact: true }),
   ).toBeAttached();
-  // The deck's counts and Pause stay with the deck.
-  await expect(page.getByRole("radio", { name: "Images", exact: true })).toBeChecked();
-  await expect(page.getByRole("button", { name: "Pause Dream", exact: true })).toHaveCount(0);
+  // Every Dream view keeps one toolbar: its media with their counts, then Pause.
+  await expect(page.getByRole("radio", { name: "Images (3)", exact: true })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Pause Dream", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Accept Dream prompt gone", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Accept Dream prompt gone", exact: true }),
@@ -2169,7 +2201,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
     page.getByRole("button", { name: "View Dream prompt discard-image", exact: true }),
   ).toBeHidden();
   await page.reload();
-  await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^Videos\b/ })).toBeChecked();
   await showView(page, "Dream");
   await expect(pair).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();

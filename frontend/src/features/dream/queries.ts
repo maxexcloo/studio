@@ -83,7 +83,7 @@ export const discardedQuery = (media: DreamMedia) =>
   infiniteQueryOptions({
     queryKey: ["dream", "discarded", media],
     queryFn: ({ pageParam }) =>
-      api<{ items: DreamItem[]; nextCursor: string }>(
+      api<{ items: DreamItem[]; nextCursor: string; total: number }>(
         `/api/dream/discarded?media=${media}&limit=40&cursor=${encodeURIComponent(pageParam)}`,
       ),
     initialPageParam: "",
@@ -112,23 +112,17 @@ export const setAnswerPath = (setId: string) =>
   `/api/dream/sets/${encodeURIComponent(setId)}/answer`;
 
 /**
- * When Dream works, or why it doesn't, and how much of today's share it has made: one line each,
- * such as "Dream works when the queue is free" and "12 of 100 today".
+ * Today's share in one line, such as "12/100 images · 0/50 videos today"; after a reset the counts
+ * run from it instead.
  */
-const dailyShare = (today: number, used: number, limit: number, kind: "images" | "videos") =>
-  used === today
-    ? `${today} of ${limit} ${kind === "images" ? "today" : "videos"}`
-    : `${today} ${kind} today · ${used} of ${limit} since reset`;
-
-export const dreamWhen = ({ settings, today, usage = today, status }: Dream) => [
-  status === "capped" ? "Dream has made today's share" : "Dream works when the queue is free",
-  ...(settings.images
-    ? [dailyShare(today.images, usage.images, settings.dailyImages, "images")]
-    : []),
-  ...(settings.videos
-    ? [dailyShare(today.videos, usage.videos, settings.dailyVideos, "videos")]
-    : []),
-];
+export const dreamQuota = ({ settings, today, usage = today }: Dream) => {
+  const shares = [
+    settings.images && `${usage.images}/${settings.dailyImages} images`,
+    settings.videos && `${usage.videos}/${settings.dailyVideos} videos`,
+  ].filter(Boolean);
+  const reset = usage.images !== today.images || usage.videos !== today.videos;
+  return shares.length ? `${shares.join(" · ")} ${reset ? "since reset" : "today"}` : "";
+};
 
 /** A chat attached to a project, and when it last asked for something. */
 export interface AttachedChat {
