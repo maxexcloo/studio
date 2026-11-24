@@ -24,6 +24,8 @@ export interface JobObservation {
   reason?: string;
   /** A failure a retry won't change: the request was refused, or a part it needs is missing. */
   permanent?: true;
+  /** A residency check failed before contacting the generation endpoint. */
+  deferredBeforeSubmission?: true;
   providerJobId?: string;
   backend?: string;
   progress?: Record<string, unknown>;
@@ -47,12 +49,13 @@ const savedStatus = (saved: JobObservation | void) =>
   saved?.status === "failed" ? ("failed" as const) : ("completed" as const);
 
 export interface QueueAdapter {
-  submit(job: OwnedJob): Promise<JobObservation>;
+  submit(job: OwnedJob, residentModel?: string): Promise<JobObservation>;
   observe(job: OwnedJob): Promise<JobObservation | undefined>;
   /** Asks the provider to stop the job; a returned `cancelled` means it cannot be running there. */
   cancel(job: OwnedJob): Promise<JobObservation | void>;
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
-  eligible?(job: OwnedJob): Promise<string | undefined>;
+  eligible?(job: OwnedJob, residentOnly?: boolean): Promise<string | undefined>;
+  dreamResidentModel?(job: OwnedJob): Promise<string | undefined> | undefined;
   dreamIdleWait?(job: OwnedJob): string | undefined;
   dreamImageSwitchMinutes?(): number;
   /** Releases readiness resources when work arrives while admission is in flight. */
@@ -69,11 +72,12 @@ export interface QueueAdapter {
 /** One adapter that hands each job to the adapter `pick` chooses for it. */
 export function routeAdapters(pick: (job: OwnedJob) => QueueAdapter): QueueAdapter {
   return {
-    submit: (job) => pick(job).submit(job),
+    submit: (job, residentModel) => pick(job).submit(job, residentModel),
     observe: (job) => pick(job).observe(job),
     cancel: (job) => pick(job).cancel(job),
     saveOutputs: (job) => pick(job).saveOutputs(job),
-    eligible: (job) => pick(job).eligible?.(job) || Promise.resolve(undefined),
+    eligible: (job, residentOnly) =>
+      pick(job).eligible?.(job, residentOnly) || Promise.resolve(undefined),
     settled: (job) => pick(job).settled?.(job) || Promise.resolve(),
   };
 }
@@ -159,10 +163,10 @@ interface ResourceLoad {
   model: string;
 }
 /** What a job loads on its resource: the model and its enabled LoRAs at their strengths. */
-const loadKey = (job: OwnedJob) =>
+const loadKey = ({ input }: Pick<OwnedJob, "input">) =>
   JSON.stringify([
-    modelOf(job.input),
-    (Array.isArray(job.input.loras) ? job.input.loras : [])
+    modelOf(input),
+    (Array.isArray(input.loras) ? input.loras : [])
       .filter((lora) => lora && lora.enabled !== false)
       .map((lora) => `${lora.name}@${lora.strength ?? ""}`)
       .sort(),
@@ -218,6 +222,7 @@ export class GenerationQueue {
    * the worker stops, restarts or goes offline (`unload`).
    */
   private loaded = new Map<string, OwnedJob>();
+  private observedProfiles = new Map<string, Set<string>>();
   private modelIdleSince?: number;
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
@@ -275,6 +280,35 @@ export class GenerationQueue {
   /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
   unload(resource: string) {
     this.loaded.delete(resource);
+    this.observedProfiles.delete(resource);
+  }
+
+  private noteCompleted(job: OwnedJob) {
+    this.loaded.set(job.resource, job);
+    if (
+      job.status !== "completed" ||
+      !job.input.profileId ||
+      !job.resource.startsWith("worker:") ||
+      (Array.isArray(job.input.loras) && job.input.loras.some((lora) => lora?.enabled !== false))
+    )
+      return;
+    let profiles = this.observedProfiles.get(job.resource);
+    if (!profiles) this.observedProfiles.set(job.resource, (profiles = new Set()));
+    profiles.add(JSON.stringify([job.input.profileBackend, loadKey(job)]));
+  }
+
+  /** Identity of the setup Studio sent, before the provider independently confirms residency. */
+  usedProfile(input: GenerationInput, resource: string) {
+    const loaded = this.loaded.get(resource);
+    return Boolean(
+      input.profileId &&
+      ((loaded?.status === "completed" &&
+        loaded.input.profileBackend === input.profileBackend &&
+        loadKey(loaded) === loadKey({ input })) ||
+        this.observedProfiles
+          .get(resource)
+          ?.has(JSON.stringify([input.profileBackend, loadKey({ input })]))),
+    );
   }
 
   private updateModelIdle(jobs: Iterable<OwnedJob>) {
@@ -461,10 +495,19 @@ export class GenerationQueue {
       .sort((a, b) => mediaRank(a) - mediaRank(b));
     for (const job of unwritten) {
       const delay = dreamDelay(job);
-      if (!delay && this.writing.size < maxWrites) this.write(job);
+      const resident = delay && (await this.adapter.dreamResidentModel?.(job));
+      const latest = this.store.job(job.ownerId, job.id);
+      if (this.stopped) return;
+      if (!latest || latest.status !== "writing" || this.held()(latest) || this.isWriting(job.id))
+        continue;
+      if (
+        (!delay || (resident && !this.store.hasOpenOwnWork(!localVideo(job)))) &&
+        this.writing.size < maxWrites
+      )
+        this.write(latest);
       else {
         const reason = delay || writeWaitReason;
-        if (job.reason !== reason) save({ ...job, reason });
+        if (latest.reason !== reason) save({ ...latest, reason });
       }
     }
     await Promise.all(
@@ -536,7 +579,7 @@ export class GenerationQueue {
               this.goneSaves.delete(job.id);
               // A cancellation that raced saving cannot discard already saved results.
               const completed = this.store.save({ ...job, ...saved, status: savedStatus(saved) });
-              this.loaded.set(completed.resource, completed);
+              this.noteCompleted(completed);
               await this.adapter.settled?.(completed);
             } else {
               job = saveObservation(latest, observation);
@@ -662,8 +705,14 @@ export class GenerationQueue {
               continue;
             }
             const delay = dreamDelay(job) || this.dreamModelWait(job);
-            if (delay) {
-              wait(job, delay);
+            const residentModel = delay && (await this.adapter.dreamResidentModel?.(job));
+            const notReady = !residentModel && delay;
+            if (this.stopped) return;
+            const current = this.store.job(job.ownerId, job.id);
+            if (!current || !waitingNow(current) || this.held()(current)) continue;
+            job = current;
+            if (notReady) {
+              wait(job, notReady);
               skipped.push(job);
               continue;
             }
@@ -683,7 +732,7 @@ export class GenerationQueue {
             let reason: string | undefined;
             this.checkingEligibility.add(job.id);
             try {
-              reason = await this.adapter.eligible?.(job);
+              reason = await this.adapter.eligible?.(job, Boolean(residentModel));
             } catch (error) {
               reason = (error as Error).message;
             } finally {
@@ -707,11 +756,12 @@ export class GenerationQueue {
             // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
             // A user can submit during an asynchronous readiness check.
             if (tier(job) === queuePriority.dream) this.updateModelIdle(this.store.openJobs());
-            const delayed = dreamDelay(job) || this.dreamModelWait(job);
-            if (delayed) this.adapter.releaseAdmission?.(job);
-            reason ||= delayed;
+            if (residentModel && this.store.hasOpenOwnWork(!localVideo(job)))
+              reason ||= "Waiting for user work to start.";
+            if (!residentModel) reason ||= dreamDelay(job) || this.dreamModelWait(job);
             if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
+              this.adapter.releaseAdmission?.(job);
               wait(job, reason);
               skipped.push(job);
               continue;
@@ -726,12 +776,31 @@ export class GenerationQueue {
             this.positions.delete(job.id);
             this.acceptedIds.add(job.id);
             this.modelIdleSince = undefined;
+            const previousLoad = this.loaded.get(resource);
             this.loaded.set(resource, job);
             this.submitting.add(job.id);
             try {
-              const observation = await this.adapter.submit(job);
+              const { deferredBeforeSubmission, ...observation } = await this.adapter.submit(
+                job,
+                residentModel || undefined,
+              );
               const latest = this.store.job(job.ownerId, job.id)!;
               if (terminalStatuses.has(latest.status)) continue;
+              if (deferredBeforeSubmission) {
+                this.acceptedIds.delete(job.id);
+                if (this.loaded.get(resource) === job) {
+                  if (previousLoad) this.loaded.set(resource, previousLoad);
+                  else this.loaded.delete(resource);
+                }
+                this.adapter.releaseAdmission?.(job);
+                const waiting = { ...latest, admittedAt: undefined };
+                if (latest.cancelRequested) {
+                  const cancelled = this.store.save({ ...waiting, status: "cancelled" });
+                  await this.adapter.settled?.(cancelled);
+                } else wait(waiting, observation.reason || "Waiting for a resident profile.");
+                skipped.push(job);
+                continue;
+              }
               const observed = { ...latest, ...observation };
               let submitted = this.store.save(
                 observation.status === "completed" ? this.saving(observed) : observed,
@@ -739,6 +808,7 @@ export class GenerationQueue {
               if (observation.status === "completed") {
                 const saved = await this.adapter.saveOutputs(submitted);
                 submitted = this.store.save({ ...submitted, ...saved, status: savedStatus(saved) });
+                this.noteCompleted(submitted);
               }
               if (latest.cancelRequested && !terminalStatuses.has(observation.status))
                 await this.adapter.cancel(submitted);

@@ -440,6 +440,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
     images: true,
     videos: false,
     uncensored: false,
+    useLoadedProfile: dreamDefaults.useLoadedProfile,
     imageBackend: "local",
     videoBackend: "local",
   });
@@ -616,7 +617,12 @@ test("Dream applies shared delays to the owner's manual and MCP generation reque
     t.mock.timers.setTime(state.clock);
   };
   state.idleMinutes.image = 1;
-  await dream.save("alice", { enabled: true, videos: true, dailyImages: 1 });
+  await dream.save("alice", {
+    enabled: true,
+    videos: true,
+    dailyImages: 1,
+    useLoadedProfile: false,
+  });
   generated({
     id: "liked-still",
     ownerId: "alice",

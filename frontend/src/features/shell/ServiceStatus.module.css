@@ -4,7 +4,7 @@
   padding-inline: 8px;
 }
 
-.progress {
+.count {
   color: var(--mantine-color-text);
   font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;

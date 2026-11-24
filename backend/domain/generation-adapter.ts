@@ -13,6 +13,7 @@ interface GenerationAdapterOptions {
   submitGeneration(
     job: OwnedJob,
     account?: RecordValue,
+    residentModel?: string,
   ): Promise<{ status: number; payload: RecordValue }>;
   jobs: Map<string, RecordValue>;
   /** The job's own gallery items. */
@@ -21,7 +22,7 @@ interface GenerationAdapterOptions {
   durableSave?(job: OwnedJob): Promise<unknown>;
   cancelPrompt(job: { promptId: string; backend?: string }): Promise<unknown>;
   recover?(job: OwnedJob): Promise<JobObservation | void>;
-  eligible?(job: OwnedJob): Promise<string | undefined>;
+  eligible?(job: OwnedJob, residentOnly?: boolean): Promise<string | undefined>;
   settled?(job: OwnedJob): Promise<void>;
 }
 
@@ -68,11 +69,17 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
   };
   return {
     eligible: options.eligible,
-    async submit(job) {
+    async submit(job, residentModel) {
       const account = job.ownerId ? options.accountForOwner(job.ownerId) : null;
       if (job.ownerId && (!account || account.authenticated === false))
         return { status: "failed", reason: "This account no longer has access." };
-      const { status, payload } = await options.submitGeneration(job, account || undefined);
+      const { status, payload } = await options.submitGeneration(
+        job,
+        account || undefined,
+        residentModel,
+      );
+      if (payload.deferredBeforeSubmission)
+        return { status: "waiting", deferredBeforeSubmission: true, reason: String(payload.error) };
       if (status >= 400)
         return {
           status: "failed",

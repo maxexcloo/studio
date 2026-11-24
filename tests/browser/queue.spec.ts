@@ -189,9 +189,13 @@ test("a request's jobs group as one set that moves and stops together", async ({
     job("set-second", "queued", "set"),
   );
   await page.goto("/");
-  const status = page.getByRole("button", { name: "Open Status", exact: true });
-  await expect(status).toHaveAccessibleDescription("Generating · 1 of 4 Finished");
-  await expect(status.getByText("1/4", { exact: true })).toBeVisible();
+  const status = page.getByRole("button", {
+    name: "Open Status",
+    exact: true,
+    includeHidden: true,
+  });
+  await expect(status).toHaveAccessibleDescription("Generating · 3 Pending");
+  await expect(status).toHaveText("3");
   const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
   await expect
     .poll(async () => {
@@ -241,6 +245,7 @@ test("a request's jobs group as one set that moves and stops together", async ({
       ["single", "queued"],
     ]);
   await expect(set).toBeHidden();
+  await expect(status).toHaveText("1");
   await expect(queue.getByText("Queue (1)", { exact: true })).toBeVisible();
   await queue.getByRole("button", { name: "Stop All", exact: true }).click();
   const stopAll = page.getByRole("dialog", { name: "Stop All Generations", exact: true });
@@ -437,11 +442,17 @@ test("Clear Failed Set removes the collapsed set from the queue and keeps failed
     });
   state.gallery.push(tile);
   await page.goto("/");
-  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const status = page.getByRole("button", {
+    name: "Open Status",
+    exact: true,
+    includeHidden: true,
+  });
+  await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toHaveAttribute("aria-expanded", "false");
   await expect(queue.getByRole("button", { name: "Retry Failed", exact: true })).toBeVisible();
+  await expect(status).toHaveText("");
   await queue.getByRole("button", { name: "Clear Failed Set", exact: true }).click();
   await expect(set).toBeHidden();
   await expect(queue.getByText("other-failed", { exact: true })).toBeVisible();
@@ -492,11 +503,18 @@ test("while work runs the queue polls only for changes and still shows the work 
       new URL(request.url()).pathname === "/api/queue" && request.url().includes("since="),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const status = page.getByRole("button", {
+    name: "Open Status",
+    exact: true,
+    includeHidden: true,
+  });
+  await expect(status).toHaveText("1");
+  await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const generating = queue.getByText("Generating – Image Quality", { exact: true });
   await expect(generating).toBeVisible();
   await polled;
   job.status = "completed";
   await expect(generating).toHaveCount(0);
+  await expect(status).toHaveText("");
 });

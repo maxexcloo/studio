@@ -94,8 +94,7 @@
   width: min(42px, 9vw);
 }
 
-/* The status keeps room for a count up to 99/99 whether or not one shows, and the modes sit in the
-   row beside it, so they keep one placement as work comes and goes. */
+/* Reserve room for the queue count so the modes keep their place as work comes and goes. */
 :where(:root[data-phone]) .header button[data-queue-count] {
   justify-content: flex-start;
   gap: 4px;

@@ -208,9 +208,33 @@ export function createGenerationSubmission({
   /** Starts a queued job on its worker (domain/generation-adapter.ts); answers `{ status, payload }`. */
   async function submitGeneration(job, account, options) {
     const input = { ...job.input, clientJobId: job.id };
-    const routed = await routeGeneration(input, account, job.backend);
+    const resident = Boolean(options?.residentModel);
+    const routed = await routeGeneration(input, account, job.backend, resident);
+    if (resident && (routed.backend !== job.backend || routed.profile?.id !== input.profileId))
+      return deferResident();
     if (routed.payload) return routed;
     return generateOnBackend(routed.backend, job, input, account, options);
+  }
+
+  const deferResident = () => ({
+    status: 409,
+    payload: {
+      deferredBeforeSubmission: true,
+      error: "Waiting for the selected profile to be resident again.",
+    },
+  });
+  async function residentBaseModel(backend, body) {
+    const worker = workerById(backend);
+    if (!isRadianceWorker(worker)) return;
+    const graph = await customWorkflowGraph(body);
+    const values = Object.values(graph).find((node) => isRadianceNode(node?.class_type))?.inputs;
+    if (!values?.model || /<lora:/i.test(String(values.prompt || ""))) return;
+    const stack = JSON.parse(String(values.loras || "[]"));
+    if (!Array.isArray(stack) || stack.length) return;
+    // Radiance keeps composed adapter stacks in separate private slots. The base run needs none.
+    const models = await new RadianceClient(worker.url).models(AbortSignal.timeout(1500));
+    if (models.some(({ id, state }) => id === values.model && state === "resident"))
+      return values.model;
   }
 
   async function prepareGenerationBody(backend, input, options) {
@@ -472,6 +496,15 @@ export function createGenerationSubmission({
     body.createdAt = new Date().toISOString();
     body.galleryAt = job.galleryAt;
     body.startedAt = Date.now();
+    if (options?.residentModel) {
+      const resident = await residentBaseModel(backend, body).catch(() => undefined);
+      if (
+        resident !== options.residentModel ||
+        !options.residentPermitted() ||
+        store.hasOpenOwnWork(body.kind !== "video")
+      )
+        return deferResident();
+    }
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");
     putGalleryItems(items);
@@ -515,6 +548,15 @@ export function createGenerationSubmission({
   }
   return {
     submitGeneration,
+    async residentProfileModel(input, backend, account) {
+      if (!input.profileId || !isRadianceWorker(workerById(backend))) return;
+      input = { ...input, prompt: input.prompt || "(written by the prompt assistant)" };
+      const routed = await routeGeneration(input, account, backend, true);
+      if (routed.backend !== backend || routed.profile?.id !== input.profileId) return;
+      const { body } = await prepareGenerationBody(backend, input);
+      if (!body || body.profileId !== input.profileId) return;
+      return residentBaseModel(backend, body);
+    },
     async radianceModel(job, account) {
       const input = { ...job.input, clientJobId: job.id };
       const routed = await routeGeneration(input, account, job.backend);
