@@ -95,9 +95,28 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await expect(search).toHaveValue("Bird");
 });
 
-test("Gallery Review offers suggestions for the current result", async ({ page }) => {
+test("Gallery Review loads the next five Suggestions across pages and reuses them", async ({
+  page,
+}) => {
   const state = await fixtures(page);
-  state.gallery.push({ ...result("bird", "Amber Bird"), jobId: "bird-job" });
+  const results = Array.from({ length: 7 }, (_, index) =>
+    result(`review-${index}`, `Review Result ${index}`),
+  );
+  state.gallery.push(...results);
+  await page.route(/\/api\/gallery\?/, (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("unrated") !== "1") return route.fallback();
+    const offset = Number(params.get("cursor") || 0);
+    const end = offset + 2;
+    return route.fulfill({
+      json: {
+        items: results.slice(offset, end),
+        hasMore: end < results.length,
+        nextCursor: String(end),
+        totalApprox: results.length,
+      },
+    });
+  });
   const asked: string[] = [];
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
@@ -120,6 +139,12 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   await page.goto("/images");
   await showGalleryView(page, "Review");
   const deck = page.getByRole("region", { name: "Review", exact: true });
+  const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card.getByText("Review Result 0", { exact: true })).toBeVisible();
+  await expect.poll(() => asked).toEqual(results.slice(1, 6).map(({ id }) => id));
+  await deck.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(card.getByText("Review Result 1", { exact: true })).toBeVisible();
+  await expect.poll(() => asked).toEqual(results.slice(1).map(({ id }) => id));
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
   const chosen = page.waitForRequest(
@@ -128,10 +153,10 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   );
   await menu.getByRole("menuitem", { name: "Later Light", exact: true }).click();
   expect((await chosen).postDataJSON()).toMatchObject({
-    itemId: "bird",
+    itemId: "review-1",
     request: "change the light",
   });
-  expect(asked).toEqual(["bird"]);
+  expect(asked).toEqual(results.slice(1).map(({ id }) => id));
 });
 
 test("Video Review opened directly leaves for the video gallery", async ({ page }) => {

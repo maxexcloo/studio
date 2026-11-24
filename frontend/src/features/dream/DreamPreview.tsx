@@ -25,10 +25,11 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { mediaTitle } from "../gallery/mediaLabels";
 import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
-import { ViewerChrome } from "../gallery/ViewerChrome";
+import { ViewerChrome, ViewerMetadata, ViewerTitle } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
 import { zoomImage } from "../gallery/zoomImage";
@@ -90,6 +91,22 @@ function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?
   );
 }
 
+function LibraryCaption({ item, full }: { item: MediaItem; full: boolean }) {
+  const title = mediaTitle(item);
+  const prompt = item.prompt?.trim();
+  return (
+    <div className={classes.caption}>
+      <ViewerTitle item={item} title={title} fw={600} lineClamp={full ? undefined : 2} />
+      <ViewerMetadata item={item} />
+      {prompt && prompt.toLowerCase() !== title.toLowerCase() && (
+        <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
+          {prompt}
+        </Text>
+      )}
+    </div>
+  );
+}
+
 /** The deck's short caption over the media, or alongside it when held sideways. */
 export function CardText({
   item,
@@ -107,11 +124,7 @@ export function CardText({
       {dreamt ? (
         <Caption item={item as DreamItem} full={full} title={title} />
       ) : (
-        <div className={classes.caption}>
-          <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
-            {item.prompt}
-          </Text>
-        </div>
+        <LibraryCaption item={item} full={full} />
       )}
     </div>
   );

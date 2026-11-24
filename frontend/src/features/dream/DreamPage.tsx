@@ -11,7 +11,7 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type SetStateAction, useEffect, useId, useRef, useState } from "react";
+import { type SetStateAction, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { dreamCardCounts } from "../../../../shared/dream";
@@ -30,6 +30,7 @@ import { DreamDeck, type Judgement } from "./DreamDeck";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
+import { reviewSuggestionCount } from "./DreamSuggestions";
 import { DreamWeek } from "./DreamWeek";
 import {
   type Dream,
@@ -122,8 +123,11 @@ const mediaLabels = { image: "Images", video: "Videos" };
 
 function useLibraryReview(seed: string, media: DreamMedia, decided: Set<string>, enabled: boolean) {
   const query = useInfiniteQuery({ ...libraryReviewQuery(seed, media), enabled });
-  const items =
-    query.data?.pages.flatMap((page) => page.items).filter((item) => !decided.has(item.id)) ?? [];
+  const items = useMemo(
+    () =>
+      query.data?.pages.flatMap((page) => page.items.filter(({ id }) => !decided.has(id))) ?? [],
+    [decided, query.data],
+  );
   const lastPage = query.data?.pages.at(-1);
   const remaining = (lastPage ? lastPage.remaining - lastPage.items.length : 0) + items.length;
   return { query, items, remaining };
@@ -180,7 +184,7 @@ export function DreamPage() {
   useEffect(() => {
     if (
       reviewing &&
-      libraryItems.length < 3 &&
+      libraryItems.length <= reviewSuggestionCount &&
       library.hasNextPage &&
       !library.isFetchingNextPage &&
       !library.isFetchNextPageError
