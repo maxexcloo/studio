@@ -29,13 +29,21 @@ import { inboxQuery } from "../dream/queries";
 import type { ComparisonImage } from "../gallery/MediaComparison";
 import { mediaSource } from "../gallery/mediaSource";
 import { MediaTile } from "../gallery/MediaTile";
+import { MediaTileActions } from "../gallery/MediaTileActions";
 import { MediaComparison, MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
+import { useRate } from "../gallery/useMediaRating";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { type GalleryState, galleryViewPath } from "../gallery/viewerLink";
 import { ComparisonRatingButtons } from "./ComparisonRatingButtons";
-import { type Comparison, comparisonQuery, comparisonTitle, comparisonsQuery } from "./queries";
+import {
+  type Comparison,
+  againItems,
+  comparisonQuery,
+  comparisonTitle,
+  comparisonsQuery,
+} from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
@@ -59,7 +67,9 @@ export function ComparePage() {
   const items = (comparison.data?.variants || []).flatMap((variant) =>
     variant.item ? [variant.item] : [],
   );
-  const hold = useHoldToSelect(items, undefined);
+  const [menuItem, setMenuItem] = useState<string | null>(null);
+  const hold = useHoldToSelect(items, undefined, setMenuItem);
+  const rate = useRate();
   const tryAgain = useTryAgain(items);
   const choose = useMutation({
     mutationFn: async (item: MediaItem) => {
@@ -136,7 +146,6 @@ export function ComparePage() {
   const { variants, seed, prompt, negative, set, axis, dream, card } = comparison.data;
   const gallerySet = comparisonSearch === undefined ? set : undefined;
   const backLabel = gallerySet ? "Show in Gallery" : "Back to Comparisons";
-  const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   const splitImages = variants.flatMap(({ label, item }) => {
     if (item?.type !== "image" || item.status !== "done" || !item.url) return [];
     const source = mediaSource(item);
@@ -150,17 +159,14 @@ export function ComparePage() {
       },
     ];
   });
-  // Compare Again brings back every finished variant, the winner first.
-  const again = items
-    .filter((item) => item.status === "done")
-    .sort((a, b) => Number(b === winner) - Number(a === winner));
+  const again = againItems(comparison.data);
   // The tallest variant sets the shared width in Side by Side.
   const aspects = items.flatMap((item) =>
     item.width && item.height ? [item.width / item.height] : [],
   );
   const aspect = aspects.length ? Math.min(...aspects) : 1;
   return (
-    <Stack gap="md" className={classes.page}>
+    <Stack gap="md" className={classes.page} {...hold.handlers}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
           <Tooltip label={backLabel}>
@@ -259,29 +265,39 @@ export function ComparePage() {
                   className={classes.tile}
                   onOpen={() => item.status === "done" && setOpen(item)}
                   onTryAgain={(failed) => tryAgain([failed.jobId || ""]).then(() => undefined)}
+                  onMenu={() => setMenuItem(item.id)}
                   actions={
-                    // Dream's answer stands: its kept side is the winner.
-                    item.status === "done" &&
-                    !dream && (
-                      <Tooltip label={won ? "Clear Winner" : "Pick as Winner"}>
-                        {phone ? (
-                          <ActionIcon {...pickProps(item, label, won)} size="lg">
-                            <icons.winner size={18} fill={won ? "currentColor" : "none"} />
-                          </ActionIcon>
-                        ) : (
-                          <Button
-                            {...pickProps(item, label, won)}
-                            size="compact-sm"
-                            radius="xl"
-                            leftSection={
-                              <icons.winner size={16} fill={won ? "currentColor" : "none"} />
-                            }
-                          >
-                            Pick
-                          </Button>
-                        )}
-                      </Tooltip>
-                    )
+                    <>
+                      {/* Right-click or a hold opens the menu; Pick keeps More's corner. */}
+                      <MediaTileActions
+                        item={item}
+                        opened={menuItem === item.id}
+                        onOpenedChange={(opened) => setMenuItem(opened ? item.id : null)}
+                        rate={rate}
+                        hideMore
+                      />
+                      {/* Dream's answer stands: its kept side is the winner. */}
+                      {item.status === "done" && !dream && (
+                        <Tooltip label={won ? "Clear Winner" : "Pick as Winner"}>
+                          {phone ? (
+                            <ActionIcon {...pickProps(item, label, won)} size="lg">
+                              <icons.winner size={18} fill={won ? "currentColor" : "none"} />
+                            </ActionIcon>
+                          ) : (
+                            <Button
+                              {...pickProps(item, label, won)}
+                              size="compact-sm"
+                              radius="xl"
+                              leftSection={
+                                <icons.winner size={16} fill={won ? "currentColor" : "none"} />
+                              }
+                            >
+                              Pick
+                            </Button>
+                          )}
+                        </Tooltip>
+                      )}
+                    </>
                   }
                 />
               ) : (

@@ -1,21 +1,37 @@
-import { Alert, Button, Group, SimpleGrid, Stack, Text, VisuallyHidden } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Group,
+  Menu,
+  SimpleGrid,
+  Stack,
+  Text,
+  VisuallyHidden,
+} from "@mantine/core";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
+import { menuWidth } from "../../theme";
+import { ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { ViewMenu } from "../../ui/ViewMenu";
+import { itemAction } from "../gallery/itemActions";
 import { mediaTitle } from "../gallery/mediaLabels";
 import { MediaTile } from "../gallery/MediaTile";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
-import { ComparisonRatingButtons } from "./ComparisonRatingButtons";
-import { comparisonTitle, comparisonsQuery } from "./queries";
+import { ComparisonRatingButtons, useRateComparison } from "./ComparisonRatingButtons";
+import { type Comparison, againItems, comparisonTitle, comparisonsQuery } from "./queries";
+import { useStageComparison } from "./variants";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import filterClasses from "../gallery/GalleryFilters.module.css";
 import galleryClasses from "../gallery/GalleryPage.module.css";
+import tileClasses from "../gallery/MediaTileActions.module.css";
 
 // Disliked comparisons stay out of the default view.
 const ratings = [
@@ -59,10 +75,17 @@ export function ComparisonList({ view }: { view: ReactNode }) {
           : mediaTitle(cover);
     return [{ comparison, cover, title }];
   });
+  // Holding a card's tile opens its menu, which is keyed by the cover's ID.
+  const [menu, setMenu] = useState<string | null>(null);
   const hold = useHoldToSelect(
     cards.map(({ cover }) => cover),
     undefined,
+    setMenu,
   );
+  const open = (comparison: Comparison) =>
+    void navigate(`/compare/${encodeURIComponent(comparison.id)}`, {
+      state: { comparisonSearch: location.search },
+    });
   return (
     <Stack gap="sm" className={galleryClasses.page}>
       <VisuallyHidden component="h1">Comparisons</VisuallyHidden>
@@ -95,7 +118,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
           </Stack>
         </Alert>
       ) : cards.length ? (
-        <SimpleGrid cols={columns} spacing="sm" style={{ alignItems: "start" }}>
+        <SimpleGrid cols={columns} spacing="sm" style={{ alignItems: "start" }} {...hold.handlers}>
           {cards.map(({ comparison, cover, title }) => (
             <Stack key={comparison.id} gap={4} miw={0}>
               <MediaTile
@@ -104,10 +127,16 @@ export function ComparisonList({ view }: { view: ReactNode }) {
                 caption="none"
                 label={`Open Comparison: ${title}`}
                 style={{ aspectRatio: `${cover.width || 1} / ${cover.height || 1}` }}
-                onOpen={() =>
-                  void navigate(`/compare/${encodeURIComponent(comparison.id)}`, {
-                    state: { comparisonSearch: location.search },
-                  })
+                onOpen={() => open(comparison)}
+                onMenu={() => setMenu(cover.id)}
+                actions={
+                  <ComparisonActions
+                    comparison={comparison}
+                    title={title}
+                    opened={menu === cover.id}
+                    onOpenedChange={(opened) => setMenu(opened ? cover.id : null)}
+                    onOpen={() => open(comparison)}
+                  />
                 }
               />
               <Group justify="space-between" gap="xs" wrap="nowrap">
@@ -137,5 +166,83 @@ export function ComparisonList({ view }: { view: ReactNode }) {
         </EmptyState>
       )}
     </Stack>
+  );
+}
+
+/** A comparison tile's menu: More on hover, right-click, the Menu key or holding opens it. */
+function ComparisonActions({
+  comparison,
+  title,
+  opened,
+  onOpenedChange,
+  onOpen,
+}: {
+  comparison: Comparison;
+  title: string;
+  opened: boolean;
+  onOpenedChange: (opened: boolean) => void;
+  onOpen: () => void;
+}) {
+  const bounds = useActionMenuBounds(opened);
+  const rate = useRateComparison(comparison);
+  const stage = useStageComparison();
+  const again = useMutation({ mutationFn: () => stage.again(againItems(comparison)) });
+  const rating = (id: "like" | "dislike") => {
+    const value = id === "like" ? "liked" : "disliked";
+    const pressed = comparison.rating === value;
+    return itemAction(id, {
+      pressed,
+      disabled: rate.isPending,
+      onClick: () => rate.mutate(pressed ? null : value),
+    });
+  };
+  return (
+    <Group
+      className={tileClasses.actions}
+      data-opened={opened || undefined}
+      justify="flex-end"
+      align="flex-start"
+      wrap="nowrap"
+    >
+      <Menu
+        {...bounds}
+        opened={opened}
+        onChange={onOpenedChange}
+        position="bottom-end"
+        width={menuWidth}
+      >
+        <Menu.Target>
+          <ActionIcon
+            className={`${tileClasses.control} ${tileClasses.more}`}
+            aria-label={`More Actions for ${title}`}
+            variant="default"
+            size={28}
+          >
+            <icons.more size={16} />
+          </ActionIcon>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <ActionMenuItems
+            groups={[
+              [
+                { id: "open", label: "Open", icon: icons.compareSideBySide, onClick: onOpen },
+                ...(againItems(comparison).length > 1
+                  ? [
+                      {
+                        id: "again",
+                        label: "Compare Again",
+                        icon: icons.compare,
+                        loading: again.isPending,
+                        onClick: () => again.mutate(),
+                      },
+                    ]
+                  : []),
+              ],
+              [rating("like"), rating("dislike")],
+            ]}
+          />
+        </Menu.Dropdown>
+      </Menu>
+    </Group>
   );
 }

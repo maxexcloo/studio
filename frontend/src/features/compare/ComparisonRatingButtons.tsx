@@ -7,12 +7,12 @@ import { icons } from "../../ui/icons";
 import { ratingLabel } from "../gallery/itemActions";
 import { type Comparison, comparisonQuery, comparisonsQuery } from "./queries";
 
-export function ComparisonRatingButtons({ comparison }: { comparison: Comparison }) {
+/** Rates a comparison (null clears it), in its page and the Comparisons list. */
+export function useRateComparison({ id }: Pick<Comparison, "id">) {
   const client = useQueryClient();
-  const { id } = comparison;
   const detail = comparisonQuery(id).queryKey;
   const list = comparisonsQuery.queryKey;
-  const save = useMutation({
+  return useMutation({
     mutationFn: (rating: ComparisonRating | null) =>
       api<{ id: string; rating: ComparisonRating | null }>(
         `/api/comparisons/${encodeURIComponent(id)}/rating`,
@@ -31,6 +31,10 @@ export function ComparisonRatingButtons({ comparison }: { comparison: Comparison
       );
     },
   });
+}
+
+export function ComparisonRatingButtons({ comparison }: { comparison: Comparison }) {
+  const save = useRateComparison(comparison);
   return (
     <Group role="group" aria-label="Comparison Rating" gap={0} wrap="nowrap">
       {(["liked", "disliked"] as const).map((rating) => {

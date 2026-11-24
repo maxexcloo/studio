@@ -55,6 +55,12 @@ export const comparisonsQuery = queryOptions({
 export const comparisonTitle = ({ axis, dream }: Pick<Comparison, "axis" | "dream">) =>
   dream?.question || (axis ? `Which ${titleCase(axis)}?` : "Compare");
 
+/** What Compare Again brings back: every finished variant, the winner first. */
+export const againItems = ({ variants, winnerItemId }: Comparison) =>
+  variants
+    .flatMap(({ item }) => (item?.status === "done" ? [item] : []))
+    .sort((a, b) => Number(b.id === winnerItemId) - Number(a.id === winnerItemId));
+
 /** Which results each of the account's comparisons holds, to find an item's comparison. */
 export const comparisonMembersQuery = queryOptions({
   queryKey: ["comparisons", "members"],

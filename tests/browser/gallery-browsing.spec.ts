@@ -2562,6 +2562,57 @@ test("Comparisons open all variants and filter by the comparison rating", async 
   ).toBeVisible();
 });
 
+test("Comparison tiles and their variants open their menus by right-click, the Menu key or a hold", async ({
+  page,
+  isMobile,
+}) => {
+  const state = await fixtures(page);
+  const items = results(2).map((item, index) => ({ ...item, jobId: `job-${index}` }));
+  state.gallery.push(...items);
+  state.comparisons.push({
+    id: "compare-1",
+    seed: "",
+    requests: [{ input: { prompt: "Browse Result 0" } }, { input: { prompt: "Browse Result 1" } }],
+    jobIds: ["job-0", "job-1"],
+    itemIds: ["browse-0", "browse-1"],
+    labels: ["Variant A", "Variant B"],
+    vote: null,
+  });
+  await page.goto("/images");
+  await showGalleryView(page, "Comparisons");
+  const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
+  const menu = page.getByRole("menu");
+  const openMenu = async (tile: typeof card) => {
+    if (isMobile) {
+      // The release neither closes the menu nor opens the tile.
+      await touch(tile, "touchstart");
+      await expect(menu).toBeVisible();
+      await touch(tile, "touchend");
+      await tile.dispatchEvent("click");
+    } else await tile.click({ button: "right" });
+    await page.mouse.move(0, 0);
+    await expect(menu).toBeVisible();
+  };
+  await openMenu(card);
+  await expect(menu.getByRole("menuitem")).toHaveText(["Open", "Compare Again", "Like", "Dislike"]);
+  await page.getByRole("menuitem", { name: "Like", exact: true }).click();
+  await expect.poll(() => state.comparisons[0].rating).toBe("liked");
+  await expect(page.getByRole("button", { name: "Like Comparison", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await card.focus();
+  await card.press("Shift+F10");
+  await page.getByRole("menuitem", { name: "Open", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  // A variant offers the gallery's item menu.
+  await openMenu(page.getByRole("button", { name: "Open Variant A", exact: true }));
+  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Delete", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Open Comparison", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+});
+
 test("Saved views keep a search, filters and sort with the account and show their counts", async ({
   page,
 }) => {
