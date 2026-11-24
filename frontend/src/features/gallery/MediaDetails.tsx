@@ -669,41 +669,134 @@ const openHere =
     open(item);
   };
 
-/** Links to the pages of results an item was made from or made. */
-function RelatedLinks({ items, open }: { items: MediaItem[]; open?: (item: MediaItem) => void }) {
+/** A lineage step's link to a related result's page: its thumbnail, then its role and title. */
+function RelatedLink({
+  item,
+  label,
+  open,
+}: {
+  item: MediaItem;
+  label: string;
+  open?: (item: MediaItem) => void;
+}) {
+  const source = mediaSource(item);
+  const thumbnail = source.thumbnailUrl || (item.type === "image" ? source.url : "");
   return (
-    <Stack gap={4} align="flex-start">
-      {items.map((related) => {
-        const source = mediaSource(related);
-        const thumbnail = source.thumbnailUrl || (related.type === "image" ? source.url : "");
-        return (
-          <Anchor
-            key={related.id}
-            component={Link}
-            to={viewerPath(related)}
-            state={followed}
-            size="sm"
-            ta="left"
-            maw="100%"
-            onClick={openHere(related, open)}
+    <Anchor
+      component={Link}
+      to={viewerPath(item)}
+      state={followed}
+      size="sm"
+      ta="left"
+      maw="100%"
+      className={classes.step}
+      onClick={openHere(item, open)}
+    >
+      <Image
+        src={thumbnail || undefined}
+        alt=""
+        w={48}
+        h={48}
+        radius="sm"
+        loading="lazy"
+        fallbackSrc=""
+        className={classes.marker}
+      />
+      <span>
+        <PartLabel>{label}</PartLabel>
+        {mediaTitle(item)}
+      </span>
+    </Anchor>
+  );
+}
+
+/**
+ * Lineage as a flow down a rail: the original, the source with what changed on the way to this
+ * result, then its versions and derived results branching off it. A dotted stretch stands for
+ * ancestors between the original and the source that aren't loaded.
+ */
+function LineageFlow({
+  item,
+  related,
+  source,
+  sourcePending,
+  changes,
+  open,
+}: {
+  item: MediaItem;
+  related: ReturnType<typeof derivations>;
+  source?: MediaItem;
+  sourcePending: boolean;
+  changes: string[];
+  open?: (item: MediaItem) => void;
+}) {
+  const { original, sourceId, versions, derived } = related;
+  return (
+    <ol className={classes.flow}>
+      {original && (
+        <li>
+          <RelatedLink item={original} label="Original" open={open} />
+        </li>
+      )}
+      {original && source && source.parentItemId !== original.id && (
+        <li data-gap>
+          <Text size="xs" c="dimmed">
+            Earlier Steps
+          </Text>
+        </li>
+      )}
+      {source ? (
+        <li>
+          <RelatedLink item={source} label="Made From" open={open} />
+        </li>
+      ) : (
+        sourceId && (
+          <li className={classes.step}>
+            <span className={classes.marker} />
+            <span>
+              <PartLabel>Made From</PartLabel>
+              <Text size="sm" c="dimmed">
+                {sourcePending ? "Loading…" : "Source Result Unavailable"}
+              </Text>
+            </span>
+          </li>
+        )
+      )}
+      {changes.length > 0 && (
+        <li data-gap>
+          <Text
+            component="ul"
+            size="xs"
+            c="dimmed"
+            m={0}
+            p={0}
+            aria-label="Changes From Source"
+            style={{ listStyle: "none" }}
           >
-            <Group component="span" gap="xs" wrap="nowrap">
-              <Image
-                src={thumbnail || undefined}
-                alt=""
-                w={48}
-                h={48}
-                flex="0 0 auto"
-                radius="sm"
-                loading="lazy"
-                fallbackSrc=""
-              />
-              <span>{mediaTitle(related)}</span>
-            </Group>
-          </Anchor>
-        );
-      })}
-    </Stack>
+            {changes.map((change) => (
+              <li key={change}>{change}</li>
+            ))}
+          </Text>
+        </li>
+      )}
+      <li className={classes.step} data-current>
+        <span className={classes.marker} />
+        <span>
+          <PartLabel>This Result</PartLabel>
+          <Text size="sm" fw={500}>
+            {mediaTitle(item)}
+          </Text>
+        </span>
+      </li>
+      {[
+        ...versions.map((child) => ["Version", child] as const),
+        ...derived.map((child) => ["Derived", child] as const),
+      ].map(([label, child]) => (
+        <li key={child.id} data-branch>
+          <RelatedLink item={child} label={label} open={open} />
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -810,42 +903,12 @@ export function MediaDetails({
     chatAddress.hash = "";
   }
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
-  // The nearest source first, then its ancestry and offshoots.
+  const flow = Boolean(
+    related.sourceId || related.original || related.versions.length || related.derived.length,
+  );
+  // Where else it belongs, after its flow.
   const lineage = (
     [
-      [
-        "Made From",
-        source ? (
-          <Stack gap={4} key="from">
-            <RelatedLinks items={[source]} open={open} />
-            {details.changes.length > 0 && (
-              <Stack gap={2}>
-                <PartLabel>Changes From Source</PartLabel>
-                <Text component="ul" size="xs" c="dimmed" m={0} ps="md">
-                  {details.changes.map((change) => (
-                    <li key={change}>{change}</li>
-                  ))}
-                </Text>
-              </Stack>
-            )}
-          </Stack>
-        ) : (
-          related.sourceId && (
-            <Text size="sm" c="dimmed">
-              {parent.isPending ? "Loading…" : "Source Result Unavailable"}
-            </Text>
-          )
-        ),
-      ],
-      ["Original", related.original && <RelatedLinks items={[related.original]} open={open} />],
-      [
-        "Versions",
-        related.versions.length > 0 && <RelatedLinks items={related.versions} open={open} />,
-      ],
-      [
-        "Derived",
-        related.derived.length > 0 && <RelatedLinks items={related.derived} open={open} />,
-      ],
       [
         "Chat",
         conversation && (
@@ -920,12 +983,22 @@ export function MediaDetails({
   return (
     <Stack gap="lg" fz="sm">
       <Caption item={item} />
-      {lineage.length > 0 && (
+      {(flow || lineage.length > 0) && (
         <DetailSection title="Lineage">
           <Stack gap="sm">
+            {flow && (
+              <LineageFlow
+                item={item}
+                related={related}
+                source={source}
+                sourcePending={parent.isPending}
+                changes={details.changes}
+                open={open}
+              />
+            )}
             {lineage.map(([label, content]) => (
               <Stack key={label} gap={4}>
-                {lineage.length > 1 && <PartLabel>{label}</PartLabel>}
+                {(flow || lineage.length > 1) && <PartLabel>{label}</PartLabel>}
                 {content}
               </Stack>
             ))}

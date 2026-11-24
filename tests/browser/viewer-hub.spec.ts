@@ -1911,10 +1911,9 @@ test("Details keep the caption, run notes and source ahead of LoRAs and prompts"
   ).toHaveText(["Caption", "Lineage", "Model", "LoRAs", "Prompt", "Negative Prompt"]);
   await expect(details.getByText(notes, { exact: true })).toBeVisible();
   await expect(details.getByText(runCaption, { exact: true })).toBeVisible();
-  await expect(details.getByRole("link", { name: "Original Bird", exact: true })).toHaveAttribute(
-    "href",
-    "/images/865",
-  );
+  await expect(
+    details.getByRole("link", { name: "Made From Original Bird", exact: true }),
+  ).toHaveAttribute("href", "/images/865");
   const expand = details.getByRole("button", { name: "Expand Caption", exact: true });
   await expand.click();
   await details.getByRole("button", { name: "Collapse Caption", exact: true }).click();
