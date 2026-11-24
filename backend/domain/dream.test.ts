@@ -936,6 +936,44 @@ test("Each new idea sees a few drawn tastes and liked prompts from outside Dream
   assert.equal(explored?.dream?.inputs?.prompts, undefined);
 });
 
+test("A project's idea avoids its own recent ideas and sees its own likes; other ideas keep the account's", async (t) => {
+  const { dream, state, projects, dreamOnce, generated } = fixture(t);
+  generated({
+    id: "kite",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    prompt: "a kite over the dunes",
+  });
+  await dream.save("alice", { enabled: true });
+  state.replies = [{ prompt: "a fox in snow", title: "Snow Fox" }];
+  await dreamOnce();
+  const beach = projects.create("alice", { name: "Beach", brief: { subjects: "the sea" } });
+  generated({
+    id: "pools",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    title: "Tide Pools",
+    prompt: "tide pools by the sea at dusk",
+    dream: { prompt: "", why: "", at: "", state: "kept", projectId: beach.id },
+  });
+  state.replies = [{ prompt: "the sea under a storm", title: "Storm Sea" }];
+  await dreamOnce();
+  const inProject = state.calls.at(-1)!.user;
+  assert.match(inProject, /Liked prompts:\n- tide pools by the sea at dusk\n/);
+  assert.match(inProject, /Recent Dream ideas to avoid:\n- Tide Pools\n/);
+  assert.doesNotMatch(inProject, /kite|Snow Fox|fox in snow/);
+  projects.update("alice", beach.id, { paused: true }, "you");
+  await dreamOnce();
+  const outside = state.calls.at(-1)!.user;
+  assert.match(outside, /Liked prompts:\n- a kite over the dunes\n/);
+  assert.match(outside, /Recent Dream ideas to avoid:\n- Snow Fox\n/);
+  assert.doesNotMatch(outside, /Tide Pools|Storm Sea|tide pools/);
+});
+
 test("Fresh concepts rotate inspirations without overriding a model experiment", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   state.access.alice!.uncensored = true;
@@ -1621,7 +1659,7 @@ test("Dream's ideas take the account's active projects, and visits record when t
   assert.match(state.calls[0].system, /the brief comes first/);
   assert.doesNotMatch(state.calls[0].system, /Choose a different subject/);
   assert.match(state.calls[1].user, /Rejected prompt: a mountain cabin\nYour prompt shows none/);
-  assert.match(state.calls[2].user, /The project's recent ideas:\n- the sea at dawn/);
+  assert.match(state.calls[2].user, /Recent Dream ideas to avoid:\n- the sea at dawn\n/);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Project brief/);
 
   const request = await serve(t, fx);
@@ -2096,6 +2134,11 @@ test("Project results and stats use the project's own finished results window", 
     stats[quiet.id].results.map((item: DreamItem) => item.id),
     ["coast"],
   );
+  // The detail view pages through every result.
+  const first = (await request(`/projects/${busy.id}/results`)).body;
+  assert.equal(first.items.length, 40);
+  const next = (await request(`/projects/${busy.id}/results?cursor=${first.nextCursor}`)).body;
+  assert.equal(next.items[0].id, "city-40");
 });
 
 test("Deleting a project stops its Dream work and leaves its results, chats and notes without it", async (t) => {
@@ -3188,8 +3231,15 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   let [project] = projects.list("alice");
   assert.equal(project.brief.avoid, "people, crowds, boats");
   assert.deepEqual(
-    project.changes?.map(({ by, why, fields }) => [by, why, fields]),
-    [["dream", "Crowds keep showing", ["avoid"]]],
+    project.changes?.map(({ by, why, fields, text }) => [by, why, fields, text]),
+    [
+      [
+        "dream",
+        "Crowds keep showing",
+        ["avoid"],
+        { avoid: { before: "people", after: "people, crowds, boats" } },
+      ],
+    ],
   );
   await request(`/inbox/${byKind("pacing").id}/accept`, {});
   // Only the latest change can be undone.

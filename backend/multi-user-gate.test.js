@@ -76,6 +76,9 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["GET", "/api/dream/week"],
     ["GET", "/api/dream/notes"],
     ["GET", "/api/chat-choices"],
+    // A project's sheet pages its results and detaches its chats.
+    ["GET", "/api/dream/projects/p-1/results"],
+    ["POST", "/api/dream/projects/attach"],
     ["PATCH", "/api/preferences"],
     ["POST", "/api/queue/pause"],
     ["POST", "/api/queue/abc-1/move"],

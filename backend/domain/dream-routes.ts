@@ -157,12 +157,15 @@ export function registerDreamRoutes(
       throw Object.assign(new Error("Name the chat."), { status: 400 });
     return chat;
   };
-  // Each project's stats and share of turns, with its newest results; MCP's `?chat=` adds that
-  // chat's project, read without counting as the chat's activity.
+  // Each project's stats and share of turns, with its newest results, and the attached chats, newest
+  // first; MCP's `?chat=` adds that chat's project, read without counting as the chat's activity.
   route("GET", "/api/dream/projects", (account, { query }) => ({
     status: 200,
     payload: {
       projects: projects.list(owner(account)),
+      chats: Object.entries(projects.chats(owner(account)))
+        .map(([chat, { projectId, at }]) => ({ chat, projectId, at }))
+        .sort((a, b) => b.at.localeCompare(a.at)),
       ...(typeof query?.chat === "string" && {
         project: projects.chatProject(owner(account), query.chat),
       }),
@@ -174,10 +177,18 @@ export function registerDreamRoutes(
       ),
     },
   }));
-  route("GET", "/api/dream/projects/:projectId/results", (account, { params }) => ({
-    status: 200,
-    payload: { items: listed(dream.projectResults(owner(account), params.projectId, 60)) },
-  }));
+  route("GET", "/api/dream/projects/:projectId/results", (account, { params, query }) => {
+    const start = Math.max(0, Number.parseInt(String(query?.cursor || "0"), 10) || 0);
+    const limit = 40;
+    const read = dream.projectResults(owner(account), params.projectId, start + limit + 1);
+    return {
+      status: 200,
+      payload: {
+        items: listed(read.slice(start, start + limit)),
+        nextCursor: read.length > start + limit ? String(start + limit) : "",
+      },
+    };
+  });
   route("POST", "/api/dream/projects", (account, { body }) =>
     answer(() => ({ project: projects.create(owner(account), projectPatch(body)) })),
   );

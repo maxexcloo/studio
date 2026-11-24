@@ -1635,9 +1635,19 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
           constraints,
           change: "change-1",
         },
-        changes: [{ id: "change-1", at: stamp, by: "chat", why: "", fields: ["subjects"] }],
+        changes: [
+          {
+            id: "change-1",
+            at: stamp,
+            by: "chat",
+            why: "",
+            fields: ["subjects"],
+            text: { subjects: { before: "Gulls", after: "Seabirds" } },
+          },
+        ],
       },
     ],
+    chats: [{ chat: "chat-harbour", projectId: "project-coast", at: stamp }],
     stats: {
       "project-coast": {
         kept: 3,
@@ -1655,18 +1665,40 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   const coast = page.getByRole("region", { name: "Coast", exact: true });
   await expect(coast).toContainText("Kept 3");
   await expect(coast).toContainText("Review 6.5");
-  await expect(coast.getByRole("progressbar", { name: "60% of turns" })).toBeVisible();
+  await expect(coast.getByRole("progressbar", { name: "60% of project turns" })).toBeVisible();
 
-  // The detail view lists a chat's change with Undo, which restores what it replaced.
+  // The detail view lists a chat's change and its words with Undo, which restores what it replaced.
   await coast.getByRole("button", { name: "Open Coast", exact: true }).click();
   await expect(page).toHaveURL(/\/dream\/projects\/project-coast$/);
   const detail = page.getByRole("dialog", { name: "Coast", exact: true });
   const changes = detail.getByRole("list", { name: "Changes", exact: true });
   await expect(changes).toContainText("Chat · Subjects");
+  await expect(changes).toContainText("Subjects: GullsSeabirds");
   await changes.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(detail).toContainText("Gulls");
+  await expect(detail.getByRole("region", { name: "Brief", exact: true })).toContainText("Gulls");
   await expect(changes).toContainText("Undone");
   await expect(changes.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
+
+  // Its results open the viewer with Dream's verdicts, over the detail view.
+  await detail
+    .getByRole("region", { name: "Results", exact: true })
+    .getByRole("button", { name: "View Dream prompt gull", exact: true })
+    .click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await expect(detail).toBeVisible();
+
+  // Its chats each detach.
+  const chats = detail.getByRole("region", { name: "Chats", exact: true });
+  await chats.getByRole("button", { name: "Detach", exact: true }).click();
+  await expect(chats).toContainText("No chats attached.");
+  expect(dream.requests.at(-1)).toMatchObject({
+    method: "POST",
+    path: "/api/dream/projects/attach",
+    body: { chat: "chat-harbour", projectId: null },
+  });
   await detail.getByRole("button", { name: "Close", exact: true }).last().click();
   await expect(detail).toBeHidden();
   await expect(page).toHaveURL(/\/dream\/projects$/);
@@ -1790,8 +1822,11 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
     return route.fulfill({ json: { text: "Soft morning light by the harbour." } });
   });
   await page.goto("/dream/projects");
-  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "New Project", exact: true }).click();
+  // The empty view explains projects and offers New Project, as the toolbar does.
+  await expect(
+    page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "New Project", exact: true }).last().click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
   if (isMobile) await name.click();
@@ -1946,7 +1981,9 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
   await fixtures(page);
   const dream = await serveDream(page);
   await page.goto("/dream/projects");
-  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
+  ).toBeVisible();
 
   const cards = [
     { kind: "characters", name: "Mara", description: "Red hair and freckles" },
@@ -1978,7 +2015,9 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
       body: {},
     });
   }
-  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
+  ).toBeVisible();
 });
 
 test("Dream autoplays silently when sound is blocked and lets the viewer choose a comparison side", async ({

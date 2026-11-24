@@ -294,7 +294,23 @@ export function createProjects({
       const after = merged(project, patch);
       const fields = changed(before, after);
       if (!fields.length) return project;
-      const change = { id: randomUUID(), at: stamp(), by, why, fields };
+      const words = (version: ProjectContent, field: string) => {
+        const value = field === "name" ? version.name : version.brief[field as "loras"];
+        return Array.isArray(value) ? value.join(", ") : value || "";
+      };
+      const text = Object.fromEntries(
+        fields
+          .filter((field) => field === "name" || field in before.brief || field in after.brief)
+          .map((field) => [field, { before: words(before, field), after: words(after, field) }]),
+      );
+      const change = {
+        id: randomUUID(),
+        at: stamp(),
+        by,
+        why,
+        fields,
+        ...(Object.keys(text).length ? { text } : {}),
+      };
       assign(project, after);
       project.previous = { ...before, change: change.id };
       project.changes = [change, ...(project.changes || [])].slice(0, maxProjectChanges);

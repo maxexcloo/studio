@@ -257,8 +257,16 @@ function ProposalEditor({
   );
 }
 
-/** A brief field's proposed text against its current text, removed words struck. */
-function BriefDiff({ label, before, after }: { label: string; before: string; after: string }) {
+/** A text field's new words against its old, removed words struck. */
+export function BriefDiff({
+  label,
+  before,
+  after,
+}: {
+  label: string;
+  before: string;
+  after: string;
+}) {
   return (
     <Text size="sm">
       <Text span c="dimmed" size="sm">

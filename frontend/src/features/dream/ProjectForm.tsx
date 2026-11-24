@@ -105,14 +105,16 @@ export const blankProject: ProjectContent = {
 /** The brief's text fields: key, label and what it holds. */
 export const briefFields = [
   ["subjects", "Subjects", "Who or what the work shows."],
+  ["styles", "Styles", "How it looks: medium, light, mood."],
+  ["avoid", "Avoid", "What prompts must never name, separated by commas."],
   ["ethnicity", "Ethnicity", "The person's ethnicity."],
   ["age", "Age", "The person's age range."],
   ["body", "Body", "The person's build and proportions."],
-  ["styles", "Styles", "How it looks: medium, light, mood."],
   ["rules", "Banned Changes & Rules", "Standing rules every prompt keeps to."],
-  ["avoid", "Avoid", "What prompts must never name, separated by commas."],
 ] as const;
 export type BriefText = (typeof briefFields)[number][0];
+/** The fields most briefs leave open, which the form groups under More. */
+const moreFields = new Set<BriefText>(["ethnicity", "age", "body", "rules"]);
 export const aspectLabel = (aspect: string) => (aspect.includes(":") ? aspect : titleCase(aspect));
 
 export function ProjectPins({
@@ -250,7 +252,7 @@ export function ProjectForm({
       onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
     />
   );
-  const fields = briefFields.map(([key, label, description]) => {
+  const briefBox = ([key, label, description]: (typeof briefFields)[number]) => {
     const box = (
       <ProjectBriefField
         key={key}
@@ -270,7 +272,15 @@ export function ProjectForm({
     ) : (
       box
     );
-  });
+  };
+  const fields = (
+    <>
+      {briefFields.filter(([key]) => !moreFields.has(key)).map(briefBox)}
+      <SettingGroup title="More">
+        <Stack>{briefFields.filter(([key]) => moreFields.has(key)).map(briefBox)}</Stack>
+      </SettingGroup>
+    </>
+  );
   const chips = (
     <Group gap="xs">
       <FieldChip
