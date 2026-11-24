@@ -120,6 +120,7 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["GET", "/api/taste"],
     ["PUT", "/api/taste"],
     ["POST", "/api/taste/refresh"],
+    ["POST", "/api/taste/reset"],
     ["DELETE", "/api/taste"],
     ["GET", "/api/dream"],
     ["GET", "/api/dream/count"],

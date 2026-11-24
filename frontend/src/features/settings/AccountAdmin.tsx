@@ -449,7 +449,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   );
 }
 
-type UserAction = "delete" | "disable" | "gallery" | "password" | "role";
+type UserAction = "delete" | "disable" | "gallery" | "password" | "role" | "taste";
 
 /** An account's visible gallery items and stored bytes, and what it made in the last 30 days. */
 interface GalleryOwner {
@@ -609,6 +609,11 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       api(`/api/accounts/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: () => setActing(null),
     onSettled: refresh,
+  });
+  const resetTaste = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (id: string) => post(`/api/taste/owners/${encodeURIComponent(id)}/reset`),
+    onSuccess: () => setActing(null),
   });
   const galleries = useQuery(galleryOwnersQuery);
   const ownerOf = (account: Account) => galleries.data?.owners[account.id];
@@ -772,6 +777,11 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   Reset Password
                 </Menu.Item>
               )}
+              {!own && (
+                <Menu.Item leftSection={<icons.reset size={16} />} onClick={act("taste")}>
+                  Reset Learnt Taste
+                </Menu.Item>
+              )}
               {identitiesOf(account).map(({ identity }, _, links) => (
                 <Menu.Item
                   key={identity}
@@ -871,6 +881,22 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         {promote
           ? `Make ${target?.username} an administrator? They can use and change everything, including other accounts.`
           : `Make ${target?.username} an ordinary user? They join ${defaultGroup?.name || "the default group"} and lose administration.`}
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={acting?.action === "taste"}
+        title="Reset Learnt Taste"
+        action="Reset"
+        pending={resetTaste.isPending}
+        error={resetTaste.error?.message}
+        onConfirm={() => target && resetTaste.mutate(target.id)}
+        onClose={() => {
+          setActing(null);
+          resetTaste.reset();
+        }}
+      >
+        Reset {target?.username}'s learnt taste? Studio forgets the summary, likes, dislikes and
+        styles it learnt and learns them again from their signals. Their edits, exclusions, rules
+        and signals stay.
       </ConfirmDialog>
       <ConfirmDialog
         opened={acting?.action === "disable"}
