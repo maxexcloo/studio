@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { type PointerEvent, type ReactNode, useMemo, useState } from "react";
+import { type PointerEvent, useMemo, useState } from "react";
 
 import {
   type Change,
@@ -282,18 +282,6 @@ export const suggestionsTool = (
   menu: assistMenu({ suggestions, templates: [], last: [] }),
   onOpen,
 });
-
-/** Supplies a text box's suggestions, loading once its AI menu opens. */
-export function ChangeSuggestions<K extends QueryKey>({
-  children,
-  ...props
-}: Omit<Parameters<typeof useChangeSuggestions<K>>[0], "enabled"> & {
-  children: (action: Action) => ReactNode;
-}) {
-  const [requested, setRequested] = useState(false);
-  const suggestions = useChangeSuggestions({ ...props, enabled: requested });
-  return children(suggestionsTool(suggestions, () => setRequested(true)));
-}
 
 /**
  * The proposed action and the words it changes, below the prompt it fills.
