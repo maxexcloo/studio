@@ -1729,17 +1729,53 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
     body: { paused: true },
   });
 
+  // More Turns switches from the card's menu and shows on the card.
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  const moreTurns = page.getByRole("menuitemcheckbox", { name: "More Turns", exact: true });
+  await expect(moreTurns).toHaveAttribute("aria-checked", "false");
+  await moreTurns.click();
+  await expect(moreTurns).toHaveAttribute("aria-checked", "true");
+  expect(dream.requests.at(-1)).toMatchObject({
+    method: "PUT",
+    path: "/api/dream/projects/project-2",
+    body: { favoured: true },
+  });
+  await page.keyboard.press("Escape");
+  await enabled.click({ force: true });
+  await expect(harbour).toContainText("More Turns");
+
+  // The detail view switches both, and deletes it from its Danger Zone.
+  await harbour.getByRole("button", { name: "Open Harbour", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Harbour", exact: true });
+  await expect(sheet.getByRole("switch", { name: "Enabled", exact: true })).toBeChecked();
+  const sheetTurns = sheet.getByRole("switch", { name: "More Turns", exact: true });
+  await expect(sheetTurns).toBeChecked();
+  await sheetTurns.click({ force: true });
+  await expect(sheetTurns).not.toBeChecked();
+  expect(dream.requests.at(-1)).toMatchObject({
+    method: "PUT",
+    path: "/api/dream/projects/project-2",
+    body: { favoured: false },
+  });
+  await sheet.getByRole("button", { name: "Delete", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Project", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
     .click();
+  await expect(sheet).toBeHidden();
   await expect(harbour).toBeHidden();
+  await expect(page).toHaveURL(/\/dream\/projects$/);
   expect(dream.requests.at(-1)).toMatchObject({
     method: "DELETE",
     path: "/api/dream/projects/project-2",
   });
+
+  // A project that no longer exists says so.
+  await page.goto("/dream/projects/project-2");
+  const gone = page.getByRole("dialog", { name: "Project", exact: true });
+  await expect(gone).toContainText("That project no longer exists.");
+  await gone.getByRole("button", { name: "Close", exact: true }).last().click();
+  await expect(gone).toBeHidden();
 });
 
 test("New Project suggests an empty brief field and Undo restores it", async ({
@@ -1874,6 +1910,17 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
     path: "/api/dream/inbox/mara/dismiss",
     body: {},
   });
+  // Its banner's Undo brings the proposal back; declining again stands.
+  const declined = page.getByRole("alert").filter({ hasText: "Declined Mara" });
+  await declined.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(mara).toBeVisible();
+  expect(dream.requests.at(-1)).toEqual({
+    method: "POST",
+    path: "/api/dream/inbox/mara/undo",
+    body: {},
+  });
+  await mara.getByRole("button", { name: "Decline", exact: true }).click();
+  await expect(mara).toBeHidden();
 
   // Clearing the Inbox still asks first.
   await page

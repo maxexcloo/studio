@@ -17,14 +17,20 @@ import type { ChangeBy, Project, ProjectChange } from "../../../../shared/projec
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
+import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
-import { SettingGroup } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { useMediaPreview } from "../gallery/MediaPreview";
-import { ProjectStatsLine, constraintBadges } from "./ProjectCard";
+import {
+  ProjectEnabled,
+  ProjectMoreTurns,
+  ProjectStatsLine,
+  constraintBadges,
+} from "./ProjectCard";
 import { ProjectPins, briefFields } from "./ProjectForm";
 import { ProposalList } from "./ProjectInbox";
 import { inboxQuery, projectPath, projectResultsQuery, projectsQuery } from "./queries";
@@ -119,10 +125,12 @@ function ProjectDetail({
   project,
   projects,
   profileLabel,
+  onDelete,
 }: {
   project: Project;
   projects: Project[];
   profileLabel: (id: string) => string;
+  onDelete: () => void;
 }) {
   const client = useQueryClient();
   const stats = useQuery(projectsQuery).data?.stats[project.id];
@@ -139,6 +147,14 @@ function ProjectDetail({
   return (
     <Stack gap="lg">
       <ProjectStatsLine project={project} stats={stats} />
+      <SettingGroup title="Status">
+        <SettingRow label="Enabled" description="Dream draws ideas from it.">
+          <ProjectEnabled project={project} label="Enabled" />
+        </SettingRow>
+        <SettingRow label="More Turns" description="Doubles its share of Dream's turns.">
+          <ProjectMoreTurns project={project} />
+        </SettingRow>
+      </SettingGroup>
       <SettingGroup title="Brief">
         <Stack gap={4}>
           {brief.map(([key, label]) => (
@@ -209,48 +225,72 @@ function ProjectDetail({
           </Text>
         )}
       </SettingGroup>
+      <SettingGroup title="Danger Zone" danger>
+        <SettingRow label="Delete Project" description="Chats using it keep going without it.">
+          <Button size="compact-sm" color="red" variant="light" onClick={onDelete}>
+            Delete
+          </Button>
+        </SettingRow>
+      </SettingGroup>
     </Stack>
   );
 }
 
 /**
- * A project's detail view at /dream/projects/:projectId: its brief, constraints, pending
- * proposals, results and changes with Undo; Edit opens the project's editor.
+ * A project's detail view at /dream/projects/:projectId: its switches, brief, constraints, pending
+ * proposals, results, changes with Undo and Delete; Edit opens the project's editor. Once
+ * `projects` load, an id none of them has says so.
  */
 export function ProjectSheet({
   projectId,
   projects,
   profileLabel,
   onEdit,
+  onDelete,
   onClose,
 }: {
   projectId?: string;
-  projects: Project[];
+  projects?: Project[];
   profileLabel: (id: string) => string;
   onEdit: (project: Project) => void;
+  onDelete: (project: Project) => void;
   onClose: () => void;
 }) {
   const id = useId();
   const phone = usePhone();
-  const opened = projects.find((entry) => entry.id === projectId);
-  const project = useLastWhileClosing(opened);
+  const found = projects?.find((entry) => entry.id === projectId);
+  const missing = Boolean(projectId && projects && !found);
+  const shown = useLastWhileClosing<Project | "missing">(missing ? "missing" : found);
   return (
     <Modal
       id={id}
-      opened={Boolean(opened)}
+      opened={Boolean(found) || missing}
       onClose={closeWhenTop(id, onClose)}
-      title={project?.name}
+      title={shown === "missing" ? "Project" : shown?.name}
       size="lg"
       fullScreen={phone}
     >
-      {project && (
-        <Stack gap="lg">
-          <ProjectDetail project={project} projects={projects} profileLabel={profileLabel} />
-          <DialogFooter secondary={[{ label: "Edit", onClick: () => onEdit(project) }]}>
-            <Button onClick={onClose}>Close</Button>
-          </DialogFooter>
-        </Stack>
-      )}
+      <Stack gap="lg">
+        {shown === "missing" ? (
+          <EmptyState fill>That project no longer exists.</EmptyState>
+        ) : (
+          shown && (
+            <ProjectDetail
+              project={shown}
+              projects={projects || []}
+              profileLabel={profileLabel}
+              onDelete={() => onDelete(shown)}
+            />
+          )
+        )}
+        <DialogFooter
+          secondary={
+            shown && shown !== "missing" ? [{ label: "Edit", onClick: () => onEdit(shown) }] : []
+          }
+        >
+          <Button onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </Stack>
     </Modal>
   );
 }

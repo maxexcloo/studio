@@ -93,11 +93,18 @@ export function DreamProjects({
         return next;
       }),
   );
+  const closeSheet = () =>
+    location.state?.fromProjects ? navigate(-1) : navigate("/dream/projects", { replace: true });
+  const startDeleting = (project: Project) => {
+    deletion.reset();
+    setDeleting(project);
+  };
   const deletion = useMutation({
     meta: { inlineError: true },
     mutationFn: (project: Project) => api(projectPath(project), { method: "DELETE" }),
-    onSuccess: () => {
+    onSuccess: (_answer, project) => {
       setDeleting(null);
+      if (project.id === projectId) closeSheet();
       return client.invalidateQueries({ queryKey: ["dream"] });
     },
   });
@@ -149,10 +156,7 @@ export function DreamProjects({
                   profileLabel={profileLabel}
                   onView={(item) => setViewing(item.id)}
                   onEdit={() => setEditing(project)}
-                  onDelete={() => {
-                    deletion.reset();
-                    setDeleting(project);
-                  }}
+                  onDelete={() => startDeleting(project)}
                 />
               ))}
             </Stack>
@@ -175,14 +179,11 @@ export function DreamProjects({
       )}
       <ProjectSheet
         projectId={projectId}
-        projects={list}
+        projects={projects.data && list}
         profileLabel={profileLabel}
         onEdit={setEditing}
-        onClose={() =>
-          location.state?.fromProjects
-            ? navigate(-1)
-            : navigate("/dream/projects", { replace: true })
-        }
+        onDelete={startDeleting}
+        onClose={closeSheet}
       />
       {phone ? (
         <TextEntrySheet opened={editorOpened} onClose={closeEditor} title={editorTitle}>

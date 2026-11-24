@@ -134,9 +134,9 @@ export function registerDreamRoutes(
     return { status: 200, payload: show(owner(account)) };
   });
   /** A project route's answer, or its refusal. */
-  const answer = (run: () => Record<string, unknown>) => {
+  const answer = async (run: () => Record<string, unknown> | Promise<Record<string, unknown>>) => {
     try {
-      return { status: 200, payload: run() };
+      return { status: 200, payload: await run() };
     } catch (error) {
       return refuse(error);
     }
@@ -157,11 +157,15 @@ export function registerDreamRoutes(
       throw Object.assign(new Error("Name the chat."), { status: 400 });
     return chat;
   };
-  // Each project's stats and share of turns, with its newest results.
-  route("GET", "/api/dream/projects", (account) => ({
+  // Each project's stats and share of turns, with its newest results; MCP's `?chat=` adds that
+  // chat's project, read without counting as the chat's activity.
+  route("GET", "/api/dream/projects", (account, { query }) => ({
     status: 200,
     payload: {
       projects: projects.list(owner(account)),
+      ...(typeof query?.chat === "string" && {
+        project: projects.chatProject(owner(account), query.chat),
+      }),
       stats: Object.fromEntries(
         Object.entries(dream.projectStats(owner(account))).map(([id, stats]) => [
           id,
@@ -192,7 +196,7 @@ export function registerDreamRoutes(
     answer(() => ({ project: projects.undo(owner(account), params.projectId) })),
   );
   route("DELETE", "/api/dream/projects/:projectId", (account, { params }) =>
-    answer(() => (projects.remove(owner(account), params.projectId), { ok: true })),
+    answer(async () => (await inbox.removeProject(owner(account), params.projectId), { ok: true })),
   );
   // MCP's: attach a chat to a project (null detaches), and read its project as it asks for work.
   route("POST", "/api/dream/projects/attach", (account, { body }) =>

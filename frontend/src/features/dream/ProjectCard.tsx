@@ -24,7 +24,10 @@ import { type DreamItem, projectPath, projectsQuery } from "./queries";
 
 const resultsShown = 8;
 
-/** A project's results so far, as chips, and its share of Dream's turns, or Disabled. */
+/**
+ * A project's results so far, as chips, and its share of Dream's turns, or Disabled; More Turns
+ * where set.
+ */
 export function ProjectStatsLine({
   project,
   stats,
@@ -41,11 +44,13 @@ export function ProjectStatsLine({
         ...(stats.review === null ? [] : [`Review ${stats.review.toFixed(1)}`]),
       ]
     : [];
+  const favoured = project.favoured && !project.paused;
   return (
     <Stack gap={6}>
-      {(chips.length > 0 || project.paused) && (
+      {(chips.length > 0 || project.paused || favoured) && (
         <Group gap={6}>
           {project.paused && <Badge color="yellow">Disabled</Badge>}
+          {favoured && <Badge variant="light">More Turns</Badge>}
           {chips.map((chip) => (
             <Badge key={chip} color="gray">
               {chip}
@@ -68,35 +73,51 @@ export function ProjectStatsLine({
 }
 
 /**
- * Whether Dream draws ideas from a project, switched at once; the reply, or a refetch after a
- * failure, settles it. A disabled project keeps its brief, results and chats.
+ * A project's on/off settings, switched at once; the reply, or a refetch after a failure, settles
+ * them. A disabled project (`paused`) keeps its brief, results and chats; More Turns (`favoured`)
+ * doubles its share of Dream's turns.
  */
-export function ProjectEnabled({ project }: { project: Project }) {
+export function useProjectSwitch(project: Project) {
   const client = useQueryClient();
-  const save = useMutation({
-    mutationFn: (paused: boolean) =>
+  return useMutation({
+    mutationFn: (patch: Pick<Project, "paused"> | Pick<Project, "favoured">) =>
       api<{ project: Project }>(projectPath(project), {
         method: "PUT",
-        body: JSON.stringify({ paused }),
+        body: JSON.stringify(patch),
       }),
-    onMutate: (paused) =>
+    onMutate: (patch) =>
       client.setQueryData(
         projectsQuery.queryKey,
         (data) =>
           data && {
             ...data,
             projects: data.projects.map((entry) =>
-              entry.id === project.id ? { ...entry, paused } : entry,
+              entry.id === project.id ? { ...entry, ...patch } : entry,
             ),
           },
       ),
     onSettled: () => client.invalidateQueries({ queryKey: projectsQuery.queryKey }),
   });
+}
+
+export function ProjectEnabled({ project, label }: { project: Project; label: string }) {
+  const save = useProjectSwitch(project);
   return (
     <Switch
-      aria-label={`Enable ${project.name}`}
+      aria-label={label}
       checked={!project.paused}
-      onChange={(event) => save.mutate(!event.currentTarget.checked)}
+      onChange={(event) => save.mutate({ paused: !event.currentTarget.checked })}
+    />
+  );
+}
+
+export function ProjectMoreTurns({ project }: { project: Project }) {
+  const save = useProjectSwitch(project);
+  return (
+    <Switch
+      aria-label="More Turns"
+      checked={Boolean(project.favoured)}
+      onChange={(event) => save.mutate({ favoured: event.currentTarget.checked })}
     />
   );
 }
@@ -114,8 +135,8 @@ export function constraintBadges(project: Project, profileLabel: (id: string) =>
 
 /**
  * A project in Dream › Projects: its brief in a line, a strip of its newest results, how they fare
- * and its share of turns, with its Enabled switch and Edit and Delete in its ⋯ menu. Its name opens it; while it
- * has results waiting for a verdict (`unseen`, newest first), the strip shows those, each opening
+ * and its share of turns, with its Enabled switch and More Turns, Edit and Delete in its ⋯ menu.
+ * Its name opens it; while it has results waiting for a verdict (`unseen`, newest first), the strip shows those, each opening
  * the viewer (`onView`), and otherwise opens it too. `fresh` counts those new since the last visit.
  */
 export function ProjectCard({
@@ -138,6 +159,7 @@ export function ProjectCard({
   onDelete: () => void;
 }) {
   const navigate = useNavigate();
+  const favour = useProjectSwitch(project);
   const open = () =>
     navigate(`/dream/projects/${encodeURIComponent(project.id)}`, {
       state: { fromProjects: true },
@@ -165,7 +187,7 @@ export function ProjectCard({
             )}
           </Group>
           <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-            <ProjectEnabled project={project} />
+            <ProjectEnabled project={project} label={`Enable ${project.name}`} />
             <Menu position="bottom-end" width={menuWidth}>
               <Menu.Target>
                 <ActionIcon
@@ -177,6 +199,26 @@ export function ProjectCard({
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
+                <Menu.Item
+                  renderRoot={(props) => <button {...props} role="menuitemcheckbox" />}
+                  aria-checked={Boolean(project.favoured)}
+                  closeMenuOnClick={false}
+                  leftSection={<icons.pacing size={16} />}
+                  rightSection={
+                    // The row is the control; the switch only shows its state.
+                    <Switch
+                      size="xs"
+                      checked={Boolean(project.favoured)}
+                      readOnly
+                      tabIndex={-1}
+                      aria-hidden
+                      style={{ pointerEvents: "none" }}
+                    />
+                  }
+                  onClick={() => favour.mutate({ favoured: !project.favoured })}
+                >
+                  More Turns
+                </Menu.Item>
                 <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
                   Edit
                 </Menu.Item>

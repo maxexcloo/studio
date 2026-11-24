@@ -249,6 +249,8 @@ export function createProjects({
     list: (ownerId: string) => read(ownerId).projects,
     /** Each attached chat's project and latest request, by conversation id. */
     chats: (ownerId: string) => read(ownerId).chats,
+    /** A chat's project, without noting activity. */
+    chatProject: (ownerId: string, chat: string) => attached(read(ownerId), chat),
     /** Makes a project; one Dream proposed notes why. */
     create(ownerId: string, patch: ProjectPatch, why = "") {
       if (!patch.name) throw failure("Name the project.", 400);
