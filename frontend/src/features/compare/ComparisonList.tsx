@@ -65,7 +65,8 @@ export function ComparisonList({ view }: { view: ReactNode }) {
         : cover.resultSet?.id === comparison.id
           ? comparison.variants.find(({ item }) => item === cover)!.label
           : mediaTitle(cover);
-    return [{ comparison, cover, title }];
+    // The card's thumbs rate the comparison, so the cover shows no rating of its own.
+    return [{ comparison, cover: { ...cover, rating: undefined }, title }];
   });
   // Holding a card's tile opens its menu, which is keyed by the cover's ID.
   const [menu, setMenu] = useState<string | null>(null);
