@@ -42,7 +42,7 @@ export function VideoSoundButton({ muted, toggle }: { muted: boolean; toggle: ()
         radius="xl"
         size="lg"
         pos="absolute"
-        bottom="sm"
+        bottom="var(--mantine-spacing-sm)"
         left="calc(var(--mantine-spacing-sm) + env(safe-area-inset-left))"
         style={{ zIndex: 1 }}
         aria-label={label}
