@@ -571,7 +571,7 @@ function ContextCards({ item }: { item: MediaItem }) {
 }
 
 /**
- * Details › Prompt with any Refused Prompt, any words removed for Taste and the prompt's thinking,
+ * Details › Prompt with any Original Prompt, Refused Prompt, any words removed for Taste and the prompt's thinking,
  * then any Negative Prompt as its own section.
  */
 function DetailsPrompt({ item }: { item: MediaItem }) {
@@ -588,6 +588,12 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
         after={<WritingThinking writing={full.data?.item.writing ?? item.writing} />}
       >
         <DetailText>{item.prompt || "No prompt recorded."}</DetailText>
+        {item.originalPrompt && (
+          <Stack gap={2}>
+            <PartLabel>Original Prompt</PartLabel>
+            <DetailText>{item.originalPrompt}</DetailText>
+          </Stack>
+        )}
         {item.refusedPrompt && (
           <Stack gap={2}>
             <PartLabel>Refused Prompt</PartLabel>

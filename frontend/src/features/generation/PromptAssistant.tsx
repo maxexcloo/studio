@@ -278,6 +278,7 @@ export function usePromptAssistant({
         }
         applyChange("Prompt improved", {
           prompt: result.prompt,
+          originalPrompt: source.prompt,
           assistant: { preset, model: result.model, source: "ui" },
         });
         if (editAfter.current) {

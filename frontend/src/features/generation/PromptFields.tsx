@@ -68,13 +68,13 @@ export function useDraftChange({
         actions,
       );
     },
-    show: ({ action, prompt }) => {
-      onChange({ prompt });
+    show: ({ action, prompt }, typed) => {
+      onChange({ prompt, originalPrompt: typed.prompt });
       if (action === "edit" || action === "recreate")
         onOperationChange(action === "edit" ? "refine" : "image");
     },
     restore: (typed) => {
-      onChange({ prompt: typed.prompt });
+      onChange({ prompt: typed.prompt, originalPrompt: undefined });
       onOperationChange(typed.operation);
     },
   });

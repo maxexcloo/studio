@@ -3894,7 +3894,9 @@ export function createDream(options: {
           count: 1,
           seed,
           prompt: side.reword ? "" : base.prompt,
-          ...(side.reword ? { writing: { kind: "dream", reword: base.prompt } } : {}),
+          ...(side.reword
+            ? { originalPrompt: base.prompt, writing: { kind: "dream", reword: base.prompt } }
+            : {}),
           loras: side.loras,
           referenceAssets: [],
         };

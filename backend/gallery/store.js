@@ -1329,6 +1329,9 @@ export function recordsFromComfyHistory(worker, history) {
         ...(storedAssistantRecord(saved.assistant)
           ? { assistant: storedAssistantRecord(saved.assistant) }
           : {}),
+        ...(typeof saved.originalPrompt === "string" && saved.originalPrompt
+          ? { originalPrompt: saved.originalPrompt }
+          : {}),
         ...(storedChatRecord(saved.chat) ? { chat: storedChatRecord(saved.chat) } : {}),
         ...(storedResultSet(saved.resultSet)
           ? { resultSet: storedResultSet(saved.resultSet) }
@@ -1494,6 +1497,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         negative: body.negative || "",
         // The prompt a provider's moderation refused before the assistant rewrote it as `prompt`.
         ...(body.refusedPrompt ? { refusedPrompt: body.refusedPrompt } : {}),
+        // What was typed before the prompt assistant rewrote it as `prompt`.
+        ...(body.originalPrompt ? { originalPrompt: body.originalPrompt } : {}),
         // What MCP removed from the prompt for the account's Taste exclusions.
         ...(Array.isArray(body.excluded) ? { excluded: body.excluded.map(String) } : {}),
         filename: title || item.filename,
