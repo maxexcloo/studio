@@ -114,7 +114,7 @@ const directionRequests: Record<VariationDirection, string> = {
 // How an edit's prompt is worded on the model that runs it; without a known model, as a description.
 const editPrompts = {
   instruction:
-    'the prompt is a short imperative edit instruction naming what changes and what stays ("change X, keep Y"), not a description of the whole image.',
+    'the prompt is a short imperative edit instruction naming what changes and what stays ("change X, keep Y"), not a description of the whole image, ending with one short keep clause ("keep her face, pose and the background unchanged") rather than a list of every detail.',
   description:
     "the edit redraws the image at partial strength, so the prompt is a full description of the edited result, not an instruction.",
   unknown: "the prompt describes the whole edited image.",
@@ -151,18 +151,21 @@ const draftGuides: Record<
 };
 // Areas to vary across the viewer's next steps.
 const stepAreas = [
-  "expression",
-  "outfit",
+  "accessories",
   "action",
+  "expression",
   "interaction",
-  "setting",
-  "weather or season",
   "lighting",
-  "color palette",
-  "framing",
+  "outfit",
+  "pose",
+  "props",
+  "setting",
   "style",
 ] as const;
 const variety = () => promptInstruction("suggestion-variety");
+// Image change suggestions swap the source's own named parts; motion ideas have their own angles.
+const specifics = (kind: "image" | "video") =>
+  kind === "image" && promptInstruction("suggestion-specifics");
 // Angles an idea can take, a few drawn at random per ask so refreshes don't circle the same ones.
 const imageAngles = [
   "a place or setting",
@@ -282,6 +285,7 @@ const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensore
         : promptInstruction("image-change-directions", {
             maxSuggestions,
             areas: angles(stepAreas, stepAreas.length),
+            specifics: specifics(kind),
           }),
     contentRule: contentRule(uncensored),
     suggestionChoices: changeChoices(kind, uncensored),
@@ -476,6 +480,7 @@ export function createSuggestions({
           media: kind === "video" ? "a video" : "an image",
           maxSuggestions,
           angles: angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions),
+          specifics: specifics(kind),
           guide: targetLines(writing).join("\n"),
           referenceContext: hasReferences && promptInstruction("draft-change-reference-context"),
           fidelity: fidelity(),

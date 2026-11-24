@@ -478,15 +478,11 @@ test("Closing a navigated viewer reveals and focuses its current virtualised gal
   await expect(current).toBeInViewport();
 });
 
-test("The installed app opens and closes the viewer without adding history entries", async ({
+test("The installed iOS app opens and closes the viewer without adding history entries", async ({
   page,
 }) => {
   await page.addInitScript(() => {
-    const matchMedia = window.matchMedia.bind(window);
-    window.matchMedia = (query) =>
-      query === "(display-mode: standalone)"
-        ? ({ ...matchMedia(query), matches: true } as MediaQueryList)
-        : matchMedia(query);
+    Object.defineProperty(navigator, "standalone", { value: true });
   });
   await fixtures(page);
   await page.route("**/api/gallery?**", (route) =>

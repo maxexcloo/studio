@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { animateProfile, dreamVideoProfile, startFrameSize } from "./animate-profile.js";
+import {
+  animateProfile,
+  dreamFrames,
+  dreamVideoProfile,
+  startFrameSize,
+} from "./animate-profile.js";
 
 const slot = (label) => [{ id: "reference", kind: "image", label }];
 const video = (id, label, extra = {}) => ({
@@ -147,7 +152,7 @@ test("A video framed by its start frame draws at the frame's proportions unless 
   assert.equal(startFrameSize({ ...framed, aspectPolicy: "manual" }, run()), null);
 });
 
-test("Dream videos prefer quality, stay on their selected backend and extend on the source model", () => {
+test("Dream videos mix the ready models, stay on their selected side and extend on the source model", () => {
   const dream = (options) =>
     dreamVideoProfile(profiles, {
       backend: "local",
@@ -156,39 +161,38 @@ test("Dream videos prefer quality, stay on their selected backend and extend on 
       unavailable: new Set(),
       ...options,
     });
-  assert.equal(
-    dream({ preferred: { side: "cloud", cloud: "grok-video" } }).profile.id,
-    "fl-quality",
-  );
-  assert.equal(dream({ preferred: { local: "fl-fast" } }).profile.id, "fl-quality");
-  assert.equal(dream({ preferred: { local: "fl-quality" } }).profile.id, "fl-quality");
+  assert.equal(dream().profile.id, "fl-quality");
+  const offered = [];
+  const chosen = dream({
+    choose: (candidates) => {
+      offered.push(...candidates.map(({ id }) => id));
+      return candidates.at(-1);
+    },
+  });
+  // Every local profile that takes a still is a candidate; text-only and Cloud ones aren't.
+  assert.deepEqual(offered, ["fl-quality", "fl-fast"]);
+  assert.equal(chosen.profile.id, "fl-fast");
   assert.equal(dream({ unavailable: new Set(["fl-quality"]) }).profile.id, "fl-fast");
-  assert.equal(dream({ extend: "fl-fast" }).profile.id, "fl-fast");
+  assert.equal(dream({ extend: "fl-fast", choose: () => profiles[1] }).profile.id, "fl-fast");
   assert.equal(dream({ backend: "cloud", localRunning: false }).profile.id, "grok-video");
-  assert.equal(dream({ extend: "fl-quality" }).profile.id, "fl-quality");
   assert.throws(() => dream({ extend: "grok-video" }), {
     message: "The source video's model isn't ready.",
   });
-  assert.throws(() => dream({ localRunning: false }), {
-    message: "Local video isn't running.",
-  });
+  assert.throws(() => dream({ localRunning: false }), { message: "Local video isn't running." });
+  assert.throws(
+    () => dreamVideoProfile([profiles[1]], { backend: "cloud", unavailable: new Set() }),
+    { message: "Cloud video isn't available to this account." },
+  );
 });
 
-test("Dream tries another compatible video family and prefers a slower alternate", () => {
-  const primary = video("ltx-quality", "LTX · Quality", { family: "ltx" });
-  const similar = video("ltx-standard", "LTX · Standard", { family: "ltx" });
-  const other = video("wan-standard", "Wan · Standard", { family: "wan" });
-  const fast = video("h3-fast", "H3 · Fast", { family: "h3" });
-  const alternate = (candidates, expected) =>
-    dreamVideoProfile(candidates, {
-      backend: "local",
-      localRunning: true,
-      unavailable: new Set(),
-      alternate: (candidates) => {
-        assert.deepEqual(candidates, [expected]);
-        return candidates[0];
-      },
-    }).profile.id;
-  assert.equal(alternate([primary, similar, other, fast, grok], other), other.id);
-  assert.equal(alternate([primary, similar, fast, grok], fast), fast.id);
+test("Dream clips run 5 to 8 seconds within the profile's frame grid", () => {
+  const clip = (frames, fps = 24, grid = { min: 17, max: 161, step: 8, offset: 1 }) =>
+    dreamFrames({ defaults: { frames, fps }, constraints: { frames: grid } });
+  assert.equal(clip(121), 121);
+  assert.equal(clip(49), 121);
+  assert.equal(clip(97, 16), 97);
+  assert.equal(clip(241, 24, { min: 17, max: 257, step: 8, offset: 1 }), 185);
+  assert.equal(clip(97, 24, { min: 17, max: 97, step: 8, offset: 1 }), 97);
+  assert.equal(clip(192, 24, { min: 124, max: 345, step: 17, offset: 5 }), 192);
+  assert.equal(dreamFrames({ defaults: { duration: 6 } }), undefined);
 });
