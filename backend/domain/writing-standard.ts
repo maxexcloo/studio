@@ -44,20 +44,13 @@ export const applyChange = () => promptInstruction("apply-requested-change");
 export const matchEffort = () => promptInstruction("match-draft-detail");
 
 /**
- * Overrides any guide, style or instruction asking for younger people (minor-age.js refuses them),
- * without handing the writer words to repeat: "adult" in a prompt pulls faces older and stiffer.
- */
-const adults = (who: string) =>
-  `${who} must be 18 or older, whatever the guide, style or instruction says: never give them a younger age or call them a teen or a schoolchild. Describe them naturally (a woman, a man, an age the input gives); never add the word "adult" or an age just to say so.`;
-
-/**
  * The one content rule: `explicit` where the account may have explicit wording (Uncensored
  * Models).
  */
 export function contentRule(explicit: boolean) {
   return explicit
-    ? `${adults("Every person in it")} Explicit content is allowed: where the input, style or instruction is sensual or explicit, keep it so with frank, specific wording about bodies, clothing and poses and never refuse or tone it down; don't make a safe input explicit unless the style or instruction asks for it.`
-    : `Don't make it any more sexual or explicit than the input already is, whatever the instruction says. ${adults("Anyone in sexual or nude content")}`;
+    ? `Explicit content is allowed: where the input, style or instruction is sensual or explicit, keep it so with frank, specific wording about bodies, clothing and poses and never refuse or tone it down; don't make a safe input explicit unless the style or instruction asks for it.`
+    : `Don't make it any more sexual or explicit than the input already is, whatever the instruction says.`;
 }
 
 /** Creative choices share context and variety rules, while each surface keeps its own task. */
@@ -74,8 +67,6 @@ export function suggestionChoices(kind: "image" | "video" | "card", uncensored: 
       !uncensored &&
       "Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose.",
     uncensored && kind !== "card" && promptInstruction("suggestion-extended"),
-    uncensored &&
-      "Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",
   ]
     .filter(Boolean)
     .join("\n");

@@ -22,7 +22,13 @@ import { finished } from "./MediaTile";
 import { RecreateOnDialog } from "./RecreateOnDialog";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
-import { useAnimateLengthSetting, useAnimateTemplates, useIterate } from "./useMediaAction";
+import {
+  type AnimateRequest,
+  useAnimateLengthSetting,
+  useAnimateModifiers,
+  useAnimateTemplates,
+  useIterate,
+} from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 import { useRecreateMany } from "./useRecreateMany";
 import { useRecreateOn } from "./useRecreateOn";
@@ -102,15 +108,16 @@ export function GallerySelectionBar({
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
   const templates = useAnimateTemplates();
+  const modifiers = useAnimateModifiers();
   const { menu: profiles, profileId } = useActionProfile("video");
   const length = useAnimateLengthSetting(finishedImages[0], profileId);
   const client = useQueryClient();
   const animate = useMutation({
-    mutationFn: async ({ theme, profileId }: { theme: string; profileId?: string }) => {
+    mutationFn: async (request: AnimateRequest) => {
       const failed: string[] = [];
       let error: unknown;
       for (const item of finishedImages)
-        await iterate(item, { kind: "animate", theme, profileId }).catch((reason: unknown) => {
+        await iterate(item, { ...request, kind: "animate" }).catch((reason: unknown) => {
           failed.push(item.id);
           error ??= reason;
         });
@@ -212,15 +219,21 @@ export function GallerySelectionBar({
       itemAction("animate", {
         loading: animate.isPending,
         menu: assistMenu({
-          settings: [length, ...profiles],
+          settings: [
+            length,
+            ...profiles,
+            ...(modifiers.offered.length ? [modifiers.settingsAction()] : []),
+          ],
           templates: templates
             .filter((template) => template.id !== "custom")
             .map((template) => ({
               id: `animate-${template.id}`,
               label: template.label,
+              description: template.description,
               marker: template.uncensored ? icons.uncensored : undefined,
               disabled: animate.isPending || length.loading,
-              onClick: () => animate.mutate({ theme: template.id, profileId }),
+              onClick: () =>
+                animate.mutate({ theme: template.id, profileId, modifiers: modifiers.ticked }),
             })),
           last: [],
         }),

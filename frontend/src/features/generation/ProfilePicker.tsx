@@ -70,9 +70,7 @@ function profileAbilities(profile: Profile) {
     can.lora && "LoRAs",
     can.sound && "Sound",
     can.transparent && "Transparent",
-    profile.native?.["4k"] === "yes"
-      ? "4K"
-      : profile.native?.["2k"] === "yes" && "2K",
+    profile.native?.["4k"] === "yes" ? "4K" : profile.native?.["2k"] === "yes" && "2K",
     isCloudProfile(profile) && "Cloud",
   ];
 }
@@ -155,8 +153,7 @@ export function ProfileSelect({
           <ChipOption
             label={title}
             description={
-              profile &&
-              [...rest, ...profileAbilities(profile)].filter(Boolean).join(" · ")
+              profile && [...rest, ...profileAbilities(profile)].filter(Boolean).join(" · ")
             }
             checked={checked}
             badges={

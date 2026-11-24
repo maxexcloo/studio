@@ -74,12 +74,12 @@ export function referencePrompt(kind: CardKind, description: string) {
 
 /**
  * A character's own story beside its looks: shown on its card and never sent to a model, which
- * draws only the description. Ages start at 18.
+ * draws only the description.
  */
 export const characterTraits = ["job", "backstory", "likes", "dislikes"] as const;
 export type CharacterTrait = (typeof characterTraits)[number];
 export const maxCharacterTrait = 500;
-export const minCharacterAge = 18;
+export const minCharacterAge = 1;
 export const maxCharacterAge = 120;
 /** How many characters one create_characters call makes (backend/mcp/generate.js). */
 export const maxNewCharacters = 4;

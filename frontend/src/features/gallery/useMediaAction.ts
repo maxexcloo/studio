@@ -7,12 +7,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+import { maxModifiers } from "../../../../shared/animate";
 import { isCloudProfile } from "../../../../shared/profiles";
 import type { StudioSession } from "../../../../shared/queue";
 import { profileStartingSize } from "../../../../shared/resolution";
 import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
 import { useRemembered } from "../auth/useRemembered";
 import {
   defaultProfile,
@@ -383,11 +385,66 @@ export interface AnimateRequest {
   theme: string;
   instruction?: string;
   profileId?: string;
+  /** Ticked Animate modifiers (`useAnimateModifiers`), run alongside the theme. */
+  modifiers?: string[];
 }
 /** Animate's templates for the account (Library › Templates), Custom last; none without the assistant. */
 export function useAnimateTemplates() {
   const assistant = useQuery(assistantQuery).data;
   return assistant?.available ? assistant.themes : [];
+}
+/** Which Animate modifiers are ticked, per account; pruned to those still offered and capped at three. */
+const noModifiers: string[] = [];
+const useRememberedModifiers = () => useRemembered("animate-modifiers", noModifiers);
+/**
+ * Animate's modifiers: the account's enabled ones (Library › Templates), with the remembered
+ * ticked IDs pruned to those still offered and capped at `maxModifiers`. `toggle` flips one on or
+ * off; a disabled (capped) modifier that isn't already ticked carries why.
+ */
+export function useAnimateModifiers() {
+  const assistant = useQuery(assistantQuery).data;
+  const offered = assistant?.available ? (assistant.modifiers ?? []) : [];
+  const [remembered, setRemembered] = useRememberedModifiers();
+  const ticked = remembered
+    .filter((id) => offered.some((item) => item.id === id))
+    .slice(0, maxModifiers);
+  const toggle = (id: string) =>
+    setRemembered((current) => {
+      const kept = current.filter((entry) => offered.some((item) => item.id === entry));
+      return kept.includes(id)
+        ? kept.filter((entry) => entry !== id)
+        : kept.length < maxModifiers
+          ? [...kept, id]
+          : kept;
+    });
+  const options = offered.map((item) => ({
+    ...item,
+    checked: ticked.includes(item.id),
+    disabled: !ticked.includes(item.id) && ticked.length >= maxModifiers,
+  }));
+  return {
+    offered,
+    ticked,
+    options,
+    toggle,
+    settingsAction: (): Action => ({
+      id: "animate-modifiers",
+      label: "Modifiers",
+      icon: icons.settings,
+      menu: [
+        options.map((item) => ({
+          id: `modifier:${item.id}`,
+          label: item.label,
+          description: item.description,
+          marker: item.uncensored ? icons.uncensored : undefined,
+          checked: item.checked,
+          disabled: item.disabled,
+          keepOpen: true,
+          onClick: () => toggle(item.id),
+        })),
+      ],
+    }),
+  };
 }
 export type Iteration =
   | { kind: "regenerate"; prompt?: string; count?: number }
@@ -431,6 +488,7 @@ export function useIterate() {
   return async (item: MediaItem, iteration: Iteration) => {
     const animate = iteration.kind === "animate";
     const written = animate ? iteration.written : undefined;
+    const modifiers = animate && iteration.modifiers?.length ? iteration.modifiers : undefined;
     const given = iteration.kind === "prompt" ? iteration : undefined;
     const { profile, choice, seed, draft, note } =
       written?.prepared ??
@@ -473,6 +531,7 @@ export function useIterate() {
               prompt: written.prompt,
               model: written.model,
               thinking: written.thinking,
+              modifiers,
             },
           }
         : animate
@@ -481,6 +540,7 @@ export function useIterate() {
                 kind: "animate",
                 theme: iteration.theme,
                 instruction: iteration.instruction,
+                modifiers,
                 source: item.prompt || "",
                 // A video's theme continues it from its last frame, so the writer moves the action on.
                 ...(item.type === "video" ? { extend: true } : {}),
@@ -529,11 +589,9 @@ export function useAnimateWriter(item: MediaItem) {
       theme,
       instruction,
       profileId,
+      modifiers,
       signal,
-    }: {
-      theme: string;
-      instruction?: string;
-      profileId?: string;
+    }: AnimateRequest & {
       signal: AbortSignal;
     }): Promise<AnimateReview> => {
       const prepared = await mediaDraft(item, "animate", client, videos, seconds, profileId);
@@ -550,6 +608,7 @@ export function useAnimateWriter(item: MediaItem) {
           profileId: profile.id,
           theme,
           instruction,
+          modifiers,
           source: item.prompt || "",
           extend: item.type === "video",
           assetId: draft.references[0]?.id,

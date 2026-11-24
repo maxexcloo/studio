@@ -15,6 +15,10 @@ const { registerAssistantRoutes, deploymentTextModel, assistantRecord, imageFrom
   await import("./assistant-routes.js");
 const { createAssistant } = await import("./assistant.js");
 const { builtInAccessProfile, effectiveAccountAccess } = await import("./account-policy.js");
+// A synthetic Uncensored preset/theme, so an account with Uncensored Models has one to see: the
+// live deployment's own uncensored wording is not test data.
+const { seedUncensoredStyles } = await import("./fixtures/uncensored-styles.js");
+seedUncensoredStyles(dir);
 
 const environment = {
   STUDIO_ASSISTANT_URL: "http://bifrost.invalid:4000",
@@ -181,11 +185,11 @@ test("the assistant is for every account, and only for profiles the account may 
         "concise",
         "enhance",
         "fix",
-        "guide",
-        "graphic-poster",
         "illustration",
         "photographic",
         "portrait",
+        "guide",
+        "structure",
         "custom",
       ],
     ],
@@ -313,10 +317,7 @@ test("Custom needs an instruction and keeps it non-explicit without Uncensored M
   assert.equal((await custom("user", "make it explicit")).status, 200);
   assert.match(calls.at(-1).messages[0].content, /Don't make it any more sexual/);
   assert.equal((await custom("uncensored", "make it explicit")).status, 200);
-  assert.match(
-    calls.at(-1).messages[0].content,
-    /\nEvery person in it must be 18 or older,[^\n]*Explicit/,
-  );
+  assert.match(calls.at(-1).messages[0].content, /\nExplicit content is allowed/);
 });
 
 test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; drafts are for administrators", async () => {

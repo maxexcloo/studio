@@ -180,7 +180,6 @@ import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-req
 import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
 import { startMediaWarmup } from "./media-warmup.js";
-import { minorAge } from "./minor-age.js";
 import {
   createModelCatalogue,
   dreamCatalogue,
@@ -1168,7 +1167,6 @@ const dream = createDream({
     propose: (ownerId, account) => inbox.propose(ownerId, account),
     drafts: (ownerId) => inbox.drafts(ownerId),
   },
-  minorAge,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
@@ -1185,7 +1183,6 @@ const inbox = createInbox({
   createCard,
   deleteCard,
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
-  minorAge,
   likeness: (a, b) => imageSearch.likeness(a, b),
   dream,
   items: (ownerId, ids) => resultNumbers.numbered(galleryItems({ ownerId, ids })),

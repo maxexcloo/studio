@@ -8,7 +8,7 @@
 - Runtime state is authoritative. Studio reads and writes only Studio names on disk (`studio` media folder, the `studio` profile block); no legacy names or fallbacks. Runtime files are moved or renamed only by `migrate-runtime` ([Data & Migrations](CONFIGURATION.md#data--migrations)), never implicitly.
 - User-facing text calls generation profiles models; code, APIs and stored data keep `profile`.
 - Keep externally used names stable: MCP tool names (lowercase snake_case with lowercase titles, such as `generate` and `upload_link`), `/api` routes, the profile file format and result links, including the `heiss-mcp-result-link-v2` sealing label.
-- Studio owns live generation profiles, prompting guides and model/LoRA catalogue definitions in its runtime data folder, including uncensored content. Administrators edit and approve them in Studio. Live data is the only source: the sample profiles in `config/profiles/` seed only a data folder that has never held a profile. Keep deployment/workload configuration in kubelab.
+- Studio owns live generation profiles, prompting guides, prompt styles and model/LoRA catalogue definitions in its runtime data folder, including uncensored content. Administrators edit and approve them in Studio. Live data is the only source: the samples in `config/profiles/` and the built-in prompt styles seed only a data folder that has never held them, so both seeds stay censored-only and an uncensored style is a flag on administrator data.
 - The whole repository is AGPL-3.0 (`LICENSE`). Keep the MIT notices for HEISS UI, J-AI Studio and MantineHub in `NOTICE`, shipped in both images, and their credits in Settings › About and `README.md`.
 - Read [UI Patterns](#ui-patterns) before UI work. Keep that section to cross-cutting interaction rules and apply each rule everywhere it occurs.
 
@@ -174,6 +174,9 @@ recur across features.
   only then do they wrap, never scrolling. On phones the gallery selection bar
   instead keeps its count, quick selects and actions on one row that scrolls
   sideways.
+- Animate's templates are themes, and a few are modifiers: ticked settings that apply on top of
+  the chosen theme, kept per account, at most three, listed before the themes. A modifier alone
+  does nothing until a theme runs.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
   Dream's Accept keeps a result unrated. Super Like accepts and rates it.

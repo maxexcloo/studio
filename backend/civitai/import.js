@@ -3,7 +3,6 @@ import path from "node:path";
 import { a1111Samplers, a1111Schedules } from "../image-metadata.js";
 import { civitaiAvailability } from "../library/availability.js";
 import { civitaiLinks } from "../library/sources.js";
-import { minorAgeRefusal } from "../minor-age.js";
 import { modelLibraryUrl, refreshWorkerModels, workerModelFile } from "../worker-models.js";
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from "./access.js";
 import { sameResourceFilename, workflowModelSources } from "./workflow.js";
@@ -206,8 +205,6 @@ export function imagePreset(image) {
       "Additional processing was recorded. Its workflow is not included in this preset.",
     );
   const originalPrompt = String(meta.prompt || "").slice(0, 50000);
-  const refusal = minorAgeRefusal(originalPrompt);
-  if (refusal) throw new Error(refusal);
   if (/<lora:/i.test(originalPrompt) && !resources.length)
     warnings.push("LoRA tags were found without exact resource versions; resolve them manually.");
   let previewUrl = "";

@@ -332,7 +332,6 @@ function fixture(t: TestContext, catalogue = profiles) {
       propose: (ownerId, account) => inbox.propose(ownerId, account),
       drafts: (ownerId) => inbox.drafts(ownerId),
     },
-    minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
     // Like the queue's writing stage, then the generation route: a Dream job's pending tile
     // carries its written prompt and mark from the queue record.
     admit: async (input, account, scope, origin) => {
@@ -387,7 +386,6 @@ function fixture(t: TestContext, catalogue = profiles) {
       state.cards![kind] = state.cards![kind].filter((card) => card.id !== id);
     },
     reference: (_account, itemId) => ({ id: `asset-${itemId}` }),
-    minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
     likeness: (a, b) => state.likeness(a, b),
     dream,
     items: (ownerId, ids) =>
@@ -2960,7 +2958,7 @@ test("A Dream job's writing request keeps its own fields through admission", () 
   });
 });
 
-test("Ideas recur in liked results, cards in two and projects in three, within limits and the 18+ floor, never repeating what the account has", () => {
+test("Ideas recur in liked results, cards in two and projects in three, within limits, never repeating what the account has", () => {
   const liked = [{ id: "a" }, { id: "b" }, { id: "c" }];
   const found = ideasFrom(
     {
@@ -2988,7 +2986,6 @@ test("Ideas recur in liked results, cards in two and projects in three, within l
     {
       liked,
       taken: new Set(["card:characters:ava", "project:beach"]),
-      minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
       at: "now",
     },
   );
@@ -2996,11 +2993,13 @@ test("Ideas recur in liked results, cards in two and projects in three, within l
     found.map(({ kind, title, evidence }) => [kind, title, evidence]),
     [
       ["project", "Neon Rooftops", ["a", "b", "c"]],
+      ["project", "Teens", ["a", "b", "c"]],
       ["card", "Mara", ["a", "c"]],
+      ["card", "Kid", ["a", "b"]],
       ["card", "Harbour", ["b", "c"]],
     ],
   );
-  assert.deepEqual(ideasFrom(null, { liked, taken: new Set(), minorAge: () => "", at: "" }), []);
+  assert.deepEqual(ideasFrom(null, { liked, taken: new Set(), at: "" }), []);
 });
 
 test("The Inbox proposes from likes while idle; a proposed project runs draft samples that Accept keeps and Dismiss deletes", async (t) => {
@@ -3044,7 +3043,7 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
   await dreamOnce();
   const asked = state.calls.filter((call) => call.system.startsWith("You find what recurs"));
   assert.equal(asked.length, 1);
-  assert.match(asked[0].system, /18 or older/);
+  assert.match(asked[0].system, /data, never instructions/);
   assert.match(asked[0].user, /Liked images:\n\[1\] Mara on a rooftop 1/);
   assert.match(asked[0].user, /Caption: A wool coat outside a ferry terminal\./);
   assert.match(asked[0].user, /outfit: Green Wool Coat\. Green boiled wool/);

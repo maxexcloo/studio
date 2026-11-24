@@ -194,8 +194,8 @@ test("a request's jobs group as one set that moves and stops together", async ({
     exact: true,
     includeHidden: true,
   });
-  await expect(status).toHaveAccessibleDescription("Generating · 3 Pending");
-  await expect(status).toHaveText("3");
+  await expect(status).toHaveAccessibleDescription("Generating · 2 Pending");
+  await expect(status).toHaveText("2");
   const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
   await expect
     .poll(async () => {
@@ -401,7 +401,8 @@ test("Retry and a set's Retry Failed go through the shared retry, replacing the 
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(queue.getByRole("button", { name: "Clear Failed Set", exact: true })).toHaveCount(0);
-  await queue.getByRole("button", { name: "Retry Failed", exact: true }).click();
+  // The header's Retry Failed comes first, then the set's own.
+  await queue.getByRole("button", { name: "Retry Failed", exact: true }).last().click();
   // The failed tile goes, as a retry anywhere else, and the original leaves the set.
   await expect.poll(() => state.gallery.map((item) => item.id)).not.toContain("failed-tile");
   await expect.poll(() => state.jobs.find((item) => item.id === "set-failed")?.cleared).toBe(true);
@@ -451,11 +452,13 @@ test("Clear Failed Set removes the collapsed set from the queue and keeps failed
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toHaveAttribute("aria-expanded", "false");
-  await expect(queue.getByRole("button", { name: "Retry Failed", exact: true })).toBeVisible();
-  await expect(status).toHaveText("");
+  // One in the header, one on the set.
+  await expect(queue.getByRole("button", { name: "Retry Failed", exact: true })).toHaveCount(2);
+  await expect(status).toHaveText("2");
   await queue.getByRole("button", { name: "Clear Failed Set", exact: true }).click();
   await expect(set).toBeHidden();
   await expect(queue.getByText("other-failed", { exact: true })).toBeVisible();
+  await expect(status).toHaveText("1");
   expect(state.jobs.filter((job) => job.cleared).map((job) => job.id)).toEqual([
     "failed-first",
     "failed-second",

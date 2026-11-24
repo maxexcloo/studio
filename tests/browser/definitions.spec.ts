@@ -548,7 +548,8 @@ test("Each Templates page lists its menu's templates by enabled and name, and ed
     .getByRole("menuitem", { name: "Edit", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit Template", exact: true });
-  await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
+  await dialog.getByRole("textbox", { name: "Brief", exact: true }).fill("A moving camera.");
+  await dialog.getByRole("checkbox", { name: "Modifier", exact: true }).check();
   await dialog
     .getByRole("radiogroup", { name: "Offered To", exact: true })
     .getByText("Uncensored Only", { exact: true })
@@ -559,6 +560,7 @@ test("Each Templates page lists its menu's templates by enabled and name, and ed
     id: "cinematic",
     kind: "animate",
     description: "A moving camera.",
+    modifier: true,
     uncensored: true,
   });
   await expect(animate.getByText("A moving camera.")).toBeVisible();

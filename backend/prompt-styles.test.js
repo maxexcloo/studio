@@ -53,6 +53,8 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
   const ids = (kind) => styles.usable(kind).map((style) => style.id);
   assert.deepEqual(ids("improve"), [
     ...rest.filter((style) => style.kind === "improve").map((style) => style.id),
+    "guide",
+    "structure",
     "custom",
   ]);
   assert.deepEqual(ids("animate"), [
@@ -62,31 +64,26 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
     "cinematic",
     "atmosphere",
     "reaction",
-    "playful",
     "reveal",
     "dialogue",
-    "two-beats",
-    "uncensored",
     "custom",
   ]);
   assert.deepEqual(ids("change"), [
     "add-prop",
-    "expression",
-    "hairstyle",
-    "new-action",
-    "new-angle",
+    "new-visual-treatment",
     "closer-shot",
     "new-setting",
+    "new-action",
+    "new-angle",
+    "expression",
+    "hairstyle",
     "new-outfit-and-place",
     "new-pose",
     "photographic-realism",
-    "illustrated-reframe",
     "relight",
     "remove-distraction",
     "repair-detail",
-    "photographic-restage",
     "simple-background",
-    "new-visual-treatment",
     "time-season-weather",
     "wardrobe-swap",
     "wider",
@@ -96,13 +93,77 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
   assert.equal(styles.defaultId(), rest[0].id);
 });
 
+test("system styles are always offered, in order before Custom, and are never stored", () => {
+  const styles = store();
+  fs.writeFileSync(
+    styles.file,
+    JSON.stringify({
+      styles: [...seedStyles, { ...seedStyles[0], kind: "improve", id: "guide", enabled: false }],
+    }),
+  );
+  const { styles: seed, hash } = styles.list();
+  assert.deepEqual(
+    styles
+      .usable("improve")
+      .slice(-3)
+      .map((style) => style.id),
+    ["guide", "structure", "custom"],
+  );
+  for (const id of ["guide", "structure"]) {
+    const style = styles.style("improve", id);
+    assert.equal(style.system, true);
+    assert.ok(style.label && style.description && style.instruction);
+    assert.equal(
+      seed.some((entry) => entry.id === id),
+      false,
+    );
+    assert.throws(() => styles.save([...seed, { ...style }], { baseHash: hash }), { status: 400 });
+  }
+});
+
+test("a modifier is not listed as a theme, resolves by ID, and must be animate", () => {
+  const styles = store();
+  const { styles: seed, hash } = styles.list();
+  const modifier = {
+    id: "slow-burn",
+    kind: "animate",
+    label: "Slow Burn",
+    description: "Take the whole clip slower",
+    instruction: "Slow Burn. Halve every speed.",
+    modifier: true,
+  };
+  const saved = styles.save([...seed, modifier], { baseHash: hash });
+  assert.equal(saved.styles.find((style) => style.id === "slow-burn").modifier, true);
+  assert.equal(
+    styles.usable("animate").some((style) => style.id === "slow-burn"),
+    false,
+  );
+  assert.deepEqual(
+    styles.modifiers().map((style) => style.id),
+    ["slow-burn"],
+  );
+  assert.equal(styles.style("animate", "slow-burn").label, "Slow Burn");
+  // A change style never keeps the flag.
+  const unchanged = styles.save(
+    [...saved.styles, { ...modifier, id: "slow-change", kind: "change", actions: ["edit"] }],
+    { baseHash: saved.hash },
+  );
+  assert.equal(unchanged.styles.find((style) => style.id === "slow-change").modifier, undefined);
+});
+
 test("change templates send a complete request for the actions they target", () => {
   const styles = store();
   const allows = (action) =>
-    styles.usable("change").filter((style) => style.actions.includes(action));
+    styles.usable("change").filter((style) => style.actions?.includes(action));
   assert.ok(allows("edit").some(({ id }) => id === "repair-detail"));
   assert.ok(allows("recreate").some(({ id }) => id === "new-angle"));
-  for (const style of styles.usable("change")) assert.equal(style.actions.length, 1);
+  // Exactly one path, or none for a template that works as either.
+  for (const style of styles.usable("change"))
+    assert.ok(!style.actions || style.actions.length === 1, `${style.id} has one path`);
+  assert.ok(
+    styles.usable("change").some((style) => !style.actions),
+    "a both-path template",
+  );
   for (const { id, instruction } of styles.usable("change"))
     assert.ok(instruction.length <= 500, `${id} fits the change request without clipping`);
 });
@@ -115,16 +176,24 @@ test("a chat draft stays AI-Drafted until approved", () => {
   assert.equal(styles.approve({ by: "admin" }).meta.aiDrafted, false);
 });
 
-test("styles need a kind, their own IDs, a name, an instruction and one audience", () => {
+test("styles need a kind, their own IDs, a name, a brief, an instruction and one audience", () => {
   const styles = store();
-  const style = { id: "noir", kind: "change", label: "Noir", instruction: "Noir: shadows." };
+  const style = {
+    id: "noir",
+    kind: "change",
+    label: "Noir",
+    description: "Hard shadows in a dark room.",
+    instruction: "Noir: shadows.",
+  };
   for (const bad of [
     [style, style],
     [{ ...style, kind: "other" }],
     [{ ...style, id: "custom" }],
+    [{ ...style, id: "guide" }],
     [{ ...style, id: "Noir!" }],
     [{ ...style, instruction: " " }],
     [{ ...style, label: "" }],
+    [{ ...style, description: " " }],
     {},
   ])
     assert.throws(() => styles.save(bad), { status: 400 });
@@ -133,7 +202,7 @@ test("styles need a kind, their own IDs, a name, an instruction and one audience
       id: "noir",
       kind: "change",
       label: "Noir",
-      description: "",
+      description: "Hard shadows in a dark room.",
       instruction: "Noir: shadows.",
       enabled: true,
     },
