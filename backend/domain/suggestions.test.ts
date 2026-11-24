@@ -72,6 +72,13 @@ function fixture(
       caption: { text: "Fishing boats moored in pale fog." },
     },
     "alice:job-video": { type: "video", status: "done", prompt: "Waves" },
+    // An import recorded without its job or prompt.
+    "alice:import": {
+      id: "import-a",
+      type: "image",
+      status: "done",
+      caption: { text: "A red fox sitting in snow." },
+    },
     "bob:job-b": { type: "image", status: "done", prompt: "A sultry portrait" },
   };
   const suggestions = createSuggestions({
@@ -385,6 +392,26 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
   // An account with explicit wording gets steps that keep an explicit image explicit.
   await suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
   assert.match(calls[1][0].content, /Explicit content is allowed[^\n]*never refuse/);
+});
+
+test("a result without a job or prompt is suggested and changed from its picture and caption", async () => {
+  const { calls, suggestions } = fixture({ image: true });
+  const steps = await suggestions.suggest("alice", { surface: "viewer", itemId: "import-a" });
+  assert.equal(steps.suggestions.length, 2);
+  assert.match(calls[0][1].content, /Prompt: \(none recorded[^\n]*\nWhat it shows: A red fox/);
+  assert.equal(calls[0][1].images, 1);
+  const answer = { action: "recreate", label: "Night", prompt: "A red fox in snow at night" };
+  const change = fixture({ image: true, reply: () => JSON.stringify(answer) });
+  const result = await change.suggestions.suggest("alice", {
+    surface: "change",
+    itemId: "import-a",
+    prompt: "",
+    request: "make it night",
+    actions: ["recreate"],
+  });
+  assert.equal((result.suggestions[0] as Change).prompt, "A red fox in snow at night");
+  assert.match(change.calls[0][1].content, /What it shows: A red fox[\s\S]*Request: make it night/);
+  assert.equal(change.calls[0][1].images, 1);
 });
 
 test("video next steps suggest concrete variations using the clip's saved prompt", async () => {

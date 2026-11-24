@@ -10,7 +10,7 @@ import {
   maxSuggestionReferences,
 } from "../../../../shared/suggestions";
 import { post } from "../../api";
-import type { GenerationInput, ReferenceAsset } from "../../types";
+import type { GenerationInput, MediaItem, ReferenceAsset } from "../../types";
 
 export function draftSuggestionContext(
   { kind, profileId }: Pick<GenerationInput, "kind" | "profileId">,
@@ -53,33 +53,40 @@ export const promptIdeasQuery = (
     ...cached,
   });
 
+/** The result a suggestion is for; imports and uploads have no job. */
+type Result = Pick<MediaItem, "id" | "jobId">;
+const resultIds = ({ id, jobId }: Result) => ({ jobId, itemId: id });
+
 /** A finished image's next steps; `fresh` asks for different ones than those saved with it. */
-export const askNextSteps = (jobId: string, fresh = false, prompt?: string, itemId?: string) =>
+export const askNextSteps = (result: Result, fresh = false, prompt?: string) =>
   post<Suggestions<NextStep>>("/api/suggestions", {
     surface: "viewer",
-    jobId,
+    ...resultIds(result),
     fresh,
     prompt,
-    itemId,
   });
 
 /** A finished image's next steps, which the viewer's Suggestions offers. */
-export const nextStepsQuery = (jobId: string, prompt?: string, itemId?: string) =>
+export const nextStepsQuery = (result: Result, prompt?: string) =>
   queryOptions({
-    queryKey: ["suggestions", "viewer", jobId, prompt, itemId],
-    queryFn: () => askNextSteps(jobId, false, prompt, itemId),
+    queryKey: ["suggestions", "viewer", result.jobId, prompt, result.id],
+    queryFn: () => askNextSteps(result, false, prompt),
     ...cached,
   });
 
 /** What could happen when a finished image is animated; `fresh` asks for different ideas. */
-export const askMotionIdeas = (jobId: string, fresh = false, itemId?: string) =>
-  post<Suggestions<NextStep>>("/api/suggestions", { surface: "animate", jobId, fresh, itemId });
+export const askMotionIdeas = (result: Result, fresh = false) =>
+  post<Suggestions<NextStep>>("/api/suggestions", {
+    surface: "animate",
+    ...resultIds(result),
+    fresh,
+  });
 
 /** A finished image's motion ideas, which Animate's Custom Animation offers. */
-export const motionIdeasQuery = (jobId: string, itemId?: string) =>
+export const motionIdeasQuery = (result: Result) =>
   queryOptions({
-    queryKey: ["suggestions", "animate", jobId, itemId],
-    queryFn: () => askMotionIdeas(jobId, false, itemId),
+    queryKey: ["suggestions", "animate", result.jobId, result.id],
+    queryFn: () => askMotionIdeas(result),
     ...cached,
   });
 
@@ -97,25 +104,23 @@ export const draftStepsQuery = (context: DraftContext, prompt: string) =>
 
 /** The action and prompt for a change to a result asked for in plain words, chosen from `actions`. */
 export const askChange = (
-  jobId: string,
+  result: Result,
   request: string,
   actions: ChangeAction[],
   prompt?: string,
-  itemId?: string,
   profileId?: string,
 ) =>
   post<Suggestions<Change>>("/api/suggestions", {
     surface: "change",
-    jobId,
+    ...resultIds(result),
     request,
     actions,
     prompt,
-    itemId,
     profileId,
   });
 
-export const inspectImage = (jobId: string, itemId: string, upscaled: boolean) =>
-  post<ImageInspection>("/api/suggestions/inspect", { jobId, itemId, upscaled });
+export const inspectImage = (result: Result, upscaled: boolean) =>
+  post<ImageInspection>("/api/suggestions/inspect", { ...resultIds(result), upscaled });
 
 /** The same for the composer's draft prompt, which has no result yet. */
 export const askDraftChange = (

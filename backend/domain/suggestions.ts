@@ -242,6 +242,10 @@ function referenceNotes(references: DraftReference[]) {
 const referenceImages = (references: DraftReference[]) =>
   references.flatMap(({ image }) => (image ? [image] : []));
 
+/** A result's prompt; an import or upload without one is written from its picture and caption. */
+const sourcePrompt = (item: SuggestionItem) =>
+  promptText(item.prompt || item.suggestedPrompt) ||
+  "(none recorded: describe it from the image and what it shows)";
 const itemLoras = (settings: Record<string, unknown>) =>
   (Array.isArray(settings.loras) ? settings.loras : [])
     .filter((lora) => lora && (typeof lora === "string" || lora.enabled !== false))
@@ -274,7 +278,7 @@ function describeItem(item: SuggestionItem, withPrompt = true) {
     `Model: ${clean(settings.profileName || settings.profileId, 120) || "unknown"}`,
     item.width && item.height ? `Size: ${item.width} × ${item.height}` : "",
     loras.length ? `LoRAs: ${loras.join(", ")}` : "",
-    withPrompt ? `Prompt: ${promptText(item.prompt || item.suggestedPrompt)}` : "",
+    withPrompt ? `Prompt: ${sourcePrompt(item)}` : "",
     item.caption?.text ? `What it shows: ${clean(item.caption.text, 600)}` : "",
   ]
     .filter(Boolean)
@@ -360,8 +364,10 @@ export function createSuggestions({
   online: () => Promise<boolean>;
   /** Whether what the owner is offered may be worded explicitly (Uncensored Models). */
   explicit: (ownerId: string) => boolean;
-  /** The owner's finished gallery item for a job, if it is theirs and visible. */
-  item: (ownerId: string, jobId: string, itemId?: string) => SuggestionItem | undefined;
+  /**
+   * The owner's visible gallery item by job and/or item id; imports and uploads have no job.
+   */
+  item: (ownerId: string, jobId?: string, itemId?: string) => SuggestionItem | undefined;
   /** A small (≤512 px) copy of the image where the running text model reads images, else null. */
   image: (item: SuggestionItem, upscaled?: boolean) => Promise<ModelImage | null>;
   /** Keeps the suggestions for this exact result and menu. */
@@ -848,14 +854,13 @@ export function createSuggestions({
       { jobId, itemId, upscaled }: { jobId?: unknown; itemId?: unknown; upscaled?: unknown },
     ): Promise<ImageInspection> {
       if (
-        typeof jobId !== "string" ||
-        !jobId ||
+        (jobId !== undefined && (typeof jobId !== "string" || !jobId)) ||
         typeof itemId !== "string" ||
         !itemId ||
         typeof upscaled !== "boolean"
       )
         throw failure("Choose an image result.", 400);
-      const source = item(ownerId, jobId, itemId);
+      const source = item(ownerId, jobId as string | undefined, itemId);
       if (!source || source.status !== "done" || source.type !== "image")
         throw failure("Image result not found.", 404);
 
@@ -934,7 +939,10 @@ export function createSuggestions({
         throw failure("Choose composer, viewer, animate, change or draft.", 400);
       if (body.itemId !== undefined && (typeof body.itemId !== "string" || !body.itemId))
         throw failure("Choose a result item.", 400);
+      if (body.jobId !== undefined && (typeof body.jobId !== "string" || !body.jobId))
+        throw failure("Choose a result.", 400);
       const itemId = body.itemId as string | undefined;
+      const jobId = body.jobId as string | undefined;
       if (
         body.prompt !== undefined &&
         (typeof body.prompt !== "string" || body.prompt.length > maxPromptCharacters)
@@ -980,8 +988,7 @@ export function createSuggestions({
         );
         if (surface === "draft" && body.kind !== "image" && body.kind !== "video")
           throw failure("Choose an image or video draft.", 400);
-        if (surface === "change" && (typeof body.jobId !== "string" || !body.jobId))
-          throw failure("Choose a result.", 400);
+        if (surface === "change" && !jobId && !itemId) throw failure("Choose a result.", 400);
         if (!request && !directions) throw failure("Describe the change.", 400);
         if (!actions.length) throw failure("Choose the actions the change may take.", 400);
         let source: SuggestionItem | Draft | undefined =
@@ -991,13 +998,13 @@ export function createSuggestions({
                 kind: body.kind as Draft["kind"],
                 prompt: promptText(body.prompt),
               }
-            : item(ownerId, body.jobId as string, itemId);
+            : item(ownerId, jobId, itemId);
         if (!source) throw failure("Result not found.", 404);
         if (directions && ("draft" in source || source.type !== "image"))
           throw failure("Choose an image to vary.", 400);
         if (!("draft" in source) && source.status !== "done")
           return empty("Changes are offered for finished results.");
-        if (!("draft" in source) && typeof body.prompt === "string")
+        if (!("draft" in source) && typeof body.prompt === "string" && body.prompt.trim())
           source = { ...source, prompt: body.prompt, suggestedPrompt: undefined };
         const model = writer(ownerId);
         if (!model) return empty("This account can't use suggestions.");
@@ -1027,8 +1034,8 @@ export function createSuggestions({
         return empty("Suggestions are off in Settings › Studio.");
       let source: SuggestionItem | undefined;
       if (surface === "viewer" || surface === "animate") {
-        if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
-        source = prepared ?? item(ownerId, body.jobId, itemId);
+        if (!prepared && !jobId && !itemId) throw failure("Choose a result.", 400);
+        source = prepared ?? item(ownerId, jobId, itemId);
         if (!source) throw failure("Result not found.", 404);
         if ((surface === "animate" && source.type === "video") || source.status !== "done")
           return empty(
@@ -1044,6 +1051,7 @@ export function createSuggestions({
       const edited =
         surface === "viewer" &&
         typeof body.prompt === "string" &&
+        body.prompt.trim() !== "" &&
         body.prompt !== source?.settings?.typedPrompt &&
         body.prompt !== (source?.prompt || source?.suggestedPrompt || "");
       const saved =
@@ -1100,7 +1108,7 @@ export function createSuggestions({
         appliedCards,
         profileId ?? "",
         referenceIds,
-        source?.jobId ?? body.jobId ?? "",
+        source?.jobId ?? jobId ?? "",
         source?.id ?? itemId,
         uncensored,
       ]);
@@ -1133,7 +1141,7 @@ export function createSuggestions({
               ...motionLines,
               "",
               "Opening frame:",
-              `Prompt: ${promptText(source.prompt || source.suggestedPrompt)}`,
+              `Prompt: ${sourcePrompt(source)}`,
               ...(source.caption?.text
                 ? [`What it shows: ${clean(source.caption.text, 600)}`]
                 : []),

@@ -3,13 +3,14 @@ import { requireLocal } from "../route-access.js";
 import { galleryItem } from "./store.js";
 
 /**
- * Recreate's start: the session and job a run made from a finished item joins, so the run is one of
- * its versions. An item without a run of its own (an upload) gets a finished job holding it
- * (`store.recordFinished`) in a Recreate session, made once and reused. The composer then runs the
- * item's prompt there: an import's own, or an upload's suggested one (domain/suggested-prompts.ts).
+ * Recreate's start for a finished item without a run of its own (an upload or import): the session
+ * and job a run made from it joins, so the run is one of its versions, and the prompt it recreates
+ * from. The item gets a finished job holding it (`store.recordFinished`) in a Recreate session, made
+ * once and reused. That prompt is the item's own, else its suggested prompt
+ * (domain/suggested-prompts.ts) or caption; `describe(item)` captions an item with none now.
  */
-export function registerRecreateRoute(app, { store }) {
-  app.post("/api/gallery/recreate", (req, res) => {
+export function registerRecreateRoute(app, { store, describe }) {
+  app.post("/api/gallery/recreate", async (req, res) => {
     if (!req.studioAccount && !requireLocal(req, res)) return;
     const item = recordsForRequest(
       [galleryItem(req.body?.galleryItemId)].filter(Boolean),
@@ -17,6 +18,12 @@ export function registerRecreateRoute(app, { store }) {
     ).find((entry) => entry.status === "done" && entry.url);
     if (!item)
       return res.status(404).json({ ok: false, error: "That item is no longer in the gallery." });
+    let prompt;
+    try {
+      prompt = item.prompt || item.suggestedPrompt || item.caption?.text || (await describe(item));
+    } catch (error) {
+      return res.status(503).json({ ok: false, error: error.message });
+    }
     const ownerId = item.ownerId || "";
     const upload = store.uploadJob(ownerId, item.id);
     const job =
@@ -25,7 +32,7 @@ export function registerRecreateRoute(app, { store }) {
       store.recordFinished(
         ownerId,
         store.createSession(ownerId, "Recreate").id,
-        { prompt: item.prompt || item.suggestedPrompt || "", kind: item.type },
+        { prompt, kind: item.type },
         {
           operation: item.type === "video" ? "animate" : "image",
           outputs: [
@@ -33,6 +40,6 @@ export function registerRecreateRoute(app, { store }) {
           ],
         },
       );
-    res.json({ ok: true, sessionId: job.sessionId, jobId: job.id });
+    res.json({ ok: true, sessionId: job.sessionId, jobId: job.id, prompt });
   });
 }
