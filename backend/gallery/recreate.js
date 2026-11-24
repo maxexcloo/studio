@@ -32,22 +32,26 @@ export function registerRecreateRoute(app, { store, describe }) {
       } catch (error) {
         return res.status(503).json({ ok: false, error: error.message });
       }
-    const ownerId = item.ownerId || "";
-    const upload = store.uploadJob(ownerId, item.id);
-    const job =
-      (item.jobId && store.job(ownerId, item.jobId)) ||
-      (upload && store.session(ownerId, upload.sessionId) && upload) ||
-      store.recordFinished(
-        ownerId,
-        store.createSession(ownerId, "Recreate").id,
-        { prompt, kind: item.type },
-        {
-          operation: item.type === "video" ? "animate" : "image",
-          outputs: [
-            { id: item.id, url: item.url, thumbnailUrl: item.thumbnailUrl, type: item.type },
-          ],
-        },
-      );
+    const job = recreateSource(store, item, prompt);
     res.json({ ok: true, sessionId: job.sessionId, jobId: job.id, prompt });
   });
+}
+
+/** Finds or records the original so later runs are versions of the same result. */
+export function recreateSource(store, item, prompt) {
+  const ownerId = item.ownerId || "";
+  const upload = store.uploadJob(ownerId, item.id);
+  return (
+    (item.jobId && store.job(ownerId, item.jobId)) ||
+    (upload && store.session(ownerId, upload.sessionId) && upload) ||
+    store.recordFinished(
+      ownerId,
+      store.createSession(ownerId, "Recreate").id,
+      { prompt, kind: item.type },
+      {
+        operation: item.type === "video" ? "animate" : "image",
+        outputs: [{ id: item.id, url: item.url, thumbnailUrl: item.thumbnailUrl, type: item.type }],
+      },
+    )
+  );
 }

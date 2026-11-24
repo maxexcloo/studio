@@ -174,7 +174,12 @@ import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { minorAge } from "./minor-age.js";
-import { createModelCatalogue, dreamCatalogue, modelsForAccount } from "./model/catalogue.js";
+import {
+  createModelCatalogue,
+  dreamCatalogue,
+  modelsForAccount,
+  withPreferredDefaults,
+} from "./model/catalogue.js";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { buildProfile, offlineModelResult } from "./model/models.js";
 import { registerModelRoutes } from "./model/routes.js";
@@ -830,6 +835,16 @@ registerResultSetRoutes(app, {
   store,
   admit: admitGeneration,
   item: resultItem,
+  defaultImageProfile: async (ownerId, account) => {
+    const { models } = await mediaModels(false);
+    const { profiles, defaults } = withPreferredDefaults(
+      modelsForAccount(models, { studioAccount: account }),
+      accountPreferences(ownerId),
+    );
+    return profiles.find(
+      (profile) => profile.kind === "image" && profile.id === defaults.imageModel,
+    );
+  },
 });
 registerMigrationRoutes(app, {
   dataDir,

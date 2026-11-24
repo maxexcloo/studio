@@ -1038,6 +1038,26 @@ test("More Like This Set is offered only for a result in a set", async ({ page }
   );
 });
 
+test("More Like This acts on a captioned import without a generation job", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(
+    page,
+    {
+      jobId: undefined,
+      prompt: "",
+      title: "Misty Harbour",
+      caption: { text: "Trawlers entering the harbour in mist." },
+    },
+    (page) =>
+      page.route("**/api/result-sets/more", (route) => {
+        asked.push(route.request().postDataJSON());
+        return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+      }),
+  );
+  await viewerAction(page, "Discover", "More Like This");
+  await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "image" }]);
+});
+
 test("Recreate keeps an edited viewer prompt and changes the seed only when requested", async ({
   page,
 }) => {
