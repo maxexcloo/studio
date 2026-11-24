@@ -3,7 +3,6 @@ import {
   Group,
   Modal,
   SegmentedControl,
-  Stack,
   Text,
   Tooltip,
   VisuallyHidden,
@@ -39,6 +38,7 @@ import type { DeckCard } from "./deck";
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia, MediaBackdrop, useDreamPlayback } from "./DeckMedia";
 import { DreamSuggestions } from "./DreamSuggestions";
+import { DreamWhy } from "./DreamWhy";
 import { sideLabel } from "./PairCard";
 import type { DreamItem, SetOverride, SetOverrides } from "./queries";
 import { type Fly, SwipeCard } from "./SwipeCard";
@@ -477,19 +477,7 @@ export function DreamPreview({
           </div>
         </div>
         <ViewerDetails item={item} opened={details} phone={phone} close={() => setDetails(false)}>
-          {item.dream && (
-            <Stack gap={4}>
-              <Text size="sm" fw={600}>
-                Why Dream Made This
-              </Text>
-              {card.kind === "pair" && <Text size="sm">{card.question}</Text>}
-              {item.dream.why && (
-                <Text size="sm" c="dimmed">
-                  {item.dream.why}
-                </Text>
-              )}
-            </Stack>
-          )}
+          <DreamWhy item={item} question={card.kind === "pair" ? card.question : undefined} />
         </ViewerDetails>
       </div>
     </Modal>

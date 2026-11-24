@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 
 import type { ResultContext } from "../../shared/characters.ts";
-import { dreamTimingSettings } from "../../shared/dream.ts";
+import { type DreamInputs, dreamTimingSettings } from "../../shared/dream.ts";
 import {
   type GenerationInput,
   type PromptWriting,
@@ -99,6 +99,8 @@ export interface WrittenPrompt {
   title?: string;
   motifs?: string[];
   cardContext?: ResultContext;
+  /** What fed a Dream idea, added to what admission recorded (`DreamOrigin`). */
+  inputs?: DreamInputs;
 }
 /**
  * Writes a job's prompt (`input.writing`), passing the text model's thinking and reply pieces on
@@ -144,6 +146,7 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
             ...(written.why ? { why: written.why } : {}),
             ...(written.motifs ? { motifs: written.motifs } : {}),
             ...(written.cardContext ? { cardContext: written.cardContext } : {}),
+            ...(written.inputs ? { inputs: { ...job.dream.inputs, ...written.inputs } } : {}),
           },
         }
       : {}),

@@ -43,6 +43,12 @@ export const viewerPathId = (pathname: string) => {
   }
 };
 
+/**
+ * A followed result opens in the gallery's viewer as a step of its own, so closing it returns to
+ * the result it was followed from, here or on another page.
+ */
+export const followed = { viewer: true };
+
 /** An item's permanent address: `/images/<id>` or `/videos/<id>`. */
 export const viewerPath = (item: { id: string; number?: number; type: MediaKind }) =>
   `${galleryPath(item.type)}/${encodeURIComponent(viewerItemId(item))}`;

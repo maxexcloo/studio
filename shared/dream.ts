@@ -10,8 +10,23 @@ export const dreamDefaults = {
   useLoadedProfile: true,
   imageBackend: "local" as "local" | "cloud",
   videoBackend: "local" as "local" | "cloud",
+  /** The image deck's mix: relative shares of new ideas, comparisons and existing work. */
+  mixNew: 40,
+  mixComparisons: 30,
+  mixExisting: 30,
+  /** Percent of ideas written uncensored, where `uncensored` and Uncensored Models allow. */
+  uncensoredShare: 40,
 };
 export type DreamSettings = typeof dreamDefaults;
+/** The largest value of each numeric Dream setting, all from 0. */
+export const dreamSettingMaxima = {
+  dailyImages: 500,
+  dailyVideos: 100,
+  mixNew: 100,
+  mixComparisons: 100,
+  mixExisting: 100,
+  uncensoredShare: 100,
+};
 export const maxDreamIdleMinutes = 120;
 export const dreamTimingSettings = {
   imageIdleMinutes: { key: "STUDIO_DREAM_IMAGE_IDLE_MINUTES", defaultValue: 0 },
@@ -101,8 +116,8 @@ export type DreamOverride = keyof typeof dreamOverrideKeys;
 export function dreamSettingError(key: keyof DreamSettings, value: unknown): string {
   if (key === "imageBackend" || key === "videoBackend")
     return value === "local" || value === "cloud" ? "" : `Choose Local or Cloud for ${key}.`;
-  if (key === "dailyImages" || key === "dailyVideos") {
-    const max = key === "dailyImages" ? 500 : 100;
+  if (key in dreamSettingMaxima) {
+    const max = dreamSettingMaxima[key as keyof typeof dreamSettingMaxima];
     return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= max
       ? ""
       : `Set ${key} to a whole number from 0 to ${max}.`;
@@ -148,4 +163,30 @@ export interface ChatNote {
   results?: string[];
   /** The character card it came with. */
   card?: string;
+}
+
+/** A liked result whose prompt a Dream idea saw, which its Details link to. */
+export interface DreamLikedPrompt {
+  id: string;
+  number?: number;
+  type: string;
+  title: string;
+}
+/** What fed a Dream result, kept on it as it was made and listed in its Details. */
+export interface DreamInputs {
+  /** The taste's likes and styles drawn for the idea, and the caption tag it featured. */
+  likes?: string[];
+  styles?: string[];
+  feature?: string;
+  /** Liked results whose prompts the writer saw. */
+  prompts?: DreamLikedPrompt[];
+  /** The project whose brief it followed. */
+  project?: string;
+  /** Chat notes and rules it was given. */
+  notes?: string[];
+  rules?: string[];
+  /** Why it runs on its model and LoRAs. */
+  choice?: string;
+  /** How its seed relates to other results, such as a comparison's shared seed. */
+  seed?: string;
 }

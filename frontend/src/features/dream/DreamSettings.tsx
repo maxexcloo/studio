@@ -1,6 +1,7 @@
 import { Alert, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { dreamSettingMaxima } from "../../../../shared/dream";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
@@ -56,23 +57,31 @@ export function DreamPreferences() {
     </SettingRow>
   );
   const number = (
-    key: "dailyImages" | "dailyVideos",
+    key: keyof typeof dreamSettingMaxima,
     label: string,
     description: string,
     disabled: boolean,
-    max: number,
   ) => (
     <SettingRow label={label} description={description}>
       <NumberSetting
+        key={settings[key]}
         label={label}
         value={settings[key]}
         min={0}
-        max={max}
+        max={dreamSettingMaxima[key]}
         disabled={disabled}
         onSave={(value) => save.mutate({ [key]: value })}
       />
     </SettingRow>
   );
+  const mixTotal = settings.mixNew + settings.mixComparisons + settings.mixExisting;
+  const mix = (key: "mixNew" | "mixComparisons" | "mixExisting", label: string, what: string) =>
+    number(
+      key,
+      label,
+      `${what} Relative to the others${mixTotal ? `: ${Math.round((settings[key] / mixTotal) * 100)}% of cards` : ""}.`,
+      !settings.images,
+    );
   return (
     <Stack gap="lg">
       <SettingGroup title="General">
@@ -87,8 +96,17 @@ export function DreamPreferences() {
           "Run on Loaded Profile",
           "Skip the idle delay when Studio can confirm that the profile and its LoRA settings are already loaded.",
         )}
-        {dream.data.uncensoredAvailable &&
-          toggle("uncensored", "Uncensored", "Allow explicit themes.")}
+        {dream.data.uncensoredAvailable && (
+          <>
+            {toggle("uncensored", "Uncensored", "Allow explicit themes.")}
+            {number(
+              "uncensoredShare",
+              "Uncensored Share",
+              "Percent of ideas with explicit themes.",
+              !settings.uncensored,
+            )}
+          </>
+        )}
       </SettingGroup>
       <SettingGroup title="Images">
         {toggle("images", "Generate Images")}
@@ -97,8 +115,16 @@ export function DreamPreferences() {
           "Daily Images",
           "The most images Dream makes a day.",
           !settings.images,
-          500,
         )}
+      </SettingGroup>
+      <SettingGroup title="Image Mix">
+        {mix("mixNew", "New Ideas", "Fresh concepts from your taste.")}
+        {mix(
+          "mixComparisons",
+          "Comparisons",
+          "One liked prompt with a single setting changed, to learn which you prefer.",
+        )}
+        {mix("mixExisting", "Existing Work", "Recreations, variations and series of liked images.")}
       </SettingGroup>
       <SettingGroup title="Videos">
         {toggle("videos", "Generate Videos", "Animate kept or liked images.")}
@@ -107,7 +133,6 @@ export function DreamPreferences() {
           "Daily Videos",
           "The most videos Dream makes a day.",
           !settings.videos,
-          100,
         )}
       </SettingGroup>
       {save.error && (

@@ -822,7 +822,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   const beyond = await dreamOnce();
   assert.deepEqual([beyond?.input.profileId, beyond?.dream?.arm], ["qwen", "explore:prompt"]);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Inspiration/);
-  assert.match(state.calls.at(-1)!.system, /Explore a fresh idea within their taste/);
+  assert.match(state.calls.at(-1)!.system, /Explore fresh ground/);
 });
 
 test("Dream favours the set model they keep over one they pass", async (t) => {
@@ -871,7 +871,13 @@ test("Dream draws from the models and tags a person set over those it learnt", a
   );
   assert.match(system, /Treat recurring props and settings as incidental/);
   assert.match(system, /Build the idea around one of these starting points/);
-  assert.doesNotMatch(system, /Possible starting points:.*(?:\bsubject:|medium or style:)/);
+  // Photography stands in for medium; only a fresh concept also draws a subject, and no featured tag.
+  assert.doesNotMatch(
+    state.calls[0].system,
+    /Possible starting points:.*(?:\bsubject:|medium or style:)/,
+  );
+  assert.match(system, /Possible starting points:.*\bsubject:/);
+  assert.doesNotMatch(system, /medium or style:|Keep this taste they like/);
 });
 
 test("Each new idea sees a few drawn tastes and liked prompts from outside Dream, and what to change first", async (t) => {
@@ -900,14 +906,27 @@ test("Each new idea sees a few drawn tastes and liked prompts from outside Dream
     },
   );
   await dream.save("alice", { enabled: true });
-  state.rolls = [99];
-  await dreamOnce();
+  const job = await dreamOnce();
   const { user } = state.calls.at(-1)!;
   assert.match(user, /\nLikes: [^,\n]+, [^,\n]+\n/);
   assert.match(user, /\nPreferred Styles: [^,\n]+\n/);
   assert.match(user, /Liked prompts:\n- a kite\n/);
   assert.doesNotMatch(user, /dreamt lantern/);
   assert.match(user, /Change first this time: palette: the colors and tones\./);
+  // What fed the idea stays on it for its Details.
+  const inputs = job?.dream?.inputs;
+  assert.equal(inputs?.likes?.length, 2);
+  assert.equal(inputs?.styles?.length, 1);
+  assert.deepEqual(inputs?.prompts, [{ id: "own", type: "image", title: "a kite" }]);
+  assert.match(String(inputs?.choice), /^Runs on a model drawn by your taste/);
+  // A fresh concept may see no liked prompts, and sees how recent prompts opened.
+  state.rolls = [99];
+  state.draws[3] = [0];
+  const explored = await dreamOnce();
+  const fresh = state.calls.at(-1)!.user;
+  assert.match(fresh, /Liked prompts:\n\(none yet\)/);
+  assert.match(fresh, /How recent prompts open; open this one differently, in your own words:\n- /);
+  assert.equal(explored?.dream?.inputs?.prompts, undefined);
 });
 
 test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
@@ -927,7 +946,7 @@ test("Fresh concepts rotate anchors and inspirations without overriding a model 
     assert.ok(job);
     assert.equal((job.input.writing as { explore?: boolean }).explore, true);
     seen.push((job.input.writing as { inspiration: string }).inspiration);
-    anchors.push(dream.read("alice").anchors!.slice(0, 10));
+    anchors.push(dream.read("alice").anchors!.slice(0, 20));
     assert.match(state.calls.at(-1)!.system, /change one or two/);
     assert.match(
       state.calls.at(-1)!.system,
@@ -985,7 +1004,6 @@ test("Fresh concept retries reject liked prompt copies and show the rejected con
     },
   ];
   await dream.save("alice", { enabled: true });
-  state.rolls = [99];
   const job = await dreamOnce();
   assert.equal(
     job?.input.prompt,
@@ -1514,6 +1532,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   );
 
   assert.equal((await request("/settings", { dailyImages: -1 }, "PUT")).status, 400);
+  assert.equal((await request("/settings", { mixNew: 101 }, "PUT")).status, 400);
   assert.equal(
     (await request("/settings", { videoIdleMinutes: 1 }, "PUT")).body.settings.videoIdleMinutes,
     undefined,
@@ -1588,7 +1607,10 @@ test("The deck converges on 40% new ideas, 30% comparisons and 30% existing work
     new: 60,
     comparison: 45,
     existing: 45,
-  });
+  }); // An account's own mix is relative; a kind without a share comes only as a fallback.
+  const mix = { ...dreamDefaults, mixNew: 1, mixComparisons: 0, mixExisting: 1 };
+  assert.deepEqual(deckOrder({ new: 0, comparison: 0, existing: 0 }, mix).at(-1), "comparison");
+  assert.deepEqual(deckOrder({ new: 3, comparison: 0, existing: 1 }, mix)[0], "existing");
 });
 
 test("Projects share turns by how their results fare, with a floor for new ones; paused ones take none", () => {
