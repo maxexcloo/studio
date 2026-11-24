@@ -108,15 +108,6 @@ export function DreamPreferences() {
           </>
         )}
       </SettingGroup>
-      <SettingGroup title="Images">
-        {toggle("images", "Generate Images")}
-        {number(
-          "dailyImages",
-          "Daily Images",
-          "The most images Dream makes a day.",
-          !settings.images,
-        )}
-      </SettingGroup>
       <SettingGroup title="Image Mix">
         {mix("mixNew", "New Ideas", "Fresh concepts from your taste.")}
         {mix(
@@ -125,6 +116,15 @@ export function DreamPreferences() {
           "One liked prompt with a single setting changed, to learn which you prefer.",
         )}
         {mix("mixExisting", "Existing Work", "Recreations, variations and series of liked images.")}
+      </SettingGroup>
+      <SettingGroup title="Images">
+        {toggle("images", "Generate Images")}
+        {number(
+          "dailyImages",
+          "Daily Images",
+          "The most images Dream makes a day.",
+          !settings.images,
+        )}
       </SettingGroup>
       <SettingGroup title="Videos">
         {toggle("videos", "Generate Videos", "Animate kept or liked images.")}
