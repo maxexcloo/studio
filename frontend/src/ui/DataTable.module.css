@@ -1,3 +1,7 @@
+.cell {
+  overflow-wrap: break-word;
+}
+
 /* The outer cells drop their side padding, so the table's text and actions line up with the
    heading, toolbar and other content of its dialog or section. */
 .cell:first-child {
@@ -9,4 +13,8 @@
 
 .recordText {
   overflow-wrap: anywhere;
+}
+
+.nowrap {
+  white-space: nowrap;
 }
