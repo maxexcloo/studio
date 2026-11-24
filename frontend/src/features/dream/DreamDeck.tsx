@@ -30,7 +30,7 @@ import { type DeckCard, type PairDeckCard, cardIds, deckCards, deckPrefetch } fr
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
 import { CardText, DreamPreview } from "./DreamPreview";
-import { DreamSuggestions, usePrefetchLibrarySuggestions } from "./DreamSuggestions";
+import { DreamSuggestions, usePrefetchReviewSuggestions } from "./DreamSuggestions";
 import { PairContent } from "./PairCard";
 import {
   type DreamItem,
@@ -286,7 +286,7 @@ export function DreamDeck({
     : deckCards(items, { depth: 6, media, current });
   const cards = coming.slice(0, 3);
   const [top] = cards;
-  usePrefetchLibrarySuggestions(quickRating ? undefined : libraryItems, top?.key);
+  usePrefetchReviewSuggestions(libraryItems, top?.key);
   if (top !== current) setCurrent(top);
   const requestedSide =
     viewing?.key === top?.key

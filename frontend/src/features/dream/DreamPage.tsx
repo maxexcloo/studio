@@ -30,7 +30,7 @@ import { DreamDeck, type Judgement } from "./DreamDeck";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
-import { librarySuggestionCount } from "./DreamSuggestions";
+import { reviewSuggestionCount } from "./DreamSuggestions";
 import { DreamWeek } from "./DreamWeek";
 import {
   type Dream,
@@ -184,7 +184,7 @@ export function DreamPage() {
   useEffect(() => {
     if (
       reviewing &&
-      libraryItems.length <= librarySuggestionCount &&
+      libraryItems.length <= reviewSuggestionCount &&
       library.hasNextPage &&
       !library.isFetchingNextPage &&
       !library.isFetchNextPageError

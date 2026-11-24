@@ -18,9 +18,9 @@ import type { DeckCard } from "./deck";
 import { sideControl, sideIconSize } from "./DeckButtons";
 import { sideLabel } from "./PairCard";
 
-export const librarySuggestionCount = 5;
+export const reviewSuggestionCount = 5;
 
-export function usePrefetchLibrarySuggestions(items: MediaItem[] | undefined, currentId?: string) {
+export function usePrefetchReviewSuggestions(items: MediaItem[] | undefined, currentId?: string) {
   const client = useQueryClient();
   const assistant = useQuery({ ...assistantQuery, enabled: !!items?.length });
   const available = assistant.data?.available;
@@ -29,7 +29,7 @@ export function usePrefetchLibrarySuggestions(items: MediaItem[] | undefined, cu
 
   useEffect(() => {
     if (!available || !items?.length || !currentId) return;
-    const upcoming = items.filter(({ id }) => id !== currentId).slice(0, librarySuggestionCount);
+    const upcoming = items.filter(({ id }) => id !== currentId).slice(0, reviewSuggestionCount);
     let cancelled = false;
     async function prefetch() {
       for (const item of upcoming) {
