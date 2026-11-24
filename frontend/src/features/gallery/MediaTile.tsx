@@ -11,6 +11,7 @@ import { JobProgressBar, jobReason, jobStatus, statusLabels } from "../generatio
 import { queueQuery, useQueueAction, withQueuePosition } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaTimestamp, mediaTitle } from "./mediaLabels";
+import { mediaOriginBadge } from "./mediaOriginBadge";
 import { mediaSource } from "./mediaSource";
 import { upscaling, useStopUpscale } from "./UpscaleControls";
 import type { useHoldToSelect } from "./useGalleryLayout";
@@ -177,6 +178,7 @@ export function MediaTile({
   hold,
   caption,
   galleryTile,
+  inComparison = false,
   detail,
   actions,
   className,
@@ -198,6 +200,7 @@ export function MediaTile({
   /** Hover captions, captions always shown, or none (phones without Tile Captions). */
   caption: "hover" | "pinned" | "none";
   galleryTile?: boolean;
+  inComparison?: boolean;
   detail?: string;
   actions?: ReactNode;
   className?: string;
@@ -221,8 +224,12 @@ export function MediaTile({
   const [retry, setRetry] = useState({ source, count: 0 });
   const attempt = retry.source === source ? retry.count : 0;
   const title = mediaTitle(item);
-  const timestamp = galleryTile && item.status === "done" ? mediaTimestamp(item) : undefined;
+  const markOrigin = galleryTile && item.status === "done";
+  const timestamp = markOrigin ? mediaTimestamp(item) : undefined;
+  const badge = markOrigin ? mediaOriginBadge(item, inComparison) : undefined;
   const drifted = !selecting && item.identity?.drifted;
+  const faceMark = "Face Check: Face Differs";
+  const description = [badge?.label, drifted ? faceMark : undefined].filter(Boolean).join(". ");
   const subtitle = item.resultSet?.caption || detail;
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
@@ -270,6 +277,7 @@ export function MediaTile({
         className={classes.button}
         data-media-id={item.id}
         aria-label={label || `${selecting ? "Select" : "Open"} ${item.type}: ${title}`}
+        aria-description={description || undefined}
         aria-pressed={selecting ? selected : undefined}
         draggable={item.status === "done" && !touch}
         onKeyDown={(event) => {
@@ -353,6 +361,31 @@ export function MediaTile({
               </div>
             )
           : null}
+        {(timestamp || badge || drifted) && (
+          <span className={classes.marks}>
+            {(timestamp || badge) && (
+              <span className={classes.metadata}>
+                {badge && (
+                  <span className={classes.sourceBadge} title={badge.label} aria-hidden>
+                    <badge.icon size={12} />
+                  </span>
+                )}
+                {timestamp && (
+                  <time className={classes.timestamp} dateTime={timestamp.value}>
+                    {timestamp.time}
+                    <span className={classes.timestampDate}>, {timestamp.day}</span>
+                  </time>
+                )}
+              </span>
+            )}
+            {drifted && (
+              <span className={classes.drift} role="img" aria-label={faceMark}>
+                <icons.character size={12} />
+                Face
+              </span>
+            )}
+          </span>
+        )}
       </UnstyledButton>
       {item.status !== "done" && <TileStatus item={item} onTryAgain={onTryAgain} />}
       {upscaleShown && <TileUpscale item={item} />}
@@ -363,22 +396,6 @@ export function MediaTile({
           aria-label={item.rating === "liked" ? "Liked" : "Disliked"}
         >
           <RatingIcon size={14} fill="currentColor" />
-        </div>
-      )}
-      {(timestamp || drifted) && (
-        <div className={classes.marks}>
-          {timestamp && (
-            <time className={classes.timestamp} dateTime={timestamp.value}>
-              {timestamp.time}
-              <span className={classes.timestampDate}>, {timestamp.day}</span>
-            </time>
-          )}
-          {drifted && (
-            <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
-              <icons.character size={12} />
-              Face
-            </div>
-          )}
         </div>
       )}
       {!selecting && actions}
