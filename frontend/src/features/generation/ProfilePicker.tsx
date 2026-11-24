@@ -4,9 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { keptLabel } from "../../../../shared/dream";
-import { isCloudProfile } from "../../../../shared/profiles";
+import { isCloudProfile, slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, Models, Profile } from "../../types";
 import { compareNames } from "../../ui/DataTable";
+import { plural } from "../../ui/plural";
 import { useIsAdmin } from "../auth/AccountGate";
 import { keepRatesQuery } from "../dream/queries";
 import { servicesStatusQuery } from "../runtime/RuntimePanel";
@@ -51,6 +52,31 @@ function useReadiness() {
     cloudHeld && isCloudProfile(profile) && profile.ready !== false
       ? { label: "Near Limit", color: "yellow" }
       : profileReadiness(profile, workers);
+}
+
+/**
+ * What sets a profile apart, for its option's subtitle: its references (edited or guiding), a
+ * negative prompt, LoRAs and its other abilities, then Cloud.
+ */
+function profileAbilities(profile: Profile) {
+  const { capabilities: can } = profile;
+  const references = Math.max(
+    slotCapacity(profile.mediaInputs ?? []),
+    ...(profile.backendOptions ?? []).map((option) => option.references),
+  );
+  return [
+    references > 0 && plural(references, "Reference"),
+    profile.kind === "image" && references > 0 && (profile.editReferences ? "Edit" : "Img2Img"),
+    can.inpaint && "Inpaint",
+    profile.kind === "image" && can.negativePrompt !== false && "Negative",
+    can.lora && "LoRAs",
+    can.sound && "Sound",
+    can.transparent && "Transparent",
+    profile.native?.["4k"] === "yes"
+      ? "Native 4K"
+      : profile.native?.["2k"] === "yes" && "Native 2K",
+    isCloudProfile(profile) && "Cloud",
+  ];
 }
 
 /** A shared name gains the part of the profile ID that differs, such as "· fp8" or "· comfyui". */
@@ -126,18 +152,14 @@ export function ProfileSelect({
       renderOption={({ option, checked }) => {
         const profile = profiles.find((profile) => profile.id === option.value);
         const status = profile && readinessOf(profile);
-        // Its name's first part titles it; the rest (speed, steps), Cloud and its keep rate follow.
+        // Its name's first part titles it; the rest (speed, steps), its abilities and keep rate follow.
         const [title, ...rest] = option.label.split(" · ");
         return (
           <ChipOption
             label={title}
             description={
               profile &&
-              [
-                ...rest,
-                isCloudProfile(profile) && "Cloud",
-                keptLabel(keepRates?.profiles[profile.id]),
-              ]
+              [...rest, ...profileAbilities(profile), keptLabel(keepRates?.profiles[profile.id])]
                 .filter(Boolean)
                 .join(" · ")
             }
