@@ -133,7 +133,7 @@ recur across features.
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action and assistant menus.
 - Media categories use Images, Videos, Text, with Cloud after Videos where it
-  is their peer. Other unordered peers sort alphabetically, except settings
+  is their peer. Sized choices (resolutions, sizes, lengths) run small to large. Other unordered peers sort alphabetically, except settings
   first, Like before Dislike, Name A–Z and Name Z–A last in sort menus,
   Refresh and Custom… last and Delete last. Settings and Library pages and
   groups sort A–Z (Settings › Where Work Runs keeps Images, Videos, Dream, Text; About is
