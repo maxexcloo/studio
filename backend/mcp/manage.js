@@ -14,6 +14,7 @@ import {
   maxCardName,
   maxCharacterImages,
 } from "../../shared/characters.ts";
+import { letter } from "../../shared/compare.ts";
 import { dreamPairAnswers } from "../../shared/dream.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
 import { mcpJson, outputIndex, scopeMarkdown } from "./media.js";
@@ -440,7 +441,7 @@ export function registerManageTools({
         const link = `${media.publicUrl}/compare/${encodeURIComponent(comparison.id)}`;
         const lines = jobs.map(
           (jobId, index) =>
-            `[${String.fromCharCode(65 + index)}](${media.pageUrl(owner, jobId)}) ${media.refOf(jobId) || ""}`,
+            `[${letter(index)}](${media.pageUrl(owner, jobId)}) ${media.refOf(jobId) || ""}`,
         );
         return {
           content: [

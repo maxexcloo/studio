@@ -1,7 +1,7 @@
 import { Text, UnstyledButton } from "@mantine/core";
 
+import { letter } from "../../../../shared/compare";
 import { useSideways } from "../../ui/usePhone";
-import { letter } from "../compare/inputs";
 import type { PairDeckCard } from "./deck";
 import { DeckMedia } from "./DeckMedia";
 import { besideFits, useBoxShape } from "./mediaFit";

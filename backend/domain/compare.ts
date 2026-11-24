@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import { type ComparisonRating, compareVariants } from "../../shared/compare.ts";
+import { type ComparisonRating, compareVariants, letter } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import { storedChatRecord } from "../gallery/records.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
@@ -55,7 +55,6 @@ interface Router {
   put(path: string, handler: Handler): unknown;
 }
 
-const letter = (index: number) => String.fromCharCode(65 + index);
 /** The result set a compare run's variant `index` belongs to, named by its label. */
 const comparisonSet = (id: string, index: number, label: string) => ({
   id,

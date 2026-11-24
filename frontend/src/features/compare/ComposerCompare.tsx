@@ -16,7 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { compareVariants } from "../../../../shared/compare";
+import { compareVariants, letter } from "../../../../shared/compare";
 import {
   loraDefaultStrength,
   loraName,
@@ -44,14 +44,7 @@ import { useDraft, useGeneration } from "../generation/GenerationProvider";
 import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { profileForBackend, profileForLoras, profileName } from "../generation/payload";
 import { profileOptions } from "../generation/ProfilePicker";
-import {
-  letter,
-  loraInputs,
-  promptInputs,
-  promptLines,
-  seedInputs,
-  strengthInputs,
-} from "./inputs";
+import { loraInputs, promptInputs, promptLines, seedInputs, strengthInputs } from "./inputs";
 import {
   addVariant,
   canAddVariant,

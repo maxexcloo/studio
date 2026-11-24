@@ -102,7 +102,8 @@ export function ComparePage() {
   });
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
   const compareAgain = useMutation({ mutationFn: () => stage.again(again) });
-  // 1–4 pick that variant as the winner (again to clear it), unless typing or a layer is above.
+  // 1–9 pick that variant as the winner and 0 the tenth (again to clear it), unless typing or a
+  // layer is above.
   const pick = useRef<(index: number) => void>(undefined);
   pick.current = (index) => {
     const item = comparison.data?.variants[index]?.item;
@@ -111,13 +112,13 @@ export function ComparePage() {
   };
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (!/^[1-4]$/.test(event.key) || event.defaultPrevented) return;
+      if (!/^\d$/.test(event.key) || event.defaultPrevented) return;
       if (event.altKey || event.metaKey || event.ctrlKey) return;
       const target = event.target as HTMLElement;
       if (target.closest("input, textarea, select, [contenteditable='true']")) return;
       if (layerAbove(null, event)) return;
       event.preventDefault();
-      pick.current?.(Number(event.key) - 1);
+      pick.current?.((Number(event.key) + 9) % 10);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
