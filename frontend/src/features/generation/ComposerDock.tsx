@@ -9,7 +9,6 @@ import { closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
 import { TextEntrySheet } from "../../ui/TextEntrySheet";
 import { useKeyboard, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone, useTouch } from "../../ui/usePhone";
-import { GenerateVariantSelect } from "../compare/ComposerCompare";
 import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 
@@ -302,7 +301,6 @@ export const ComposerDock = memo(function ComposerDock({
           opened={opened}
           onClose={collapse}
           title="Generate"
-          titleAction={<GenerateVariantSelect />}
           fieldTitles={{ prompt: "Prompt", negative: "Negative Prompt" }}
           hidden={handingOver}
           onPaste={pasteReferences}

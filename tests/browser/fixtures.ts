@@ -632,7 +632,8 @@ export async function fixtures(page: Page) {
               {
                 ...variant.input,
                 resultSet: { id, title: "Comparison", index, variation: variant.label },
-                seed,
+                // As the server does, a variant's own seed, else the shared one.
+                seed: String(variant.input.seed || seed),
                 operation: "image",
                 parentJobId: body.parentJobId,
                 parentItemId: body.parentItemId,

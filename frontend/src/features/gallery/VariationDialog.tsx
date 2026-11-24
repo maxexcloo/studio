@@ -19,7 +19,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { useReturnFocus } from "../../ui/useReturnFocus";
 import { useGroupFeature } from "../auth/AccountGate";
 import { charactersQuery } from "../characters/queries";
-import { showVariant } from "../compare/variants";
+import { setVariants } from "../compare/inputs";
 import {
   type Draft,
   defaultProfile,
@@ -122,7 +122,7 @@ export function VariationDialog({
       );
       const base = { ...draft, input: { ...draft.input, prompt } };
       const variants = variationVariants(base, runProfile, seed, item, cards, answer.suggestions);
-      return showVariant(draft, variants, 0);
+      return setVariants(draft, variants);
     },
     onSuccess: (draft) => {
       setDraft(draft);

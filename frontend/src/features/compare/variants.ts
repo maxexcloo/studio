@@ -2,14 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { compareVariants, letter } from "../../../../shared/compare";
 import { isCloudProfile, loraName, loraStrengthSweep } from "../../../../shared/profiles";
+import { selectedResolution } from "../../../../shared/resolution";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
+import { useRemembered } from "../auth/useRemembered";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { submitBlockedReason } from "../generation/GenerationEditor";
 import {
   type Draft,
-  type Variant,
   defaultProfile,
   initialInput,
   inputForProfile,
@@ -28,74 +29,53 @@ import {
   usesNegative,
 } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
-import { runSeeds, variantLabels } from "./inputs";
+import {
+  draftVariants,
+  moreSeeds,
+  ownSeed,
+  randomSeed,
+  runSeeds,
+  setVariants,
+  variantLabels,
+} from "./inputs";
 import type { Comparison } from "./queries";
 
-/**
- * Every variant of `draft`, the one being edited as it stands; just it outside a comparison. A
- * given label (Keep & Vary's) names the variant only until it is edited.
- */
-export function draftVariants(draft: Draft): Variant[] {
-  const current = { input: draft.input, references: draft.references };
-  return draft.compare
-    ? draft.compare.variants.map((variant, index) => {
-        if (index !== draft.compare!.active) return variant;
-        const edited = variant.input !== draft.input || variant.references !== draft.references;
-        return edited ? current : { ...variant, ...current };
-      })
-    : [current];
-}
+const fitsComparison = (count: number) =>
+  count >= compareVariants.min && count <= compareVariants.max;
 
-/** `draft` editing `variants[index]`; a single variant ends the comparison. */
-export function showVariant(draft: Draft, variants: Variant[], index: number): Draft {
+/**
+ * `input` on `profile` with that profile's own settings, keeping the seed and, where the profile
+ * offers the same size tier, the size.
+ */
+function modelInput(input: GenerationInput, profile: Profile): GenerationInput {
+  const tier = selectedResolution(input, profile);
   return {
-    ...draft,
-    input: variants[index].input,
-    references: variants[index].references,
-    compare: variants.length > 1 ? { variants, active: index } : undefined,
+    ...inputForProfile(input, profile),
+    seed: input.seed,
+    ...(tier && { width: input.width, height: input.height, resolutionTier: tier }),
   };
 }
 
-/** Adds a copy of the variant being edited, then edits the copy. */
-export function addVariant(draft: Draft): Draft {
-  const variants = draftVariants(draft);
-  const next = [...variants, { input: draft.input, references: draft.references }];
-  return showVariant(draft, next, next.length - 1);
-}
+/** Each variant the composer's draft compares as it runs, its models looked up in `profiles`. */
+export const variantsOf = (draft: Draft, profiles: Profile[]) =>
+  draftVariants(draft, (input, profileId) => {
+    const profile = profiles.find((each) => isProfile(each, profileId));
+    return profile && modelInput(input, profile);
+  });
 
-/** Removes `variants[index]`, still editing the same variant unless it was the one removed. */
-export function removeVariant(draft: Draft, index: number): Draft {
-  const active = draft.compare?.active ?? 0;
-  const next = draftVariants(draft).filter((_, each) => each !== index);
-  return showVariant(draft, next, Math.min(active > index ? active - 1 : active, next.length - 1));
-}
-
-export const canAddVariant = (draft: Draft) => draftVariants(draft).length < compareVariants.max;
-
-export const fitsComparison = (count: number) =>
-  count >= compareVariants.min && count <= compareVariants.max;
-
-/** A comparison of `inputs`, each a change to the variant being edited, whose references they keep. */
-export function compareInputs(draft: Draft, inputs: GenerationInput[]): Draft {
-  return showVariant(
+/** Removes a set variant; one left ends the comparison. */
+export const removeVariant = (draft: Draft, profiles: Profile[], index: number) =>
+  setVariants(
     draft,
-    inputs.map((input) => ({ input, references: draft.references })),
-    0,
+    variantsOf(draft, profiles).filter((_, each) => each !== index),
   );
-}
-
-/** `input` as it stands, then on each of `profiles` with its seed. */
-export const modelInputs = (input: GenerationInput, profiles: Profile[]) => [
-  input,
-  ...profiles.map((profile) => ({ ...inputForProfile(input, profile), seed: input.seed })),
-];
 
 /** The composer's comparison: its variants, their labels and why it can't run yet, if it can't. */
 export function useDraftComparison() {
   const { profiles, models } = useGeneration();
   const draft = useDraft(true);
   const lora = useQuery(loraInfoQuery).data?.loras;
-  const variants = draftVariants(draft);
+  const variants = variantsOf(draft, profiles);
   const profileOf = (input: GenerationInput) =>
     profileForBackend(
       input.profileId
@@ -115,20 +95,21 @@ export function useDraftComparison() {
   const keys = variants.map(({ input, references }, index) =>
     JSON.stringify([{ ...input, seed: seeds[index] }, references.map((reference) => reference.id)]),
   );
-  const blockedReason =
-    variants
-      .map(({ input, references }, index) => {
-        const reason = submitBlockedReason({
-          input,
-          profile: profileOf(input),
-          references,
-          uploading: false,
-          assisting: false,
-        });
-        return reason && `Variant ${letter(index)}: ${reason}`;
-      })
-      .find(Boolean) ||
-    (new Set(keys).size < keys.length ? "Change a variant so each one differs." : undefined);
+  const blockedReason = !fitsComparison(variants.length)
+    ? `Choose ${compareVariants.min}–${compareVariants.max} variants to compare.`
+    : variants
+        .map(({ input, references }, index) => {
+          const reason = submitBlockedReason({
+            input,
+            profile: profileOf(input),
+            references,
+            uploading: false,
+            assisting: false,
+          });
+          return reason && `Variant ${letter(index)}: ${reason}`;
+        })
+        .find(Boolean) ||
+      (new Set(keys).size < keys.length ? "Change a variant so each one differs." : undefined);
   return { variants, labels, profileOf, blockedReason };
 }
 
@@ -188,12 +169,21 @@ export function useStageComparison() {
     setDraft(draft);
     openComposer("image");
   };
+  const [seeds] = useRemembered("compare-seeds", "4");
   return {
-    fromItem: async (item: MediaItem) => open(addVariant(await exactDraft(item, client))),
+    // A result's exact settings, compared across seeds from its own.
+    fromItem: async (item: MediaItem) => {
+      const draft = await exactDraft(item, client);
+      const seed = ownSeed(draft.input.seed) || randomSeed();
+      open({
+        ...draft,
+        input: { ...draft.input, seed },
+        compare: { axis: "Seed", seeds: moreSeeds([], Number(seeds) - 1) },
+      });
+    },
     again: async (items: MediaItem[]) => {
       const drafts = await Promise.all(items.map((item) => exactDraft(item, client)));
-      const variants = drafts.map(({ input, references }) => ({ input, references }));
-      open(showVariant(drafts[0], variants, 0));
+      open(setVariants(drafts[0], drafts));
     },
     useThis: async (item: MediaItem) => open(await exactDraft(item, client)),
     testLora: async (name: string, prompt: string) => {
@@ -213,16 +203,18 @@ export function useStageComparison() {
       const preferred = defaultProfile(models, "image");
       const profile = suits(preferred) ? preferred : profiles.find(suits);
       if (!profile) throw new Error("No ready image profile can run this LoRA.");
-      const input = { ...inputForProfile({ ...initialInput, prompt }, profile), loras: [] };
       // Without the LoRA, then its default and the strengths beside it.
-      const variants = loraStrengthSweep(info.loras[name]).map((strength) => ({
+      open({
+        sessionId: "",
+        operation: "image",
+        input: { ...inputForProfile({ ...initialInput, prompt }, profile), loras: [] },
         references: [],
-        input: {
-          ...input,
-          loras: strength ? [{ name, strength, enabled: true, triggers: true }] : [],
+        compare: {
+          axis: "LoRA Strength",
+          lora: name,
+          strengths: loraStrengthSweep(info.loras[name]),
         },
-      }));
-      open(showVariant({ sessionId: "", operation: "image", input, references: [] }, variants, 0));
+      });
     },
   };
 }

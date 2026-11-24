@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { mediaTimestamp, mediaTitle, modelSummary } from "./mediaLabels";
+import { comparisonVariant, mediaTimestamp, mediaTitle, modelSummary } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 
 import classes from "./MediaViewer.module.css";
@@ -18,6 +18,7 @@ export function ViewerMetadata({ item }: { item: MediaItem }) {
   const settings = item.settings || {};
   const seconds = Number(settings.duration) || Number(settings.frames) / Number(settings.fps);
   const line = [
+    comparisonVariant(item),
     summary,
     width && height ? `${width} × ${height}` : "",
     item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10}s` : "",
