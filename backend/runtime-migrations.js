@@ -3,6 +3,7 @@ import { cloudModelsPreference } from "./cloud-models-preference.js";
 import { logger } from "./crash-log.js";
 import { reloadDeploymentSettings } from "./deployment-settings.js";
 import { directRoute } from "./domain/direct-route.ts";
+import { projectsSimplify } from "./projects-simplify.js";
 import { tasteSimplify } from "./taste-simplify.js";
 import { uncensoredNames } from "./uncensored-names.js";
 
@@ -35,6 +36,12 @@ const steps = [
     name: "tasteSimplify",
     run: tasteSimplify,
     changes: (plan) => plan.accounts.length,
+    online: true,
+  },
+  {
+    name: "projectsSimplify",
+    run: projectsSimplify,
+    changes: (plan) => plan.projects.length + plan.proposals.length,
     online: true,
   },
 ];

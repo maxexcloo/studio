@@ -31,6 +31,7 @@ import { Thumbnail } from "./DiscardedDreams";
 import { useJudge } from "./DreamDeck";
 import {
   ProjectEnabled,
+  ProjectFlags,
   ProjectMoreTurns,
   ProjectStatsLine,
   constraintBadges,
@@ -52,7 +53,7 @@ const fieldNames: Record<string, string> = {
   name: "Name",
   loras: "Favourite LoRAs",
   cards: "Pinned Cards",
-  constraints: "Constraints",
+  constraints: "Allowed Inputs",
   paused: "Status",
   favoured: "More Turns",
   created: "Created",
@@ -274,7 +275,7 @@ function ProjectDetail({
         </Stack>
       </SettingGroup>
       <ProjectPins cards={project.cards} />
-      <SettingGroup title="Constraints">
+      <SettingGroup title="Allowed Inputs">
         <Group gap={6}>
           {badges.length ? (
             badges.map((badge) => (
@@ -284,7 +285,7 @@ function ProjectDetail({
             ))
           ) : (
             <Text size="sm" c="dimmed">
-              Any profile, aspect and resolution, with LoRAs.
+              Any inputs.
             </Text>
           )}
         </Group>
@@ -358,7 +359,16 @@ export function ProjectSheet({
       id={id}
       opened={Boolean(found) || missing}
       onClose={closeWhenTop(id, onClose)}
-      title={shown === "missing" ? "Project" : shown?.name}
+      title={
+        shown === "missing" || !shown ? (
+          "Project"
+        ) : (
+          <Group gap="xs" wrap="nowrap" component="span">
+            {shown.name}
+            <ProjectFlags project={shown} />
+          </Group>
+        )
+      }
       size="lg"
       fullScreen={phone}
     >

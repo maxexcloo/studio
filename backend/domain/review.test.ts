@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { Project, Review } from "../../shared/projects.ts";
+import { type Project, type Review, anyConstraints } from "../../shared/projects.ts";
 import { type ReviewItem, createReview, reviewReply } from "./review.ts";
 
 const project = (id: string, brief: Partial<Project["brief"]> = {}): Project => ({
   id,
   name: id.toUpperCase(),
-  brief: { subjects: "", styles: "", avoid: "", ...brief },
-  constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+  brief: { description: "", styles: "", avoid: "", ...brief },
+  constraints: anyConstraints(),
   createdAt: "",
   updatedAt: "",
 });
@@ -50,7 +50,10 @@ test("review scores each unseen project image against its brief and saves it", a
     text: () => ({ side: "cloud", uncensored: false }),
     items: () => items,
     visible: () => true,
-    projects: () => [project("beach", { subjects: "the sea", avoid: "people" }), project("empty")],
+    projects: () => [
+      project("beach", { description: "the sea", avoid: "people" }),
+      project("empty"),
+    ],
     explicit: () => true,
     image: async () => ({ mime: "image/jpeg", data: "" }),
     save: (item, result) => saved.push([String(item.id), result]),
@@ -58,7 +61,7 @@ test("review scores each unseen project image against its brief and saves it", a
     log: { info() {} },
   });
   assert.equal(await review.tick(), "done");
-  assert.deepEqual(asked, [{ brief: "Subjects: the sea\nAvoid: people", explicit: true }]);
+  assert.deepEqual(asked, [{ brief: "Brief: the sea\nAvoid: people", explicit: true }]);
   assert.deepEqual(
     saved.map(([id, { brief, ...result }]) => [id, result, typeof brief]),
     [
@@ -75,7 +78,7 @@ test("review checks recent project images, again once the brief changes", async 
   const day = 24 * 60 * 60_000;
   let now = 30 * day;
   const made = (age: number) => new Date(now - age * day).toISOString();
-  let brief = { subjects: "a fox" };
+  let brief = { description: "a fox" };
   const asked: string[] = [];
   const dream = { state: "kept", projectId: "fox" };
   const items: ReviewItem[] = [
@@ -106,7 +109,7 @@ test("review checks recent project images, again once the brief changes", async 
     log: { info() {} },
   });
   assert.equal(await review.tick(), "done");
-  assert.deepEqual(asked, ["Subjects: a fox"]);
+  assert.deepEqual(asked, ["Brief: a fox"]);
   assert.deepEqual(
     items.map((item) => [item.id, item.review?.miss]),
     [
@@ -118,7 +121,7 @@ test("review checks recent project images, again once the brief changes", async 
   );
   now += 60_000;
   assert.equal(await review.tick(), "none");
-  brief = { subjects: "two foxes" };
+  brief = { description: "two foxes" };
   assert.equal(await review.tick(), "done");
-  assert.equal(asked.at(-1), "Subjects: two foxes");
+  assert.equal(asked.at(-1), "Brief: two foxes");
 });

@@ -13,7 +13,13 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
-import type { Project, ProjectStats } from "../../../../shared/projects";
+import {
+  type Project,
+  type ProjectRangeInput,
+  type ProjectStats,
+  projectRangeInputs,
+  rangeLabels,
+} from "../../../../shared/projects";
 import { api } from "../../api";
 import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
@@ -24,9 +30,24 @@ import { type DreamItem, projectPath, projectsQuery } from "./queries";
 
 const resultsShown = 8;
 
+/** A project's flags, which follow its name: Disabled, or More Turns where set. */
+export function ProjectFlags({ project }: { project: Project }) {
+  if (project.paused)
+    return (
+      <Badge color="yellow" style={{ flexShrink: 0 }}>
+        Disabled
+      </Badge>
+    );
+  return project.favoured ? (
+    <Badge variant="light" style={{ flexShrink: 0 }}>
+      More Turns
+    </Badge>
+  ) : null;
+}
+
 /**
  * A project's results so far, as chips, and its share of Dream's project turns while another
- * project shares them, or Disabled; More Turns where set.
+ * project shares them.
  */
 export function ProjectStatsLine({
   project,
@@ -44,13 +65,10 @@ export function ProjectStatsLine({
         ...(stats.review === null ? [] : [`Review ${stats.review.toFixed(1)}`]),
       ]
     : [];
-  const favoured = project.favoured && !project.paused;
   return (
     <Stack gap={6}>
-      {(chips.length > 0 || project.paused || favoured) && (
+      {chips.length > 0 && (
         <Group gap={6}>
-          {project.paused && <Badge color="yellow">Disabled</Badge>}
-          {favoured && <Badge variant="light">More Turns</Badge>}
           {chips.map((chip) => (
             <Badge key={chip} color="gray">
               {chip}
@@ -122,14 +140,28 @@ export function ProjectMoreTurns({ project }: { project: Project }) {
   );
 }
 
-/** A project's constraints as badges: profiles, No LoRAs, aspect and resolution. */
+/** A project's allowed inputs as badges: models, LoRAs, aspects, resolutions, switches and ranges. */
 export function constraintBadges(project: Project, profileLabel: (id: string) => string) {
   const { constraints } = project;
+  const range = (key: ProjectRangeInput) => {
+    const { min, max } = constraints.ranges[key] ?? {};
+    if (min === undefined && max === undefined) return [];
+    const bounds =
+      min === undefined ? `≤ ${max}` : max === undefined ? `≥ ${min}` : `${min}–${max}`;
+    return [`${rangeLabels[key]} ${bounds}`];
+  };
   return [
     ...constraints.profiles.map(profileLabel),
-    ...(constraints.loras ? [] : ["No LoRAs"]),
-    ...(constraints.aspect ? [aspectLabel(constraints.aspect)] : []),
-    ...(constraints.resolution ? [constraints.resolution] : []),
+    ...(constraints.loras === "none"
+      ? ["No LoRAs"]
+      : constraints.loras.map((name) => `LoRA ${name}`)),
+    ...constraints.aspects.map(aspectLabel),
+    ...constraints.resolutions,
+    ...(constraints.sound === undefined ? [] : [constraints.sound ? "Sound" : "Silent"]),
+    ...(constraints.transparent === undefined
+      ? []
+      : [constraints.transparent ? "Transparent" : "Opaque"]),
+    ...projectRangeInputs.flatMap(range),
   ];
 }
 
@@ -181,6 +213,7 @@ export function ProjectCard({
                 {project.name}
               </Text>
             </UnstyledButton>
+            <ProjectFlags project={project} />
             {fresh > 0 && (
               <Badge variant="light" style={{ flexShrink: 0 }}>
                 {fresh} New

@@ -155,7 +155,7 @@ const get = async (route, account) =>
 
 test("A project brief suggestion can fill an empty field and responds only with that text", async () => {
   const route = "/api/assistant/project-brief";
-  const input = { name: "Harbour Study", brief: { subjects: "Waterfront streets" } };
+  const input = { name: "Harbour Study", brief: { description: "Waterfront streets" } };
   assert.equal((await post(route, { ...input, field: "loras" }, "admin")).status, 400);
   const result = await post(route, { ...input, field: "styles" }, "admin");
   assert.equal(result.status, 200, result.text);

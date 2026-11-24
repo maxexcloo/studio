@@ -74,12 +74,6 @@ function overlap(a: Set<string>, b: Set<string>) {
   const union = a.size + b.size - shared;
   return union ? shared / union : 0;
 }
-const stem = (word: string) => word.replace(/men$/, "man").replace(/([^s])s$/, "$1");
-/** Whether a prompt shares no word with a brief's subjects, so it can't be showing them. */
-export function missesSubjects(prompt: string, subjects: string) {
-  const wanted = new Set([...contentWords(subjects)].map(stem));
-  return wanted.size > 0 && ![...contentWords(prompt)].some((word) => wanted.has(stem(word)));
-}
 /**
  * How the latest `count` prompts open: each one's first eight words, which the shared style
  * clause leaves out of the recent prompts the writer sees, so a stock opening would go unseen.

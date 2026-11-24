@@ -153,7 +153,7 @@ function DismissDialog({
       >
         <Stack>
           <TextBox
-            label="Reason"
+            aria-label="Reason"
             description="Optional: what Dream should learn from it."
             value={reason}
             onChange={setReason}
@@ -200,13 +200,17 @@ function ProposalEditor({
       />
     );
   const { brief, rule, card } = change;
+  const fields = Object.keys(brief || {}) as BriefText[];
   return (
     <CardForm onSubmit={() => onAccept(change)}>
       {brief &&
-        (Object.keys(brief) as BriefText[]).map((key) => (
+        fields.map((key) => (
           <TextBox
             key={key}
-            label={briefLabel(key)}
+            // A lone field takes its name from the dialog's title.
+            {...(fields.length === 1
+              ? { "aria-label": briefLabel(key) }
+              : { label: briefLabel(key) })}
             autosize
             minRows={2}
             value={String(brief[key] ?? "")}
@@ -215,7 +219,7 @@ function ProposalEditor({
         ))}
       {rule !== undefined && (
         <TextBox
-          label="Rule"
+          aria-label="Rule"
           description="A rule that only bans (never X, no X) joins your Exclusions; any other joins My Preferences in Settings › Taste."
           autosize
           minRows={2}
@@ -392,7 +396,7 @@ function ProposalCard({
           </Text>
         )}
         {change.project &&
-          (["subjects", "styles"] as const).map(
+          (["description", "styles"] as const).map(
             (key) =>
               change.project?.brief[key] && (
                 <Text key={key} size="sm">
