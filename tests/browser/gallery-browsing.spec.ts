@@ -2516,7 +2516,7 @@ test("Comparisons open all variants and filter by the comparison rating", async 
   expect(state.comparisons.find(({ id }) => id === "dream-pair")?.winnerItemId).toBe("browse-3");
   const back = page.getByRole("link", { name: "Back to Comparisons", exact: true });
   await back.click();
-  const filter = async (rating: "All Ratings" | "Liked" | "Disliked") => {
+  const filter = async (rating: "All" | "Liked" | "Disliked") => {
     await page.getByRole("button", { name: "Rating", exact: true }).click();
     await page.getByRole("menuitem", { name: rating, exact: true }).click();
   };
@@ -2531,7 +2531,7 @@ test("Comparisons open all variants and filter by the comparison rating", async 
   await expect(dislike).toHaveAttribute("aria-pressed", "true");
   await back.click();
   await expect(page).toHaveURL(/\/images\/comparisons\?rating=disliked$/);
-  await filter("All Ratings");
+  await filter("All");
   const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
   await expect(card).toBeVisible();
   await expect(page.getByText(/^2 Variants\b/)).toHaveCount(2);
