@@ -150,6 +150,14 @@ function cleanTraits(body) {
   return traits;
 }
 
+/** Refuses a card whose text codes someone as under 18 (minor-age.js), before it's saved. */
+export async function checkCardAge(kind, body) {
+  const traits = kind === "characters" ? cleanTraits(body) : {};
+  const text = [body?.name, body?.description].map((value) => String(value || "").trim());
+  const refusal = await minorAgeRefusal([...text, ...Object.values(traits)].join("\n"));
+  if (refusal) throw new CardError(refusal);
+}
+
 /**
  * The fields a request may set on a `kind` card, checked; images must be references the account
  * owns. A character waiting on its portrait or candidates (`pending`) may have none yet.
@@ -166,8 +174,6 @@ export function cleanCard(kind, account, body, pending = false) {
   if (description.length > maxCardDescription)
     throw new CardError(`Keep the description within ${maxCardDescription} characters.`);
   if (!images.min && !description) throw new CardError(`Describe the ${noun}.`);
-  const refusal = minorAgeRefusal([name, description, ...Object.values(traits)].join("\n"));
-  if (refusal) throw new CardError(refusal);
   if ((ids.length < images.min && !(pending && !ids.length)) || ids.length > images.max)
     throw new CardError(
       images.min
@@ -257,11 +263,11 @@ export const refusal = (account) => {
 export function registerCardRoutes(app) {
   /** `run(account, ownerId, input)` once the account may use cards; CardErrors answer 400. */
   const route = (method, path, run) =>
-    directRoute(app, method, path, (account, input) => {
+    directRoute(app, method, path, async (account, input) => {
       const refused = refusal(account);
       if (refused) return refused;
       try {
-        return run(account, account?.userId || "", input);
+        return await run(account, account?.userId || "", input);
       } catch (error) {
         if (!(error instanceof CardError)) throw error;
         return { status: error.status, payload: { ok: false, error: error.message } };
@@ -280,11 +286,13 @@ export function registerCardRoutes(app) {
       payload: { [kind]: listCards(kind, ownerId).map((card) => shownCard(account, card)) },
     }));
 
-    route("POST", `/api/${kind}`, (account, _ownerId, { body }) =>
-      reply(201, account, createCard(account, kind, body)),
-    );
+    route("POST", `/api/${kind}`, async (account, _ownerId, { body }) => {
+      await checkCardAge(kind, body);
+      return reply(201, account, createCard(account, kind, body));
+    });
 
-    route("PUT", `/api/${kind}/:id`, (account, _ownerId, { params, body }) => {
+    route("PUT", `/api/${kind}/:id`, async (account, _ownerId, { params, body }) => {
+      await checkCardAge(kind, body);
       const card = editCard(account, kind, params.id, body);
       return card ? reply(200, account, card) : missing;
     });

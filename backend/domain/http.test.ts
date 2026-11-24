@@ -29,7 +29,7 @@ test(
     let child: ChildProcess | undefined;
     const root = `http://127.0.0.1:${port}`;
     async function start() {
-      child = spawn(process.execPath, ["backend/index.js"], {
+      child = spawn(process.execPath, [...process.execArgv, "backend/index.js"], {
         cwd: projectRoot,
         env: {
           ...process.env,

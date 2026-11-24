@@ -41,7 +41,7 @@ export function importRecord(value) {
  */
 export async function importUpload(upload, record, ownerId = "") {
   const kept = importRecord(record);
-  const refusal = minorAgeRefusal(kept.prompt);
+  const refusal = await minorAgeRefusal(kept.prompt);
   if (refusal) throw new Error(refusal);
   return saveUpload(
     { ...upload, ...kept, name: kept.prompt ? promptTitle(kept.prompt) : upload.name },

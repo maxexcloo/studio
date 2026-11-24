@@ -912,8 +912,8 @@ export function createDream(options: {
     propose(ownerId: string, account?: GenerationAccount): Promise<boolean>;
     drafts(ownerId: string): { id: string; project: ProjectContent }[];
   };
-  /** The words in `text` that state an age under 18 (minor-age.js), or "". */
-  minorAge(text: string): string;
+  /** The refusal for text that codes someone as under 18 (minor-age.js), or "". */
+  minorAgeRefusal(text: string): Promise<string>;
   admit(
     input: GenerationInput,
     account?: GenerationAccount,
@@ -2073,8 +2073,8 @@ export function createDream(options: {
       outfit: outfit?.description,
       scene: scene?.description,
     });
-    if (pinnedPrompt && options.minorAge(pinnedPrompt))
-      throw new Error("A pinned card describes someone under 18.");
+    const pinnedRefusal = pinnedPrompt && (await options.minorAgeRefusal(pinnedPrompt));
+    if (pinnedRefusal) throw new Error(pinnedRefusal);
     const brief = project
       ? [
           ["Subjects", project.brief.subjects],
@@ -2433,7 +2433,7 @@ export function createDream(options: {
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
     /** Why a reply can't be used, or "" when it can. A retry may miss the brief's subjects. */
-    const problem = (
+    const problem = async (
       prompt: string,
       title: string,
       motifs: string[],
@@ -2441,9 +2441,8 @@ export function createDream(options: {
       retry: boolean,
     ) => {
       if (!prompt) return "Your reply had no usable prompt.";
-      const minor = options.minorAge(prompt);
-      if (minor)
-        return `"${minor}" reads as someone under 18; drop it, without adding "adult" or an age.`;
+      const minor = await options.minorAgeRefusal(prompt);
+      if (minor) return minor;
       const excluded = namedMotif(prompt, forbidden);
       if (excluded)
         return `Your prompt includes "${excluded}", which their rules or brief say to avoid.`;
@@ -2491,7 +2490,7 @@ export function createDream(options: {
       const wrong =
         prompt.length > maxPromptCharacters
           ? "Leave more room for the pinned cards by making your reply shorter."
-          : problem(
+          : await problem(
               idea,
               title,
               chosenMotifs,

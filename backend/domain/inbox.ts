@@ -166,12 +166,7 @@ function imageEvidence(item: DreamItem) {
 }
 
 /** Named contexts are strong evidence only when separate runs agree on the description. */
-function namedCards(
-  liked: DreamItem[],
-  owned: Record<CardKind, Character[]>,
-  minorAge: (text: string) => string,
-  at: string,
-) {
+function namedCards(liked: DreamItem[], owned: Record<CardKind, Character[]>, at: string) {
   const groups = new Map<
     string,
     {
@@ -188,13 +183,7 @@ function namedCards(
       if (!card) continue;
       const name = clean(card.name, maxCardName + 1);
       const description = clean(card.description, maxCardDescription + 1);
-      if (
-        !name ||
-        name.length > maxCardName ||
-        description.length > maxCardDescription ||
-        minorAge(`${name} ${description}`)
-      )
-        continue;
+      if (!name || name.length > maxCardName || description.length > maxCardDescription) continue;
       const key = cardKey(kind, name);
       const group = groups.get(key) ?? { kind, name, entries: [] };
       group.entries.push({ id, job: jobId, set: resultSet?.id ?? jobId, description });
@@ -249,16 +238,11 @@ function namedCards(
 /**
  * The usable ideas in the text model's reply: cards of a known kind within a card's limits
  * recurring in at least two of the `liked` results it numbered from 1, and projects recurring in
- * at least three; none stating an age under 18, and none the account has (`taken`, as keys).
+ * at least three; none the account has (`taken`, as keys).
  */
 export function ideasFrom(
   reply: Record<string, unknown> | null,
-  {
-    liked,
-    taken,
-    minorAge,
-    at,
-  }: { liked: { id?: string }[]; taken: Set<string>; minorAge(text: string): string; at: string },
+  { liked, taken, at }: { liked: { id?: string }[]; taken: Set<string>; at: string },
 ): Stored[] {
   const seen = new Set(taken);
   const list = (key: string) => (Array.isArray(reply?.[key]) ? (reply![key] as any[]) : []);
@@ -274,7 +258,6 @@ export function ideasFrom(
       !description ||
       description.length > maxCardDescription ||
       evidence.length < 2 ||
-      minorAge(`${name} ${description}`) ||
       seen.has(cardKey(kind, name))
     )
       return [];
@@ -305,7 +288,6 @@ export function ideasFrom(
       subjects.length > maxProjectBrief ||
       styles.length > maxProjectBrief ||
       evidence.length < 3 ||
-      minorAge(`${name} ${subjects} ${styles}`) ||
       seen.has(key)
     )
       return [];
@@ -334,19 +316,17 @@ export function ideasFrom(
 
 /**
  * The usable brief edits in the text model's reply: one field of one of the numbered `projects`,
- * rewritten whole within a brief's length, different from now and stating no age under 18.
+ * rewritten whole within a brief's length and different from now.
  */
 function editsFrom(
   reply: Record<string, unknown> | null,
   {
     projects,
     results,
-    minorAge,
     at,
   }: {
     projects: Pick<Project, "id" | "name" | "brief">[];
     results: { id?: string }[];
-    minorAge(text: string): string;
     at: string;
   },
 ): Stored[] {
@@ -360,7 +340,6 @@ function editsFrom(
       !edits.fields.includes(field) ||
       text.length > maxProjectBrief ||
       lower(text) === lower(String(project.brief[field] || "")) ||
-      minorAge(text) ||
       seen.has(project.id)
     )
       return [];
@@ -410,8 +389,8 @@ export function createInbox(options: {
   deleteCard(ownerId: string, kind: CardKind, id: string): void;
   /** A gallery image as a reference asset, or a throw where it can't be one. */
   reference(account: GenerationAccount | undefined, itemId: string): { id: string };
-  /** The words in `text` that state an age under 18 (minor-age.js), or "". */
-  minorAge(text: string): string;
+  /** The refusal for text that codes someone as under 18 (minor-age.js), or "". */
+  minorAgeRefusal(text: string): Promise<string>;
   likeness(a: DreamItem, b: DreamItem): number | undefined;
   /** Dream's results and samples (domain/dream.ts). */
   dream: {
@@ -633,6 +612,19 @@ export function createInbox(options: {
         : [],
     );
   }
+  /** The proposals whose words code no one as under 18 (minor-age.js); unchecked ones go too. */
+  async function adult<T extends Stored | { proposal: Stored }>(found: T[]) {
+    const refusals = await Promise.all(
+      found.map((entry) => {
+        const { title, change } = "proposal" in entry ? entry.proposal : entry;
+        const brief = change.project?.brief ?? change.brief ?? {};
+        return options.minorAgeRefusal(
+          [title, change.card?.description, ...Object.values(brief)].filter(Boolean).join("\n"),
+        );
+      }),
+    );
+    return found.filter((_, index) => !refusals[index]);
+  }
   /** A chat earns a proposal when the account liked results from separate runs. */
   function chatsFor(ownerId: string, liked: DreamItem[]): Stored[] {
     const attached = projects.chats(ownerId);
@@ -654,7 +646,7 @@ export function createInbox(options: {
       const [first] = evidence;
       const subject = first.resultSet?.context?.character?.name;
       const title = clean(first.resultSet?.title || first.title, maxProjectName);
-      if (!title || names.has(lower(title)) || options.minorAge(title)) continue;
+      if (!title || names.has(lower(title))) continue;
       names.add(lower(title));
       found.push({
         id: randomUUID(),
@@ -752,7 +744,7 @@ export function createInbox(options: {
       temperature: 0.4,
       maxTokens: 2500,
     });
-    return ideasFrom(parsed(text), { liked, taken, minorAge: options.minorAge, at: stamp() });
+    return adult(ideasFrom(parsed(text), { liked, taken, at: stamp() }));
   }
   /** Brief edits for projects whose results keep missing, or whose keeps share something. */
   async function editsFor(ownerId: string, record: InboxRecord, writer: InboxWriter) {
@@ -800,12 +792,7 @@ export function createInbox(options: {
       temperature: 0.3,
       maxTokens: 2000,
     });
-    return editsFrom(parsed(text), {
-      projects: weighed,
-      results,
-      minorAge: options.minorAge,
-      at: stamp(),
-    });
+    return adult(editsFrom(parsed(text), { projects: weighed, results, at: stamp() }));
   }
   /** The proposal waiting under this id, or a 404. */
   function find(record: InboxRecord, id: string) {
@@ -834,8 +821,6 @@ export function createInbox(options: {
       const { brief = {} } = projectPatch({ brief: edited.brief });
       if (Object.keys(brief).some((key) => !keys.includes(key)))
         throw failure("Edit only the fields the proposal changes.", 400);
-      if (options.minorAge(Object.values(brief).join(" ")))
-        throw failure("Keep every age at 18 or older.", 400);
       return { ...proposal.change, brief };
     }
     if (kind === "rule") {
@@ -851,8 +836,6 @@ export function createInbox(options: {
         throw failure("Name and describe the card.", 400);
       if (description.length > maxCardDescription)
         throw failure(`Describe the card in at most ${maxCardDescription} characters.`, 400);
-      if (options.minorAge(`${name} ${description}`))
-        throw failure("Keep every age at 18 or older.", 400);
       return { card: { kind: proposal.change.card!.kind, name, description } };
     }
     return proposal.change;
@@ -977,21 +960,24 @@ export function createInbox(options: {
      */
     async propose(ownerId: string, account?: GenerationAccount) {
       await options.dream.dropDrafts(ownerId, keep(load(ownerId)));
-      const record = load(ownerId);
-      if (now() - (Date.parse(record.batchAt || "") || 0) < limits.batchMs) return false;
+      const stamped = load(ownerId);
+      if (now() - (Date.parse(stamped.batchAt || "") || 0) < limits.batchMs) return false;
       // Stamped first, so a failed batch waits too.
-      record.batchAt = stamp();
-      record.proposals = record.proposals.filter((entry) => current(ownerId, entry));
+      stamped.batchAt = stamp();
+      save(ownerId, stamped);
       const liked = options.dream.liked(ownerId, likes.from);
-      offer(record, [...chatsFor(ownerId, liked), ...pacingFor(ownerId), ...rulesFor(ownerId)]);
-      save(ownerId, record);
       const cards = options.cards(ownerId);
+      const found =
+        cards && (account?.userId || "") === ownerId
+          ? (await adult(namedCards(liked, cards, stamp()))).slice(0, namedCardsPerBatch)
+          : [];
+      const chats = await adult(chatsFor(ownerId, liked));
+      const record = load(ownerId);
+      record.proposals = record.proposals.filter((entry) => current(ownerId, entry));
+      offer(record, [...chats, ...pacingFor(ownerId), ...rulesFor(ownerId)]);
+      save(ownerId, record);
       const saved = savedImages(ownerId, account);
-      if (cards && (account?.userId || "") === ownerId) {
-        const found = namedCards(liked, cards, options.minorAge, stamp()).slice(
-          0,
-          namedCardsPerBatch,
-        );
+      if (found.length) {
         runtimeTransaction(options.dataDir, () => {
           for (const { proposal, auto } of found) {
             const pending = record.proposals.find((entry) => entry.key === proposal.key);
@@ -1070,6 +1056,13 @@ export function createInbox(options: {
       id: string,
       edited?: ProposalChange,
     ): Promise<Accepted<DreamItem>> {
+      const words = [
+        edited?.card?.name,
+        edited?.card?.description,
+        ...Object.values(edited?.brief ?? {}),
+      ];
+      const refusal = await options.minorAgeRefusal(words.filter(Boolean).join("\n"));
+      if (refusal) throw failure(refusal, 400);
       const { latest, title } = runtimeTransaction(options.dataDir, () => {
         const record = load(ownerId);
         const proposal = find(record, id);

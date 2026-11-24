@@ -139,6 +139,7 @@ const reasoningEfforts = {
   rate: "none",
   review: "none",
   rewrite: null,
+  safety: "none",
   sheet: null,
   suggestions: "none",
   taste: "none",
@@ -867,7 +868,7 @@ export function createAssistant(
     const what = `Prompt assistant ${options.call} with ${options.model}`;
     try {
       const reply = await request(options);
-      const refusal = promptCalls.has(options.call) && minorAgeRefusal(reply.text);
+      const refusal = promptCalls.has(options.call) && (await minorAgeRefusal(reply.text));
       if (refusal) throw new AssistantError(refusal, { status: 400 });
       const by = reply.served && reply.served !== options.model ? ` (${reply.served})` : "";
       log.info?.(`${what}${by} in ${reply.ms} ms`);
@@ -877,6 +878,24 @@ export function createAssistant(
         log.warn?.(`${what} failed after ${now() - started} ms: ${error.message}`);
       throw error;
     }
+  }
+  /**
+   * Whether `text` codes someone as under 18, as the `minor-age-check` instruction judges it, for
+   * minor-age.js. On the uncensored side, so adult wording is read rather than refused.
+   */
+  async function judgeMinorAge(text) {
+    const reply = await chat({
+      call: "safety",
+      model: await modelFor("safety", true),
+      messages: [
+        { role: "system", content: promptInstruction("minor-age-check") },
+        { role: "user", content: text },
+      ],
+      temperature: 0,
+      maxTokens: 300,
+      timeout: 20_000,
+    });
+    return replyJson(reply.text);
   }
   const failure = (error) => (error instanceof AssistantError ? error.reason : "unusable reply");
   const rethrowCancel = (error) => {
@@ -922,7 +941,7 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const refusal = minorAgeRefusal(`${original}\n${asked}\n${notes}`);
+    const refusal = await minorAgeRefusal(`${original}\n${asked}\n${notes}`);
     if (refusal) throw new AssistantError(refusal, { status: 400 });
     const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
     const maker = upsampler && (await listModels()).includes(upsampler.model);
@@ -1343,7 +1362,7 @@ Prompt: ${context}`
       const written = cleanPrompt(
         typeof parsed.prompt?.prompt === "string" ? parsed.prompt.prompt : "",
       );
-      if (written && !minorAgeRefusal(written)) read.prompt = written;
+      if (written && !(await minorAgeRefusal(written))) read.prompt = written;
     }
     if (steps && parsed.steps) read.steps = parsed.steps;
     if (Object.keys(read).length === 1) throw new AssistantError("unusable reply");
@@ -1616,6 +1635,7 @@ Prompt: ${context}`
     listModels,
     listModelDetails,
     chat,
+    judgeMinorAge,
     rewrite,
     negative,
     matchLoras,

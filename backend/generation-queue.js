@@ -328,7 +328,7 @@ export function createGenerationQueue({
       // Retries, recovered work and anything queued before the check tightened meet it here too.
       submit: async (job, residentModel) => {
         const refusal =
-          minorAgeRefusal(job.input.prompt) ||
+          (await minorAgeRefusal(job.input.prompt)) ||
           (job.dream && (await dream().queuedProfileIssue(job)));
         return refusal
           ? { status: "failed", reason: refusal, permanent: true }
@@ -414,7 +414,7 @@ export function createGenerationQueue({
     promptStage &&
       (async (job, stream) => {
         const written = await promptStage(job, stream);
-        const refusal = minorAgeRefusal(written?.prompt);
+        const refusal = await minorAgeRefusal(written?.prompt);
         if (refusal) throw Object.assign(new Error(refusal), { permanent: true });
         return written;
       }),
@@ -435,7 +435,7 @@ export function createGenerationQueue({
     }),
   );
   async function validateGenerationInput(input, account) {
-    const refusal = minorAgeRefusal(input.prompt);
+    const refusal = await minorAgeRefusal(input.prompt);
     if (refusal) return { status: 400, payload: { ok: false, error: refusal } };
     if (input.writing === undefined) return validateGeneration(input, account);
     if (typeof input.writing?.prompt === "string") {

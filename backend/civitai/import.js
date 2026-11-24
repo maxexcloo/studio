@@ -206,8 +206,6 @@ export function imagePreset(image) {
       "Additional processing was recorded. Its workflow is not included in this preset.",
     );
   const originalPrompt = String(meta.prompt || "").slice(0, 50000);
-  const refusal = minorAgeRefusal(originalPrompt);
-  if (refusal) throw new Error(refusal);
   if (/<lora:/i.test(originalPrompt) && !resources.length)
     warnings.push("LoRA tags were found without exact resource versions; resolve them manually.");
   let previewUrl = "";
@@ -344,6 +342,8 @@ export async function importCivitaiImage(
   const image = response.items?.find((item) => item.id === id);
   if (!image) throw new Error("That image is unavailable. Check its link and your Civitai token.");
   const preset = imagePreset(image);
+  const refusal = await minorAgeRefusal(preset.prompt);
+  if (refusal) throw new Error(refusal);
   const resources = [];
   const sourceFiles = workflowModelSources(preset.sourceMetadata);
   for (const source of sourceFiles) {

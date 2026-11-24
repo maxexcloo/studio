@@ -925,10 +925,10 @@ export function registerGenerateTools({
     for (const prompt of args.prompts) {
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
-      // Refused before any prompt queues, so no part of a set runs (admission checks each too).
-      const minor = minorAgeRefusal(prompt);
-      if (minor) throw new Error(minor);
     }
+    // Refused before any prompt queues, so no part of a set runs (admission checks each too).
+    const minor = (await Promise.all(args.prompts.map(minorAgeRefusal))).find(Boolean);
+    if (minor) throw new Error(minor);
     // Each call of a turn ("200 more") brings new ideas rather than repeating the turn's earlier sets.
     const listProblem =
       promptListProblem(args.prompts) ||
@@ -1462,10 +1462,8 @@ export function registerGenerateTools({
       return add ? `${next.replace(/[\s,.;]+$/, "")}, ${add}` : next;
     };
     const checked = prompts.flat().map(changed);
-    for (const prompt of checked) {
-      const minor = minorAgeRefusal(prompt);
-      if (minor) throw new Error(minor);
-    }
+    const minor = (await Promise.all(checked.map(minorAgeRefusal))).find(Boolean);
+    if (minor) throw new Error(minor);
     const [project, exclusions] = await Promise.all([
       attachedProject(signal),
       accountExclusions(media, owner, signal),
@@ -1918,7 +1916,7 @@ export function registerGenerateTools({
             `${name} looks like ${same.name}, already in this request or Library (${same.description}). Use or update ${same.name}, or give a clearly different name and looks.`,
           );
         known.push(entry);
-        const refusal = minorAgeRefusal(Object.values(card).join("\n"));
+        const refusal = await minorAgeRefusal(Object.values(card).join("\n"));
         if (refusal) throw new Error(refusal);
       }
       const names = characters.map(({ name }) => name);

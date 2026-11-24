@@ -308,7 +308,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       propose: (ownerId, account) => inbox.propose(ownerId, account),
       drafts: (ownerId) => inbox.drafts(ownerId),
     },
-    minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
+    minorAgeRefusal: async (text) => (/\b16\b/.test(text) ? "Under 18." : ""),
     // Like the queue's writing stage, then the generation route: a Dream job's pending tile
     // carries its written prompt and mark from the queue record.
     admit: async (input, account, scope, origin) => {
@@ -363,7 +363,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       state.cards![kind] = state.cards![kind].filter((card) => card.id !== id);
     },
     reference: (_account, itemId) => ({ id: `asset-${itemId}` }),
-    minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
+    minorAgeRefusal: async (text) => (/\b16\b/.test(text) ? "Under 18." : ""),
     likeness: (a, b) => state.likeness(a, b),
     dream,
     items: (ownerId, ids) =>
@@ -2716,20 +2716,18 @@ test("A Dream job's writing request keeps its own fields through admission", () 
   });
 });
 
-test("Ideas recur in liked results, cards in two and projects in three, within limits and the 18+ floor, never repeating what the account has", () => {
+test("Ideas recur in liked results, cards in two and projects in three, within limits, never repeating what the account has", () => {
   const liked = [{ id: "a" }, { id: "b" }, { id: "c" }];
   const found = ideasFrom(
     {
       projects: [
         { name: "Neon Rooftops", subjects: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
         { name: "Diners", subjects: "all-night diners", styles: "", results: [1, 2] },
-        { name: "Teens", subjects: "a 16 year old", styles: "", results: [1, 2, 3] },
         { name: "Beach", subjects: "the sea", styles: "", results: [1, 2, 3] },
       ],
       cards: [
         { kind: "Character", name: "Mara", description: "red hair, freckles", results: [1, 3, 3] },
         { kind: "outfit", name: "Green Cloak", description: "a long green cloak", results: [2] },
-        { kind: "character", name: "Kid", description: "a 16 year old", results: [1, 2] },
         { kind: "scene", name: "Harbour", description: "a harbour at dusk", results: [2, 3] },
         { kind: "scene", name: "harbour", description: "the same harbour", results: [1, 2] },
         { kind: "character", name: "Ava", description: "dark hair", results: [1, 2] },
@@ -2739,7 +2737,6 @@ test("Ideas recur in liked results, cards in two and projects in three, within l
     {
       liked,
       taken: new Set(["card:characters:ava", "project:beach"]),
-      minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
       at: "now",
     },
   );
@@ -2751,7 +2748,7 @@ test("Ideas recur in liked results, cards in two and projects in three, within l
       ["card", "Harbour", ["b", "c"]],
     ],
   );
-  assert.deepEqual(ideasFrom(null, { liked, taken: new Set(), minorAge: () => "", at: "" }), []);
+  assert.deepEqual(ideasFrom(null, { liked, taken: new Set(), at: "" }), []);
 });
 
 test("The Inbox proposes from likes while idle; a proposed project runs draft samples that Accept keeps and Dismiss deletes", async (t) => {
@@ -2789,8 +2786,12 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     projects: [
       { name: "Rooftops", subjects: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
       { name: "Harbours", subjects: "harbours at dusk", styles: "film", results: [4, 5, 6] },
+      { name: "Teens", subjects: "a 16 year old", styles: "", results: [1, 2, 3] },
     ],
-    cards: [{ kind: "character", name: "Mara", description: "red hair", results: [1, 2] }],
+    cards: [
+      { kind: "character", name: "Mara", description: "red hair", results: [1, 2] },
+      { kind: "character", name: "Kid", description: "a 16 year old", results: [1, 2] },
+    ],
   };
   await dreamOnce();
   const asked = state.calls.filter((call) => call.system.startsWith("You find what recurs"));

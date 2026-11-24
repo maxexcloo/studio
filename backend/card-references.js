@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import { cardKinds, referenceCandidates, referencePrompt } from "../shared/characters.ts";
 import {
   CardError,
+  checkCardAge,
   checkRoom,
   cleanCard,
   createCard,
@@ -30,6 +31,7 @@ export function registerCardReferenceRoutes(app, { profiles, queue }) {
       const id = typeof body?.id === "string" ? body.id : "";
       try {
         const { description } = cleanCard(kind, account, body, true);
+        await checkCardAge(kind, body);
         if (!description) throw new CardError(`Describe the ${noun} to draw it.`);
         if (id && !listCards(kind, ownerId).some((card) => card.id === id))
           return { status: 404, payload: { ok: false, error: `No such ${noun}.` } };

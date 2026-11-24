@@ -923,6 +923,21 @@ test("chat turns reasoning off for structured calls", async () => {
   assert.deepEqual([await effort("describe"), await effort("rewrite")], ["none", undefined]);
 });
 
+test("the age check sends the text to the uncensored model under its instruction and reads its verdict", async () => {
+  const seen = fakeGateway(() => json('{"refuse": true, "minor": "16-year-old", "sexual": ""}'));
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  assert.deepEqual(await engine.judgeMinorAge("a 16-year-old at the beach"), {
+    refuse: true,
+    minor: "16-year-old",
+    sexual: "",
+  });
+  const { body } = seen.calls.at(-1);
+  assert.equal(body.model, "cloud/uncensored");
+  assert.equal(body.temperature, 0);
+  assert.match(body.messages[0].content, /child-safety check/);
+  assert.equal(body.messages[1].content, "a 16-year-old at the beach");
+});
+
 test("chat names a reply the token limit cut off", async () => {
   const seen = fakeGateway(() =>
     Response.json({ choices: [{ message: { content: "" }, finish_reason: "length" }] }),

@@ -880,7 +880,7 @@ export function createImportEngine({
         approximate: recipe.approximate,
         extraProcessing: recipe.extraProcessing,
       };
-      const refusal = minorAgeRefusal(recipe.prompt);
+      const refusal = await minorAgeRefusal(recipe.prompt);
       if (refusal) throw new Error(refusal);
       record.preset = {
         prompt: recipe.prompt,

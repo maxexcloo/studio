@@ -1,94 +1,56 @@
-// Studio makes no image or video of anyone under 18. A prompt is refused when it states an age under
-// 18 or names a minor outright, or when it pairs a minor-coded word (teen, schoolgirl, school
-// uniform, a student at school, child, petite and young) with sexual, nude, revealing or suggestive
-// wording, whatever adult age it also states. Every path that writes or queues a prompt uses this
-// one check (admission, the queue, the assistant, characters, imports) before it reaches a model.
-const under18 = [
-  "one",
-  "two",
-  "three",
-  "four",
-  "five",
-  "six",
-  "seven",
-  "eight",
-  "nine",
-  "ten",
-  "eleven",
-  "twelve",
-  "thirteen",
-  "fourteen",
-  "fifteen",
-  "sixteen",
-  "seventeen",
-];
-const age = `(?:1[0-7]|[1-9]|${under18.join("|")})`;
-// Not the end of a larger number ("twenty-one-year-old", "21-year-old").
-const ageStart = "(?<![\\w-])(?<!(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\\s-]?)";
-const teenAge = `(?:1[0-7]|${under18.slice(9).join("|")})`;
-const patterns = [
-  // "16-year-old", "16 year old", "sixteen years old", "16-17-year-old", "16yo", "16 y/o"
-  new RegExp(`${ageStart}${age}(?:\\s*[-–—]\\s*\\d{1,2})?[\\s-]*(?:years?|yrs?)[\\s-]*old\\b`, "i"),
-  new RegExp(`${ageStart}${age}(?:\\s*[-–—]\\s*\\d{1,2})?\\s*(?:yo|y/o|y\\.o\\.?)(?![\\w/])`, "i"),
-  new RegExp(`${ageStart}${age}[\\s-]*years?[\\s-]*of[\\s-]*age\\b`, "i"),
-  // "aged 16", "age: 16", "ages 16–22"
-  new RegExp(`\\bage[sd]?\\s*:?\\s*${age}\\b(?!\\s*(?:mm|cm|%))`, "i"),
-  /\b(?:underage|under-age|pre-?teens?|loli|lolicon|shota|shotacon|jailbait)\b/i,
-];
-const sexual = new RegExp(
-  `\\b(?:${[
-    "nude|nudes|nudity|naked|topless|bottomless|undress\\w*|strip(?:ping|pers?|tease)",
-    "nsfw|sex|sexy|sexual\\w*|explicit|erotic\\w*|porn\\w*|hentai|lewd|horny|aroused|arousal",
-    "seduc\\w*|sensual\\w*|sultry|alluring|provocative\\w*|suggestive\\w*|flirt\\w*",
-    "lingerie|underwear|panty|panties|knickers|bras?|thongs?|g[\\s-]?strings?|bikinis?|micro[\\s-]?bikinis?",
-    "revealing|skimpy|scantily|see[\\s-]?through|miniskirts?|mini[\\s-]skirts?|short skirts?|upskirt|downblouse|cleavage|cameltoe",
-    "nipples?|areola\\w*|breasts?|boobs?|titties|genitals?|pussy|vagina\\w*|labia|penis|ass|buttocks",
-    "orgasm\\w*|masturbat\\w*|cum|cumshot|cumming|fellatio|blow ?jobs?|hand ?jobs?|intercourse|penetration",
-    "fetish\\w*|kinky|bdsm|bondage|boudoir|pin[\\s-]?up|onlyfans|playboy|grop\\w*|fondl\\w*|molest\\w*|rape",
-    "spread(?:ing)? (?:her|his|their) legs|bedroom eyes|come[\\s-]hither|making out",
-  ].join("|")})\\b`,
-  "i",
-);
-const school =
-  /\b(?:school\w*|classroom|homework|lockers?|detention|recess|playground|teacher'?s? pet)\b/i;
-const young = new RegExp(
-  `\\b(?:${[
-    "teens?|teenagers?|teenaged?|teeny|tweens?|adolescen\\w*|pubescent|prepubescent|puberty",
-    "school[\\s-]?(?:girls?|boys?|kids?|children|child|uniforms?)|(?:high|middle|elementary|primary|grade|junior high|secondary)[\\s-]?school(?:ers?)?|seifuku",
-    "child|children|childish|child[\\s-]?like|kids?|kiddos?|toddlers?|infants?|little (?:girls?|boys?)|young (?:girls?|boys?)",
-    "(?:petite|tiny|little)[\\s,-]+(?:and\\s+)?(?:young|youthful)|(?:young|youthful)[\\s-]looking|looks? (?:very |so |really )?young|very young|too young",
-    "barely legal|just (?:turned )?(?:18|eighteen)|baby[\\s-]?faced?|lolita|nymphets?|under[\\s-]?(?:18|eighteen)|sweet sixteen",
-    `(?:girls?|boys?|wom[ae]n|m[ae]n|she|he|her|him|daughter|son|sister|brother)(?:\\s*(?:,|\\(|is|'s|was|aged))+\\s*${teenAge}(?![\\w%/:]|\\s*(?:x|×|mm|cm|px|frames?|images?|photos?|shots?|steps?|panels?|seconds?)\\b)`,
-    `${teenAge}[fm]`,
-  ].join("|")})\\b`,
-  "i",
-);
-// "Student" codes a minor only at school; an office or college student is an adult.
-const student = /\bstudents?\b/i;
+// Studio makes no image or video of anyone under 18. The text model judges each prompt against the
+// `minor-age-check` instruction (assistant.js judgeMinorAge): one that states an age under 18 or
+// names a minor outright, or that frames someone as a minor beside sexual, nude, revealing or
+// suggestive wording, whatever adult age it also states, is refused. Every path that writes or
+// queues a prompt uses this one check (admission, the queue, the assistant, characters, imports)
+// before it reaches a model. It fails closed: text the check couldn't judge is refused too.
 
-/** The minor-coded words in `text` and the sexual words they are paired with, if any. */
-function minorMatch(text) {
-  const value = String(text || "");
-  for (const pattern of patterns) {
-    const match = pattern.exec(value);
-    if (match) return { words: match[0].trim(), sexual: "" };
+const cacheLimit = 2000;
+let engine = null;
+/** Verdicts by text, as promises so concurrent checks of one text share a call. */
+const verdicts = new Map();
+
+/** The assistant engine (assistant.js) that judges text; until one is set, all text is refused. */
+export function useMinorAgeCheck(assistant) {
+  engine = assistant;
+  verdicts.clear();
+}
+
+async function judge(text) {
+  const verdict = await engine.judgeMinorAge(text);
+  if (typeof verdict?.refuse !== "boolean") throw new Error("unusable verdict");
+  const words = (value) => (typeof value === "string" ? value.trim().slice(0, 120) : "");
+  return { refuse: verdict.refuse, minor: words(verdict.minor), sexual: words(verdict.sexual) };
+}
+
+function verdictOf(text) {
+  const cached = verdicts.get(text);
+  if (cached) return cached;
+  const pending = judge(text);
+  verdicts.set(text, pending);
+  if (verdicts.size > cacheLimit) verdicts.delete(verdicts.keys().next().value);
+  // Only answers are kept; a failed check runs again next time.
+  pending.catch(() => verdicts.delete(text));
+  return pending;
+}
+
+/**
+ * The refusal for text that codes someone as under 18, or '' when it codes none. Where the check
+ * can't run, the refusal asks to try again.
+ */
+export async function minorAgeRefusal(text) {
+  const value = String(text || "").trim();
+  if (!value) return "";
+  let verdict;
+  try {
+    if (!engine) throw new Error("no text model");
+    verdict = await verdictOf(value);
+  } catch {
+    return "Studio couldn't check this prompt for anyone under 18 just now, so it didn't use it. Try again in a moment.";
   }
-  const sexualWord = sexual.exec(value)?.[0];
-  if (!sexualWord) return null;
-  const words = young.exec(value)?.[0] || (school.test(value) && student.exec(value)?.[0]);
-  return words ? { words: words.trim(), sexual: sexualWord } : null;
-}
-
-/** The words in `text` that code someone as under 18, or '' when there are none. */
-export function minorAge(text) {
-  return minorMatch(text)?.words || "";
-}
-
-/** The refusal for a prompt that codes someone as under 18, or '' when it codes none. */
-export function minorAgeRefusal(text) {
-  const found = minorMatch(text);
-  if (!found) return "";
-  return found.sexual
-    ? `Studio makes no sexual or suggestive images or videos of anyone who reads as under 18, and this prompt pairs "${found.words}" with "${found.sexual}", whatever age it states. Drop that teen, school or child framing; a woman or man needs no added "adult" or age.`
-    : `Studio makes no images or videos of anyone under 18, and this prompt says "${found.words}". Drop it; a woman or man needs no added "adult" or age.`;
+  if (!verdict.refuse) return "";
+  const words = verdict.minor || "its age wording";
+  return verdict.sexual
+    ? `Studio makes no sexual or suggestive images or videos of anyone who reads as under 18, and this prompt pairs "${words}" with "${verdict.sexual}", whatever age it states. Drop that teen, school or child framing; a woman or man needs no added "adult" or age.`
+    : `Studio makes no images or videos of anyone under 18, and this prompt says "${words}". Drop it; a woman or man needs no added "adult" or age.`;
 }

@@ -26,6 +26,7 @@
 - Browser specs run only in CI. They cover meaningful desktop, Chromium phone and WebKit phone flows through accessible roles and event-driven fixtures, with shared mocks in `fixtures.ts` and cross-feature journeys in `workflows.spec.ts`. Avoid exact animation timing and cosmetic-only assertions; fixtures never become production fallbacks.
 - Keep runtime data out of Git and test output.
 - Tests never generate media or call cloud providers. Verify real behaviour on the live deployment, never on a local copy of production data.
+- Focused `node --test` runs pass `--import ./backend/fixtures/minor-age-check.js`, as `mise run test` does: the age check fails closed without a text model.
 - Report measured conditions for performance claims.
 - To use live Studio or LibreChat in agent-browser, sign in as the user: run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser). Audits may read other Studio accounts' data, but nothing an agent does may write to, generate in or carry data between accounts.
 
