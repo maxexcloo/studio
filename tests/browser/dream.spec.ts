@@ -948,7 +948,7 @@ test("Taste shows keep rates by model and tag kind, and marks values from their 
   await row("Colours", "golden light")
     .getByRole("button", { name: "Actions for golden light", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "More Like This", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Add to Favourites", exact: true }).click();
   await expect
     .poll(() => dream.requests.at(-1)?.body)
     .toEqual({
@@ -960,11 +960,13 @@ test("Taste shows keep rates by model and tag kind, and marks values from their 
       .getByRole("region", { name: "My Preferences", exact: true })
       .getByText("Tag: golden light", { exact: true }),
   ).toBeVisible();
-  // Never is for words and tags; a model can only be liked more or less.
+  // Exclusions are for words and tags; a model can only be a favourite or less of.
   await row("Models", "Image Quality")
     .getByRole("button", { name: "Actions for Image Quality", exact: true })
     .click();
-  await expect(page.getByRole("menuitem", { name: "Never", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Add to Exclusions", exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({

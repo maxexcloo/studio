@@ -12,11 +12,11 @@ export type Verdict = "discard" | "keep" | "variations" | "like" | "animate" | "
 /** One way to judge the top card, as the deck's bar and the viewer's bar both offer it. */
 export interface Choice {
   choice: Verdict | PairAnswer;
-  /** The viewer's action id, which its keyboard shortcuts find (E Edit, F Superlike). */
+  /** The viewer's action id, which its keyboard shortcuts find (E Edit, F Super Like). */
   id: string;
   label: string;
   icon: LucideIcon;
-  /** A single card's ratings: Like, Dislike and Superlike. */
+  /** A single card's verdicts: Pass, Super Like and Accept. */
   main?: boolean;
   primary?: boolean;
 }

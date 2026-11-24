@@ -1768,7 +1768,10 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.reload();
   await expect
     .poll(() => {
-      const query = new URLSearchParams(state.galleryRequests.at(-1));
+      // The page's own request, not the newest-result check that reads from now.
+      const query = new URLSearchParams(
+        state.galleryRequests.findLast((request) => !request.includes("finished=1")),
+      );
       return [query.get("q"), query.get("rating"), query.has("since"), query.has("comparisons")];
     })
     .toEqual(["", "liked", false, false]);
