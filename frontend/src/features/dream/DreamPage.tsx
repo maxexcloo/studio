@@ -244,16 +244,6 @@ export function DreamPage() {
           {waiting && <VisuallyHidden id={waitingId}>{waiting}</VisuallyHidden>}
           {selector}
           <Group gap={4} wrap="nowrap" ml="auto">
-            {view === "projects" && (
-              <Button
-                size="compact-sm"
-                variant="default"
-                leftSection={<icons.add size={14} />}
-                onClick={() => setCreatingProject(true)}
-              >
-                New Project
-              </Button>
-            )}
             {data?.settings.enabled && (
               <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
                 <ActionIcon
@@ -266,6 +256,16 @@ export function DreamPage() {
                   {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
                 </ActionIcon>
               </Tooltip>
+            )}
+            {view === "projects" && (
+              <Button
+                size="compact-sm"
+                variant="default"
+                leftSection={<icons.add size={14} />}
+                onClick={() => setCreatingProject(true)}
+              >
+                New Project
+              </Button>
             )}
             {data && <DreamAllocation dream={data} />}
           </Group>
