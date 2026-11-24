@@ -5,6 +5,7 @@ import type {
   DreamCounts,
   DreamDigest,
   DreamInputs,
+  DreamLimits,
   DreamSettings,
   KeepRates,
 } from "../../../../shared/dream";
@@ -42,6 +43,8 @@ export type SetOverride = "like" | "discard";
 export type SetOverrides = Record<string, SetOverride>;
 export interface Dream {
   settings: DreamSettings;
+  /** The most this account may choose for each amount, which an administrator sets. */
+  limits: DreamLimits;
   /** Finished results waiting for a verdict, oldest first. */
   unseen: DreamItem[];
   /** When the visit before this one ended; null on the first. */

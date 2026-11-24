@@ -1,4 +1,9 @@
-import { dreamOverrideKeys, dreamTimingSettings } from "../shared/dream.ts";
+import {
+  dreamLimitSettings,
+  dreamOverrideKeys,
+  dreamTimingSettings,
+  dreamUnseenOffKey,
+} from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
 import { dataDir } from "./data-dir.js";
 import { mediaDefaultProfileKeys } from "./generation-defaults.js";
@@ -98,6 +103,8 @@ const known = new Set([
   ...defaultProfileKeys,
   ...Object.values(dreamTimingSettings).map(({ key }) => key),
   ...Object.values(dreamOverrideKeys),
+  ...Object.values(dreamLimitSettings).map(({ key }) => key),
+  dreamUnseenOffKey,
   ...catalogueFlags.map((item) => item.key),
 ]);
 
@@ -179,8 +186,23 @@ export function dreamTimingMinutes(name) {
   return Number(process.env[key] || defaultValue);
 }
 
+/** The most each account may choose for each Dream amount, and whether it may turn the unseen pause off. */
+export function dreamLimits() {
+  const limit = ({ key, defaultValue, bound }) => {
+    const value = Number(process.env[key] || NaN);
+    return Number.isInteger(value) && value >= 0 ? Math.min(value, bound) : defaultValue;
+  };
+  return {
+    dailyImages: limit(dreamLimitSettings.dailyImages),
+    dailyVideos: limit(dreamLimitSettings.dailyVideos),
+    pauseAfterUnseen: limit(dreamLimitSettings.pauseAfterUnseen),
+    unseenOff: process.env[dreamUnseenOffKey] === "1",
+  };
+}
+
 export function describeDreamPolicy() {
   const overrides = dreamOverrides();
+  const limits = dreamLimits();
   return Object.fromEntries([
     ...Object.entries(dreamOverrideKeys).map(([name, key]) => [
       name,
@@ -190,5 +212,13 @@ export function describeDreamPolicy() {
       name,
       { key, value: dreamTimingMinutes(name), ...settingSource(key) },
     ]),
+    ...Object.entries(dreamLimitSettings).map(([name, { key, bound }]) => [
+      `${name}Limit`,
+      { key, value: limits[name], bound, ...settingSource(key) },
+    ]),
+    [
+      "unseenOff",
+      { key: dreamUnseenOffKey, value: limits.unseenOff, ...settingSource(dreamUnseenOffKey) },
+    ],
   ]);
 }

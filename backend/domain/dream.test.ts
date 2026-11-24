@@ -9,7 +9,13 @@ import test, { type TestContext } from "node:test";
 import express from "express";
 
 import type { CardKind, Character, ResultContext } from "../../shared/characters.ts";
-import { type DreamSettings, dreamDefaults, dreamTimingSettings } from "../../shared/dream.ts";
+import {
+  type DreamSettings,
+  defaultDreamLimits,
+  dreamDefaults,
+  dreamSettingError,
+  dreamTimingSettings,
+} from "../../shared/dream.ts";
 import { dreamVideoProfile } from "../animate-profile.js";
 import {
   closeRuntimeDatabase,
@@ -88,6 +94,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   const state = {
     owners: ["alice", "bob"],
     overrides: {} as Partial<DreamSettings>,
+    limits: { ...defaultDreamLimits },
     idleMinutes: {
       image: dreamTimingSettings.imageIdleMinutes.defaultValue,
       video: dreamTimingSettings.videoIdleMinutes.defaultValue,
@@ -235,6 +242,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dataDir,
     idleMinutes: (kind) => state.idleMinutes[kind],
     overrides: () => state.overrides,
+    limits: () => state.limits,
     store,
     taste,
     projects: (ownerId) => projects.list(ownerId),
@@ -2465,6 +2473,48 @@ test("A plain Pass dislikes a result and keeps it for reference, and a full back
   assert.equal(await dreamOnce(), undefined);
   assert.match(state.logs.at(-1)!, /Dream waits while 60 results are unseen/);
   assert.equal(dream.unseen("alice").length, 60);
+  // Each person sets how many unseen results Dream waits on, within the administrator's limit.
+  await dream.save("alice", { pauseAfterUnseen: 100 });
+  assert.equal(dream.read("alice").settings.pauseAfterUnseen, 60);
+  state.limits.pauseAfterUnseen = 100;
+  assert.equal(dream.read("alice").settings.pauseAfterUnseen, 100);
+  assert.ok(await dreamOnce());
+  // Off never waits, only where the administrator allows it.
+  await dream.save("alice", { pauseAfterUnseen: 0 });
+  assert.equal(dream.read("alice").settings.pauseAfterUnseen, 100);
+  state.limits.unseenOff = true;
+  assert.equal(dream.read("alice").settings.pauseAfterUnseen, 0);
+});
+
+test("Dream's amounts stay within the administrator's limits, which saving checks", () => {
+  const limits = { ...defaultDreamLimits, dailyImages: 1000 };
+  assert.equal(dreamSettingError("dailyImages", 1000, limits), "");
+  assert.match(dreamSettingError("dailyImages", 1001, limits), /from 0 to 1000/);
+  assert.match(dreamSettingError("pauseAfterUnseen", 0, limits), /from 1 to 60/);
+  assert.equal(dreamSettingError("pauseAfterUnseen", 0, { ...limits, unseenOff: true }), "");
+  assert.equal(dreamSettingError("mixNew", 100, limits), "");
+});
+
+test("Dream sets an unusable idea aside for a fresh one, and discards the job after three", async (t) => {
+  const { dream, state, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  taste.edit("alice", { exclusions: ["wet"] });
+  const wet = { prompt: "A wet fox shakes off the rain on a wooden porch." };
+  const dry = { prompt: "A fox naps on a sunny wooden porch." };
+  // Its rewrite is still unusable, so Dream draws a fresh idea rather than failing the job.
+  state.replies = [wet, wet, dry];
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.equal(job?.input.prompt, dry.prompt);
+  assert.equal(state.calls.length, 3);
+  // Three unusable draws set the job aside as discarded, not failed.
+  state.replies = Array.from({ length: 6 }, () => wet);
+  await assert.rejects(
+    dream.write(job!, { signal: new AbortController().signal, onThinking() {}, onDelta() {} }),
+    (error: Error & { discard?: true }) =>
+      error.discard === true && /idea was unusable/.test(error.message),
+  );
+  assert.equal(state.calls.length, 9);
 });
 
 test("Dream mostly compares models and LoRAs, rarely steps or guidance, and steps only with a steps control", async (t) => {
