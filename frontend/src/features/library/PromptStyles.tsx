@@ -329,7 +329,6 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
               key: "kind",
               header: "Type",
               sortValue: (style) => kindLabel(style.kind),
-              // The main column takes the free width, so the type keeps its line instead.
               cell: (style) => (
                 <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
                   {kindLabel(style.kind)}

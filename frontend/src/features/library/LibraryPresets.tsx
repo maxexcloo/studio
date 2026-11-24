@@ -207,6 +207,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
             {
               key: "holds",
               header: "Holds",
+              wrap: true,
               sortValue: presetHolds,
               cell: (preset) => (
                 <Text size={phone ? "xs" : "sm"} c="dimmed">
