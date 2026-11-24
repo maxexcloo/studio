@@ -26,11 +26,6 @@
   background: var(--mantine-color-default);
 }
 
-.applied {
-  --studio-enter-from: translateY(4px);
-  animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter) both;
-}
-
 .grid {
   width: 100%;
   margin-inline: auto;
@@ -59,12 +54,21 @@
   );
 }
 
-.splitChoices {
-  width: min(100%, 40rem);
+/* Split: the variant choices and labels span the fitted image's width, below its label row. */
+.splitColumn {
+  --split-height: max(16rem, 100dvh - 17rem);
+  width: min(
+    100%,
+    (
+        var(--split-height) - var(--mantine-font-size-xs) * var(--mantine-line-height-xs) -
+          var(--mantine-spacing-sm)
+      ) *
+      var(--split-aspect)
+  );
   margin-inline: auto;
 }
 
 .split {
   position: relative;
-  height: max(16rem, 100dvh - 17rem);
+  height: var(--split-height);
 }
