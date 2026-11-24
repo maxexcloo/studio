@@ -1,11 +1,9 @@
 import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
 import { Check, Heart, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { icons } from "../../ui/icons";
 import { useHold } from "../../ui/useHold";
-import { useTouch } from "../../ui/usePhone";
-import { useRemembered } from "../auth/useRemembered";
 import { type Choice, dreamChoices } from "./choices";
 import type { DeckCard } from "./deck";
 
@@ -25,10 +23,8 @@ export const sideControl = { variant: "default", size: "lg", radius: "xl" } as c
 export const sideIconSize = 20;
 
 export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
-  // A tap would leave a tooltip over the card.
-  const touch = useTouch();
   return (
-    <Tooltip label="Undo" disabled={touch}>
+    <Tooltip label="Undo">
       <ActionIcon
         {...sideControl}
         data-touch-target
@@ -74,20 +70,7 @@ export function DeckButtons({
     neither: "Pass",
   };
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
-  // Tapped buttons would leave their tooltips over the card, so touch screens show none. Pass says
-  // once, after its first tap, that holding it adds a reason.
-  const touch = useTouch();
-  const [hinted, setHinted] = useRemembered("dream-pass-hint", false);
-  const [hinting, setHinting] = useState(false);
-  useEffect(() => {
-    if (!hinting) return;
-    const timer = setTimeout(() => setHinting(false), 4000);
-    return () => clearTimeout(timer);
-  }, [hinting]);
-  const { consumeClick, ...hold } = useHold(card.key, () => {
-    setHinted(true);
-    askPass();
-  });
+  const { consumeClick, ...hold } = useHold(card.key, askPass);
   return (
     <div
       role="group"
@@ -111,12 +94,7 @@ export function DeckButtons({
             ? rate
             : undefined;
         return (
-          <Tooltip
-            key={id}
-            label={description ?? title}
-            disabled={touch && !(pass && hinting)}
-            opened={touch && pass && hinting ? true : undefined}
-          >
+          <Tooltip key={id} label={description ?? title}>
             <ActionIcon
               className={classes.answer}
               data-touch-target
@@ -132,12 +110,7 @@ export function DeckButtons({
               data-pass={pass || undefined}
               {...(pass && hold)}
               onClick={(event) => {
-                if (pass && consumeClick(event)) return;
-                act(choice);
-                if (pass && touch && !hinted) {
-                  setHinted(true);
-                  setHinting(true);
-                }
+                if (!pass || !consumeClick(event)) act(choice);
               }}
             >
               {side ? (

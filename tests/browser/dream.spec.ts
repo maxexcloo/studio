@@ -548,25 +548,24 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     ]);
 });
 
-test("A touch screen says once, after the first Pass, that holding it adds a reason", async ({
+test("A touch screen says until the first Pass that holding it adds a reason", async ({
   page,
   isMobile,
 }) => {
   test.skip(!isMobile, "Touch hint");
   await fixtures(page);
-  await serveDream(page, { unseen: ["one", "two", "three"].map((id) => dreamItem(id)) });
+  await serveDream(page, { unseen: ["one", "two"].map((id) => dreamItem(id)) });
   await page.goto("/dream");
-  const pass = page.getByRole("group", { name: "Dream Actions" }).getByRole("button", {
-    name: "Pass",
-    exact: true,
-  });
-  const hint = page.getByRole("tooltip", { name: "Hold to Add a Reason" });
-  await expect(hint).toBeHidden();
-  await pass.tap();
+  const hint = page.getByText("Hold Pass to add a reason", { exact: true });
   await expect(hint).toBeVisible();
+  await page
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "Pass", exact: true })
+    .tap();
+  await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
+  await expect(hint).toBeHidden();
   await page.reload();
-  await pass.tap();
-  await expect(current(page).getByRole("img", { name: "Dream prompt three" })).toBeVisible();
+  await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
   await expect(hint).toBeHidden();
 });
 
@@ -2163,7 +2162,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
     page.getByRole("button", { name: "View Dream prompt discard-image", exact: true }),
   ).toBeHidden();
   await page.reload();
-  await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^Videos\b/ })).toBeChecked();
   await showView(page, "Dream");
   await expect(pair).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();

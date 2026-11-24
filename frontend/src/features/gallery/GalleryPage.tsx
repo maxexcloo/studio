@@ -1040,9 +1040,12 @@ function Gallery() {
         <LoadingState fill label="Loading Gallery" />
       ) : gallery.error && !gallery.data ? (
         <Alert color="red" title="Couldn't Load the Gallery">
-          <Button size="compact-sm" variant="default" onClick={() => void gallery.refetch()}>
-            Retry
-          </Button>
+          <Stack gap="sm" align="flex-start">
+            {gallery.error.message}
+            <Button size="compact-sm" variant="default" onClick={() => void gallery.refetch()}>
+              Retry
+            </Button>
+          </Stack>
         </Alert>
       ) : loaded.length ? (
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
@@ -1120,14 +1123,17 @@ function Gallery() {
       )}
       {refresh.isError && (
         <Alert color="red" title="Couldn't Update the Gallery">
-          <Button
-            size="compact-sm"
-            variant="default"
-            loading={refresh.isFetching}
-            onClick={refreshFirst}
-          >
-            Retry
-          </Button>
+          <Stack gap="sm" align="flex-start">
+            {refresh.error.message}
+            <Button
+              size="compact-sm"
+              variant="default"
+              loading={refresh.isFetching}
+              onClick={refreshFirst}
+            >
+              Retry
+            </Button>
+          </Stack>
         </Alert>
       )}
       <MorePages listing={gallery} results={listingScope} paused={!!itemId || !!review} />
