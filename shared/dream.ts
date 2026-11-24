@@ -92,6 +92,34 @@ export function dreamSettingError(key: keyof DreamSettings, value: unknown): str
   }
   return typeof value === "boolean" ? "" : `Set ${key} to true or false.`;
 }
+
+/** A model, LoRA or theme (caption tag) in the weekly digest, with its kept and passed results. */
+export interface DreamDigestRow {
+  name: string;
+  kept: number;
+  passed: number;
+}
+/** Dream › This Week: the account's last seven days of Dream verdicts, read from its records. */
+export interface DreamDigest<Item> {
+  kept: number;
+  passed: number;
+  /** The best kept results: Super Liked, then liked, then the best reviewed and newest. */
+  top: Item[];
+  /** The best keep rates, from at least two verdicts each. */
+  best: Record<"models" | "loras" | "themes", DreamDigestRow[]>;
+  /** The themes passed most, and why results were passed, a pass without a reason as "skip". */
+  passedThemes: DreamDigestRow[];
+  reasons: { reason: DreamPassReason; count: number }[];
+  /** What Dream leans on next: its taste's favourites, its active projects, and how often it explores. */
+  next: {
+    models: string[];
+    loras: string[];
+    themes: string[];
+    projects: string[];
+    explore: number;
+  };
+}
+
 /** Context a chat gave Studio (MCP), which Dream may draw on as a soft hint. */
 export interface ChatNote {
   id: string;

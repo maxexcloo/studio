@@ -130,6 +130,7 @@ function DismissDialog({
       id={id}
       opened={opened}
       onClose={closeWhenTop(id, () => !pending && onClose())}
+      onExitTransitionEnd={() => setReason("")}
       title={title}
       fullScreen={phone}
     >
@@ -494,7 +495,6 @@ export function ProposalList({ proposals, projects }: { proposals: Shown[]; proj
         )}
       </CardDialog>
       <DismissDialog
-        key={reasoning?.id ?? "none"}
         title="Decline"
         opened={reasoning !== null}
         pending={decline.isPending}
@@ -572,7 +572,6 @@ export function ProjectInbox({ projects }: { projects: Project[] }) {
         >
           <ProposalList proposals={proposals} projects={projects} />
           <DismissDialog
-            key={String(clearing)}
             title="Clear Inbox"
             opened={clearing}
             pending={clear.isPending}

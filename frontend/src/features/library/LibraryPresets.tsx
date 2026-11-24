@@ -8,6 +8,7 @@ import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SelectionBar } from "../../ui/SelectionBar";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import {
   defaultProfile,
@@ -47,9 +48,10 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
   const [selection, setSelection] = useState<Set<string> | null>(null);
   const selected = presets.records.filter(({ id }) => selection?.has(id));
   const [replacing, setReplacing] = useState<Preset | null>(null);
+  const renamed = useLastWhileClosing(renaming);
   const taken = presets.records.some(
     (preset) =>
-      preset.id !== renaming?.id &&
+      preset.id !== renamed?.id &&
       preset.title.toLocaleLowerCase() === name.trim().toLocaleLowerCase(),
   );
   const rename = () => {

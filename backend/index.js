@@ -71,6 +71,7 @@ import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { createChatNotes } from "./domain/chat-notes.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
+import { createDreamDigest } from "./domain/dream-digest.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
 import { createDream } from "./domain/dream.ts";
 import { createEnricher } from "./domain/enrich.ts";
@@ -200,7 +201,7 @@ import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
 import { createPromptStage } from "./prompt-stage.js";
 import { promptStyleStore } from "./prompt-styles.js";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
-import { configuredCloudUsage } from "./providers/cloud-usage.ts";
+import { cloudHeld, configuredCloudUsage } from "./providers/cloud-usage.ts";
 import { createFaces } from "./providers/faces.ts";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
@@ -287,6 +288,9 @@ if (runtime) {
 }
 // The local text route while a workload serving text runs; without a runtime, text takes the cloud route.
 const localText = runtime ? createLocalText({ controller: runtime.controller }) : undefined;
+// Grok's weekly usage, for Status; near its limit Dream and chats run new work locally.
+const cloudUsage = configuredCloudUsage();
+const cloudLocalOnly = async () => cloudHeld(await cloudUsage?.());
 const mcp = registerMcpRoutes(app, {
   dataDir,
   runtime: runtime?.controller,
@@ -312,6 +316,7 @@ const mcp = registerMcpRoutes(app, {
       .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
       .filter((job) => job.input.kind === "video")
       .map((job) => ({ reason: job.reason, at: Date.parse(job.updatedAt) })),
+  cloudHeld: cloudLocalOnly,
 });
 app.use(express.json({ limit: "25mb" }));
 const cloudProvider = configuredCliProxy();
@@ -769,7 +774,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   store,
 });
 registerStatusRoutes(app, {
-  cloudUsage: configuredCloudUsage(),
+  cloudUsage,
   observeServices,
   queue: generationQueue,
 });
@@ -1000,6 +1005,7 @@ const dream = createDream({
       },
     };
   },
+  cloudHeld: cloudLocalOnly,
   online: async (kind, backend) => {
     if (backend === "cloud") {
       const profiles = (await directCloud?.profiles().catch(() => [])) || [];
@@ -1148,6 +1154,15 @@ registerDreamRoutes(app, {
   dream,
   projects,
   inbox,
+  digest: createDreamDigest({
+    decided: (ownerId, since) =>
+      galleryItems({ ownerId, dreamState: ["kept", "discarded"], dreamDecidedSince: since }),
+    taste: (ownerId) => taste.read(ownerId),
+    projects: (ownerId) => projects.list(ownerId),
+    exploring: (ownerId) => dream.exploring(ownerId),
+    profiles: async () => (await mediaModels(false)).models.profiles || [],
+    loraName: (name) => loraName(name, catalogueLoraInfo(name)),
+  }),
   notes: chatNotes,
   listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });

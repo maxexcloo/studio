@@ -65,7 +65,7 @@ This path uses Radiance's own media API. Install the [ComfyUI worker](worker/REA
 
 ## Cloud Models
 
-`STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account.
+`STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account. Once every Grok account has used `STUDIO_CLOUD_USAGE_LIMIT` percent of its weekly credits, Dream and chats run new work on local models unless a chat asks for Grok; a cloud profile chosen in the composer still runs.
 
 ## Accounts & Single Sign-On
 
@@ -161,6 +161,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_CLIPROXYAPI_MANAGEMENT_KEY`   | CLIProxyAPI management key, to show Grok's weekly usage in Status                           | none: usage reads Unknown                    |                        |
 | `STUDIO_CLIPROXYAPI_URL`              | CLIProxyAPI base URL                                                                        | none: no cloud models                        |                        |
 | `STUDIO_CLIPROXYAPI_VIDEO_MODEL`      | Video model for a cloud profile that names none                                             | the provider's advertised Grok video model   |                        |
+| `STUDIO_CLOUD_USAGE_LIMIT`            | Percent of Grok's weekly credits past which Dream and chats run new work locally            | `80`                                         |                        |
 | `STUDIO_CONTROL_MCP_API_KEY`          | Key for the MCP GPU control tools                                                           | none                                         |                        |
 | `STUDIO_DATA_DIR`                     | Data folder                                                                                 | `/data` in the image, else `data/`           |                        |
 | `STUDIO_DEFAULT_IMAGE_PROFILE`        | Profile ID new image drafts start on                                                        | the first ready profile                      | Studio                 |

@@ -8,6 +8,7 @@ import {
 import { maxDismissReason } from "../../shared/inbox.ts";
 import type { ChatNotes } from "./chat-notes.ts";
 import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
+import type { DreamDigestReader } from "./dream-digest.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 import type { InboxStore } from "./inbox.ts";
 import { type Projects, projectPatch } from "./projects.ts";
@@ -22,12 +23,14 @@ export function registerDreamRoutes(
     dream,
     projects,
     inbox,
+    digest,
     notes,
     listed,
   }: {
     dream: Dream;
     projects: Projects;
     inbox: InboxStore;
+    digest: DreamDigestReader;
     notes: ChatNotes;
     /** The results as lists carry them, numbered (domain/result-numbers.ts) and without what Details reads. */
     listed: <T extends object>(items: T[]) => T[];
@@ -90,6 +93,10 @@ export function registerDreamRoutes(
         ),
     },
   }));
+  route("GET", "/api/dream/week", async (account) => {
+    const { top, ...rest } = await digest(owner(account));
+    return { status: 200, payload: { ...rest, top: listed(top) } };
+  });
   // The header's badge counts cards waiting for a verdict.
   route("GET", "/api/dream/count", (account) => ({
     status: 200,

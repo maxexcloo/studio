@@ -32,6 +32,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
@@ -286,6 +287,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   });
   const [editing, setEditing] = useState<AccessGroup | "new" | null>(null);
   const [deleting, setDeleting] = useState<AccessGroup | null>(null);
+  const edited = useLastWhileClosing(editing);
   const remove = useMutation({
     mutationFn: (group: AccessGroup) =>
       api(`/api/accounts/profiles/${encodeURIComponent(group.id)}`, { method: "DELETE" }),
@@ -416,13 +418,13 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
       <Modal
         opened={!!editing}
         onClose={() => setEditing(null)}
-        title={editing === "new" ? "New Group" : "Edit Group"}
+        title={edited === "new" ? "New Group" : "Edit Group"}
       >
         <FocusTrap.InitialFocus />
-        {editing && (
+        {edited && (
           <GroupEditor
-            key={editing === "new" ? "new" : editing.id}
-            initial={editing === "new" ? undefined : editing}
+            key={edited === "new" ? "new" : edited.id}
+            initial={edited === "new" ? undefined : edited}
             admin={data}
             onCancel={() => setEditing(null)}
             saved={(group) => {
@@ -580,6 +582,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [acting, setActing] = useState<{ action: UserAction; account: Account } | null>(null);
+  const resetting = useLastWhileClosing(acting?.action === "password" ? acting.account : null);
   // Changes show at once; the saved list (or, after a failure, the refetched one) settles them.
   const optimistic = (apply: (data: Administration) => Administration) => {
     void client.cancelQueries({ queryKey: accountAdminQuery.queryKey });
@@ -827,16 +830,14 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       <ChatGateway gateway={data.gateway} accounts={data.accounts} change={gatewayChange} />
       <Modal opened={creating} onClose={() => setCreating(false)} title="New User">
         <FocusTrap.InitialFocus />
-        {creating && (
-          <NewAccount
-            admin={data}
-            onCancel={() => setCreating(false)}
-            saved={() => {
-              setCreating(false);
-              refresh();
-            }}
-          />
-        )}
+        <NewAccount
+          admin={data}
+          onCancel={() => setCreating(false)}
+          saved={() => {
+            setCreating(false);
+            refresh();
+          }}
+        />
       </Modal>
       <Modal
         opened={acting?.action === "password"}
@@ -844,10 +845,10 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         title="Reset Password"
       >
         <FocusTrap.InitialFocus />
-        {target && acting?.action === "password" && (
+        {resetting && (
           <ResetPassword
-            key={target.id}
-            account={target}
+            key={resetting.id}
+            account={resetting}
             saved={() => setActing(null)}
             onCancel={() => setActing(null)}
           />

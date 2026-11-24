@@ -477,6 +477,7 @@ export function MediaViewer({
         returnFocus={false}
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
+        variant="viewer"
         classNames={{
           content: classes.content,
           body: classes.body,
@@ -820,7 +821,6 @@ export function MediaViewer({
                       </ActionBarSurface>
                     ) : (
                       <MediaViewerActions
-                        key={displayed.id}
                         item={displayed}
                         compare={compare}
                         iterate={iterate}
