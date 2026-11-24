@@ -1,4 +1,4 @@
-import { Button, Progress, Select, Text } from "@mantine/core";
+import { Button, Progress, SegmentedControl, Select, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -56,7 +56,8 @@ const scopeLabels: Record<PassScope, string> = {
 /**
  * A Settings › Studio › Catch Up row that starts or stops a background feature's pass over the
  * gallery at `route` and follows it; with `scopeLabel` it also chooses the pass's scope (All,
- * Missing or Out of Date, the default).
+ * Missing or Out of Date, the default), and with `ownRoute` whether it covers only the signed-in
+ * account's images or every account's.
  */
 export function GalleryPass({
   route,
@@ -65,7 +66,7 @@ export function GalleryPass({
   remaining,
   progressLabel,
   scopeLabel,
-  pairedRoute,
+  ownRoute,
 }: {
   route: string;
   label: string;
@@ -75,20 +76,22 @@ export function GalleryPass({
   progressLabel: string;
   /** The scope selector's accessible name; without it every pass is Out of Date. */
   scopeLabel?: string;
-  /** The other view of a shared catch-up worker. */
-  pairedRoute?: string;
+  /** The same pass over the signed-in account's images alone. */
+  ownRoute?: string;
 }) {
   const client = useQueryClient();
-  const query = passQuery(route);
+  const [own, setOwn] = useState(false);
+  const passRoute = own && ownRoute ? ownRoute : route;
+  const query = passQuery(passRoute);
   const status = useQuery(query);
   const [chosen, setChosen] = useState<PassScope>("outdated");
   const change = useMutation({
     mutationFn: (action: "start" | "stop") =>
-      post<PassStatus>(`${route}/${action}`, action === "start" ? { scope: chosen } : undefined),
-    onSuccess: (data) => {
-      client.setQueryData(query.queryKey, data);
-      if (pairedRoute) void client.invalidateQueries({ queryKey: passQuery(pairedRoute).queryKey });
-    },
+      post<PassStatus>(
+        `${passRoute}/${action}`,
+        action === "start" ? { scope: chosen } : undefined,
+      ),
+    onSuccess: (data) => client.setQueryData(query.queryKey, data),
   });
   const data = status.data;
   // A running pass shows its own scope; otherwise the one to start.
@@ -106,7 +109,8 @@ export function GalleryPass({
   return (
     <SettingRow
       label={label}
-      wide={Boolean(scopeLabel)}
+      // Beside Whose Images the controls keep their own widths.
+      wide={Boolean(scopeLabel) && !ownRoute}
       description={
         <>
           {description}
@@ -120,6 +124,16 @@ export function GalleryPass({
     >
       {data && (data.active || data.state === "stopped") && (
         <Progress size="sm" w={96} value={progress} aria-label={progressLabel} />
+      )}
+      {ownRoute && (
+        <SegmentedControl
+          aria-label="Whose Images"
+          size="xs"
+          data={["Everyone", "Mine"]}
+          value={own ? "Mine" : "Everyone"}
+          disabled={data?.active}
+          onChange={(value) => setOwn(value === "Mine")}
+        />
       )}
       {scopeLabel && (
         <Select

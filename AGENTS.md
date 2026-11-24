@@ -130,9 +130,11 @@ recur across features.
   Delete last, and share their sizing and item style. An action's settings sit
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action and assistant menus.
-- Media categories use Images, Videos, Text. Other unordered peers sort
-  alphabetically, except settings first, Like before Dislike, Name A–Z and
-  Name Z–A last in sort menus, Refresh and Custom… last and Delete last.
+- Media categories use Images, Videos, Text, with Cloud after Videos where it
+  is their peer. Other unordered peers sort alphabetically, except settings
+  first, Like before Dislike, Name A–Z and Name Z–A last in sort menus,
+  Refresh and Custom… last and Delete last. Settings sections, groups and rows
+  put settings before actions, with the Danger Zone last.
 - Labels name the verb alone where the menu or box already says what it acts
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps

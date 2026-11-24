@@ -300,7 +300,7 @@ test("Administrators save and verify per-user cloud and uncensored access throug
 test("Users change their email only behind password-protected controls", async ({ page }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "user" });
-  await page.goto("/settings");
+  await page.goto("/settings#account");
   const own = page.getByRole("region", { name: "Settings: Account", exact: true });
   await expect(own.getByText("admin@example.test", { exact: true })).toBeVisible();
   await own.getByRole("button", { name: "Change", exact: true }).click();
