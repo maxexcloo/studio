@@ -81,7 +81,9 @@ recur across features.
   section failure inline without taking down the workspace.
 - Use one section heading and toolbar; group further parts with `SettingGroup`.
   Use compact `DataTable` rows for dense records and cards for visual content.
-  Phone tables fold secondary information into the main cell. Use headings
+  Phone tables fold secondary information into the main cell. A record's flags
+  (AI, Failing, Default, Disabled) sit right after its name, never in their own
+  column or line; status columns hold values, not flags. Use headings
   rather than accordions, and popups to create or configure records.
 - Settings use `SettingGroup` and `SettingRow`. Switches apply on/off settings
   immediately and optimistically, rolling back or refetching after failure;
