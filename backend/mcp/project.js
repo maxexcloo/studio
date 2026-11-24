@@ -287,10 +287,11 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
     if (!project) return null;
     const all = await media.profiles("all", owner).catch(() => []);
     const label = (id) => all.find((profile) => profile.id === id)?.label || id;
-    const { id, name, brief, constraints } = project;
+    const { id, name, brief, constraints, paused } = project;
     return {
       id,
       name,
+      enabled: !paused,
       brief,
       constraints: {
         ...constraints,

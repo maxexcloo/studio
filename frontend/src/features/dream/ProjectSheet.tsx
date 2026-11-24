@@ -21,6 +21,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup } from "../../ui/SettingRows";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { useMediaPreview } from "../gallery/MediaPreview";
 import { ProjectStatsLine, constraintBadges } from "./ProjectCard";
@@ -35,7 +36,7 @@ const fieldNames: Record<string, string> = {
   loras: "Favourite LoRAs",
   cards: "Pinned Cards",
   constraints: "Constraints",
-  paused: "Paused",
+  paused: "Status",
   favoured: "More Turns",
   created: "Created",
 };
@@ -231,11 +232,12 @@ export function ProjectSheet({
 }) {
   const id = useId();
   const phone = usePhone();
-  const project = projects.find((entry) => entry.id === projectId);
+  const opened = projects.find((entry) => entry.id === projectId);
+  const project = useLastWhileClosing(opened);
   return (
     <Modal
       id={id}
-      opened={Boolean(project)}
+      opened={Boolean(opened)}
       onClose={closeWhenTop(id, onClose)}
       title={project?.name}
       size="lg"

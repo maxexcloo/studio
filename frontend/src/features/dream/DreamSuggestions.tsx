@@ -16,6 +16,7 @@ import { suggestionItems, useChangeSuggestions } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
+import { sideControl, sideIconSize } from "./DeckButtons";
 import { sideLabel } from "./PairCard";
 
 interface DreamSuggestionsProps {
@@ -110,9 +111,7 @@ function ItemSuggestions({
   const unavailable = !available && !more.length && "Suggestions are unavailable for this result.";
   const trigger = (
     <ActionIcon
-      variant="default"
-      radius="xl"
-      size="md"
+      {...sideControl}
       data-touch-target
       aria-label="Suggestions"
       aria-disabled={Boolean(unavailable) || undefined}
@@ -120,7 +119,7 @@ function ItemSuggestions({
       data-disabled={Boolean(unavailable) || undefined}
       loading={loading}
     >
-      <icons.assistant size={18} />
+      <icons.assistant size={sideIconSize} />
     </ActionIcon>
   );
   if (unavailable) return <Tooltip label={unavailable}>{trigger}</Tooltip>;

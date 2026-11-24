@@ -111,7 +111,11 @@ export function createGenerationSubmission({
       )
         return {
           status: 400,
-          payload: { ok: false, error: "The requested model does not match the selected profile." },
+          payload: {
+            ok: false,
+            permanent: true,
+            error: "The requested model does not match the selected profile.",
+          },
         };
       // An ordinary account runs the profile's own checkpoint (graphs.js falls back to the selected
       // mode's), never a file named in the request; a reused result carries the one it ran.
@@ -122,13 +126,14 @@ export function createGenerationSubmission({
             status: 403,
             payload: {
               ok: false,
+              permanent: true,
               error: "This account cannot use the selected generation profile.",
             },
           };
         if (Array.isArray(input?.loras) && input.loras.length && !mayUseFeature(account, "loras"))
           return {
             status: 403,
-            payload: { ok: false, error: "LoRAs are off for this account." },
+            payload: { ok: false, permanent: true, error: "LoRAs are off for this account." },
           };
         const allowed = loraAllowed(account);
         const refused = (Array.isArray(input?.loras) ? input.loras : []).find(
@@ -137,7 +142,11 @@ export function createGenerationSubmission({
         if (refused)
           return {
             status: 403,
-            payload: { ok: false, error: `This account cannot use the LoRA “${refused.name}”.` },
+            payload: {
+              ok: false,
+              permanent: true,
+              error: `This account cannot use the LoRA “${refused.name}”.`,
+            },
           };
       }
       // A combined profile runs only on the backend it names; one that isn't ready refuses with why.
@@ -256,7 +265,7 @@ export function createGenerationSubmission({
       if (foreign)
         return {
           status: 409,
-          payload: { ok: false, error: "That generation ID is already in use." },
+          payload: { ok: false, permanent: true, error: "That generation ID is already in use." },
         };
     }
     if (existing)

@@ -427,7 +427,7 @@ test("Status summarises each kind's workers and state, quietly", async ({ page }
   const drawer = page.getByRole("dialog", { name: "Queue", exact: true });
   const summary = drawer.getByRole("region", { name: "Service Status", exact: true });
   await expect(summary).toHaveText(
-    "Images1 worker · IdleVideos1 worker · OfflineText1 worker · Running",
+    "Images1 worker · IdleVideos1 worker · OfflineCloudGrok · 40% UsedText1 worker · Running",
   );
   // Nothing in it acts.
   await expect(summary.getByRole("link")).toHaveCount(0);

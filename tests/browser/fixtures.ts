@@ -446,6 +446,7 @@ export async function fixtures(page: Page) {
             endpoints: [{ id: "text", label: "Text Worker", state: "healthy", reason: "Ready" }],
           },
         },
+        cloud: [{ label: "Grok", used: 40, reason: "Weekly usage." }],
         workers: [
           {
             id: "primary",
@@ -1307,10 +1308,20 @@ export async function showGalleryView(
 /** Shows Liked, Uploads or the unfiltered Gallery. */
 export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") {
   await showGalleryView(page, choice === "Uploads" ? "Uploads" : "Gallery");
-  const liked = page.getByRole("button", { name: "Liked", exact: true });
-  const on = (await liked.getAttribute("aria-pressed")) === "true";
-  if (on !== (choice === "Liked")) await liked.click();
-  await expect(liked).toHaveAttribute("aria-pressed", String(choice === "Liked"));
+  // Liked is a Filters choice, shown as a removable chip while on.
+  const chip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
+  if ((await chip.count()) > 0 !== (choice === "Liked")) await toggleGalleryFilter(page, "Liked");
+  await expect(chip).toHaveCount(choice === "Liked" ? 1 : 0);
+}
+
+/** Turns one of the gallery's Show filters (Liked, Disliked) on or off in its Filters popup. */
+export async function toggleGalleryFilter(page: Page, name: "Liked" | "Disliked") {
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Show", exact: true })
+    .getByRole("button", { name, exact: true })
+    .click();
+  await page.keyboard.press("Escape");
 }
 
 /** Shows the reference picker's Uploads tab, which lists uploaded images. */

@@ -1,12 +1,13 @@
-import { Drawer, FocusTrap, ScrollArea, Stack, Text } from "@mantine/core";
+import { Drawer, FocusTrap, ScrollArea, Stack } from "@mantine/core";
 import { type ReactNode, useId } from "react";
 
 import type { MediaItem } from "../../types";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
-import { ViewerMetadata } from "./ViewerChrome";
+import { ViewerTitle } from "./ViewerChrome";
 
 import classes from "./MediaViewer.module.css";
 
@@ -36,10 +37,12 @@ export function ViewerDetails({
   const id = useId();
   const closeSheet = closeWhenTop(id, close);
   const swipe = useSwipeClose("down", closeSheet);
-  const details = (
+  // The desktop panel stays mounted, so it loads an item's details only while it shows them.
+  const shown = useLastWhileClosing(opened ? item : null);
+  const details = (of: MediaItem) => (
     <>
       {children}
-      <MediaDetails item={item} related={related} open={follow} />
+      <MediaDetails item={of} related={related} open={follow} />
     </>
   );
   if (phone)
@@ -66,17 +69,11 @@ export function ViewerDetails({
         }}
       >
         <Drawer.Overlay />
-        <Drawer.Content {...swipe}>
+        {/* Named by its title alone, not the time beside it. */}
+        <Drawer.Content {...swipe} aria-label={title}>
           <FocusTrap.InitialFocus />
           <Drawer.Header>
-            <Stack gap={2} miw={0}>
-              <Drawer.Title>
-                <Text span fw={600} lh={1.2} lineClamp={2}>
-                  {title}
-                </Text>
-              </Drawer.Title>
-              <ViewerMetadata item={item} compact title={title} />
-            </Stack>
+            <ViewerTitle component="h2" item={item} title={title} fw={600} lh={1.2} lineClamp={2} />
             <Drawer.CloseButton aria-label="Close Details" />
           </Drawer.Header>
           <Drawer.Body>
@@ -85,7 +82,7 @@ export function ViewerDetails({
               pt="md"
               pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))"
             >
-              {details}
+              {details(item)}
             </Stack>
           </Drawer.Body>
         </Drawer.Content>
@@ -106,13 +103,8 @@ export function ViewerDetails({
       >
         <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
-            <Stack gap={2} miw={0}>
-              <Text fw={600} lineClamp={2} lh={1.2}>
-                {title}
-              </Text>
-              <ViewerMetadata item={item} />
-            </Stack>
-            {opened && details}
+            <ViewerTitle item={item} title={title} fw={600} lineClamp={2} lh={1.2} />
+            {shown && details(shown)}
           </Stack>
         </ScrollArea>
       </aside>

@@ -10,9 +10,12 @@ import { promptInstruction } from "../prompt-instructions.js";
 export const precedence =
   "The model's prompting guide decides length, format, and wording conventions for the selected mode. The person's intent decides what is depicted, and the chosen style or theme decides the tone.";
 
+/** Every writer, prompts and captions alike, names things as people say them. */
+export const plainWords =
+  "Use everyday words, not euphemisms or clinical or archaic ones (bike seat, not saddle).";
+
 /** Generation models read and voice American English; other spellings read and sound wrong to them. */
-export const americanEnglish =
-  "Use American English spelling for English prompt text (color, gray, center). Keep quoted text and any requested language exactly as given.";
+export const americanEnglish = `Use American English spelling for English prompt text (color, gray, center). Keep quoted text and any requested language exactly as given. ${plainWords}`;
 
 /** What the writer may add: only what the input states or implies. */
 export const fidelity = () => promptInstruction("keep-requested-details");

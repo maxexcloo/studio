@@ -862,6 +862,9 @@ export function QueueActions() {
     }) > 0;
   const everyone = usePausesEveryone();
   const [confirming, setConfirming] = useState<keyof typeof bulk>();
+  const failed = (queue.data?.jobs ?? []).filter((job) => job.status === "failed");
+  const retryJobs = useTryAgain(failed.flatMap((job) => job.items));
+  const [retrying, setRetrying] = useState(false);
   if (!queue.data) return null;
   const jobs = shownJobs(queue.data.jobs);
   // An empty queue offers its Resume in the empty state instead.
@@ -880,14 +883,19 @@ export function QueueActions() {
       .join(" "),
     "clear-failed": bulk["clear-failed"].text,
   };
-  const clearing = jobs.some((job) => job.status === "failed");
-  const queueAction = (label: string, Icon: LucideIcon, onClick: () => void) => (
+  const retryAll = async () => {
+    setRetrying(true);
+    await retryJobs(failed.map((job) => job.id));
+    setRetrying(false);
+  };
+  const queueAction = (label: string, Icon: LucideIcon, onClick: () => void, pending = false) => (
     <Tooltip key={label} label={label}>
       <ActionIcon
         aria-label={label}
         variant="subtle"
         color="gray"
-        disabled={action.isPending}
+        loading={pending}
+        disabled={action.isPending || retrying}
         onClick={onClick}
       >
         <Icon size={16} />
@@ -897,13 +905,14 @@ export function QueueActions() {
   return (
     // At the end of the heading it shares: beside the title, or beside the phone drawer's Close.
     <Group gap={4} wrap="nowrap" justify="flex-end">
-      {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
-        pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
-      )}
-      {clearing &&
+      {failed.length > 0 &&
         queueAction(bulk["clear-failed"].label, bulk["clear-failed"].icon, () =>
           setConfirming("clear-failed"),
         )}
+      {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
+        pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
+      )}
+      {failed.length > 0 && queueAction("Retry All", icons.retry, () => void retryAll(), retrying)}
       {stopping > 0 && (
         <Tooltip label="Stop All">
           <ActionIcon

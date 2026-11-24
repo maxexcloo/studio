@@ -9,6 +9,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
+import { type FetchQueryOptions, useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
   type ReactNode,
@@ -115,19 +116,31 @@ export function WorkspaceSectionSelect({
 
 /**
  * Desktop navigation and mounted panes share the route-backed workspace modal. A section given as
- * a function places its heading itself, so its toolbar can sit beside it.
+ * a function places its heading itself, so its toolbar can sit beside it. The open section's and its
+ * neighbours' `queries` load ahead, so a next visit shows its contents rather than a loader.
  */
 export function WorkspaceSections({
   label,
   sections,
   content,
+  queries = {},
 }: {
   label: string;
   sections: WorkspaceSection[];
   content: Record<string, ReactNode | ((heading: ReactNode) => ReactNode)>;
+  // Each query has its own data type.
+  queries?: Record<string, FetchQueryOptions<any, any, any, any>[]>;
 }) {
   const phone = usePhone();
+  const client = useQueryClient();
   const { location, active } = useWorkspaceSection(sections);
+  useEffect(() => {
+    // Only what isn't loaded yet; a section refreshes its own as it opens.
+    const at = sections.findIndex((section) => section.value === active);
+    for (const { value } of sections.slice(Math.max(at - 1, 0), at + 2))
+      for (const query of queries[value] ?? [])
+        void client.prefetchQuery({ ...query, staleTime: Infinity });
+  }, [active]);
   const [visited, setVisited] = useState(() => new Set([active]));
   if (!visited.has(active)) setVisited(new Set([...visited, active]));
   // Sections share the workspace modal's scrolling body (the grid's parent), so each keeps its own

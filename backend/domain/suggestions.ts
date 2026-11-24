@@ -114,24 +114,26 @@ const directionRequests: Record<VariationDirection, string> = {
 // How an edit's prompt is worded on the model that runs it; without a known model, as a description.
 const editPrompts = {
   instruction:
-    'the prompt is a short imperative edit instruction naming what changes and what stays ("change X, keep Y"), not a description of the whole image.',
+    'the prompt is a short imperative edit instruction naming what changes and what stays ("change X, keep Y"), not a description of the whole image, ending with one short keep clause ("keep her face, pose and the background unchanged") rather than a list of every detail.',
   description:
     "the edit redraws the image at partial strength, so the prompt is a full description of the edited result, not an instruction.",
   unknown: "the prompt describes the whole edited image.",
 };
 // What each action does, for the model choosing one; an image's and a video's Animate differ. An
 // edit model changes one part and keeps the rest; a partial redraw keeps the shapes, so a change
-// to a person or the framing would barely show there and recreates instead.
+// to a person or the framing would barely show there and recreates instead. Where an edit runs on
+// another model or the source has LoRAs (`loses`), it reshapes a figure poorly, so figure changes
+// recreate on the source's own model and LoRAs.
 const actionGuides: Record<
   ChangeAction,
-  (kind: "image" | "video", edits?: WritingTarget["edits"]) => string
+  (kind: "image" | "video", edits?: WritingTarget["edits"], loses?: string) => string
 > = {
-  edit: (_kind, edits) =>
+  edit: (_kind, edits, loses) =>
     edits === "instruction"
-      ? `edit: an editing model changes this image itself and keeps everything else as it is; the best choice for local changes (face, expression, hair, clothing, a body detail, light, colors, weather, small additions or removals); ${editPrompts.instruction}`
+      ? `edit: an editing model changes this image itself and keeps everything else as it is; the best choice for local changes (face, expression, hair, clothing, ${loses ? "" : "a body detail, "}light, colors, weather, small additions or removals)${loses ? `; ${loses}, so never for the figure, body proportions or build` : ""}; ${editPrompts.instruction}`
       : `edit: redraws this image at partial strength, which keeps its composition, pose, figure, face and clothing shapes, so only for light, color, weather and texture changes; ${editPrompts[edits || "unknown"]}`,
-  recreate: (kind, edits) =>
-    `recreate: make the ${kind} again from the rewritten prompt with the same seed and settings, so the rest stays close while the change lands; for changes ${edits === "instruction" ? "to the composition, framing, pose, subject or style" : "to the person (body, figure, face, expression, hair, clothing), pose, framing, subject or style"} that an edit can't make.`,
+  recreate: (kind, edits, loses) =>
+    `recreate: make the ${kind} again from the rewritten prompt with the same seed and settings, so the rest stays close while the change lands; for changes ${edits === "instruction" ? `to the composition, framing, pose, subject${loses ? ", figure, body proportions, build" : ""} or style` : "to the person (body, figure, face, expression, hair, clothing), pose, framing, subject or style"} that an edit can't make.`,
   animate: (kind) =>
     kind === "video"
       ? "animate: make the video again from a rewritten motion prompt (motion, camera, action, sound)."
@@ -151,18 +153,21 @@ const draftGuides: Record<
 };
 // Areas to vary across the viewer's next steps.
 const stepAreas = [
-  "expression",
-  "outfit",
+  "accessories",
   "action",
+  "expression",
   "interaction",
-  "setting",
-  "weather or season",
   "lighting",
-  "color palette",
-  "framing",
+  "outfit",
+  "pose",
+  "props",
+  "setting",
   "style",
 ] as const;
 const variety = () => promptInstruction("suggestion-variety");
+// Image change suggestions swap the source's own named parts; motion ideas have their own angles.
+const specifics = (kind: "image" | "video") =>
+  kind === "image" && promptInstruction("suggestion-specifics");
 // Angles an idea can take, a few drawn at random per ask so refreshes don't circle the same ones.
 const imageAngles = [
   "a place or setting",
@@ -241,16 +246,34 @@ function referenceNotes(references: DraftReference[]) {
 const referenceImages = (references: DraftReference[]) =>
   references.flatMap(({ image }) => (image ? [image] : []));
 
+const itemLoras = (settings: Record<string, unknown>) =>
+  (Array.isArray(settings.loras) ? settings.loras : [])
+    .filter((lora) => lora && (typeof lora === "string" || lora.enabled !== false))
+    .map((lora) => clean(typeof lora === "string" ? lora : lora.name, 80))
+    .filter(Boolean);
+/**
+ * Why an edit on `profileId` can't reshape a finished result's figure faithfully: it runs on
+ * another model than the one that made it, or the result was made with LoRAs; "" for neither.
+ */
+function editLoss(source: SuggestionItem, editor?: WritingTarget | null, profileId?: string) {
+  const settings = source.settings || {};
+  return [
+    editor &&
+      profileId &&
+      profileId !== settings.profileId &&
+      `it runs on ${editor.label}, not this model`,
+    itemLoras(settings).length && "this was made with LoRAs",
+  ]
+    .filter(Boolean)
+    .join(" and ");
+}
 /**
  * What the item was made with and what it shows, for the model's next steps and changes; without
  * its prompt where the model already has it.
  */
 function describeItem(item: SuggestionItem, withPrompt = true) {
   const settings = item.settings || {};
-  const loras = (Array.isArray(settings.loras) ? settings.loras : [])
-    .filter((lora) => lora && (typeof lora === "string" || lora.enabled !== false))
-    .map((lora) => clean(typeof lora === "string" ? lora : lora.name, 80))
-    .filter(Boolean);
+  const loras = itemLoras(settings);
   return [
     `Model: ${clean(settings.profileName || settings.profileId, 120) || "unknown"}`,
     item.width && item.height ? `Size: ${item.width} × ${item.height}` : "",
@@ -275,6 +298,7 @@ const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensore
         : promptInstruction("image-change-directions", {
             maxSuggestions,
             areas: angles(stepAreas, stepAreas.length),
+            specifics: specifics(kind),
           }),
     contentRule: contentRule(uncensored),
     suggestionChoices: suggestionChoices(kind, uncensored),
@@ -469,6 +493,7 @@ export function createSuggestions({
           media: kind === "video" ? "a video" : "an image",
           maxSuggestions,
           angles: angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions),
+          specifics: specifics(kind),
           guide: targetLines(writing).join("\n"),
           referenceContext: hasReferences && promptInstruction("draft-change-reference-context"),
           fidelity: fidelity(),
@@ -672,6 +697,7 @@ export function createSuggestions({
     const pictures = referenceImages(references);
     const notes = draft ? referenceNotes(references) : [];
     const editing = (!draft && profileId ? editWriting : sourceWriting)?.edits;
+    const loses = draft ? "" : editLoss(source, editWriting, profileId);
     const instruction = offered.includes("edit") && editing === "instruction";
     const onlyInstruction = instruction && offered.length === 1;
     // One direction alone gets several variations of it, to compare.
@@ -697,7 +723,7 @@ export function createSuggestions({
             "Choose the one action that fits best:",
             ...offered.map(
               (action) =>
-                `- ${draft && action !== "upscale" ? draftGuides[action](kind, editing) : actionGuides[action](kind, editing)}`,
+                `- ${draft && action !== "upscale" ? draftGuides[action](kind, editing) : actionGuides[action](kind, editing, loses)}`,
             ),
             promptInstruction("write-changed-prompt"),
           ]

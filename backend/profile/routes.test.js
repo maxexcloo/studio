@@ -115,13 +115,16 @@ test("Library prompt edits reach the writer immediately and preserve history and
       .status,
     400,
   );
-  const text = "Name the visible subject and action. Reply with only {{titleRule}}.";
+  const text = "Name the visible subject and action. Reply with only {{titleRule}}. {{plainWords}}";
   const saved = await call("PUT", edit, { text, baseHash: title.hash });
   assert.equal(saved.status, 200);
   assert.equal(saved.body.version, 1);
   assert.equal(
-    promptInstruction(title.id, { titleRule: "one title, including the literal {{titleRule}}" }),
-    "Name the visible subject and action. Reply with only one title, including the literal {{titleRule}}.",
+    promptInstruction(title.id, {
+      plainWords: "Plain words.",
+      titleRule: "one title, including the literal {{titleRule}}",
+    }),
+    "Name the visible subject and action. Reply with only one title, including the literal {{titleRule}}. Plain words.",
   );
   assert.equal(
     (await call("PUT", edit, { text: title.initial, baseHash: title.hash })).status,

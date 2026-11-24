@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -34,6 +33,7 @@ import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
+import { useHold } from "../../ui/useHold";
 import { usePhone } from "../../ui/usePhone";
 import { CardDescription, CardDialog, CardForm, CardThumbnails } from "../characters/CardImages";
 import { useMediaPreview } from "../gallery/MediaPreview";
@@ -106,7 +106,7 @@ function useAccept() {
   });
 }
 
-/** Dismissing one proposal, or Clearing the Inbox, with an optional reason that teaches Dream. */
+/** Declining one proposal, or Clearing the Inbox, with an optional reason that teaches Dream. */
 function DismissDialog({
   title,
   opened,
@@ -130,6 +130,7 @@ function DismissDialog({
       id={id}
       opened={opened}
       onClose={closeWhenTop(id, () => !pending && onClose())}
+      onExitTransitionEnd={() => setReason("")}
       title={title}
       fullScreen={phone}
     >
@@ -152,7 +153,7 @@ function DismissDialog({
           {error && <Alert color="red">{error}</Alert>}
           <DialogFooter pending={pending} onCancel={onClose}>
             <Button type="submit" loading={pending}>
-              {title === "Clear Inbox" ? "Clear" : "Dismiss"}
+              {title === "Clear Inbox" ? "Clear" : "Decline"}
             </Button>
           </DialogFooter>
         </Stack>
@@ -304,18 +305,23 @@ function ProposalCard({
   proposal,
   project,
   accepting,
+  declining,
   onAccept,
   onEdit,
-  onDismiss,
+  onDecline,
+  onReason,
 }: {
   proposal: Shown;
   project?: Project;
   accepting: boolean;
+  declining: boolean;
   onAccept: () => void;
   onEdit: () => void;
-  onDismiss: () => void;
+  onDecline: () => void;
+  onReason: () => void;
 }) {
   const Icon = kindIcon(proposal);
+  const { consumeClick, ...hold } = useHold(proposal.id, onReason);
   const { change } = proposal;
   const pictures = (items: DreamItem[]) =>
     items.map((item, index) => ({
@@ -341,11 +347,6 @@ function ProposalCard({
               {proposal.why}
             </Text>
           </Stack>
-          <Tooltip label="Dismiss">
-            <ActionIcon variant="subtle" color="gray" aria-label="Dismiss" onClick={onDismiss}>
-              <icons.clear size={16} />
-            </ActionIcon>
-          </Tooltip>
         </Group>
         {change.brief &&
           Object.entries(change.brief).map(([key, value]) => (
@@ -388,11 +389,39 @@ function ProposalCard({
         )}
         <Group gap="xs" justify="flex-end">
           {editable(proposal) && (
-            <Button size="compact-sm" variant="subtle" disabled={accepting} onClick={onEdit}>
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              disabled={accepting || declining}
+              onClick={onEdit}
+            >
               Edit
             </Button>
           )}
-          <Button size="compact-sm" variant="default" loading={accepting} onClick={onAccept}>
+          <Tooltip label="Hold to Add a Reason">
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              color="gray"
+              aria-description="Hold to Add a Reason"
+              aria-keyshortcuts="Shift+F10"
+              disabled={accepting}
+              loading={declining}
+              {...hold}
+              onClick={(event) => {
+                if (!consumeClick(event)) onDecline();
+              }}
+            >
+              Decline
+            </Button>
+          </Tooltip>
+          <Button
+            size="compact-sm"
+            variant="default"
+            disabled={declining}
+            loading={accepting}
+            onClick={onAccept}
+          >
             Accept
           </Button>
         </Group>
@@ -402,21 +431,22 @@ function ProposalCard({
 }
 
 /**
- * Proposals as cards, each accepted as proposed, edited then accepted, or dismissed with an
- * optional reason. `projects` give brief edits their current text to compare with.
+ * Proposals as cards, each accepted as proposed, edited then accepted, or declined: at once, or
+ * with a reason that teaches Dream after a hold. `projects` give brief edits their current text
+ * to compare with.
  */
 export function ProposalList({ proposals, projects }: { proposals: Shown[]; projects: Project[] }) {
   const accept = useAccept();
   const settled = useSettled();
   const [editing, setEditing] = useState<Shown | null>(null);
-  const [dismissing, setDismissing] = useState<Shown | null>(null);
-  const dismiss = useMutation({
+  const [reasoning, setReasoning] = useState<Shown | null>(null);
+  const decline = useMutation({
     meta: { inlineError: true },
     mutationFn: ({ proposal, reason }: { proposal: Shown; reason: string }) =>
       post<Inbox<DreamItem>>(proposalPath(proposal, "dismiss"), reason ? { reason } : {}),
     onSuccess: (inbox, { proposal }) => {
       settled(inbox, proposal);
-      setDismissing(null);
+      setReasoning(null);
     },
   });
   return (
@@ -428,19 +458,24 @@ export function ProposalList({ proposals, projects }: { proposals: Shown[]; proj
             proposal={proposal}
             project={projects.find((project) => project.id === proposal.projectId)}
             accepting={accept.isPending && accept.variables?.proposal.id === proposal.id}
+            declining={
+              !reasoning && decline.isPending && decline.variables?.proposal.id === proposal.id
+            }
             onAccept={() => accept.mutate({ proposal })}
             onEdit={() => {
               accept.reset();
               setEditing(proposal);
             }}
-            onDismiss={() => {
-              dismiss.reset();
-              setDismissing(proposal);
+            onDecline={() => decline.mutate({ proposal, reason: "" })}
+            onReason={() => {
+              decline.reset();
+              setReasoning(proposal);
             }}
           />
         ))}
       </Stack>
       {!editing && accept.error && <Alert color="red">{accept.error.message}</Alert>}
+      {!reasoning && decline.error && <Alert color="red">{decline.error.message}</Alert>}
       <CardDialog
         opened={editing !== null}
         title={editing?.title ?? ""}
@@ -460,13 +495,12 @@ export function ProposalList({ proposals, projects }: { proposals: Shown[]; proj
         )}
       </CardDialog>
       <DismissDialog
-        key={dismissing?.id ?? "none"}
-        title="Dismiss"
-        opened={dismissing !== null}
-        pending={dismiss.isPending}
-        error={dismiss.error?.message}
-        onDismiss={(reason) => dismissing && dismiss.mutate({ proposal: dismissing, reason })}
-        onClose={() => setDismissing(null)}
+        title="Decline"
+        opened={reasoning !== null}
+        pending={decline.isPending}
+        error={decline.error?.message}
+        onDismiss={(reason) => reasoning && decline.mutate({ proposal: reasoning, reason })}
+        onClose={() => setReasoning(null)}
       />
     </>
   );
@@ -538,7 +572,6 @@ export function ProjectInbox({ projects }: { projects: Project[] }) {
         >
           <ProposalList proposals={proposals} projects={projects} />
           <DismissDialog
-            key={String(clearing)}
             title="Clear Inbox"
             opened={clearing}
             pending={clear.isPending}

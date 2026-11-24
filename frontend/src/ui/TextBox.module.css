@@ -246,9 +246,11 @@
   margin-inline-start: auto;
 }
 
+/* The text is its editor's one scroller: at its ends iOS would otherwise pan the visual viewport. */
 .editor textarea {
   flex: 1;
   min-height: 0;
+  overscroll-behavior: contain;
   padding: 0 var(--input-padding-inline-end) 0 0;
   font-size: 1.0625rem;
   line-height: 1.55;

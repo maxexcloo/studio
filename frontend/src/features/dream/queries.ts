@@ -18,6 +18,8 @@ export type DreamItem = MediaItem & {
     at: string;
     state: "unseen" | "kept" | "discarded";
     decidedAt?: string;
+    /** How Dream made it; a clip animates a still or extends a video. */
+    arm?: string;
     uncensored?: true;
     /** One side of a comparison: alike but for what `question` asks about. */
     pair?: { id: string; side: 0 | 1 | 2; size?: 3; question: string; label: string };
@@ -101,24 +103,23 @@ export const setAnswerPath = (setId: string) =>
   `/api/dream/sets/${encodeURIComponent(setId)}/answer`;
 
 /**
- * When Dream works, or why it doesn't, and how much of today's share it has made, such as "Dream
- * works when the queue is free · 12 of 40 today".
+ * When Dream works, or why it doesn't, and how much of today's share it has made: one line each,
+ * such as "Dream works when the queue is free" and "12 of 40 today".
  */
 const dailyShare = (today: number, used: number, limit: number, kind: "images" | "videos") =>
   used === today
     ? `${today} of ${limit} ${kind === "images" ? "today" : "videos"}`
     : `${today} ${kind} today · ${used} of ${limit} since reset`;
 
-export const dreamWhen = ({ settings, today, usage = today, status }: Dream) =>
-  [
-    status === "capped" ? "Dream has made today's share" : "Dream works when the queue is free",
-    ...(settings.images
-      ? [dailyShare(today.images, usage.images, settings.dailyImages, "images")]
-      : []),
-    ...(settings.videos
-      ? [dailyShare(today.videos, usage.videos, settings.dailyVideos, "videos")]
-      : []),
-  ].join(" · ");
+export const dreamWhen = ({ settings, today, usage = today, status }: Dream) => [
+  status === "capped" ? "Dream has made today's share" : "Dream works when the queue is free",
+  ...(settings.images
+    ? [dailyShare(today.images, usage.images, settings.dailyImages, "images")]
+    : []),
+  ...(settings.videos
+    ? [dailyShare(today.videos, usage.videos, settings.dailyVideos, "videos")]
+    : []),
+];
 
 export const projectsQuery = queryOptions({
   queryKey: ["dream", "projects"],
