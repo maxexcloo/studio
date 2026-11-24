@@ -30,6 +30,7 @@ import {
   deckOrder,
   dreamRequest,
   motionBeat,
+  remasterTargets,
   turnShares,
 } from "./dream.ts";
 import { createInbox, ideasFrom } from "./inbox.ts";
@@ -3772,6 +3773,99 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
   assert.deepEqual(extension.input.referenceAssets, [
     { assetId: "last-frame-clip", source: "gallery", slot: "start" },
   ]);
+});
+
+test("Dream remasters a kept or liked clip once, larger or on a stronger tier", async (t) => {
+  const video = (id: string, label: string, width: number) => ({
+    id,
+    kind: "video",
+    label,
+    defaults: { width, height: width, fps: 24, frames: 121 },
+    constraints: { frames: { min: 9, max: 241, step: 8, offset: 1 } },
+    mediaInputs: [{ id: `${id}-start`, role: "start", required: true }],
+  });
+  const fast = video("ltx-fast", "LTX · Fast", 1024);
+  const quality = {
+    ...video("ltx-quality", "LTX · Quality", 1024),
+    options: { loras: ["film.safetensors"] },
+  };
+  const small = video("small", "Small · Quality", 512);
+  assert.deepEqual(
+    remasterTargets({ width: 512, height: 512 }, "LTX · Quality", [fast, quality, small]).map(
+      (profile) => profile.id,
+    ),
+    ["ltx-quality"],
+    "Never a weaker tier, and the same tier only at a larger frame",
+  );
+  assert.deepEqual(
+    remasterTargets({ width: 1024, height: 1024 }, "LTX · Fast", [fast, quality, small]).map(
+      (profile) => profile.id,
+    ),
+    ["ltx-quality"],
+    "A stronger tier remasters a fast clip at its size, never smaller",
+  );
+  assert.deepEqual(remasterTargets({ width: 1024, height: 1024 }, "LTX · Quality", [quality]), []);
+
+  const fx = fixture(t, [...profiles, fast, quality]);
+  fx.state.idleMinutes.video = 0;
+  fx.state.video = "ltx-quality";
+  await fx.dream.save("alice", { enabled: true, images: false, videos: true, dailyVideos: 10 });
+  const clip = (id: string, profileId: string, width: number, fields: Partial<DreamItem> = {}) => {
+    const session = fx.store.createSession("alice", "Gallery").id;
+    const input = {
+      kind: "video",
+      profileId,
+      prompt: `the camera follows ${id}`,
+      loras: [
+        { name: "film.safetensors", strength: 0.5, enabled: true },
+        { name: "ink.safetensors", strength: 1, enabled: true },
+      ],
+      referenceAssets: [{ assetId: `asset-${id}`, source: "gallery", slot: `${profileId}-start` }],
+      writing: { kind: "animate", prompt: `the camera follows ${id}`, title: `Clip ${id}` },
+    };
+    const job = fx.store.enqueue("alice", session, input, "animate", undefined, "local-media");
+    fx.store.save({ ...job, status: "completed" });
+    fx.state.items.push({
+      id,
+      jobId: job.id,
+      ownerId: "alice",
+      type: "video",
+      status: "done",
+      title: `Clip ${id}`,
+      width,
+      height: width,
+      settings: { profileId },
+      ...fields,
+    });
+  };
+  // Neither a clip already at its model's class nor one whose prompt names an exclusion.
+  clip("sharp", "ltx-quality", 1024, { rating: "liked" });
+  fx.taste.edit("alice", { exclusions: ["banned"] });
+  clip("banned", "ltx-fast", 512, { rating: "liked" });
+  clip("quick", "ltx-fast", 1024, {
+    dream: { prompt: "", why: "", at: "", state: "kept", arm: "animate", projectId: "beach" },
+  });
+  const remaster = await fx.dreamOnce();
+  assert.equal(remaster?.dream?.arm, "remaster");
+  assert.equal(remaster.parentItemId, "quick");
+  assert.equal(remaster.dream.projectId, "beach");
+  assert.match(remaster.dream.why, /^Remaster · Clip quick · LTX · Quality at \d+×\d+$/);
+  assert.equal(remaster.input.profileId, "ltx-quality");
+  assert.equal(remaster.input.prompt, "the camera follows quick");
+  assert.equal((remaster.input.writing as { title?: string }).title, "Clip quick");
+  assert.equal(remaster.input.frames, 121);
+  // Only the LoRAs its new profile can load go with it.
+  assert.deepEqual(remaster.input.loras, [
+    { name: "film.safetensors", strength: 0.5, enabled: true },
+  ]);
+  assert.deepEqual(remaster.input.referenceAssets, [
+    { assetId: "asset-quick", source: "gallery", slot: "ltx-quality-start" },
+  ]);
+  // Each clip is remastered once, and a remaster never again.
+  for (const item of fx.state.items)
+    if (item.jobId === remaster.id) item.dream = { ...item.dream!, state: "kept" };
+  const next = await fx.dreamOnce();
+  assert.notEqual(next?.dream?.arm, "remaster");
 });
 
 test("Keep rates count each owner's judged Dream images by profile, LoRA and tag", async (t) => {
