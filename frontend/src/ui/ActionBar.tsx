@@ -41,6 +41,8 @@ export interface Action {
   description?: string;
   /** Every bar action has one; a menu option may go without (a suggested change). */
   icon?: LucideIcon;
+  /** A marker after a menu label, such as an uncensored template's flame. */
+  marker?: LucideIcon;
   /**
    * A bar's main choice, such as Dream's Pass and Like: when labelled, a full-size round button in
    * this variant, at the bar's ends around the smaller icons.
@@ -384,7 +386,9 @@ function MenuRows({
                 />
               ) : checked || selected ? (
                 <Check size={14} />
-              ) : undefined
+              ) : (
+                action.marker && <action.marker size={14} aria-hidden />
+              )
             }
             role={checked === undefined ? undefined : "menuitemcheckbox"}
             renderRoot={
