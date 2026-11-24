@@ -426,15 +426,18 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
   const keepRates = useQuery(keepRatesQuery);
   const fields = useTasteFields();
   const loraInfo = useQuery(loraInfoQuery);
+  const saved = (next: Taste) => {
+    client.setQueryData(tasteQuery.queryKey, next);
+    void client.invalidateQueries({ queryKey: ["suggestions"], refetchType: "none" });
+  };
   // A removed or pinned value makes its field the person's own, as Save in Edit does.
   const change = useMutation({
     mutationFn: (preferences: TastePreferenceChanges) =>
       api<Taste>("/api/taste", { method: "PUT", body: JSON.stringify({ preferences }) }),
-    onSuccess: (next) => client.setQueryData(tasteQuery.queryKey, next),
+    onSuccess: saved,
   });
   const [clearing, setClearing] = useState(false);
   const [editing, setEditing] = useState(false);
-  const saved = (next: Taste) => client.setQueryData(tasteQuery.queryKey, next);
   const refresh = useMutation({
     meta: { inlineError: true },
     mutationFn: () => post<Taste>("/api/taste/refresh"),
