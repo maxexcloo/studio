@@ -2309,6 +2309,30 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
 
+test("Dream draws a project's LoRAs only from those it allows, exploring included", async (t) => {
+  const { dream, state, store, projects, dreamOnce } = fixture(t, [profiles[0]]);
+  state.loras.alice = {
+    ratings: { "fox.safetensors": "liked", "film.safetensors": "liked" },
+  };
+  projects.create("alice", {
+    name: "Film",
+    brief: { description: "a harbour", loras: ["fox.safetensors", "film.safetensors"] },
+    constraints: { loras: ["film.safetensors"] },
+  });
+  await dream.save("alice", { enabled: true });
+  const names = (job: { id: string }) =>
+    (store.job("alice", job.id)!.input.loras as { name: string }[]).map((lora) => lora.name);
+  // Fox ranks first by taste, but only film is allowed; a favourite it doesn't allow isn't offered.
+  const drawn = (await dreamOnce())!;
+  assert.deepEqual(names(drawn), ["film.safetensors"]);
+  assert.match(state.calls.at(-1)!.user, /- Favourite LoRAs: film\.safetensors\n/);
+  // An explored, unrated LoRA the project doesn't allow gives way to one it does.
+  state.rolls = [99];
+  const explored = (await dreamOnce())!;
+  assert.deepEqual(names(explored), ["film.safetensors"]);
+  assert.notEqual(explored.dream?.arm, "explore:lora");
+});
+
 test("Dream loads uncensored LoRAs only with Uncensored on", async (t) => {
   const explicit = { ...profiles[0], options: { loras: ["explicit.safetensors"] } };
   const { dream, state, store, dreamOnce } = fixture(t, [explicit]);

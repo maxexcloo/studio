@@ -55,6 +55,14 @@ export const anyConstraints = (): ProjectConstraints => ({
   loras: [],
   ranges: {},
 });
+/** Whether a project lets a LoRA run; without a project, any may. */
+export const loraAllowed = (
+  project: { constraints: ProjectConstraints } | undefined,
+  name: string,
+) =>
+  !project ||
+  (project.constraints.loras !== "none" &&
+    (!project.constraints.loras.length || project.constraints.loras.includes(name)));
 /**
  * Keeps an input's LoRAs, sound, transparency and numbers to the constraints, in place, and says
  * what changed ("Steps 20 → 8"). Sound and transparency apply only where the profile has them.

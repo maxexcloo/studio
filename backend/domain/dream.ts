@@ -37,6 +37,7 @@ import {
   type ProjectStats,
   type Review,
   fitProjectInput,
+  loraAllowed,
 } from "../../shared/projects.ts";
 import {
   type GenerationInput,
@@ -1922,17 +1923,18 @@ export function createDream(options: {
     taste: TasteRecord,
     weigh: (key: string) => number,
     judged: Judgement,
+    target?: ProjectContent,
   ) {
     const library = options.loraLibrary(ownerId);
     const { kept, total } = judged.counts(`loras:${profile.id}`);
     const share =
       total >= keptLoras.least && kept / total >= keptLoras.rate ? keptLoras.share : shares.lora;
-    if (!library || !chance(share)) return [];
+    if (!library || target?.constraints.loras === "none" || !chance(share)) return [];
     const learnt = new Map(taste.loraScores.map((lora) => [lora.name, lora]));
     const candidates = fit(
       profile,
       (profile.options?.loras || [])
-        .filter((name) => library.ratings[name] !== "disliked")
+        .filter((name) => library.ratings[name] !== "disliked" && loraAllowed(target, name))
         .map((name) => ({ name, strength: learnt.get(name)?.strength, enabled: true as const })),
     );
     const lora = drawn(
@@ -2135,7 +2137,10 @@ export function createDream(options: {
       ? [
           ["Brief", project.brief.description],
           ["Styles", project.brief.styles],
-          ["Favourite LoRAs", project.brief.loras?.join(", ")],
+          [
+            "Favourite LoRAs",
+            project.brief.loras?.filter((name) => loraAllowed(project, name)).join(", "),
+          ],
           ["Avoid", project.brief.avoid],
           ["Pinned Character", character && `${character.name}: ${character.description}`],
           ["Pinned Outfit", outfit && `${outfit.name}: ${outfit.description}`],
@@ -2910,17 +2915,23 @@ export function createDream(options: {
         const offSide = `Your favourite models don't run on ${backend === "cloud" ? "Cloud" : "Local"}`;
         note = note ? `${note} · ${offSide}` : offSide;
       }
-      if (!loras) {
-        loras = exploitLoras(ownerId, profile, taste, weigh, judged);
-        loraWhy = loras.length ? "a LoRA drawn by your taste and keep rates" : "no LoRAs";
+      // A seed's, import's or explored LoRA the project doesn't allow gives way to one it does.
+      if (loras?.some((lora) => !loraAllowed(target, lora.name))) {
+        loras = undefined;
+        loraWhy = undefined;
+        if (axis === "lora") {
+          axis = "prompt";
+          note = "Exploring new ground";
+        }
       }
-      const allowedLoras = target?.constraints.loras;
-      if (allowedLoras === "none") {
-        loras = [];
-        loraWhy = "no LoRAs, as the project asks";
-      } else if (allowedLoras?.length && loras.some((lora) => !allowedLoras.includes(lora.name))) {
-        loras = loras.filter((lora) => allowedLoras.includes(lora.name));
-        loraWhy = loras.length ? "a LoRA the project allows" : "no LoRAs the project allows";
+      if (!loras) {
+        loras = exploitLoras(ownerId, profile, taste, weigh, judged, target);
+        loraWhy =
+          target?.constraints.loras === "none"
+            ? "no LoRAs, as the project asks"
+            : loras.length
+              ? "a LoRA drawn by your taste and keep rates"
+              : "no LoRAs";
       }
       // One of the sizes the project allows, at random.
       const allowedSize = target && shuffled(projectSizes(profile, target.constraints))[0];
