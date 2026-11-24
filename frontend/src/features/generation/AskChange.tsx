@@ -254,6 +254,7 @@ export function changeTemplates(
       .map((change): Action => ({
         id: `change:${change.id}`,
         label: change.label,
+        icon: change.uncensored ? icons.uncensored : undefined,
         disabled,
         onClick: () => pick(change.instruction),
       })),
