@@ -147,7 +147,8 @@ export async function fixtures(page: Page) {
       item:
         gallery.find(
           (item) =>
-            item.jobId === jobId && (!comparison.itemIds || item.id === comparison.itemIds[index]),
+            item.jobId === jobId &&
+            (!comparison.itemIds?.[index] || item.id === comparison.itemIds[index]),
         ) || null,
     })),
   });
@@ -274,8 +275,9 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/preferences") {
       if (method === "PATCH") {
-        Object.assign(preferences.preferences, body);
-        preferences.saved = [...new Set([...preferences.saved, ...Object.keys(body)])];
+        const { previousGalleryViews: _previousGalleryViews, ...patch } = body;
+        Object.assign(preferences.preferences, patch);
+        preferences.saved = [...new Set([...preferences.saved, ...Object.keys(patch)])];
       }
       return respond(preferences);
     }
@@ -559,17 +561,46 @@ export async function fixtures(page: Page) {
       const job = recordGeneration(body, sessionId);
       return respond({ jobId: job.id, sessionId, status: "queued" });
     }
+    if (path === "/api/comparisons/recreate" && method === "POST") {
+      const original = gallery.find(({ id }) => id === body.itemId)!;
+      const source = jobs.find(({ id }) => id === original.jobId)!;
+      const job = recordGeneration(
+        { ...body.input, parentJobId: source.id, parentItemId: original.id },
+        source.sessionId,
+      );
+      const comparison = {
+        id: `compare-${comparisons.length + 1}`,
+        seed: String(body.input.seed),
+        jobIds: [source.id, job.id],
+        itemIds: [original.id, ""],
+        labels: body.labels,
+        variants: [original, ...job.items].map((item, index) => ({
+          jobId: item.jobId,
+          label: body.labels[index],
+          item,
+        })),
+        createdAt: stamp,
+        vote: null,
+      };
+      comparisons.push(comparison);
+      return respond(comparison);
+    }
     // Compare Selected records chosen gallery images.
     if (path === "/api/comparisons" && method === "POST") {
       const comparison = {
         id: `compare-${comparisons.length + 1}`,
         seed: "",
-        requests: body.itemIds.map((id: string) => ({
-          input: { prompt: gallery.find((item) => item.id === id)?.prompt },
+        requests: body.itemIds.map((id: string, index: number) => ({
+          input: {
+            prompt: gallery.find((item) =>
+              id ? item.id === id : item.jobId === body.jobIds[index],
+            )?.prompt,
+          },
         })),
         jobIds: body.jobIds,
         itemIds: body.itemIds,
-        labels: body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
+        labels:
+          body.labels ?? body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
         vote: null,
       };
       comparisons.push(comparison);
@@ -712,6 +743,9 @@ export async function fixtures(page: Page) {
               i.rating !== "disliked") &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
+          (url.searchParams.get("drifted") !== "1" || i.identity?.drifted) &&
+          (!url.searchParams.has("character") ||
+            i.identity?.characterId === url.searchParams.get("character")) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
           (!url.searchParams.has("chat") ||
             i.chat?.conversationId === url.searchParams.get("chat")) &&

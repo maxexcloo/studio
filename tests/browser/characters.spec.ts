@@ -785,3 +785,78 @@ test("Outfits and scenes go into the prompt in order from the References sheet, 
     ["Gala", "an emerald gown and gold heels"],
   ]);
 });
+
+test("Face Check lists a character's results worst first, filters the gallery and recreates drifted ones", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push({ ...mara, createdAt: stamp });
+  const result = (id: string, prompt: string, score: number, drifted: boolean) => {
+    const settings = { profileId: "image:test", seed: 77, steps: 20, count: 1 };
+    const item = {
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      url: image,
+      thumbnailUrl: image,
+      prompt,
+      title: prompt,
+      width: 1024,
+      height: 1024,
+      createdAt: stamp,
+      settings,
+      identity: { characterId: mara.id, score, faces: 1, drifted, checkedAt: stamp },
+    };
+    state.jobs.push({
+      id: item.jobId,
+      jobId: item.jobId,
+      sessionId: "session-mara",
+      status: "completed",
+      operation: "image",
+      input: { kind: "image", prompt, ...settings },
+      items: [item],
+      outputs: [item],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+    state.gallery.push(item);
+  };
+  result("kept", "Mara by the river", 0.72, false);
+  result("drifted", "Mara at the market", 0.21, true);
+  // The gallery's Off-Character filter shows the drifted result alone.
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Off-Character", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect
+    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).get("drifted"))
+    .toBe("1");
+  const tile = (title: string) =>
+    page.getByRole("button", { name: `Open image: ${title}`, exact: true });
+  await expect(tile("Mara at the market")).toBeVisible();
+  await expect(tile("Mara by the river")).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove Off-Character Filter", exact: true }).click();
+  await expect(tile("Mara by the river")).toBeVisible();
+  // Library › Characters › Face Check: worst first, with Recreate for the drifted one only.
+  await page.goto("/library#characters");
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Face Check", exact: true }).click();
+  const check = page.getByRole("dialog", { name: "Face Check", exact: true });
+  const rows = check
+    .getByRole("table", { name: "Mara's Results", exact: true })
+    .locator("tbody tr");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText("0.21");
+  await expect(rows.last()).toContainText("0.72");
+  await expect(check.getByRole("button", { name: /^Recreate / })).toHaveCount(1);
+  await check.getByRole("button", { name: "Recreate Mara at the market", exact: true }).click();
+  await expect(check.getByRole("button", { name: "Recreate Mara at the market" })).toHaveText(
+    "Queued",
+  );
+  expect(state.jobs.at(-1)).toMatchObject({
+    sessionId: "session-mara",
+    parentItemId: "drifted",
+    input: { prompt: "Mara at the market", seed: "", count: 1, profileId: "image:test" },
+  });
+});

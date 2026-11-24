@@ -12,6 +12,7 @@ export function ViewMenu<T extends string>({
   label,
   value,
   groups,
+  actions = [],
   onChange,
   onOpen,
   describedBy,
@@ -26,6 +27,8 @@ export function ViewMenu<T extends string>({
     /** How many items the view holds, once known. */
     count?: number;
   }[])[];
+  /** Actions on the views, after a divider: saving the one shown, say. */
+  actions?: { label: string; disabled?: boolean; onClick: () => void }[];
   onChange: (value: T) => void;
   describedBy?: string;
   /** Runs as the menu opens, so counts load only once wanted. */
@@ -81,6 +84,12 @@ export function ViewMenu<T extends string>({
               </Menu.Item>
             ))}
           </Fragment>
+        ))}
+        {actions.length > 0 && <Menu.Divider />}
+        {actions.map((action) => (
+          <Menu.Item key={action.label} disabled={action.disabled} onClick={action.onClick}>
+            {action.label}
+          </Menu.Item>
         ))}
       </Menu.Dropdown>
     </Menu>

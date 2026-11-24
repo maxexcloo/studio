@@ -326,7 +326,8 @@ export function registerCompareRoutes(
       : res.status(404).json({ ok: false, error: "That comparison is unavailable." });
   });
   // MCP records its multi-model and one-thing runs through this one (with the `axis` they vary
-  // and the chat's project), and Compare Selected the chosen images (`itemIds`, one per job).
+  // and the chat's project), and Compare Selected the chosen images (`itemIds`, one per job; an
+  // empty one is its job's first image, such as Recreate On's run that is still queued).
   directRoute(app, "POST", "/api/comparisons", (account, { body }) => {
     const strings = (value: unknown) =>
       Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
@@ -346,7 +347,7 @@ export function registerCompareRoutes(
         (!Array.isArray(itemIds) ||
           itemIds.length !== jobIds.length ||
           itemIds.some((id) => typeof id !== "string") ||
-          new Set(itemIds).size !== itemIds.length))
+          new Set(itemIds.filter(Boolean)).size !== itemIds.filter(Boolean).length))
     )
       return {
         status: 400,
@@ -365,6 +366,7 @@ export function registerCompareRoutes(
         : items.some((item) => item.jobId === id && item.type === "image");
     };
     const chosen = (id: string, index: number) =>
+      !id ||
       items.some((item) => item.id === id && item.jobId === jobIds[index] && item.type === "image");
     if (!jobIds.every(image) || (itemIds && !itemIds.every(chosen)))
       return { status: 404, payload: { ok: false, error: "A comparison image is unavailable." } };
@@ -373,6 +375,49 @@ export function registerCompareRoutes(
       ...(projectId ? { projectId } : {}),
     });
     return { status: 201, payload: show(record, items) };
+  });
+  directRoute(app, "POST", "/api/comparisons/recreate", async (account, { body }) => {
+    const { itemId, input, labels } = body || {};
+    const items = galleryFor(account, { itemIds: typeof itemId === "string" ? [itemId] : [] });
+    if (!items) return galleryOff;
+    const source = items.find(
+      (item) => item.id === itemId && item.type === "image" && item.status === "done",
+    );
+    if (!source?.jobId)
+      return { status: 404, payload: { ok: false, error: "That image is unavailable." } };
+    if (!object(input) || !labelsValid(labels, 2))
+      return {
+        status: 400,
+        payload: { ok: false, error: "Choose a model and name the comparison sides." },
+      };
+    const ownerId = account?.userId || "";
+    const sourceJob = store.job(ownerId, source.jobId);
+    const jobId = randomUUID();
+    const sessionId = sourceJob?.sessionId || store.createSession(ownerId).id;
+    // Persist the comparison first, so a write failure cannot leave a paid generation without its comparison.
+    const record: ComparisonRecord = {
+      id: randomUUID(),
+      ownerId,
+      createdAt: new Date().toISOString(),
+      seed: String(input.seed ?? ""),
+      jobIds: [source.jobId, jobId],
+      itemIds: [itemId, ""],
+      labels,
+      vote: null,
+    };
+    save(record);
+    let result;
+    try {
+      result = await options.admit(
+        { ...input, kind: "image", count: 1, clientJobId: jobId } as GenerationInput,
+        account ?? undefined,
+        { sessionId, operation: "image", parentJobId: sourceJob?.id, parentItemId: itemId },
+      );
+    } finally {
+      if (!store.job(ownerId, jobId))
+        options.write(options.read().filter(({ id }) => id !== record.id));
+    }
+    return result.status >= 400 ? result : { status: 201, payload: show(record, items) };
   });
   // The variants run as one queue set, sharing the first numeric seed (else a random one) unless
   // they carry their own, as a comparison of seeds does; a refused variant cancels the rest.
