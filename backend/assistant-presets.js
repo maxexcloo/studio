@@ -67,7 +67,6 @@ export const seedStyles = Object.freeze([
     id: "graphic-poster",
     kind: "improve",
     enabled: true,
-    censored: true,
     label: "Graphic Poster",
     description: "Turn the scene into a poster with clear shapes and deliberate space.",
     instruction:
@@ -123,7 +122,6 @@ export const seedStyles = Object.freeze([
     id: "atmosphere",
     kind: "animate",
     enabled: true,
-    censored: true,
     label: "Moving Surroundings",
     description: "Give movement to visible surroundings while holding the composition.",
     instruction:

@@ -549,7 +549,7 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
   await dialog
     .getByRole("radiogroup", { name: "Offered To", exact: true })
-    .getByText("Without Uncensored", { exact: true })
+    .getByText("Uncensored Only", { exact: true })
     .click();
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -557,9 +557,8 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
     id: "cinematic",
     kind: "animate",
     description: "A moving camera.",
-    censored: true,
+    uncensored: true,
   });
-  expect(saves.at(-1).styles[2].uncensored).toBeUndefined();
   await expect(table.getByText("A moving camera.")).toBeVisible();
 });
 

@@ -1,8 +1,8 @@
 /**
  * The assistant's fixed options, edited in Library › Prompt Styles: `<data>/prompt-styles.json`
  * holds `{styles, meta}`, each style `{id, kind, label, description,
- * instruction, enabled, uncensored?, censored?}`. An `uncensored` style is offered only to accounts
- * with Uncensored Models and a `censored` one only to accounts without, so both see as many. `kind` is the menu it belongs to: `improve` (Improve
+ * instruction, enabled, uncensored?}`. An `uncensored` style is offered only to accounts with
+ * Uncensored Models, which also see every other style. `kind` is the menu it belongs to: `improve` (Improve
  * Prompt's rewrite styles), `animate` (Animate's themes) or `change` (fixed AI edits); IDs are
  * unique within a kind. A data folder without the file has the built-in seed
  * (assistant-presets.js); the first save records it as version 1. Every save is a new version under
@@ -54,12 +54,9 @@ function cleanStyles(value) {
       enabled: entry.enabled !== false,
       ...(kind === "change" && actions && { actions: [...new Set(actions)] }),
       ...(entry.uncensored === true ? { uncensored: true } : {}),
-      ...(entry.censored === true ? { censored: true } : {}),
     };
     if (!style.label || !style.instruction)
       throw fail(`Style ${index + 1} needs a name and an instruction.`);
-    if (style.uncensored && style.censored)
-      throw fail(`Style ${index + 1} cannot be both for and without Uncensored Models.`);
     return style;
   });
 }

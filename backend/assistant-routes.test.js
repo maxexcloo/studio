@@ -252,12 +252,15 @@ test("Uncensored needs Uncensored Models, whatever the profile, and runs on the 
     403,
   );
   assert.equal((await get("/api/assistant", "user")).uncensored, false);
-  // Each menu lists as many for either account: the uncensored style takes a censored one's place.
+  // Uncensored Models add the uncensored styles to every menu without taking any away.
   const menus = (status) =>
-    [status.presets, status.themes, status.changes].map((list) => list.length);
-  assert.deepEqual(
-    menus(await get("/api/assistant", "uncensored")),
-    menus(await get("/api/assistant", "user")),
+    [status.presets, status.themes, status.changes].map((list) => list.map((style) => style.id));
+  const general = menus(await get("/api/assistant", "user"));
+  menus(await get("/api/assistant", "uncensored")).forEach((ids, index) =>
+    assert.deepEqual(
+      ids.filter((id) => general[index].includes(id)),
+      general[index],
+    ),
   );
   // Text offers and defaults to uncensored models only for accounts that may use them.
   const writing = (status) => [status.writingModel, status.models];
