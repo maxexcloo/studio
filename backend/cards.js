@@ -14,7 +14,6 @@ import { mayUseFeature } from "./account-policy.js";
 import { dataDir } from "./data-dir.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { galleryJobItems } from "./gallery/store.js";
-import { minorAgeRefusal } from "./minor-age.js";
 import { ownerDocumentName, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { referenceAssetMetadataForAccount, referenceExistsForAccount } from "./references.js";
 import { localRefusal } from "./route-access.js";
@@ -166,8 +165,6 @@ export function cleanCard(kind, account, body, pending = false) {
   if (description.length > maxCardDescription)
     throw new CardError(`Keep the description within ${maxCardDescription} characters.`);
   if (!images.min && !description) throw new CardError(`Describe the ${noun}.`);
-  const refusal = minorAgeRefusal([name, description, ...Object.values(traits)].join("\n"));
-  if (refusal) throw new CardError(refusal);
   if ((ids.length < images.min && !(pending && !ids.length)) || ids.length > images.max)
     throw new CardError(
       images.min

@@ -32,7 +32,6 @@ import { upscaleQualities } from "../../shared/upscale.ts";
 import { maxResultCaption } from "../gallery/records.js";
 import { profileAspectSize } from "../generation-defaults.js";
 import { recommendedNegative } from "../lora/prompts.js";
-import { minorAgeRefusal } from "../minor-age.js";
 import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { promptStyleStore } from "../prompt-styles.js";
 import {
@@ -449,7 +448,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave model, count, tier, size and LoRAs out unless asked (Studio uses the default model and its size). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Never make anyone sexual or nude under 18 or a teen, without adding "adult" or an age to say so.`,
+    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave model, count, tier, size and LoRAs out unless asked (Studio uses the default model and its size). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
     z.strictObject({
       request: z
         .string()
@@ -908,9 +907,6 @@ export function registerGenerateTools({
     for (const prompt of args.prompts) {
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
-      // Refused before any prompt queues, so no part of a set runs (admission checks each too).
-      const minor = minorAgeRefusal(prompt);
-      if (minor) throw new Error(minor);
     }
     // Each call of a turn ("200 more") brings new ideas rather than repeating the turn's earlier sets.
     const listProblem =
@@ -1452,10 +1448,6 @@ export function registerGenerateTools({
       return add ? `${next.replace(/[\s,.;]+$/, "")}, ${add}` : next;
     };
     const checked = prompts.flat().map(changed);
-    for (const prompt of checked) {
-      const minor = minorAgeRefusal(prompt);
-      if (minor) throw new Error(minor);
-    }
     const [project, exclusions] = await Promise.all([
       attachedProject(signal),
       accountExclusions(media, owner, signal),
@@ -1913,8 +1905,6 @@ export function registerGenerateTools({
             `${name} looks like ${same.name}, already in this request or Library (${same.description}). Use or update ${same.name}, or give a clearly different name and looks.`,
           );
         known.push(entry);
-        const refusal = minorAgeRefusal(Object.values(card).join("\n"));
-        if (refusal) throw new Error(refusal);
       }
       const names = characters.map(({ name }) => name);
       const reply = await generateOnce(

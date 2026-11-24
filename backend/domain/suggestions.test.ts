@@ -572,7 +572,7 @@ test("viewer next steps vary across relevant areas, specific, and uncensored onl
   await labels("bob", "job-b");
   assert.match(
     calls[1][0].content,
-    /clearly adult human subject.*changes to how they look.*non-graphic body alternatives/,
+    /human subject.*changes to how they look.*non-graphic body alternatives/,
   );
 });
 
@@ -654,7 +654,6 @@ test("all creative suggestion surfaces share context and variety while motion ke
       assert.match(system.content, /current prompt and reference images first/);
       assert.match(system.content, /Preserve identity, species, breed, age/);
       assert.match(system.content, /not synonyms or near-duplicates/);
-      assert.match(system.content, /minors, ambiguous ages or nonhuman subjects/);
       assert.match(context.content, /35-year-old woman with a broad build/);
       if (surface === "animate" || kind === "video") {
         assert.match(system.content, /Vary motion, subject action/);

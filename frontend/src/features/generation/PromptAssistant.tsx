@@ -17,6 +17,9 @@ import { profileForLoras } from "./payload";
 export interface AssistantOption {
   id: string;
   label: string;
+  /** The brief under the name in its menu. */
+  description?: string;
+  system?: boolean;
   /** Offered only to accounts with Uncensored Models. */
   uncensored?: boolean;
 }
@@ -32,6 +35,8 @@ interface AssistantStatus {
   themes: (AssistantOption & { instruction?: string })[];
   /** Fixed AI edits, each run as its instruction. */
   changes: AssistantChangeOption[];
+  /** Animate's modifiers, enabled accounts only, alphabetically; none to offer when empty. */
+  modifiers?: AssistantOption[];
   defaultPreset?: string;
   vision?: boolean;
   loras?: boolean;
@@ -417,28 +422,31 @@ export function usePromptAssistant({
     if (style) setPresetId(style);
     assistance.mutate({ action, preset: style });
   };
-  const custom = change || info.presets.some((item) => item.id === "custom");
+  const custom = info.presets.find((item) => item.id === "custom");
   const styles = info.presets.filter((item) => item.id !== "custom");
   const templates: ToolAction[] = styles.map((item) => ({
     id: `style:${item.id}`,
     label: styles.length === 1 ? "Improve Prompt" : item.label,
+    description: item.description,
     marker: item.uncensored ? icons.uncensored : undefined,
     checked: styles.length > 1 ? item.id === preset?.id : undefined,
     disabled,
     onClick: () => run("rewrite", item.id),
   }));
-  const customActions: ToolAction[] = custom
-    ? [
-        {
-          id: "custom",
-          label: "Custom…",
-          icon: icons.custom,
-          // A change can write a prompt from nothing; the Custom style rewrites one.
-          disabled: !change && disabled,
-          onClick: () => setAsking(true),
-        },
-      ]
-    : [];
+  const customActions: ToolAction[] =
+    custom || change
+      ? [
+          {
+            id: "custom",
+            label: "Custom…",
+            description: custom?.description ?? "Your own instruction",
+            icon: icons.custom,
+            // A change can write a prompt from nothing; the Custom style rewrites one.
+            disabled: !change && disabled,
+            onClick: () => setAsking(true),
+          },
+        ]
+      : [];
   const more: ToolAction[] = negativeOffered
     ? [{ id: "negative", label: "Write Negative", disabled, onClick: () => run("negative") }]
     : [];

@@ -87,6 +87,8 @@ export interface PromptStyle {
   instruction: string;
   enabled: boolean;
   uncensored?: boolean;
+  /** Animate only: applied on top of a chosen theme, never offered as one. */
+  modifier?: boolean;
 }
 interface PromptStyleVersion {
   version: number;

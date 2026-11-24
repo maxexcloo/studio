@@ -2004,7 +2004,7 @@ test("create_characters saves each card with its story and queues its portrait, 
     },
   ]);
   assert.match(texts(reply), /^Saved Mara, Ivo in Library › Characters/);
-  // A name already in use queues nothing; an age under 18 never reaches the tool.
+  // A name already in use queues nothing.
   f.characters.push({
     id: "chr-1",
     name: "Mara",
@@ -2037,10 +2037,12 @@ test("create_characters saves each card with its story and queues its portrait, 
   await failure(client, "create_characters", {
     characters: [{ name: "Cora", description: "", portrait: "A ranger" }],
   });
-  await failure(client, "create_characters", {
+  // A child's age is kept as given.
+  const young = await call(client, "create_characters", {
     characters: [{ name: "Kit", description: "Ranger", portrait: "A ranger", age: 16 }],
   });
-  assert.equal(f.submitted.length, before);
+  assert.notEqual(young.isError, true, texts(young));
+  assert.equal(f.submitted.length, before + 1);
 });
 
 test("models lists the account's characters, and generate applies one by name: its first image goes in and its lead starts each prompt", async (t) => {

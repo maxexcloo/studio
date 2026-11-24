@@ -1,14 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { temporaryFolder } from "./fixtures/temporary.js";
+import { seedUncensoredStyles } from "./fixtures/uncensored-styles.js";
 import { loadMcpPrompting } from "./mcp/prompting.js";
 import {
   animateClip,
   animateInstructions,
+  animateRequest,
   clipName,
+  maxModifiers,
   writeAnimatePrompt,
 } from "./prompt-animate.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
+
+// Isolated from the real data folder, with a synthetic Uncensored theme for the restricted-theme
+// cases below: the live deployment's own uncensored wording is not test data.
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-prompt-animate-");
+seedUncensoredStyles(process.env.STUDIO_DATA_DIR);
 
 // The three shapes Animate writes for, each with its mode's format rule from the merged guide.
 const shapes = {
@@ -71,17 +80,43 @@ test("each theme asks for its own motion and camera", () => {
   const theme = (name) =>
     animateInstructions({ ...shapes.grok, writing: { theme: name } }).split("Theme: ")[1];
   assert.match(theme("cinematic"), /camera move that keeps its action readable.*stopping point/);
-  assert.match(theme("living"), /activity already under way continue through one small step/);
+  assert.match(theme("living"), /activity already under way carry two linked steps/);
   assert.match(theme("action"), /what takes the impact or weight.*one readable follow-through/);
   assert.match(theme("atmosphere"), /Lock the opening composition.*element of the surroundings/);
   assert.match(theme("dialogue"), /makes sound.*brief line.*listener's glance/);
-  assert.match(theme("reaction"), /eyes, ears or head.*new expression or settled pose/);
-  assert.match(theme("two-beats"), /two linked actions where the first sets up the second/);
-  assert.match(
-    theme("uncensored"),
-    /already in the frame[\s\S]*Every person in it must be 18 or older/,
-  );
+  assert.match(theme("reaction"), /eyes, ears or head.*returned gesture, and end on it/);
+  assert.match(theme("uncensored"), /already in the frame[\s\S]*Explicit content is allowed/);
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
+});
+
+test("a ticked modifier's text reaches the prompt, folded in alongside the theme", () => {
+  const system = animateInstructions({
+    ...shapes.grok,
+    writing: { theme: "cinematic", modifiers: ["uncensored-modifier"] },
+  });
+  assert.match(system, /Uncensored Modifier\. Add a little more flesh in motion\./);
+  assert.match(system, /Fold these modifiers into the same through-line/);
+  // Without any modifier, the line and its heading both disappear, with no stray blank line.
+  const plain = animateInstructions({ ...shapes.grok, writing: { theme: "cinematic" } });
+  assert.doesNotMatch(plain, /Fold these modifiers/);
+  assert.doesNotMatch(plain, /\n\n\n/);
+});
+
+test("Animate's request caps modifiers at three and drops duplicates", () => {
+  assert.deepEqual(
+    animateRequest({ theme: "cinematic", modifiers: ["a", "a", "b", "c", "d"] }).modifiers,
+    ["a", "b", "c"].slice(0, maxModifiers),
+  );
+  assert.equal(maxModifiers, 3);
+});
+
+test("an unknown modifier is a 400, and an uncensored one needs Uncensored Models", () => {
+  assert.equal(issue({}, { theme: "cinematic", modifiers: ["not-a-modifier"] }), 400);
+  assert.equal(issue({}, { theme: "cinematic", modifiers: ["uncensored-modifier"] }), 403);
+  assert.equal(
+    issue({ uncensoredModels: true }, { theme: "cinematic", modifiers: ["uncensored-modifier"] }),
+    undefined,
+  );
 });
 
 test("quiet source motion and explicit dialogue keep their own scope within a short clip", async () => {
@@ -116,10 +151,7 @@ test("quiet source motion and explicit dialogue keep their own scope within a sh
     assert.match(system.content, /shortening it for physical action and pauses/);
     assert.match(system.content, /only 5 seconds long/);
   }
-  assert.match(
-    requests[0][0].content,
-    /activity already under way continue through one small step/,
-  );
+  assert.match(requests[0][0].content, /activity already under way carry two linked steps/);
   assert.match(requests[1][0].content, /listener's glance, nod or reply only when time permits/);
   assert.match(requests[2][0].content, /Preserve requested filmmaking and camera moves/);
   assert.ok(requests[2][1].content.includes(`Instruction: ${instruction}`));

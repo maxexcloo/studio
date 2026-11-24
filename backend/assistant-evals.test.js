@@ -9,6 +9,13 @@ import {
   scoreNegative,
   scoreRewrite,
 } from "./assistant-evals.js";
+import { temporaryFolder } from "./fixtures/temporary.js";
+import { seedUncensoredStyles } from "./fixtures/uncensored-styles.js";
+
+// Isolated from the real data folder, with a synthetic Uncensored preset so the eval set's
+// "uncensored-couple" case resolves: the live deployment's own uncensored wording is not test data.
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-assistant-evals-");
+seedUncensoredStyles(process.env.STUDIO_DATA_DIR);
 
 test("the eval set has 22 rewrite, 15 LoRA, 5 negative and 6 animate cases with unique ids", () => {
   const evals = loadEvals();

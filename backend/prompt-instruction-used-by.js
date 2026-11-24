@@ -4,6 +4,7 @@ export const promptInstructionUsedBy = {
   "animate-frame-described": "Animate, from the frame's caption",
   "animate-frame-seen": "Animate, when the model sees the frame",
   "animate-frame-unknown": "Animate, from the prompt alone",
+  "animate-modifiers": "Animate",
   "animate-pacing": "Animate",
   "animate-short": "Animate, when the length is unknown",
   "appearance-preferences": "prompt writers, with your appearance preferences",

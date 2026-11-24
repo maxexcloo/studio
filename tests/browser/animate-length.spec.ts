@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  backToActionMenu,
   expandAssistantMenu,
   fixtures,
   image,
@@ -15,6 +16,19 @@ for (const review of [false, true]) {
     page,
   }) => {
     const state = await fixtures(page);
+    await page.route("**/api/assistant", (route) =>
+      route.fulfill({
+        json: {
+          available: true,
+          presets: [],
+          changes: [],
+          themes: [
+            { id: "action", label: "Action", description: "One action and its follow-through." },
+          ],
+          modifiers: [{ id: "slow", label: "Slow", description: "Use gradual movement." }],
+        },
+      }),
+    );
     const local = {
       ...profiles[1],
       defaults: { ...profiles[1].defaults, frames: 192, fps: 24, steps: 8 },
@@ -67,8 +81,16 @@ for (const review of [false, true]) {
     await menu.getByText(length, { exact: true }).click();
     await expect(menu.getByRole("radio", { name: length, exact: true })).toBeChecked();
     if (review) await menu.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
+    await menu.getByRole("menuitem", { name: "Modifiers", exact: true }).click();
+    const modifier = menu.getByRole("menuitem", { name: "Slow", exact: true });
+    await expect(modifier).toHaveAccessibleDescription("Use gradual movement.");
+    await modifier.click();
+    await expect(modifier).toHaveAttribute("aria-checked", "true");
+    await backToActionMenu(menu);
     await expandAssistantMenu(menu, "Templates");
-    await menu.getByRole("menuitem", { name: "Action", exact: true }).click();
+    const template = menu.getByRole("menuitem", { name: "Action", exact: true });
+    await expect(template).toHaveAccessibleDescription("One action and its follow-through.");
+    await template.click();
     if (review) {
       const dialog = page.getByRole("dialog", { name: "Review Prompt", exact: true });
       await expect(dialog.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -80,6 +102,7 @@ for (const review of [false, true]) {
         frames: 243,
         fps: 24,
         assetId: "asset-length-bird",
+        modifiers: ["slow"],
       });
       switched = true;
       await dialog.getByRole("button", { name: "Run", exact: true }).click();
@@ -91,9 +114,13 @@ for (const review of [false, true]) {
             profileId: local.id,
             frames: 243,
             fps: 24,
-            writing: { kind: "animate", prompt: "The bird lifts its wings." },
+            writing: { kind: "animate", prompt: "The bird lifts its wings.", modifiers: ["slow"] },
           }
-        : { profileId: cloud.id, duration: 10, writing: { kind: "animate", theme: "action" } },
+        : {
+            profileId: cloud.id,
+            duration: 10,
+            writing: { kind: "animate", theme: "action", modifiers: ["slow"] },
+          },
     );
     expect(state.jobs[0].input.parentItemId).toBe("length-bird");
     expect(state.jobs[0].input.referenceAssets).toEqual([

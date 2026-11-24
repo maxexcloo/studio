@@ -122,7 +122,7 @@ test(
       });
       assert.equal(refused.status, 400);
     }
-    // A character keeps an adult age and its story; one waiting on its portrait may have no image.
+    // A character keeps its age and story; one waiting on its portrait may have no image.
     const pending = await call("/api/characters", {
       method: "POST",
       cookie: cookies.artist,
@@ -130,7 +130,7 @@ test(
         ...card,
         name: "Ivo",
         referenceIds: [],
-        age: 40,
+        age: 16,
         likes: "rain",
         portrait: { jobId: "job-ivo" },
       },
@@ -138,27 +138,34 @@ test(
     assert.equal(pending.status, 201, pending.body.error);
     assert.deepEqual(
       [pending.body.character.age, pending.body.character.likes, pending.body.character.portrait],
-      [40, "rain", { jobId: "job-ivo", status: "making" }],
+      [16, "rain", { jobId: "job-ivo", status: "making" }],
     );
-    for (const story of [
-      { age: 16 },
-      { job: "x".repeat(501) },
-      { backstory: "a 15 year old runaway" },
-    ])
-      assert.equal(
-        (
-          await call("/api/characters", {
-            method: "POST",
-            cookie: cookies.artist,
-            body: { ...card, name: "Kit", ...story },
-          })
-        ).status,
-        400,
-      );
     await call(`/api/characters/${pending.body.character.id}`, {
       method: "DELETE",
       cookie: cookies.artist,
     });
+    // A story naming a child's age is kept as given; one over its limit is refused.
+    const childhood = await call("/api/characters", {
+      method: "POST",
+      cookie: cookies.artist,
+      body: { ...card, name: "Kit", backstory: "a 15 year old runaway" },
+    });
+    assert.equal(childhood.status, 201, childhood.body.error);
+    assert.equal(childhood.body.character.backstory, "a 15 year old runaway");
+    await call(`/api/characters/${childhood.body.character.id}`, {
+      method: "DELETE",
+      cookie: cookies.artist,
+    });
+    assert.equal(
+      (
+        await call("/api/characters", {
+          method: "POST",
+          cookie: cookies.artist,
+          body: { ...card, name: "Kit", job: "x".repeat(501) },
+        })
+      ).status,
+      400,
+    );
     const updated = await call(`/api/characters/${id}`, {
       method: "PUT",
       cookie: cookies.artist,

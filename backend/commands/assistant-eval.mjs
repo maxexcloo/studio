@@ -4,10 +4,17 @@
 // environment. `--record` writes the live replies back as the recorded ones CI replays; review
 // that diff before committing it.
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { evalsDir, loadEvals, runEvals } from "../assistant-evals.js";
 import { gatewaySettings } from "../assistant.js";
+import { seedUncensoredStyles } from "../fixtures/uncensored-styles.js";
+
+// Isolated from the real data folder, with a synthetic Uncensored preset so the eval set's
+// "uncensored-couple" case resolves: the live deployment's own uncensored wording is not test data.
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-assistant-eval-"));
+seedUncensoredStyles(process.env.STUDIO_DATA_DIR);
 
 const record = process.argv.includes("--record");
 let settings;

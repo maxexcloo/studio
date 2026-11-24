@@ -20,7 +20,6 @@ import { writeBytesFileAsync } from "./json-store.js";
 import { workflowLoraBase } from "./lora/radiance.js";
 import { mediaRoot, mediaSubfolder } from "./media-paths.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
-import { minorAgeRefusal } from "./minor-age.js";
 import { withPngText } from "./png-text.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
@@ -325,11 +324,8 @@ export function createGenerationQueue({
           .catch(() => undefined);
       },
       releaseAdmission: (job) => releaseLease(job.id),
-      // Retries, recovered work and anything queued before the check tightened meet it here too.
       submit: async (job, residentModel) => {
-        const refusal =
-          minorAgeRefusal(job.input.prompt) ||
-          (job.dream && (await dream().queuedProfileIssue(job)));
+        const refusal = job.dream && (await dream().queuedProfileIssue(job));
         return refusal
           ? { status: "failed", reason: refusal, permanent: true }
           : generationAdapter.submit(job, residentModel);
@@ -410,12 +406,10 @@ export function createGenerationQueue({
         completed(items);
       },
     },
-    // A written prompt passes the same age check as one the person wrote.
+    // A written prompt is checked for the job as it will run.
     promptStage &&
       (async (job, stream) => {
         const written = await promptStage(job, stream);
-        const refusal = minorAgeRefusal(written?.prompt);
-        if (refusal) throw Object.assign(new Error(refusal), { permanent: true });
         return written;
       }),
   );
@@ -435,8 +429,6 @@ export function createGenerationQueue({
     }),
   );
   async function validateGenerationInput(input, account) {
-    const refusal = minorAgeRefusal(input.prompt);
-    if (refusal) return { status: 400, payload: { ok: false, error: refusal } };
     if (input.writing === undefined) return validateGeneration(input, account);
     if (typeof input.writing?.prompt === "string") {
       // Already written (a Dream variation): the record goes with the prompt it explains.

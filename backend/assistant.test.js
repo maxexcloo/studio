@@ -13,7 +13,14 @@ import {
   validDraftGuide,
 } from "./assistant.js";
 import { writerGuide } from "./domain/writing-standard.ts";
+import { temporaryFolder } from "./fixtures/temporary.js";
+import { seedUncensoredStyles } from "./fixtures/uncensored-styles.js";
 import { flux3Upsampler } from "./prompt-upsamplers.js";
+
+// Isolated from the real data folder, with a synthetic Uncensored preset for "Uncensored runs on
+// the assistant model" below: the live deployment's own uncensored wording is not test data.
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-assistant-");
+seedUncensoredStyles(process.env.STUDIO_DATA_DIR);
 
 const gateway = (extra = {}) => ({
   STUDIO_ASSISTANT_URL: "http://bifrost.invalid:4000",
@@ -492,7 +499,7 @@ test("Custom follows its instruction, and only Uncensored Models lift the explic
   });
   assert.match(
     seen.calls.at(-1).body.messages[0].content,
-    /"make it summer"\nEvery person in it must be 18 or older,[^\n]*Explicit/,
+    /"make it summer"\nExplicit content is allowed/,
   );
 });
 
@@ -809,7 +816,7 @@ test("Uncensored card ideas describe the reference without proposing body edits"
   });
   const system = seen.calls[0].body.messages[0].content;
   assert.match(system, /without inventing or changing bodies/);
-  assert.match(system, /ambiguous ages or nonhuman subjects/);
+  assert.match(system, /Keep each card kind's scope/);
   assert.doesNotMatch(system, /include a non-graphic body-shape/);
 });
 

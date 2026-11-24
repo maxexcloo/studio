@@ -1,4 +1,3 @@
-import { isCloudProfile } from "../shared/profiles.ts";
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt for the
  * frame a clip starts from and a theme, as the queue item's writing stage (prompt-stage.js) or for
@@ -13,6 +12,8 @@ import { isCloudProfile } from "../shared/profiles.ts";
  *
  * `extend` marks a continuation from a video's last frame, whose `source` is that video's prompt.
  */
+import { animationModifierIds, maxModifiers } from "../shared/animate.ts";
+import { isCloudProfile } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
@@ -30,8 +31,16 @@ import { families } from "./family-catalogue.js";
 import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
-/** An enabled Animate theme (Library › Templates) or Custom, by id; null otherwise. */
-const animateTheme = (id) => promptStyleStore().style("animate", id);
+/** An enabled Animate theme (Library › Templates) or Custom, by id; null for a modifier or unknown id. */
+const animateTheme = (id) => {
+  const found = promptStyleStore().style("animate", id);
+  return found && !found.modifier ? found : null;
+};
+
+/** An enabled Animate modifier (Library › Templates) by id; null otherwise. */
+const animateModifier = (id) => promptStyleStore().modifier(id);
+
+export { maxModifiers };
 
 // Phrases that tell a video model nothing; the writer is told to leave them out. Not "cinematic",
 // which MiniMax H3's own guide uses.
@@ -109,6 +118,14 @@ export function animateInstructions({
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
   // About two and a half spoken words a second, leaving room for the action around them.
   const speech = Math.round(2.5 * (seconds || 6));
+  const modifiers = (Array.isArray(writing.modifiers) ? writing.modifiers : [])
+    .map((id) => animateModifier(id))
+    .filter(Boolean);
+  const modifierInstructions = modifiers.length
+    ? promptInstruction("animate-modifiers", {
+        modifiers: modifiers.map((modifier) => modifier.instruction).join("\n"),
+      })
+    : "";
   return promptInstruction("animate", {
     model: profile.label || profile.id,
     precedence,
@@ -127,8 +144,10 @@ export function animateInstructions({
     filler: animateFiller.join(", "),
     sound2: audio ? " or hears" : "",
     words,
-    theme: theme.instruction,
-    contentRule: contentRule(explicit || Boolean(theme.uncensored)),
+    theme: [theme.instruction, modifierInstructions].filter(Boolean).join("\n"),
+    contentRule: contentRule(
+      explicit || Boolean(theme.uncensored) || modifiers.some((modifier) => modifier.uncensored),
+    ),
     guide: writerGuide(guide) || "(none; write a clear, specific natural-language prompt)",
   });
 }
@@ -147,6 +166,7 @@ export function animateRequest(value) {
     source: String(value?.source || "")
       .trim()
       .slice(0, maxPromptCharacters),
+    modifiers: animationModifierIds(value?.modifiers),
     ...(value?.extend === true ? { extend: true } : {}),
   };
 }
@@ -159,6 +179,12 @@ export function animateIssue(writing, { allowed }) {
     return { status: 400, error: "Describe what should happen." };
   if (theme.uncensored && !allowed("uncensoredModels"))
     return { status: 403, error: `${theme.label} needs Uncensored Models for this account.` };
+  for (const id of writing.modifiers || []) {
+    const modifier = animateModifier(id);
+    if (!modifier) return { status: 400, error: "Choose a known animation modifier." };
+    if (modifier.uncensored && !allowed("uncensoredModels"))
+      return { status: 403, error: `${modifier.label} needs Uncensored Models for this account.` };
+  }
   return null;
 }
 

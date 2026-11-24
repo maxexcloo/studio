@@ -475,7 +475,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Review Prompt",
     "Suggestions",
     "Templates",
-    "Custom…",
+    /^Custom…/,
     "Refresh",
     "Run Again",
     "Run Again, Same Seed",
@@ -483,7 +483,9 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Recreate in Composer",
   ]);
   await expandAssistantMenu(menu, "Templates");
-  await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
+  const template = menu.getByRole("menuitem", { name: "Softer Shadows", exact: true });
+  await expect(template).toHaveAccessibleDescription("Gentler contrast.");
+  await template.click();
   await expect
     .poll(() => asked.find((body) => body.surface === "change"))
     .toMatchObject({ request: "soften the shadows", actions: ["recreate"] });
