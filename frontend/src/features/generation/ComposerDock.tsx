@@ -315,6 +315,7 @@ export const ComposerDock = memo(function ComposerDock({
           {({ field, done }) => (
             <GenerationForm
               fill
+              onDone={done}
               onNegativeWritten={() => {
                 if (field === "prompt") done();
               }}

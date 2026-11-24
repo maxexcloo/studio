@@ -1,5 +1,7 @@
 import { type TouchEvent, useRef } from "react";
 
+import { easing, motionTransition } from "../theme";
+import { useMotionDuration } from "./Appearance";
 import { closingPopup, layerAbove, popupLayer } from "./popupClicks";
 
 /** Whether anything from `from` up to and including `to` is scrolled away from its top. */
@@ -13,8 +15,9 @@ function scrolled(from: Element, to: Element) {
 
 /**
  * Touch handlers for a phone drawer or sheet that a drag towards `direction` pulls with the finger
- * and, past 80 px, closes. A drag mostly across that direction is left alone, and a downward one
- * only pulls while the content under the finger is scrolled to its top, so lists still scroll.
+ * and, past 80 px, closes, carrying on off the screen; short of that it eases back. A drag mostly
+ * across that direction is left alone, and a downward one only pulls while the content under the
+ * finger is scrolled to its top, so lists still scroll.
  */
 export function useSwipeClose(direction: "down" | "left", close: () => void, enabled = true) {
   const drag = useRef<{
@@ -27,22 +30,29 @@ export function useSwipeClose(direction: "down" | "left", close: () => void, ena
     transform?: string;
   } | null>(null);
   const down = direction === "down";
+  const motion = motionTransition(useMotionDuration());
   function release(event: TouchEvent<HTMLElement>) {
     const start = drag.current;
     drag.current = null;
     if (start?.transition === undefined) return;
-    event.currentTarget.style.transition = start.transition;
+    const sheet = event.currentTarget;
+    const pulled = sheet.style.transform;
+    sheet.style.transition = start.transition;
+    sheet.style.transform = start.transform ?? "";
     if (event.type === "touchend" && event.cancelable) event.preventDefault();
-    if (
-      enabled &&
-      start.moved > 80 &&
-      event.type === "touchend" &&
-      !layerAbove(event.currentTarget)
-    ) {
-      close();
-    } else {
-      event.currentTarget.style.transform = start.transform ?? "";
-    }
+    const closing = enabled && start.moved > 80 && event.type === "touchend" && !layerAbove(sheet);
+    if (closing) close();
+    if (!motion.duration) return;
+    // The sheet leaves from where the finger let go, as its own exit would, or eases back.
+    const away = down ? "translateY(100%)" : "translateX(-100%)";
+    const animation = sheet.animate(
+      [{ transform: pulled }, { transform: closing ? away : start.transform || "none" }],
+      closing
+        ? { duration: motion.exitDuration, easing: easing.exit, fill: "forwards" }
+        : { duration: motion.duration, easing: easing.enter },
+    );
+    // Once away, the sheet's own closed state holds it there.
+    if (closing) animation.onfinish = () => animation.cancel();
   }
   return {
     onTouchStart(event: TouchEvent<HTMLElement>) {

@@ -10,7 +10,6 @@ import {
 import { ArrowUp } from "lucide-react";
 import {
   Suspense,
-  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -33,6 +32,7 @@ import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, MediaKind, QueueJob } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
+import { lazyLoaded } from "../../ui/lazyLoaded";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
@@ -105,9 +105,8 @@ type PageState = GalleryState &
   };
 /** A built-in view, or a saved one (`saved:` and its ID). */
 type GalleryView = "gallery" | "uploads" | "comparisons" | "review" | `saved:${string}`;
-const loadReview = () => import("./GalleryReview");
-const GalleryReview = lazy(() =>
-  loadReview().then(({ GalleryReview }) => ({ default: GalleryReview })),
+const [GalleryReview, loadReview] = lazyLoaded(() =>
+  import("./GalleryReview").then((module) => module.GalleryReview),
 );
 // Review loads once the page is idle, so opening it doesn't wait for its code.
 (window.requestIdleCallback || setTimeout)(() => void loadReview());
@@ -574,9 +573,12 @@ function Gallery() {
     });
   }, [itemId, listingScope, loaded, shown, total]);
   const viewerItems = order?.items || loaded;
-  // The query the shown results answer: placeholder results still answer the previous one.
-  const [resultsKey, setResultsKey] = useState(listingScope);
-  if (!gallery.isPlaceholderData && resultsKey !== listingScope) setResultsKey(listingScope);
+  // The query the shown results answer, and whether they are uploads: placeholder results still
+  // answer the previous one, and keep its heading until the new ones arrive.
+  const [results, setResults] = useState({ key: listingScope, uploads: filters.uploads });
+  if (!gallery.isPlaceholderData && results.key !== listingScope)
+    setResults({ key: listingScope, uploads: filters.uploads });
+  const resultsKey = results.key;
   const selection = useGallerySelection(loaded, scope, {
     complete: !gallery.hasNextPage && !gallery.hasPreviousPage,
     ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
@@ -811,7 +813,7 @@ function Gallery() {
       onOpen={() => setCountsWanted(true)}
       value={
         routeView ??
-        (saved.current ? `saved:${saved.current}` : filters.uploads ? "uploads" : "gallery")
+        (saved.current ? `saved:${saved.current}` : results.uploads ? "uploads" : "gallery")
       }
       groups={[
         [
@@ -888,7 +890,7 @@ function Gallery() {
       }}
     >
       <VisuallyHidden component="h1">
-        {filters.uploads ? "Uploads" : kind === "video" ? "Videos" : "Images"}
+        {results.uploads ? "Uploads" : kind === "video" ? "Videos" : "Images"}
       </VisuallyHidden>
       {/* The search and filters stay in place while selecting; the selection bar follows them.
           Phones keep them in sight only while a search, filter or selection applies. */}

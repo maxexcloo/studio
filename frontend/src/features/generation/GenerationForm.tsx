@@ -91,6 +91,7 @@ export function GenerationForm({
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
+  onDone,
   onNegativeWritten,
 }: {
   onSubmitted?: (jobId: string) => void;
@@ -102,6 +103,7 @@ export function GenerationForm({
   autoFocusPrompt?: boolean;
   focusPrompt?: boolean;
   fill?: boolean;
+  onDone?: () => void;
   onNegativeWritten?: () => void;
 }) {
   const { setDraft, update, profile, selectProfile, models } = useGeneration();
@@ -273,6 +275,7 @@ export function GenerationForm({
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
       fill={fill}
+      onDone={onDone}
       onNegativeWritten={onNegativeWritten}
       ideas
     />

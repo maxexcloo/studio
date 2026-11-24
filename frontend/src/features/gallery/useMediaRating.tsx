@@ -174,10 +174,13 @@ export function showDisliked(
         <Button
           size="compact-sm"
           variant="subtle"
-          onClick={() => {
+          onClick={(event) => {
             notifications.hide(notification);
             undo();
+            // Focus leaves the closing banner: back to the dialog, or to the page, where the gallery
+            // returns it to the restored tile.
             if (owner?.isConnected && !layerAbove(owner)) owner.focus({ preventScroll: true });
+            else event.currentTarget.blur();
           }}
         >
           Undo

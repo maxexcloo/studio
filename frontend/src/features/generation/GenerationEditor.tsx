@@ -166,6 +166,7 @@ export function GenerationEditor({
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
+  onDone,
   onNegativeWritten,
   ideas: offerIdeas = false,
 }: {
@@ -210,6 +211,8 @@ export function GenerationEditor({
    * of the chips, one row that scrolls sideways, and actions, and a text box being edited takes it alone.
    */
   fill?: boolean;
+  /** Done in the filled sheet: leaves the text box being edited, keeping focus in the sheet. */
+  onDone?: () => void;
   onNegativeWritten?: () => void;
   /** Offers taste-led prompt ideas in the prompt's AI menu while the prompt is empty. */
   ideas?: boolean;
@@ -432,7 +435,7 @@ export function GenerationEditor({
                   radius="xl"
                   // The text keeps focus until the press ends, so the bar keeps Done under it.
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => (document.activeElement as HTMLElement | null)?.blur()}
+                  onClick={onDone}
                 >
                   Done
                 </Button>

@@ -14,15 +14,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import {
-  type CSSProperties,
-  type ReactNode,
-  Suspense,
-  lazy,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type CSSProperties, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 
 import { api, post } from "../../api";
@@ -37,7 +29,7 @@ import { inboxQuery } from "../dream/queries";
 import type { ComparisonImage } from "../gallery/MediaComparison";
 import { mediaSource } from "../gallery/mediaSource";
 import { MediaTile } from "../gallery/MediaTile";
-import { MediaViewer } from "../gallery/MediaViewer";
+import { MediaComparison, MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
@@ -48,9 +40,6 @@ import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
 
-const MediaComparison = lazy(() =>
-  import("../gallery/MediaComparison").then((module) => ({ default: module.MediaComparison })),
-);
 type SplitImage = ComparisonImage & { value: string; width?: number; height?: number };
 
 /**
