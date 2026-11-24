@@ -10,7 +10,7 @@ import { ChatChoices } from "./ChatChoices";
 import { chatNotesQuery, projectsQuery } from "./queries";
 
 /**
- * Dream › Taste: what chats told Studio, which Dream may draw on, each with Delete, then what each
+ * Settings › Taste: what chats told Studio, which Dream may draw on, each with Delete, then what each
  * chat remembers.
  */
 export function ChatNotes() {

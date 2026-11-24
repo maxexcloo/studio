@@ -182,8 +182,11 @@ export interface DreamInputs {
   prompts?: DreamLikedPrompt[];
   /** The project whose brief it followed. */
   project?: string;
-  /** Chat notes and rules it was given. */
+  /** Chat notes, Dream's guidance and My Preferences it was given. */
   notes?: string[];
+  guidance?: string;
+  preferences?: string;
+  /** The rules older results were given, before My Preferences replaced them. */
   rules?: string[];
   /** Why it runs on its model and LoRAs. */
   choice?: string;

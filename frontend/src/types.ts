@@ -192,7 +192,7 @@ export interface MediaItem {
   faceRedo?: boolean;
   /** A prompt that would recreate an item made without one (an upload); Recreate uses it. */
   suggestedPrompt?: string;
-  /** Self-review against its owner's rules and any project's brief (backend/domain/review.ts). */
+  /** Self-review against its project's brief (backend/domain/review.ts). */
   review?: Review;
   createdAt?: string;
   galleryAt?: string;

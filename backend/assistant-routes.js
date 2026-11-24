@@ -27,6 +27,7 @@ import { accountPreferences, defaultTextSide } from "./account-preferences.js";
 import { AssistantError, createAssistant, gatewaySettings, uncensoredText } from "./assistant.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { projectPatch } from "./domain/projects.ts";
+import { tasteLines } from "./domain/taste.ts";
 import { americanEnglish, contentRule } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { promptInstruction } from "./prompt-instructions.js";
@@ -145,7 +146,8 @@ export async function textModels(engine, workloadModels) {
  * `workloadModels()`: the models of Studio's workloads serving text, running or not, which prompt writing
  * may pick too. `profiles(req)`: the generation profiles this account may use (account-scoped).
  * `guide(profile)`: its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `liked(req,
- * profile)`: { examples, loras } from liked results on the same family. `frame(req, assetId)`: a
+ * profile)`: { examples, loras } from liked results on the same family. `taste(req)`: what Prompt
+ * Writing receives of the account's taste (domain/taste.ts `area`). `frame(req, assetId)`: a
  * reference image the account may use, as the text model reads it; `caption(req, assetId)` what it
  * shows in words.
  */
@@ -161,6 +163,7 @@ export function registerAssistantRoutes(
     guide = () => null,
     loras = async () => [],
     liked = async () => ({ examples: [], loras: [] }),
+    taste = () => ({ on: false, guidance: "", prefer: "", learnt: "", exclusions: [] }),
     frame = async () => null,
     caption = () => "",
     shutdown,
@@ -310,6 +313,7 @@ export function registerAssistantRoutes(
       references,
       stack,
       examples,
+      taste: tasteLines(taste({ studioAccount: account })),
       negative: context.profile.capabilities?.negativePrompt !== false,
       writer: writerOf(account),
       signal,
@@ -400,6 +404,7 @@ export function registerAssistantRoutes(
           engine,
           writing,
           clip: animateClip(body, context.profile),
+          taste: tasteLines(taste({ studioAccount: account })),
           explicit: allowed(account, "uncensoredModels"),
           writer: writerOf(account),
           frame: () => frame({ studioAccount: account }, assetId),

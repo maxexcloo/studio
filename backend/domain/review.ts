@@ -28,28 +28,17 @@ interface ReviewWriter {
 /** A score at or below this misses the brief. */
 const missAt = 5;
 const missCharacters = 160;
-// Only results this new, or still unseen in Dream, are reviewed, so a new rule doesn't send the
-// whole gallery to the text model.
+// Only results this new, or still unseen in Dream, are reviewed, so a changed brief doesn't send
+// the whole gallery to the text model.
 const recentMs = 7 * 24 * 60 * 60_000;
-// How long an owner's rules are reused across the results a walk weighs.
-const rulesMs = 60_000;
 export const reviewInstructions = () =>
   promptInstruction("review-gallery", {
     missAt,
   });
 
-/**
- * The brief as the reviewer reads it, or "" when it asks for nothing: the owner's rules, with the
- * prompt to judge their exceptions by, and the project's brief.
- */
-function briefText(
-  rules: string[],
-  { subjects, styles, avoid }: Partial<ProjectBrief>,
-  prompt = "",
-) {
+/** A project's brief as the reviewer reads it, or "" when it asks for nothing. */
+function briefText({ subjects, styles, avoid }: Partial<ProjectBrief>) {
   return [
-    rules.length && `Rules:\n${rules.map((rule) => `- ${rule}`).join("\n")}`,
-    rules.length && prompt && `Prompt: ${prompt}`,
     subjects && `Subjects: ${subjects}`,
     styles && `Styles: ${styles}`,
     avoid && `Avoid: ${avoid}`,
@@ -87,10 +76,10 @@ export function reviewReply(reply: { score?: unknown; miss?: unknown }) {
 }
 
 /**
- * Self-review: while Studio is idle (domain/idle-work.ts, as captions), each recent image whose
- * owner has rules, and each unseen Dream image made for a project, is scored against those rules
- * and the project's brief by the text model where its owner runs text (`text`) while it reads
- * images, and its review saved on the result. A changed brief makes recent results due again.
+ * Self-review: while Studio is idle (domain/idle-work.ts, as captions), each recent or unseen Dream
+ * image made for a project is scored against the project's brief by the text model where its owner
+ * runs text (`text`) while it reads images, and its review saved on the result. A changed brief
+ * makes recent results due again.
  */
 export function createReview(options: {
   /** The Settings › Maintenance switch (STUDIO_SELF_REVIEW). */
@@ -102,8 +91,6 @@ export function createReview(options: {
   changes?(): number;
   visible(item: ReviewItem): boolean;
   projects(ownerId: string): Project[];
-  /** The owner's rules (domain/taste.ts). */
-  rules(ownerId: string): string[];
   /** Whether the owner's results may be read with the uncensored model. */
   explicit(ownerId: string): boolean;
   /** The owner's text writer (account-policy.js `promptWriter`). */
@@ -115,20 +102,13 @@ export function createReview(options: {
   log?: { info(message: string): void };
 }) {
   const { writer, now = Date.now } = options;
-  const read = new Map<string, { at: number; rules: string[] }>();
-  const rules = (ownerId: string) => {
-    let entry = read.get(ownerId);
-    if (!entry || now() - entry.at > rulesMs)
-      read.set(ownerId, (entry = { at: now(), rules: options.rules(ownerId) }));
-    return entry.rules;
-  };
   const brief = (item: ReviewItem) => {
     const ownerId = item.ownerId || "";
     const projectId = item.dream?.projectId;
     const project = projectId
       ? options.projects(ownerId).find((entry) => entry.id === projectId)
       : undefined;
-    return briefText(rules(ownerId), project?.brief || {}, item.prompt);
+    return briefText(project?.brief || {});
   };
   // Checked before each pick, so an owner's images wait while their text model can't read them.
   const vision = { cloud: true, local: false };

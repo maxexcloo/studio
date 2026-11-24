@@ -118,6 +118,14 @@ registerAssistantRoutes(app, {
       : { summary: "Lead with light." },
   loras: async () => loras,
   liked: async () => ({ examples: ["a liked prompt"], loras: [] }),
+  // Prompt Writing uses this account's taste, with its guidance and exclusions.
+  taste: () => ({
+    on: true,
+    guidance: "Keep it photographic.",
+    prefer: "",
+    learnt: "",
+    exclusions: ["smoking"],
+  }),
 });
 const server = app.listen(0, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
@@ -212,6 +220,13 @@ test("the assistant is for every account, and only for profiles the account may 
     calls.at(-1).messages[0].content,
     /a liked prompt/,
     "liked prompts are style examples",
+  );
+  assert.equal(
+    JSON.stringify(calls.at(-1).messages[1].content).includes(
+      "Prompt: a cabin\\nTheir guidance: Keep it photographic.\\nNever include: smoking",
+    ),
+    true,
+    "the writing taste follows the prompt",
   );
 });
 

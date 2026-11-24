@@ -69,7 +69,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_SELF_REVIEW",
     "Self-Review",
-    "While Studio is idle, the assistant model scores recent images against their owner's rules and their project's brief. Needs a model that reads images.",
+    "While Studio is idle, the assistant model scores recent Dream project images against their project's brief. Needs a model that reads images.",
   ),
   flag(
     "STUDIO_SUGGESTED_PROMPTS",

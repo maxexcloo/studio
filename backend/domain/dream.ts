@@ -1258,63 +1258,48 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
+  /** A shape drawn by its score (Favourites score high), less for shapes that keep poorly (`shapeWeights`). */
+  const favouriteShape = (taste: TasteRecord) =>
+    drawn(
+      [...taste.scores]
+        .filter(([attribute]) => attribute.startsWith("aspect:"))
+        .map(([attribute, { score }]) => {
+          const shape = attribute.slice("aspect:".length);
+          return [shape, score * (shapeWeights[shape] ?? 1)];
+        }),
+    );
   /**
-   * One of the person's own shapes where they set them, else one drawn by its score, less for
-   * shapes that keep poorly (`shapeWeights`).
-   */
-  const favouriteShape = (taste: TasteRecord) => {
-    const own = taste.preferences.shapes;
-    return own
-      ? drawn(own.map((value) => [value, 1]))
-      : drawn(
-          [...taste.scores]
-            .filter(([attribute]) => attribute.startsWith("aspect:"))
-            .map(([attribute, { score }]) => {
-              const shape = attribute.slice("aspect:".length);
-              return [shape, score * (shapeWeights[shape] ?? 1)];
-            }),
-        );
-  };
-  /**
-   * A tag to feature: one of the person's own where they set them, else one drawn by its score
-   * among those liked at least `featuredLikes` times; never one their rules leave out or that is
-   * cooling down (`motifs`).
+   * A tag to feature, drawn by its score among the person's favourites and those liked at least
+   * `featuredLikes` times; never one excluded or cooling down (`motifs`).
    */
   const featuredTag = (taste: TasteRecord, motifs: string[]) => {
-    const open = (tag: string) => !motifs.some((motif) => mentionsMotif(tag, motif));
-    const own = taste.preferences.tags;
-    if (own) return drawn(own.filter(open).map((value) => [value, 1]));
+    const own = taste.preferences.favourites?.tags ?? [];
     return drawn(
       [...taste.scores]
-        .filter(([attribute, { liked }]) => attribute.startsWith("tag:") && liked >= featuredLikes)
+        .filter(
+          ([attribute, { liked }]) =>
+            attribute.startsWith("tag:") &&
+            (liked >= featuredLikes || own.includes(attribute.slice(4))),
+        )
         .map(([attribute, { score }]): [string, number] => [attribute.slice(4), score])
-        .filter(([tag]) => open(tag)),
+        .filter(([tag]) => !motifs.some((motif) => mentionsMotif(tag, motif))),
     );
   };
   /**
-   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (among the
-   * person's own favourite models where any of them run there, by keep rate; `offSide` says when
-   * none do) less its recent share (`spread`), else the kind's default there: the account's own
-   * for that side, the catalogue's, or the first.
+   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (Favourites
+   * score high; `offSide` says when none of them runs there) less its recent share (`spread`), else
+   * the kind's default there: the account's own for that side, the catalogue's, or the first.
    */
   function exploitProfile(
     kind: Kind,
     catalogue: Awaited<ReturnType<typeof options.catalogue>>,
     taste: TasteRecord,
     weigh: (key: string) => number,
-    { keepRate }: Judgement,
   ) {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
-    const own = taste.preferences.models?.filter((id) =>
-      profiles.some((profile) => profile.id === id),
-    );
+    const favourites = taste.preferences.favourites?.models ?? [];
     const scores = new Map(
-      own?.length
-        ? own.map((id) => [id, keepRate(`profile:${id}`)])
-        : [...taste.profiles.image, ...taste.profiles.video].map((entry) => [
-            entry.id,
-            entry.score,
-          ]),
+      [...taste.profiles.image, ...taste.profiles.video].map((entry) => [entry.id, entry.score]),
     );
     const side = profiles.some(isCloudProfile) ? "cloud" : "local";
     const defaultIds = [
@@ -1330,7 +1315,12 @@ export function createDream(options: {
       ) ||
       defaultIds.flatMap((id) => profiles.filter((profile) => profile.id === id))[0] ||
       profiles[0];
-    return { profile, offSide: Boolean(taste.preferences.models?.length && !own?.length) };
+    return {
+      profile,
+      offSide: Boolean(
+        favourites.length && !favourites.some((id) => profiles.some((entry) => entry.id === id)),
+      ),
+    };
   }
   /**
    * Another ready profile of the kind drawn by its keep rate, those the account ran fewest jobs on
@@ -1730,13 +1720,13 @@ export function createDream(options: {
   const pausedMotifs = (similar: DreamItem[]) =>
     similar.flatMap((item) => item.dream?.motifs ?? []);
   const seedMotifs = (ownerId: string, record: DreamRecord) => {
-    const { preferences, rules, exclusions = [] } = options.taste.read(ownerId);
-    const forbidden = [
-      ...explicitExclusions(exclusions),
-      ...forbiddenMotifs(preferences.avoid ?? [], rules, true),
-    ];
+    const { prefer, guidance, exclusions } = options.taste.area(ownerId, "dream");
+    const forbidden = explicitExclusions(exclusions);
     const paused = pausedMotifs(similarPasses(ownerId));
-    return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden, paused)];
+    return [
+      ...forbidden,
+      ...cooledMotifs(record, [prefer, guidance].join("\n"), forbidden, paused),
+    ];
   };
 
   /**
@@ -1887,14 +1877,11 @@ export function createDream(options: {
         .filter((name) => library.ratings[name] !== "disliked")
         .map((name) => ({ name, strength: learnt.get(name)?.strength, enabled: true as const })),
     );
-    const own = taste.preferences.loras;
     const lora = drawn(
       candidates.map((lora): [DreamLora, number] => [
         lora,
-        (own
-          ? Number(own.includes(lora.name))
-          : (learnt.get(lora.name)?.score ?? 0) +
-            (library.ratings[lora.name] === "liked" ? 1 : 0)) * weigh(`lora:${lora.name}`),
+        ((learnt.get(lora.name)?.score ?? 0) + (library.ratings[lora.name] === "liked" ? 1 : 0)) *
+          weigh(`lora:${lora.name}`),
       ]),
     );
     return lora ? [lora] : [];
@@ -2095,24 +2082,16 @@ export function createDream(options: {
       record.settings.uncensored &&
       access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
-    const {
-      summary,
-      rules,
-      likes,
-      styles,
-      preferences,
-      learnt,
-      exclusions = [],
-    } = options.taste.read(ownerId);
-    // Their own avoids and those Studio learnt both steer the idea; only their own are enforced.
-    const avoid = [...new Set([...(preferences.avoid ?? []), ...learnt.avoid])];
+    const learntTaste = options.taste.read(ownerId);
+    const taste = options.taste.area(ownerId, "dream", learntTaste);
+    const { exclusions } = taste;
+    // What Studio learnt steers the idea only while Dream uses their taste; the brief's bans are enforced.
+    const { likes, styles, avoid } = taste.on
+      ? learntTaste.learnt
+      : { likes: [], styles: [], avoid: [] };
     const forbidden = [
       ...explicitExclusions(exclusions),
-      ...forbiddenMotifs(
-        [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
-        [...rules, project?.brief.rules ?? ""],
-        true,
-      ),
+      ...forbiddenMotifs([project?.brief.avoid ?? ""], [project?.brief.rules ?? ""], true),
     ];
     const [fewest, most] = explore ? tasteDraw.exploreLikes : tasteDraw.likes;
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
@@ -2123,12 +2102,16 @@ export function createDream(options: {
       ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
       ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),
     ];
-    const rulesRule = rules.length
+    const own = [
+      taste.guidance && `Their guidance: ${taste.guidance}`,
+      taste.prefer && `Their preferences: ${taste.prefer}`,
+    ].filter((line): line is string => Boolean(line));
+    const rulesRule = own.length
       ? [
-          "Keep every one of their rules: they are limits the prompt must not break, never a look to aim for, so vary everything they leave open.",
+          "Keep to their guidance and preferences: never break a limit they set, and vary everything they leave open.",
         ]
       : [];
-    const ruleLines = rules.length ? ["Their rules:", ...rules.map((rule) => `- ${rule}`)] : [];
+    const ruleLines = own;
     const media = kindOf(profile);
     const model = await writer.model("dream", false, text(ownerId));
     const guide = `Prompting guide: ${writerGuide(options.guide(profile)) || "(none)"}`;
@@ -2157,7 +2140,7 @@ export function createDream(options: {
     const notes = chatNotes(ownerId, projectId, project, pinned);
     const noteLines = notes.length
       ? [
-          "Notes from their chats, as background only (never over their rules or the brief; use what fits, ignore the rest):",
+          "Notes from their chats, as background only (never over their preferences, guidance or the brief; use what fits, ignore the rest):",
           ...notes.map((note) => `- ${note}`),
         ]
       : [];
@@ -2172,7 +2155,8 @@ export function createDream(options: {
     const newConcept = media === "image" && !like && !seed && !series && !reword;
     const fixed = [
       ...brief.filter(([label]) => label !== "Avoid").map(([, value]) => value),
-      ...rules,
+      taste.prefer,
+      taste.guidance,
     ].join("\n");
     // More Like This follows its source; other ideas move away from what was passed as too similar.
     const similar = like ? [] : similarPasses(ownerId);
@@ -2273,7 +2257,7 @@ export function createDream(options: {
     else {
       // Liked prompts that name what is excluded, cooling or passed as too similar would lead back to it.
       const [least, most] = explore ? tasteDraw.explorePrompts : tasteDraw.prompts;
-      const likedPrompts = (await tastePrompts(ownerId))
+      const likedPrompts = (taste.on ? await tastePrompts(ownerId) : [])
         .filter(
           ({ prompt }) =>
             !namedMotif(prompt, forbidden) &&
@@ -2360,7 +2344,7 @@ export function createDream(options: {
         {
           role: "user",
           content: [
-            ...(like && summary ? [`Taste profile: ${summary}`] : []),
+            ...(like && taste.learnt ? [`Taste profile: ${taste.learnt}`] : []),
             ...(newConcept && contentTaste.length ? ["Taste profile:", ...contentTaste] : []),
             ...ruleLines,
             ...briefLines,
@@ -2446,7 +2430,7 @@ export function createDream(options: {
         return `"${minor}" reads as someone under 18; drop it, without adding "adult" or an age.`;
       const excluded = namedMotif(prompt, forbidden);
       if (excluded)
-        return `Your prompt includes "${excluded}", which their rules or brief say to avoid.`;
+        return `Your prompt includes "${excluded}", which their exclusions or brief say to avoid.`;
       if (series)
         return shots.some((shot) => normalised(shot) === normalised(prompt))
           ? "You repeated an earlier result of the series."
@@ -2534,7 +2518,8 @@ export function createDream(options: {
           ...(likedUsed.length ? { prompts: likedUsed } : {}),
           ...(briefed && project ? { project: project.name } : {}),
           ...(briefed && notes.length ? { notes } : {}),
-          ...(!reword && rules.length ? { rules: rules.map((rule) => clean(rule, 200)) } : {}),
+          ...(!reword && taste.guidance ? { guidance: taste.guidance } : {}),
+          ...(!reword && taste.prefer ? { preferences: clean(taste.prefer, 400) } : {}),
         };
         return {
           prompt,
@@ -2734,7 +2719,7 @@ export function createDream(options: {
       const judged = judgement(ownerId);
       const weigh = spread(ownerId, judged);
       // More Like This keeps its result's profile where it is still ready.
-      const exploited = exploitProfile(kind, catalogue, taste, weigh, judged);
+      const exploited = exploitProfile(kind, catalogue, taste, weigh);
       let profile =
         catalogue.profiles.find(
           (item) => kindOf(item) === "image" && steer && item.id === steer.profileId,
@@ -2857,13 +2842,7 @@ export function createDream(options: {
       } else if (inspiration) note = `${note} · Inspired by an import`;
       else if (axis === "prompt") note = "Exploring new ground";
       if (!possible.includes(profile)) {
-        profile = exploitProfile(
-          kind,
-          { ...catalogue, profiles: possible },
-          taste,
-          weigh,
-          judged,
-        ).profile!;
+        profile = exploitProfile(kind, { ...catalogue, profiles: possible }, taste, weigh).profile!;
         loras = undefined;
         loraWhy = undefined;
         modelWhy = "a model the project allows, drawn by your taste";

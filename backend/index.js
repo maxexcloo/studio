@@ -98,6 +98,7 @@ import {
   preferenceSignal,
   registerTasteRoutes,
   setPreferenceSignals,
+  tasteLines,
   tasteSignal,
 } from "./domain/taste.ts";
 import { createTitler } from "./domain/titles.ts";
@@ -325,6 +326,7 @@ const mcp = registerMcpRoutes(app, {
       .filter((job) => job.input.kind === "video")
       .map((job) => ({ reason: job.reason, at: Date.parse(job.updatedAt) })),
   cloudHeld: cloudLocalOnly,
+  chatTaste: (ownerId) => tasteLines(taste.area(ownerId, "chats")),
 });
 app.use(express.json({ limit: "25mb" }));
 const cloudProvider = configuredCliProxy();
@@ -641,6 +643,7 @@ const assistantEngine = registerAssistantRoutes(app, {
   guide: assistant.guide,
   loras: assistant.loras,
   liked: assistant.liked,
+  taste: (req) => taste.area(ownerIdForRequest(req), "writing"),
 });
 
 registerGalleryReadRoutes(app, {
@@ -663,6 +666,7 @@ const textWriter = (ownerId = "") =>
 const textOnline = async () => Boolean(assistantEngine);
 const taste = createTaste({
   dataDir,
+  areas: (ownerId) => accountPreferences(ownerId).tasteAreas,
   writer: tasteWriter,
   promptWriter: textWriter,
   online: textOnline,
@@ -759,6 +763,7 @@ const promptStage = createPromptStage({
   frame: assistant.image,
   caption: assistant.caption,
   setPrompts: (job) => setPrompts(store, job, resultItem),
+  taste: (ownerId) => taste.area(ownerId, "writing"),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const queueRuntime = createGenerationQueue({
@@ -1188,7 +1193,13 @@ registerDreamRoutes(app, {
   digest: createDreamDigest({
     decided: (ownerId, since) =>
       galleryItems({ ownerId, dreamState: ["kept", "discarded"], dreamDecidedSince: since }),
-    taste: (ownerId) => taste.read(ownerId),
+    taste: (ownerId) => {
+      const { learnt, preferences } = taste.read(ownerId);
+      const own = preferences.favourites ?? {};
+      return Object.fromEntries(
+        ["models", "loras", "tags"].map((kind) => [kind, [...(own[kind] ?? []), ...learnt[kind]]]),
+      );
+    },
     projects: (ownerId) => projects.list(ownerId),
     exploring: (ownerId) => dream.exploring(ownerId),
     profiles: async () => (await mediaModels(false)).models.profiles || [],
@@ -1258,7 +1269,7 @@ registerIdlePassRoutes(app, "/api/gallery/captions/me", {
   requireAdmin,
   owner: ownerIdForRequest,
 });
-// Self-review (domain/review.ts): recent results scored against their owner's rules and any project's brief.
+// Self-review (domain/review.ts): recent Dream project results scored against their project's brief.
 const selfReview = createReview({
   enabled: () => flagEnabled("STUDIO_SELF_REVIEW"),
   writer: assistantEngine,
@@ -1269,7 +1280,6 @@ const selfReview = createReview({
   changes: galleryChangeCount,
   visible: hasGalleryMedia,
   projects: (ownerId) => projects.list(ownerId),
-  rules: (ownerId) => taste.read(ownerId).rules,
   explicit: explicitFor,
   image: smallImage,
   save: (item, review) => updateGalleryJob(galleryKey(item), { review }),

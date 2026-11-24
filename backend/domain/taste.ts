@@ -2,15 +2,20 @@ import { randomInt } from "node:crypto";
 
 import type { PairAnswer } from "../../shared/dream.ts";
 import {
+  type TasteArea,
+  type TasteAreaSetting,
   type TasteFields,
+  type TasteMarkKind,
+  type TasteMarks,
   type TastePreferenceChanges,
   type TastePreferences,
   type TasteWords,
   maxTastePhrase,
-  maxTasteRule,
-  maxTasteSummary,
+  maxTastePrefer,
   shapeOf,
+  tasteAreasOf,
   tasteLimits,
+  tasteMarkKinds,
 } from "../../shared/taste.ts";
 import { logWarning } from "../crash-log.js";
 import {
@@ -21,6 +26,7 @@ import {
 import { promptInstruction } from "./../prompt-instructions.js";
 import type { DomainResponse } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
+import { ruleBans } from "./dream-concepts.ts";
 import { agePools, likeLedger } from "./like-spread.ts";
 
 /**
@@ -122,7 +128,7 @@ interface TasteItem {
 }
 /**
  * One account's stored taste: the signals it learns from, newest first, the summariser's words and
- * the fields the person set, which neither the summariser nor the scores change.
+ * the person's own preferences, which neither the summariser nor the scores change.
  */
 interface StoredTaste extends TasteWords {
   preferences: TastePreferences;
@@ -147,14 +153,12 @@ interface TasteReadOut {
   loraScores: ({ name: string; strength?: number } & Weighted)[];
 }
 /**
- * One account's taste profile: each field as it stands (the person's where they set it, else what
- * Studio learnt), what Studio learnt, its scores (rebuilt from the signals on each read, so they
- * decay with time) read out, and a summary for suggestions and Dream's writer.
+ * One account's taste profile: what Studio learnt (less what the person marked or excluded), their
+ * own preferences, and its scores (rebuilt from the signals on each read, so they decay with time,
+ * then steered by Favourites and Less Of) read out.
  */
-export interface TasteRecord
-  extends Omit<StoredTaste, keyof TasteWords>, TasteReadOut, TasteFields {
+export interface TasteRecord extends Omit<StoredTaste, keyof TasteWords>, TasteReadOut {
   learnt: TasteFields;
-  summary: string;
   /** By attribute: `profile:<id>`, `lora:<name>@<strength>`, `tag:<tag>`, `aspect:<ratio>`, `steps:<profile>:<n>`, `cfg:<profile>:<n>`. */
   scores: Map<string, TasteScore>;
 }
@@ -209,6 +213,8 @@ const summarySignals = 50;
 /** The summariser writes after this many new signals, at most every ten minutes. */
 const summariseAfter = 10;
 const summariseGapMs = 10 * 60_000;
+/** The longest summary of learnt taste a text model reads, in characters. */
+const maxTasteSummary = 1000;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const instructions = () => promptInstruction("summarise-taste");
 const loraText = (lora: TasteLora) =>
@@ -406,34 +412,92 @@ function readOut(signals: TasteSignal[], scores: Map<string, TasteScore>): Taste
 }
 
 /** The values of the attributes starting with `prefix` that scored above nothing, best first. */
-const favourites = (scores: Map<string, TasteScore>, prefix: string, limit: number) =>
+const best = (scores: Map<string, TasteScore>, prefix: string) =>
   [...scores]
     .filter(([attribute, { score }]) => attribute.startsWith(prefix) && score > 0)
     .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, limit)
     .map(([attribute]) => attribute.slice(prefix.length));
 
+/** Score attributes' prefixes for what More and Less Like This mark. */
+const markPrefixes: Record<Exclude<TasteMarkKind, "words">, string> = {
+  models: "profile:",
+  loras: "lora:",
+  shapes: "aspect:",
+  tags: "tag:",
+};
+/** How much a Less Of mark keeps of a liked attribute's score. */
+const lessWeight = 0.25;
 /**
- * The profile in plain sentences, for the text model wherever it reads someone's taste: the
- * person's favourite models and LoRAs where they set them, else the three that scored best.
+ * Steers the scores by the person's marks: a favourite scores at least as well as the best of its
+ * family, and one marked Less keeps a quarter of what it earned.
  */
-function summaryOf(
-  fields: TasteFields,
-  preferences: TastePreferences,
-  { loraScores }: TasteReadOut,
-) {
-  const models = preferences.models ?? fields.models.slice(0, 3);
-  const loras = (preferences.loras ?? fields.loras.slice(0, 3)).map((name) => {
+function steered(scores: Map<string, TasteScore>, favourites: TasteMarks, less: TasteMarks) {
+  for (const [kind, prefix] of Object.entries(markPrefixes) as [TasteMarkKind, string][]) {
+    // A LoRA's attributes carry the strength it ran at.
+    const of = (attribute: string, value: string) =>
+      attribute === prefix + value ||
+      (kind === "loras" && attribute.startsWith(`${prefix}${value}@`));
+    const family = [...scores].filter(([attribute]) => attribute.startsWith(prefix));
+    const top = Math.max(1, ...family.map(([, { score }]) => score));
+    for (const value of favourites[kind] ?? []) {
+      const own = family.filter(([attribute]) => of(attribute, value));
+      if (!own.length) scores.set(prefix + value, { score: top, liked: 0 });
+      for (const [attribute, entry] of own)
+        scores.set(attribute, { ...entry, score: Math.max(0, entry.score) + top });
+    }
+    for (const value of less[kind] ?? [])
+      for (const [attribute, entry] of family)
+        if (of(attribute, value) && entry.score > 0)
+          scores.set(attribute, { ...entry, score: entry.score * lessWeight });
+  }
+  return scores;
+}
+const sameWord = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+/** Whether the person marked, or excluded, a learnt value, which then shows as theirs. */
+const ownedBy =
+  ({ favourites = {}, less = {}, exclusions = [] }: TastePreferences, kind: TasteMarkKind) =>
+  (value: string) =>
+    [...(favourites[kind] ?? []), ...(less[kind] ?? []), ...exclusions].some((entry) =>
+      sameWord(entry, value),
+    );
+/** What adopting a rule added: the bans it excluded, or the line it added to My Preferences. */
+export interface Adoption {
+  excluded?: string[];
+  preferred?: string;
+}
+/** A person's view of an area of taste (Settings › Taste › Where Taste Applies). */
+export interface AreaTaste {
+  /** Whether the area uses what Studio learnt and My Preferences. */
+  on: boolean;
+  guidance: string;
+  /** My Preferences, with the learnt words they asked for more of; "" while off. */
+  prefer: string;
+  /** What Studio learnt, in plain sentences; "" while off. */
+  learnt: string;
+  /** Never used, whatever the switch. */
+  exclusions: string[];
+}
+/** An area's taste as labelled lines for a text model, Guidance first and Exclusions last. */
+export const tasteLines = (taste: AreaTaste) =>
+  [
+    taste.guidance && `Their guidance: ${taste.guidance}`,
+    taste.prefer && `Their preferences: ${taste.prefer}`,
+    taste.learnt && `Their taste, as Studio learnt it: ${taste.learnt}`,
+    taste.exclusions.length && `Never include: ${taste.exclusions.join(", ")}`,
+  ].filter((line): line is string => Boolean(line));
+/** The learnt taste in plain sentences, with the three models and LoRAs that scored best. */
+function summaryOf({ learnt, loraScores }: TasteRecord) {
+  const loras = learnt.loras.slice(0, 3).map((name) => {
     const strength = loraScores.find((lora) => lora.name === name)?.strength;
     return `${name}${strength === undefined ? "" : ` @${strength}`}`;
   });
   return [
-    fields.likes.length && `Likes ${fields.likes.join(", ")}.`,
-    fields.styles.length && `Styles: ${fields.styles.join(", ")}.`,
-    fields.avoid.length && `Avoids ${fields.avoid.join(", ")}.`,
-    models.length && `Liked models: ${models.join(", ")}.`,
+    learnt.likes.length && `Likes ${learnt.likes.join(", ")}.`,
+    learnt.styles.length && `Styles: ${learnt.styles.join(", ")}.`,
+    learnt.avoid.length && `Leans away from ${learnt.avoid.join(", ")}.`,
+    learnt.models.length && `Liked models: ${learnt.models.slice(0, 3).join(", ")}.`,
     loras.length && `Liked LoRAs: ${loras.join(", ")}.`,
-    fields.note,
+    learnt.note,
   ]
     .filter(Boolean)
     .join(" ")
@@ -629,8 +693,8 @@ function tasteChoice(jobId: unknown, values: ChoiceValues = {}): TasteChoice {
 /** The longest model profile id or LoRA name a taste field holds, in characters. */
 const maxName = 400;
 /** The longest entry a taste list field holds, in characters. */
-const longestIn = (key: string) =>
-  key === "models" || key === "loras" ? maxName : key === "rules" ? maxTasteRule : maxTastePhrase;
+const longestIn = (kind: string) =>
+  kind === "models" || kind === "loras" ? maxName : maxTastePhrase;
 /** Up to `limit` distinct, trimmed phrases of at most `longest` characters from a list. */
 const phrases = (value: unknown, limit: number, longest = maxTastePhrase) =>
   [
@@ -647,10 +711,11 @@ const phrases = (value: unknown, limit: number, longest = maxTastePhrase) =>
  * from the signals on every read. The text model summarises the signals into words after every ten
  * (at most every ten minutes, never while text is offline, and only while `updates` allows: the
  * Settings › Studio switch STUDIO_TASTE_UPDATES) and on request. `writer` is null where the
- * account may not send prompts to it.
+ * account may not send prompts to it. `areas` reads the account's saved Where Taste Applies.
  */
 export function createTaste({
   dataDir,
+  areas = () => undefined,
   writer = () => null,
   promptWriter = () => undefined,
   online = async () => true,
@@ -659,6 +724,7 @@ export function createTaste({
   now = Date.now,
 }: {
   dataDir: string;
+  areas?: (ownerId: string) => Partial<Record<TasteArea, Partial<TasteAreaSetting>>> | undefined;
   writer?: (ownerId: string) => TasteWriter | null;
   /** `sample` of the owner's liked gallery items outside Dream made in the range (ms), at random. */
   galleryLikes?: (
@@ -691,38 +757,44 @@ export function createTaste({
   /** The account's taste profile, its scores rebuilt from its signals as of now. */
   function read(ownerId: string): TasteRecord {
     const taste = load(ownerId);
-    const scores = tasteScores(taste.signals, now());
+    const { preferences } = taste;
+    const scores = steered(
+      tasteScores(taste.signals, now()),
+      preferences.favourites ?? {},
+      preferences.less ?? {},
+    );
     const out = readOut(taste.signals, scores);
+    const open = (kind: TasteMarkKind) => {
+      const owned = ownedBy(preferences, kind);
+      return (value: string) => !owned(value);
+    };
     const learnt: TasteFields = {
-      likes: taste.likes,
-      avoid: taste.avoid,
-      styles: taste.styles,
+      likes: taste.likes.filter(open("words")),
+      avoid: taste.avoid.filter(open("words")),
+      styles: taste.styles.filter(open("words")),
       note: taste.note,
-      rules: [],
-      exclusions: [],
       models: [...out.profiles.image, ...out.profiles.video]
         .filter((entry) => entry.score > 0)
         .sort(byScore)
-        .slice(0, tasteLimits.models)
-        .map((entry) => entry.id),
+        .map((entry) => entry.id)
+        .filter(open("models"))
+        .slice(0, tasteLimits.models),
       loras: out.loraScores
         .filter((lora) => lora.score > 0)
-        .slice(0, tasteLimits.loras)
-        .map((lora) => lora.name),
-      shapes: favourites(scores, "aspect:", tasteLimits.shapes),
-      tags: favourites(scores, "tag:", tasteLimits.tags),
+        .map((lora) => lora.name)
+        .filter(open("loras"))
+        .slice(0, tasteLimits.loras),
+      shapes: best(scores, "aspect:").filter(open("shapes")).slice(0, tasteLimits.shapes),
+      tags: best(scores, "tag:").filter(open("tags")).slice(0, tasteLimits.tags),
     };
-    const fields = { ...learnt, ...taste.preferences };
     return {
       preferences: taste.preferences,
       updatedAt: taste.updatedAt,
       signals: taste.signals,
       since: taste.since,
-      ...fields,
       ...out,
       learnt,
       scores,
-      summary: summaryOf(fields, taste.preferences, out),
     };
   }
   const write = (ownerId: string, taste: StoredTaste) =>
@@ -754,6 +826,7 @@ export function createTaste({
       throw failure("Like, compare or iterate on a few results first.", 400);
     attempted.set(ownerId, now());
     const recent = before.signals.slice(0, summarySignals);
+    const { favourites = {}, less = {} } = before.preferences;
     let text: string;
     try {
       ({ text } = await model.chat({
@@ -769,6 +842,12 @@ export function createTaste({
               "",
               "Gallery likes, sampled from their whole history:",
               ...(liked.length ? liked : ["(none)"]),
+              ...(favourites.words?.length
+                ? ["", `They asked for more of: ${favourites.words.join(", ")}`]
+                : []),
+              ...(less.words?.length
+                ? ["", `They asked for less of: ${less.words.join(", ")}`]
+                : []),
             ].join("\n"),
           },
         ],
@@ -788,8 +867,7 @@ export function createTaste({
     }
     const words: TasteWords = {
       likes: phrases(reply?.likes, tasteLimits.likes),
-      // As many as the instructions ask for; the person's own list may hold more.
-      avoid: phrases(reply?.avoid, 8),
+      avoid: phrases(reply?.avoid, tasteLimits.avoid),
       styles: phrases(reply?.styles, tasteLimits.styles),
       note:
         typeof reply?.note === "string"
@@ -832,11 +910,45 @@ export function createTaste({
     }
     return job;
   }
+  /** Sets the person's own preferences; null clears one. */
+  function edit(ownerId: string, changes: TastePreferenceChanges) {
+    const current = load(ownerId);
+    const preferences = { ...current.preferences };
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) delete preferences[key as keyof TastePreferences];
+      else Object.assign(preferences, { [key]: value });
+    }
+    write(ownerId, { ...current, preferences });
+    return read(ownerId);
+  }
   return {
     read,
+    /**
+     * What `area` receives of the account's taste: Exclusions and its guidance always, what Studio
+     * learnt and My Preferences while its switch is on. Pass a `record` already read to reuse it.
+     */
+    area(ownerId: string, area: TasteArea, record?: TasteRecord): AreaTaste {
+      const { taste: on, guidance } = tasteAreasOf(areas(ownerId))[area];
+      const { preferences } = record ?? load(ownerId);
+      const exclusions = preferences.exclusions ?? [];
+      if (!on) return { on, guidance, prefer: "", learnt: "", exclusions };
+      const more = [
+        ...(preferences.favourites?.words ?? []),
+        ...(preferences.favourites?.tags ?? []),
+      ];
+      return {
+        on,
+        guidance,
+        prefer: [preferences.prefer, more.length && `More of ${more.join(", ")}.`]
+          .filter(Boolean)
+          .join(" "),
+        learnt: summaryOf(record ?? read(ownerId)),
+        exclusions,
+      };
+    },
     refresh,
     /**
-     * Forgets the learnt words, keeping the signals and the person's own fields, then rebuilds them
+     * Forgets the learnt words, keeping the signals and the person's own preferences, then rebuilds them
      * from the signals where the account may use the text model.
      */
     resetLearnt(ownerId: string) {
@@ -890,17 +1002,50 @@ export function createTaste({
       if (dropped) write(ownerId, { ...taste, signals, since: Math.max(0, taste.since - dropped) });
     },
     exclusions: (ownerId: string) => load(ownerId).preferences.exclusions ?? [],
-    /** Sets the person's fields, which learning then leaves alone; null hands one back to Studio. */
-    edit(ownerId: string, changes: TastePreferenceChanges) {
-      const current = load(ownerId);
-      const preferences = { ...current.preferences };
-      for (const [key, value] of Object.entries(changes)) {
-        if (value === null) delete preferences[key as keyof TasteFields];
-        else Object.assign(preferences, { [key]: value });
+    /**
+     * Adopts a rule an issue suggests (domain/inbox.ts): one that only bans things adds those not
+     * yet excluded to Exclusions, any other joins My Preferences on its own line. Returns what it
+     * added, which `unadopt` takes back.
+     */
+    adopt(ownerId: string, rule: string): Adoption {
+      const { preferences } = load(ownerId);
+      const bans = ruleBans(rule);
+      if (bans) {
+        const had = preferences.exclusions ?? [];
+        const excluded = bans.filter((ban) => !had.some((entry) => sameWord(entry, ban)));
+        if (had.length + excluded.length > tasteLimits.exclusions)
+          throw failure(`Exclusions are full at ${tasteLimits.exclusions}: remove one first.`, 400);
+        edit(ownerId, { exclusions: [...had, ...excluded] });
+        return { excluded };
       }
-      write(ownerId, { ...current, preferences });
-      return read(ownerId);
+      const prefer = [preferences.prefer, rule].filter(Boolean).join("\n");
+      if (prefer.length > maxTastePrefer)
+        throw failure("My Preferences are full: shorten them first.", 400);
+      edit(ownerId, { prefer });
+      return { preferred: rule };
     },
+    /** Whether a rule is already adopted: its bans all excluded, or its line in My Preferences. */
+    adopted(ownerId: string, rule: string) {
+      const { preferences } = load(ownerId);
+      const bans = ruleBans(rule);
+      const has = (list: string[], value: string) => list.some((entry) => sameWord(entry, value));
+      return bans
+        ? bans.every((ban) => has(preferences.exclusions ?? [], ban))
+        : has((preferences.prefer ?? "").split("\n"), rule);
+    },
+    /** Takes back only what adopting a rule added. */
+    unadopt(ownerId: string, { excluded = [], preferred }: Adoption) {
+      const { preferences } = load(ownerId);
+      const lines = (preferences.prefer ?? "").split("\n");
+      const line = preferred === undefined ? -1 : lines.lastIndexOf(preferred);
+      return edit(ownerId, {
+        ...(excluded.length && {
+          exclusions: (preferences.exclusions ?? []).filter((entry) => !excluded.includes(entry)),
+        }),
+        ...(line >= 0 && { prefer: lines.filter((_, index) => index !== line).join("\n") }),
+      });
+    },
+    edit,
     forget(ownerId: string) {
       deleteRuntimeDocument(dataDir, name(ownerId));
     },
@@ -923,42 +1068,47 @@ export function registerTasteRoutes(
   const show = (ownerId: string, record: TasteRecord) => ({
     status: 200,
     payload: {
-      summary: record.summary,
       learnt: record.learnt,
       preferences: record.preferences,
-      likes: record.likes,
-      avoid: record.avoid,
-      exclusions: record.exclusions,
-      styles: record.styles,
-      note: record.note,
-      rules: record.rules,
-      models: record.models,
-      loras: record.loras,
-      shapes: record.shapes,
-      tags: record.tags,
       loraScores: record.loraScores,
       updatedAt: record.updatedAt,
       signals: record.signals.length,
       writer: taste.writable(ownerId),
     },
   });
-  /** Whether a field's value fits it: null hands the field back to Studio. */
-  const fits = (key: string, value: unknown) => {
-    if (!Object.hasOwn(tasteLimits, key)) return false;
-    if (value === null) return true;
-    if (key === "note") return typeof value === "string" && value.length <= tasteLimits.note;
-    const longest = longestIn(key);
-    return (
-      Array.isArray(value) &&
-      value.length <= tasteLimits[key as Exclude<keyof TasteFields, "note">] &&
-      value.every(
-        (entry) =>
-          typeof entry === "string" &&
-          entry.trim().length <= longest &&
-          (key !== "shapes" || (Number.isFinite(Number(entry)) && Number(entry) > 0)),
-      )
+  /** A list of up to `limit` distinct entries of at most `longest` characters (shapes as ratios). */
+  const list = (value: unknown, limit: number, longest: number, shapes = false) =>
+    Array.isArray(value) &&
+    value.length <= limit &&
+    value.every(
+      (entry) =>
+        typeof entry === "string" &&
+        entry.trim().length <= longest &&
+        (!shapes || (Number.isFinite(Number(entry)) && Number(entry) > 0)),
     );
-  };
+  const marks = (value: unknown) =>
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.entries(value as object).every(
+      ([kind, entries]) =>
+        (tasteMarkKinds as readonly string[]).includes(kind) &&
+        list(entries, tasteLimits[kind as TasteMarkKind], longestIn(kind), kind === "shapes"),
+    );
+  /** Whether a preference's value fits it: null clears it. */
+  const fits = (key: string, value: unknown) =>
+    value === null ||
+    (key === "prefer" && typeof value === "string" && value.length <= maxTastePrefer) ||
+    (key === "exclusions" && list(value, tasteLimits.exclusions, maxTastePhrase)) ||
+    ((key === "favourites" || key === "less") && marks(value));
+  const cleanList = (kind: string, value: string[]) =>
+    kind === "shapes"
+      ? [...new Set(value.map((shape) => shapeOf(Number(shape))))]
+      : phrases(
+          kind === "tags" ? value.map((tag) => tag.toLowerCase()) : value,
+          value.length,
+          longestIn(kind),
+        );
   /** Answers with the owner's profile once `work` settles, or why it failed. */
   const settle = async (ownerId: string, work: Promise<TasteRecord>) => {
     try {
@@ -981,20 +1131,19 @@ export function registerTasteRoutes(
     )
       return { status: 400, payload: { ok: false, error: "Supply valid taste preferences." } };
     const clean = Object.fromEntries(
-      Object.entries(preferences as Record<string, string | string[] | null>).map(
-        ([key, value]) => [
-          key,
-          value === null || typeof value === "string"
-            ? (value?.trim() ?? null)
-            : key === "shapes"
-              ? [...new Set(value.map((shape) => shapeOf(Number(shape))))]
-              : phrases(
-                  key === "tags" ? value.map((tag) => tag.toLowerCase()) : value,
-                  value.length,
-                  longestIn(key),
-                ),
-        ],
-      ),
+      Object.entries(preferences as Record<string, unknown>).map(([key, value]) => [
+        key,
+        value === null || typeof value === "string"
+          ? (value as string | null)?.trim() || null
+          : Array.isArray(value)
+            ? cleanList(key, value)
+            : Object.fromEntries(
+                Object.entries(value as TasteMarks).map(([kind, entries]) => [
+                  kind,
+                  cleanList(kind, entries),
+                ]),
+              ),
+      ]),
     );
     return show(owner(account), taste.edit(owner(account), clean));
   });

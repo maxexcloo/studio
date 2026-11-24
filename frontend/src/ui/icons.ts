@@ -2,12 +2,14 @@ import {
   Activity,
   ArrowDownUp,
   ArrowLeftRight,
+  Ban,
   Blend,
   Bookmark,
   Check,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
+  CircleMinus,
   ClipboardPaste,
   Columns2,
   ContactRound,
@@ -158,6 +160,8 @@ export const icons = {
   duplicate: Files,
   edit: Pencil,
   enableAccount: UserCheck,
+  /** Never: an Exclusion in Settings › Taste, never used anywhere. */
+  exclude: Ban,
   /** A link that opens another site in a new tab. */
   external: ExternalLink,
   /** Continuing a video from its last frame. */
@@ -173,6 +177,8 @@ export const icons = {
   import: Import,
   /** Keeping something: Dream's Accept and a comparison's Both. */
   keep: CircleCheck,
+  /** Less Like This on a learnt value, a soft down-weight in Settings › Taste. */
+  less: CircleMinus,
   library: Library,
   like: ThumbsUp,
   /** A pasted web link, such as Import › From URL. */
@@ -197,7 +203,7 @@ export const icons = {
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: filled(Pause),
-  /** Pinning a value to the account's taste (Dream › Taste). */
+  /** More Like This on a learnt value: a Favourite in Settings › Taste. */
   pin: Pin,
   /** A saved preset: the Presets chip and Library › Presets. */
   preset: Bookmark,
@@ -232,7 +238,7 @@ export const icons = {
   reverse: Rewind,
   /** Showing a written prompt for editing before it runs (Review Prompt). */
   review: ScanText,
-  /** A taste rule, a limit every prompt keeps, as Dream's Inbox proposes one. */
+  /** A rule an issue suggests, as Dream's Inbox proposes one. */
   rule: ShieldCheck,
   /** Running an item again with its own seed (Run Again, Same Seed). */
   sameSeed: Repeat,

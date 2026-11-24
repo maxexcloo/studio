@@ -21,7 +21,7 @@ import { promptInstruction } from "./../prompt-instructions.js";
 import { explicitExclusions, namedMotif } from "./dream-concepts.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
-import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
+import { type PromptWriter, type Taste, type TasteWriter, tasteLines } from "./taste.ts";
 import {
   americanEnglish,
   applyChange,
@@ -411,7 +411,7 @@ export function createSuggestions({
   fixed = () => [],
   now = Date.now,
 }: {
-  taste: Pick<Taste, "read" | "exclusions">;
+  taste: Pick<Taste, "read" | "area" | "exclusions">;
   /** Null where the account may not send prompts to the text model. */
   writer: (ownerId: string) => Writer | null;
   online: () => Promise<boolean>;
@@ -642,17 +642,24 @@ export function createSuggestions({
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
-  /** The taste profile and the prompts the owner liked, as the model's context. */
+  /**
+   * The owner's taste as Suggestions receives it (Settings › Taste), with the prompts they liked
+   * and disliked while it uses their taste, as the model's context.
+   */
   function tasteContext(ownerId: string) {
     const record = taste.read(ownerId);
+    const area = taste.area(ownerId, "suggestions", record);
     // Signals keep a prompt's opening sentences, which show the taste.
-    const prompts = (kinds: string[]) => [
-      ...new Set(
-        record.signals
-          .filter((signal) => kinds.includes(signal.kind) && signal.prompt)
-          .map((signal) => signal.prompt!),
-      ),
-    ];
+    const prompts = (kinds: string[]) =>
+      area.on
+        ? [
+            ...new Set(
+              record.signals
+                .filter((signal) => kinds.includes(signal.kind) && signal.prompt)
+                .map((signal) => signal.prompt!),
+            ),
+          ]
+        : [];
     const liked = prompts(["like", "compare"]);
     const disliked = prompts(["dislike", "report"]).slice(0, 3);
     // A different few each time, so ideas don't keep drawing on the same prompts.
@@ -661,21 +668,14 @@ export function createSuggestions({
       [liked[index], liked[other]] = [liked[other], liked[index]];
     }
     liked.length = Math.min(liked.length, 5);
-    const limits = [
-      ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
-      ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
-      ...(record.exclusions ?? []).map((motif) => `Exclude from new ideas: ${motif}`),
-    ];
+    const lines = tasteLines(area);
     return {
-      known: Boolean(record.summary || liked.length),
-      motionLines: [record.summary ? `Taste for tone: ${record.summary}` : "", ...limits].filter(
-        Boolean,
-      ),
+      // Without their taste there is nothing to learn first.
+      known: !area.on || Boolean(area.learnt || area.prefer || liked.length),
+      motionLines: lines,
       lines: [
-        `Taste profile: ${record.summary || "(none yet)"}`,
-        ...limits,
-        "Prompts they liked:",
-        ...(liked.length ? liked.map((text) => `- ${text}`) : ["(none yet)"]),
+        ...lines,
+        ...(liked.length ? ["Prompts they liked:", ...liked.map((text) => `- ${text}`)] : []),
         ...(disliked.length
           ? ["Prompts they disliked; steer away from them:", ...disliked.map((text) => `- ${text}`)]
           : []),
