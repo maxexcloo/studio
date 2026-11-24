@@ -69,6 +69,7 @@ import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
+import { createChatNotes } from "./domain/chat-notes.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDreamDigest } from "./domain/dream-digest.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
@@ -658,8 +659,8 @@ const taste = createTaste({
   promptWriter: textWriter,
   online: textOnline,
   updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
-  galleryLikes: (ownerId, count) =>
-    galleryItems({ ownerId, rating: "liked", status: "done", notDream: true, sample: count }),
+  galleryLikes: (ownerId, query) =>
+    galleryItems({ ownerId, rating: "liked", status: "done", notDream: true, ...query }),
 });
 /**
  * Hears which of an account's items were rated, by hand or by animating a photo: each with its
@@ -715,7 +716,7 @@ registerPromptHistoryRoutes(app);
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerCardRoutes(app);
 registerVideoEditRoutes(app, { store });
-registerRecreateRoute(app, { store });
+registerRecreateRoute(app, { store, describe: describeNow });
 registerGalleryImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerLinkImportRoute(app, {
   importLink: libraryRoutes.importLink,
@@ -930,9 +931,9 @@ const suggestions = createSuggestions({
   cards: accountCards,
   item: (ownerId, jobId, itemId) =>
     (itemId ? unseenDreamItem(ownerId, itemId, jobId) : undefined) ??
-    filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
-      (item) => !itemId || item.id === itemId,
-    ),
+    filterVisibleGallery(
+      jobId ? galleryJobItems(jobId, ownerId) : [galleryItem(itemId, ownerId)].filter(Boolean),
+    ).find((item) => !itemId || item.id === itemId),
   image: async (item, upscaled) =>
     (await assistantEngine?.supportsVision(textWriter(item.ownerId)))
       ? smallImage(item, upscaled)
@@ -974,6 +975,7 @@ registerSuggestionRoutes(app, {
 // Dream (domain/dream.ts): idle-time results from each account's taste and resolved settings.
 // It only queues work; it never places GPU workloads.
 const projects = createProjects({ cards: accountCards, dataDir });
+const chatNotes = createChatNotes({ dataDir });
 const dream = createDream({
   dataDir,
   idleMinutes: (kind) =>
@@ -983,6 +985,7 @@ const dream = createDream({
   taste,
   projects: (ownerId) => projects.list(ownerId),
   chats: (ownerId) => projects.chats(ownerId),
+  notes: (ownerId) => chatNotes.list(ownerId),
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
   // A group's Dream feature gates its routes and idle work alike.
   access: (ownerId) => {
@@ -1160,6 +1163,7 @@ registerDreamRoutes(app, {
     profiles: async () => (await mediaModels(false)).models.profiles || [],
     loraName: (name) => loraName(name, catalogueLoraInfo(name)),
   }),
+  notes: chatNotes,
   listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });
 // Dream yields to idle background work, so review and captions can run before it reaches its caps.
@@ -1360,6 +1364,16 @@ const enricher = createEnricher({
   save: (item, enriched) => updateGalleryJob(galleryKey(item), enriched),
   failed: (reason) => logWarning(`Couldn't enrich a new result: ${reason}`),
 });
+/**
+ * What a result without a prompt or caption shows, captioned now (with whatever else its read
+ * still needs), for an action that works from it.
+ */
+async function describeNow(item) {
+  await enricher.caption(item, new AbortController().signal).catch(() => {
+    throw new Error("Studio couldn't describe this image. Write a prompt for it in Generate.");
+  });
+  return galleryItem(item.id, item.ownerId)?.caption?.text || "";
+}
 /** New results' Background AI: one read each, then what it left to each task's own work. */
 async function enrichCompleted(items) {
   const done = await enricher.completed(items);

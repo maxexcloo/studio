@@ -84,6 +84,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                     card={card}
                     onEdit={() => dialogs.edit(card)}
                     onSheet={() => dialogs.sheet(card)}
+                    onFaceCheck={() => dialogs.faceCheck(card)}
                     onDelete={() => dialogs.remove(card)}
                   />
                 )

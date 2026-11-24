@@ -95,8 +95,12 @@ interface Router {
 const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
-const suggestionRevision = 2;
+const suggestionRevision = { image: 3, video: 2 } as const;
 const motionRevision = 4;
+const savedRevision = (field: "nextSteps" | "motionIdeas", item?: SuggestionItem) =>
+  field === "motionIdeas"
+    ? motionRevision
+    : suggestionRevision[item?.type === "video" ? "video" : "image"];
 /** Ideas avoid this many of the latest shown in the same menu. */
 const shownIdeas = maxSuggestions;
 const maxRequest = 500;
@@ -181,7 +185,7 @@ const imageAngles = [
   "a prop",
   "an interaction with someone or something",
   "the weather or season",
-  "a photographic style",
+  "a rendering style or medium",
 ];
 const motionAngles = [
   "the subject's action",
@@ -246,6 +250,10 @@ function referenceNotes(references: DraftReference[]) {
 const referenceImages = (references: DraftReference[]) =>
   references.flatMap(({ image }) => (image ? [image] : []));
 
+/** A result's prompt; an import or upload without one is written from its picture and caption. */
+const sourcePrompt = (item: SuggestionItem) =>
+  promptText(item.prompt || item.suggestedPrompt) ||
+  "(none recorded: describe it from the image and what it shows)";
 const itemLoras = (settings: Record<string, unknown>) =>
   (Array.isArray(settings.loras) ? settings.loras : [])
     .filter((lora) => lora && (typeof lora === "string" || lora.enabled !== false))
@@ -278,12 +286,19 @@ function describeItem(item: SuggestionItem, withPrompt = true) {
     `Model: ${clean(settings.profileName || settings.profileId, 120) || "unknown"}`,
     item.width && item.height ? `Size: ${item.width} × ${item.height}` : "",
     loras.length ? `LoRAs: ${loras.join(", ")}` : "",
-    withPrompt ? `Prompt: ${promptText(item.prompt || item.suggestedPrompt)}` : "",
+    withPrompt ? `Prompt: ${sourcePrompt(item)}` : "",
     item.caption?.text ? `What it shows: ${clean(item.caption.text, 600)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
 }
+const changeChoices = (kind: "image" | "video", uncensored: boolean) =>
+  [
+    suggestionChoices(kind, uncensored),
+    kind === "image" && promptInstruction("image-style-suggestion"),
+  ]
+    .filter(Boolean)
+    .join("\n");
 /** The viewer's next steps instruction, from the picture where the model reads it. */
 const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensored: boolean) =>
   promptInstruction("suggest-viewer", {
@@ -301,7 +316,7 @@ const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensore
             specifics: specifics(kind),
           }),
     contentRule: contentRule(uncensored),
-    suggestionChoices: suggestionChoices(kind, uncensored),
+    suggestionChoices: changeChoices(kind, uncensored),
     variety: variety(),
     americanEnglish,
     avoidFiller: avoidFiller(),
@@ -364,8 +379,10 @@ export function createSuggestions({
   online: () => Promise<boolean>;
   /** Whether what the owner is offered may be worded explicitly (Uncensored Models). */
   explicit: (ownerId: string) => boolean;
-  /** The owner's finished gallery item for a job, if it is theirs and visible. */
-  item: (ownerId: string, jobId: string, itemId?: string) => SuggestionItem | undefined;
+  /**
+   * The owner's visible gallery item by job and/or item id; imports and uploads have no job.
+   */
+  item: (ownerId: string, jobId?: string, itemId?: string) => SuggestionItem | undefined;
   /** A small (≤512 px) copy of the image where the running text model reads images, else null. */
   image: (item: SuggestionItem, upscaled?: boolean) => Promise<ModelImage | null>;
   /** Keeps the suggestions for this exact result and menu. */
@@ -419,14 +436,14 @@ export function createSuggestions({
   }
 
   const savedSteps = (
-    field: "nextSteps" | "motionIdeas",
+    revision: number,
     steps: (PromptIdea | NextStep)[],
     uncensored: boolean,
   ): SavedSteps => ({
     steps: steps as NextStep[],
     at: new Date(now()).toISOString(),
     count: maxSuggestions,
-    revision: field === "motionIdeas" ? motionRevision : suggestionRevision,
+    revision,
     ...(uncensored ? { uncensored } : {}),
   });
   function saveSteps(
@@ -435,7 +452,7 @@ export function createSuggestions({
     steps: (PromptIdea | NextStep)[],
     uncensored: boolean,
   ) {
-    save(source, field, savedSteps(field, steps, uncensored));
+    save(source, field, savedSteps(savedRevision(field, source), steps, uncensored));
   }
 
   async function write(
@@ -501,7 +518,7 @@ export function createSuggestions({
           keepDescriptions: keepDescriptions(),
           subjectFirst: subjectFirst(),
           contentRule: contentRule(uncensored),
-          suggestionChoices: suggestionChoices(kind, uncensored),
+          suggestionChoices: changeChoices(kind, uncensored),
           variety: variety(),
           americanEnglish,
           avoidFiller: avoidFiller(),
@@ -726,8 +743,13 @@ export function createSuggestions({
                 `- ${draft && action !== "upscale" ? draftGuides[action](kind, editing) : actionGuides[action](kind, editing, loses)}`,
             ),
             promptInstruction("write-changed-prompt"),
+            kind === "image" &&
+              (offered.includes("edit") || offered.includes("recreate")) &&
+              promptInstruction("write-style-change"),
           ]
-      ).join("\n"),
+      )
+        .filter(Boolean)
+        .join("\n"),
       guide: [
         editWriting && targetLine(editWriting, "Edit"),
         sourceWriting && targetLine(sourceWriting, !draft && profileId ? "Recreate" : undefined),
@@ -847,7 +869,7 @@ export function createSuggestions({
         ].join("\n"),
         keep(reply: unknown) {
           const steps = readSteps(reply as { steps?: unknown } | null, offered);
-          return steps.length ? savedSteps("nextSteps", steps, uncensored) : undefined;
+          return steps.length ? savedSteps(suggestionRevision.image, steps, uncensored) : undefined;
         },
       };
     },
@@ -870,14 +892,13 @@ export function createSuggestions({
       { jobId, itemId, upscaled }: { jobId?: unknown; itemId?: unknown; upscaled?: unknown },
     ): Promise<ImageInspection> {
       if (
-        typeof jobId !== "string" ||
-        !jobId ||
+        (jobId !== undefined && (typeof jobId !== "string" || !jobId)) ||
         typeof itemId !== "string" ||
         !itemId ||
         typeof upscaled !== "boolean"
       )
         throw failure("Choose an image result.", 400);
-      const source = item(ownerId, jobId, itemId);
+      const source = item(ownerId, jobId as string | undefined, itemId);
       if (!source || source.status !== "done" || source.type !== "image")
         throw failure("Image result not found.", 404);
 
@@ -956,7 +977,10 @@ export function createSuggestions({
         throw failure("Choose composer, viewer, animate, change or draft.", 400);
       if (body.itemId !== undefined && (typeof body.itemId !== "string" || !body.itemId))
         throw failure("Choose a result item.", 400);
+      if (body.jobId !== undefined && (typeof body.jobId !== "string" || !body.jobId))
+        throw failure("Choose a result.", 400);
       const itemId = body.itemId as string | undefined;
+      const jobId = body.jobId as string | undefined;
       if (
         body.prompt !== undefined &&
         (typeof body.prompt !== "string" || body.prompt.length > maxPromptCharacters)
@@ -1009,8 +1033,7 @@ export function createSuggestions({
         );
         if (surface === "draft" && body.kind !== "image" && body.kind !== "video")
           throw failure("Choose an image or video draft.", 400);
-        if (surface === "change" && (typeof body.jobId !== "string" || !body.jobId))
-          throw failure("Choose a result.", 400);
+        if (surface === "change" && !jobId && !itemId) throw failure("Choose a result.", 400);
         if (!request && !directions) throw failure("Describe the change.", 400);
         if (!actions.length) throw failure("Choose the actions the change may take.", 400);
         let source: SuggestionItem | Draft | undefined =
@@ -1020,13 +1043,13 @@ export function createSuggestions({
                 kind: body.kind as Draft["kind"],
                 prompt: promptText(body.prompt),
               }
-            : item(ownerId, body.jobId as string, itemId);
+            : item(ownerId, jobId, itemId);
         if (!source) throw failure("Result not found.", 404);
         if (directions && ("draft" in source || source.type !== "image"))
           throw failure("Choose an image to vary.", 400);
         if (!("draft" in source) && source.status !== "done")
           return empty("Changes are offered for finished results.");
-        if (!("draft" in source) && typeof body.prompt === "string")
+        if (!("draft" in source) && typeof body.prompt === "string" && body.prompt.trim())
           source = { ...source, prompt: body.prompt, suggestedPrompt: undefined };
         const model = writer(ownerId);
         if (!model) return empty("This account can't use suggestions.");
@@ -1056,8 +1079,8 @@ export function createSuggestions({
         return empty("Suggestions are off in Settings › Studio.");
       let source: SuggestionItem | undefined;
       if (surface === "viewer" || surface === "animate") {
-        if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
-        source = prepared ?? item(ownerId, body.jobId, itemId);
+        if (!prepared && !jobId && !itemId) throw failure("Choose a result.", 400);
+        source = prepared ?? item(ownerId, jobId, itemId);
         if (!source) throw failure("Result not found.", 404);
         if ((surface === "animate" && source.type === "video") || source.status !== "done")
           return empty(
@@ -1073,16 +1096,17 @@ export function createSuggestions({
       const edited =
         surface === "viewer" &&
         typeof body.prompt === "string" &&
+        body.prompt.trim() !== "" &&
         body.prompt !== source?.settings?.typedPrompt &&
         body.prompt !== (source?.prompt || source?.suggestedPrompt || "");
-      const saved =
-        surface === "animate" ? source?.motionIdeas : !edited ? source?.nextSteps : undefined;
+      const field = surface === "animate" ? "motionIdeas" : "nextSteps";
+      const saved = edited ? undefined : source?.[field];
       if (edited)
         source = { ...source!, prompt: body.prompt as string, suggestedPrompt: undefined };
       if (
         saved?.steps.length &&
         saved.count === maxSuggestions &&
-        saved.revision === (surface === "animate" ? motionRevision : suggestionRevision) &&
+        saved.revision === savedRevision(field, source) &&
         !fresh &&
         Boolean(saved.uncensored) === uncensored
       )
@@ -1129,7 +1153,7 @@ export function createSuggestions({
         appliedCards,
         profileId ?? "",
         referenceIds,
-        source?.jobId ?? body.jobId ?? "",
+        source?.jobId ?? jobId ?? "",
         source?.id ?? itemId,
         uncensored,
       ]);
@@ -1162,7 +1186,7 @@ export function createSuggestions({
               ...motionLines,
               "",
               "Opening frame:",
-              `Prompt: ${promptText(source.prompt || source.suggestedPrompt)}`,
+              `Prompt: ${sourcePrompt(source)}`,
               ...(source.caption?.text
                 ? [`What it shows: ${clean(source.caption.text, 600)}`]
                 : []),

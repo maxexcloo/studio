@@ -26,14 +26,7 @@ export async function askItemChange(
     : undefined;
   const availableActions = profileId ? actions : actions.filter((action) => action !== "edit");
   if (!availableActions.length) throw new Error("No image model is ready for edits.");
-  const answer = await askChange(
-    item.jobId!,
-    request,
-    availableActions,
-    prompt,
-    item.id,
-    profileId,
-  );
+  const answer = await askChange(item, request, availableActions, prompt, profileId);
   return { answer, profileId };
 }
 
@@ -107,10 +100,7 @@ export function useItemChange<T extends string>(
     setChange(null);
   }
   return {
-    available:
-      Boolean(assistant.data?.available) &&
-      item.status === "done" &&
-      Boolean(item.url && item.jobId),
+    available: Boolean(assistant.data?.available) && item.status === "done" && Boolean(item.url),
     pending: ask.isPending,
     proposal: change?.proposal,
     typed: change?.typed,

@@ -7,17 +7,19 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { itemAction, itemActionGroups } from "../gallery/itemActions";
 import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
+import { CharacterFaceCheck } from "./CharacterFaceCheck";
 import { type CharacterCard, useDeleteCharacter, useMakeSheet } from "./queries";
 import { useCardRating } from "./useCardRating";
 
 /**
- * New, Edit and Delete Character and Make Sheet for a list of cards: `edit`
- * and `remove` open their dialog, which `dialogs` renders. `onLayer` hears when one opens or closes
- * over a sheet. A sheet in the making shows on its card.
+ * New, Edit and Delete Character, Make Sheet and Face Check for a list of cards: `edit`,
+ * `faceCheck` and `remove` open their dialog, which `dialogs` renders. `onLayer` hears when one
+ * opens or closes over a sheet. A sheet in the making shows on its card.
  */
 export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {}) {
   const [editing, setEditing] = useState<{ card?: CharacterCard; start?: CharacterStart }>();
   const [deleting, setDeleting] = useState<CharacterCard | null>(null);
+  const [checking, setChecking] = useState<CharacterCard | null>(null);
   const deletion = useDeleteCharacter();
   const making = useMakeSheet();
   const closeEditor = () => {
@@ -34,6 +36,10 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
       onLayer(true);
     },
     sheet: (card: CharacterCard) => making.mutate(card),
+    faceCheck: (card: CharacterCard) => {
+      setChecking(card);
+      onLayer(true);
+    },
     remove: (card: CharacterCard) => {
       deletion.reset();
       setDeleting(card);
@@ -46,6 +52,13 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
           character={editing?.card}
           start={editing?.start}
           onClose={closeEditor}
+        />
+        <CharacterFaceCheck
+          card={checking}
+          onClose={() => {
+            setChecking(null);
+            onLayer(false);
+          }}
         />
         <ConfirmDialog
           opened={deleting !== null}
@@ -64,17 +77,19 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   };
 }
 
-/** A card's ⋯ menu: Edit Character, Make Sheet, rating and Delete Character. */
+/** A card's ⋯ menu: Edit Character, Make Sheet, Face Check, rating and Delete Character. */
 export function CharacterMenu({
   card,
   onEdit,
   onSheet,
+  onFaceCheck,
   onDelete,
   withinPortal = true,
 }: {
   card: CharacterCard;
   onEdit: () => void;
   onSheet: () => void;
+  onFaceCheck: () => void;
   onDelete: () => void;
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
@@ -98,6 +113,12 @@ export function CharacterMenu({
                 icon: icons.sheet,
                 disabled: !card.references.length || card.sheet?.status === "making",
                 onClick: onSheet,
+              },
+              {
+                id: "face-check",
+                label: "Face Check",
+                icon: icons.character,
+                onClick: onFaceCheck,
               },
             ],
             ...itemActionGroups([

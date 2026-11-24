@@ -155,21 +155,25 @@ export const galleryArrivalsQuery = (listing: GalleryListing, leftAt: number) =>
     refetchOnWindowFocus: false,
   });
 
+/** How many results a listing holds, reading a single item; `unrated` counts Review's. */
+async function galleryCount(listing: GalleryListing, signal: AbortSignal, unrated?: boolean) {
+  const params = galleryParams(listing);
+  params.set("limit", "1");
+  if (unrated) params.set("unrated", "1");
+  return (await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal })).totalApprox;
+}
+
 /** How many results the gallery, Uploads and Review (unrated) each hold, for the view menu. */
 export const galleryViewCountsQuery = (kind: MediaKind) =>
   queryOptions({
     queryKey: [...galleryKey, "view-counts", kind],
     queryFn: async ({ signal }) => {
-      const count = async (uploads: boolean, unrated?: boolean) => {
-        const params = galleryParams({
-          search: "",
-          kind,
-          filters: { ...emptyGalleryFilters, uploads },
-        });
-        params.set("limit", "1");
-        if (unrated) params.set("unrated", "1");
-        return (await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal })).totalApprox;
-      };
+      const count = (uploads: boolean, unrated?: boolean) =>
+        galleryCount(
+          { search: "", kind, filters: { ...emptyGalleryFilters, uploads } },
+          signal,
+          unrated,
+        );
       const [gallery, uploads, review] = await Promise.all([
         count(false),
         count(true),
@@ -178,6 +182,39 @@ export const galleryViewCountsQuery = (kind: MediaKind) =>
       return { gallery, uploads, review };
     },
     staleTime: 30_000,
+  });
+
+/** How many results a saved view's listing holds, for the view menu. */
+export const galleryListingCountQuery = (listing: GalleryListing) =>
+  queryOptions({
+    queryKey: [...galleryListingKey(listing), "count"],
+    queryFn: ({ signal }) => galleryCount(listing, signal),
+    staleTime: 30_000,
+  });
+
+/**
+ * The newest finished images Face Check compared with a character card, each with its `identity`,
+ * worst match first: off-character ones, then by face similarity, those without a face last.
+ */
+export const characterResultsQuery = (characterId: string) =>
+  queryOptions({
+    queryKey: [...galleryKey, "character", characterId],
+    queryFn: async ({ signal }) => {
+      const params = galleryParams({ search: "", kind: "image", filters: emptyGalleryFilters });
+      params.set("character", characterId);
+      params.set("finished", "1");
+      params.set("limit", "200");
+      const { items } = await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
+      const rank = ({ identity }: MediaItem) => [
+        identity?.drifted ? 0 : 1,
+        // Similarity runs to 1; no face sorts after every score.
+        identity?.score ?? 2,
+      ];
+      return items.sort((a, b) => {
+        const [x, y] = [rank(a), rank(b)];
+        return x[0] - y[0] || x[1] - y[1];
+      });
+    },
   });
 
 export const galleryReviewQuery = (

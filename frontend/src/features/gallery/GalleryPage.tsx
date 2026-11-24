@@ -68,6 +68,7 @@ import {
   galleryViewCountsQuery,
   viewerItemQuery,
 } from "./queries";
+import { useSavedViews } from "./SavedViews";
 import {
   type SimilarStrictness,
   similarChipLabels,
@@ -101,7 +102,8 @@ type PageState = GalleryState &
     viewer?: boolean;
     viewFrom?: string;
   };
-type GalleryView = "gallery" | "uploads" | "comparisons" | "review";
+/** A built-in view, or a saved one (`saved:` and its ID). */
+type GalleryView = "gallery" | "uploads" | "comparisons" | "review" | `saved:${string}`;
 const loadReview = () => import("./GalleryReview");
 const loadComparisons = () => import("../compare/ComparisonList");
 const GalleryReview = lazy(() =>
@@ -730,8 +732,21 @@ function Gallery() {
       else void routerNavigate(base, { replace: true });
     });
   };
+  const saved = useSavedViews(kind, { search: query, filters, sort }, countsWanted);
   function showView(next: GalleryView) {
     if (next === routeView) return;
+    const view = saved.view(next);
+    if (view) {
+      // A saved view restores its search, filters and sort as the gallery shows them.
+      searchAfterTyping.cancel();
+      setQueryText(view.search);
+      setSearch(view.search);
+      setFilters({ ...emptyGalleryFilters, ...view.filters });
+      setSort(view.sort);
+      if (similar) removeSimilar();
+      if (routeView) leaveView();
+      return;
+    }
     if (next === "review" || next === "comparisons") {
       // Switching between Review and Comparisons keeps the gallery entry that Back returns to.
       if (!routeView) viewScroll.current = { key: location.key, top: window.scrollY };
@@ -752,25 +767,47 @@ function Gallery() {
       return;
     }
     const uploads = next === "uploads";
-    if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
+    // Leaving a saved view leaves its search, filters and sort too.
+    if (saved.current) {
+      setQuery("");
+      setFilters({ ...emptyGalleryFilters, uploads });
+      setSort("newest");
+    } else if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
     if (routeView) leaveView();
   }
   const counts = useQuery({ ...galleryViewCountsQuery(kind), enabled: countsWanted }).data;
-  const comparisons = useQuery({ ...comparisonMembersQuery, enabled: countsWanted }).data
-    ?.comparisons.length;
+  const comparisons = useQuery({
+    ...comparisonMembersQuery,
+    enabled: countsWanted || (!routeView && !filters.uploads && loaded.length > 0),
+  }).data?.comparisons;
+  const comparisonMembers = useMemo(() => {
+    const items = new Set<string>();
+    const jobs = new Set<string>();
+    for (const { itemIds, jobIds } of comparisons ?? []) {
+      for (const [index, jobId] of jobIds.entries()) {
+        const itemId = itemIds?.[index];
+        if (itemId) items.add(itemId);
+        else jobs.add(jobId);
+      }
+    }
+    return { items, jobs };
+  }, [comparisons]);
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
       ref={viewButton}
       onOpen={() => setCountsWanted(true)}
-      value={routeView ?? (filters.uploads ? "uploads" : "gallery")}
+      value={
+        routeView ??
+        (saved.current ? `saved:${saved.current}` : filters.uploads ? "uploads" : "gallery")
+      }
       groups={[
         [
           { value: "gallery", label: "Gallery", count: counts?.gallery },
           { value: "uploads", label: "Uploads", count: counts?.uploads },
         ],
         [
-          { value: "comparisons", label: "Comparisons", count: comparisons },
+          { value: "comparisons", label: "Comparisons", count: comparisons?.length },
           {
             value: "review",
             label: "Review",
@@ -778,7 +815,9 @@ function Gallery() {
             count: counts?.review,
           },
         ],
+        ...(saved.choices.length ? [saved.choices] : []),
       ]}
+      actions={routeView ? [] : saved.actions}
       onChange={showView}
     />
   );
@@ -1023,6 +1062,7 @@ function Gallery() {
           )}
           <MediaGrid
             items={loaded}
+            comparisonMembers={comparisonMembers}
             results={resultsKey}
             byDay={byDay}
             timeline={timeline.data?.days}
@@ -1084,6 +1124,7 @@ function Gallery() {
           onCompared={showCompared}
         />
       )}
+      {saved.dialogs}
       {selected && (
         <MediaViewer
           quiet

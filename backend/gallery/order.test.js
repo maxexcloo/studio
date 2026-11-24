@@ -344,3 +344,17 @@ test("an owner's titled item with the same prompt is found by its prompt", async
   assert.equal(titled("alice")?.title, "Lantern");
   assert.equal(titled("carol"), undefined);
 });
+
+test("a character's Face Check results and its off-character ones page alone", () => {
+  const identity = (characterId, drifted) => ({
+    identity: { characterId, score: drifted ? 0.2 : 0.7, faces: 1, drifted, checkedAt: "" },
+  });
+  setGallery([
+    item("kept", "2026-01-01", identity("mira", false)),
+    item("drifted", "2026-01-02", identity("mira", true)),
+    item("other", "2026-01-03", identity("tomas", true)),
+    item("unchecked", "2026-01-04"),
+  ]);
+  assert.deepEqual(ids(pageGallery({ query: { characterId: "mira" } }).items), ["drifted", "kept"]);
+  assert.deepEqual(ids(pageGallery({ query: { drifted: true } }).items), ["other", "drifted"]);
+});

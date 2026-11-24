@@ -309,11 +309,17 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await expect(current(page)).toContainText("last-image");
 });
 
-test("Suggest can queue a library item variation at its source", async ({ page }) => {
+test("Suggest can queue a variation of a library import without a job or prompt", async ({
+  page,
+}) => {
   await fixtures(page);
-  await serveDream(page, { library: [dreamItem("harbour", { dream: undefined })] });
+  await serveDream(page, {
+    library: [dreamItem("harbour", { dream: undefined, jobId: undefined, prompt: "" })],
+  });
+  const asked: any[] = [];
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
+    asked.push(body);
     return route.fulfill({
       json: {
         suggestions:
@@ -343,6 +349,10 @@ test("Suggest can queue a library item variation at its source", async ({ page }
     profileId: "image:test",
     prompt: "A tighter harbour view",
   });
+  expect(asked.map(({ surface, jobId, itemId }) => ({ surface, jobId, itemId }))).toEqual([
+    { surface: "viewer", jobId: undefined, itemId: "harbour" },
+    { surface: "change", jobId: undefined, itemId: "harbour" },
+  ]);
 });
 
 test("Keep & Vary accepts a Dream card and stages four variations of one thing to compare", async ({
@@ -1902,10 +1912,12 @@ test("Dream autoplays silently when sound is blocked and lets the viewer choose 
   const player = viewer.locator("video");
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
   await expect(player).toHaveJSProperty("muted", true);
-  await viewer
-    .getByRole("group", { name: "Viewer Header", exact: true })
-    .getByRole("button", { name: "Unmute", exact: true })
-    .click();
+  const unmute = viewer.getByRole("button", { name: "Unmute", exact: true });
+  const stage = (await player.boundingBox())!;
+  const corner = (await unmute.boundingBox())!;
+  expect(corner.x + corner.width).toBeGreaterThan(stage.x + stage.width * 0.75);
+  expect(corner.y + corner.height).toBeGreaterThan(stage.y + stage.height * 0.75);
+  await unmute.click();
   await expect(player).toHaveJSProperty("muted", false);
 });
 

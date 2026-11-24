@@ -69,7 +69,8 @@ export const comparisonOf = (
   item: MediaItem,
 ) =>
   members?.comparisons.find((comparison) =>
-    comparison.itemIds
-      ? comparison.itemIds.includes(item.id)
-      : Boolean(item.jobId && comparison.jobIds.includes(item.jobId)),
+    comparison.jobIds.some((jobId, index) => {
+      const chosen = comparison.itemIds?.[index];
+      return chosen ? chosen === item.id : Boolean(item.jobId && jobId === item.jobId);
+    }),
   )?.id;

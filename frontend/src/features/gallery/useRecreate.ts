@@ -7,19 +7,20 @@ import { useOpenComposer } from "../generation/openComposer";
 import { useItemMutation } from "./useItemMutation";
 
 /**
- * Recreate › Recreate in Composer for an item made outside Studio (an upload), once it has a prompt (an import's own
- * or a written suggestion): the composer opens on that prompt with the model it has for the item's kind, and the run
- * is one of the item's versions (backend/gallery/recreate.js).
+ * Recreate › Recreate in Composer for an item made outside Studio (an upload): the composer opens
+ * with the model it has for the item's kind on the prompt Studio recreates it from (an import's own,
+ * a written suggestion or what it shows), and the run is one of the item's versions
+ * (backend/gallery/recreate.js).
  */
 export function useRecreateAction(item: MediaItem, onApplied: () => void): Action {
   const { setDraft, changeKind } = useGenerationActions();
   const openComposer = useOpenComposer();
   const recreate = useItemMutation(item.id, "recreate", {
     mutationFn: () =>
-      post<{ sessionId: string; jobId: string }>("/api/gallery/recreate", {
+      post<{ sessionId: string; jobId: string; prompt: string }>("/api/gallery/recreate", {
         galleryItemId: item.id,
       }),
-    onSuccess: ({ sessionId, jobId }) => {
+    onSuccess: ({ sessionId, jobId, prompt }) => {
       changeKind(item.type);
       setDraft((previous) => ({
         ...previous,
@@ -32,7 +33,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
         references: [],
         input: {
           ...previous.input,
-          prompt: item.prompt || item.suggestedPrompt || "",
+          prompt,
           seed: "",
           referenceAssets: [],
           referenceDetails: [],
@@ -46,7 +47,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
     id: "prompt-composer",
     label: "Recreate in Composer",
     icon: icons.prompt,
-    disabled: !(item.prompt || item.suggestedPrompt) || recreate.isPending,
+    disabled: recreate.isPending,
     loading: recreate.isPending,
     onClick: () => recreate.mutate(),
   };
