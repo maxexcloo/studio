@@ -9,7 +9,7 @@ import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSectio
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
-import { useStageComparison } from "../compare/variants";
+import { loraTestProfile, useStageComparison } from "../compare/variants";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { loraLibraryQuery } from "../generation/loraLibrary";
 import { loraInfoQuery } from "../generation/LoraPicker";
@@ -93,6 +93,8 @@ export function LibraryPage() {
     },
   });
   const compare = useStageComparison();
+  const models = useQuery(modelsQuery);
+  const loraInfo = useQuery(loraInfoQuery);
   // Test LoRA compares the LoRA's strengths on the sample prompt of an import that brought it,
   // else its title; its trigger words are added when it runs.
   const testLora = useMutation({
@@ -153,6 +155,9 @@ export function LibraryPage() {
         installingKey={install.isPending ? install.variables?.key : undefined}
         onCheckUpdates={admin ? () => update.mutate(undefined) : undefined}
         onTest={section === "loras" ? (item) => testLora.mutate(item) : undefined}
+        canTest={(item) =>
+          Boolean(loraTestProfile(models.data, loraInfo.data?.loras, item.file || ""))
+        }
         onUpdateAll={
           admin && items.some(freeUpdate) ? () => update.mutate({ all: true }) : undefined
         }

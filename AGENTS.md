@@ -195,6 +195,10 @@ recur across features.
   On a set, Deny All dislikes every member. Super Like keeps the set and rates
   the image shown, or the cover when the set is closed. An explicit Like
   or Deny on a member overrides the set verdict for that member.
+- An action nothing available can run (no model animates images, none takes
+  references, none edits) is greyed out, whole menu included, without a message
+  saying why; an existing tooltip may stay. The gallery selection bar and its
+  menu instead show only the actions that apply. Real failures still report.
 - A finished selection action ends the selection, keeping selected only the
   items it failed for; opening a menu does not. Quick selects take every
   match, not only loaded pages, and deletion confirms.

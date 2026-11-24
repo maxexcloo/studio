@@ -1,4 +1,4 @@
-import { ActionIcon, Menu, Tooltip } from "@mantine/core";
+import { ActionIcon, Menu } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -110,22 +110,20 @@ function ItemSuggestions({
       : []),
   ];
   const loading = change.pending || iteration.isPending || compare.isPending || prepare.isPending;
-  const unavailable =
-    !change.available && !more.length && "Suggestions are unavailable for this result.";
+  // Nothing to suggest for this result: the control greys out.
+  const unavailable = !change.available && !more.length;
   const trigger = (
     <ActionIcon
       {...sideControl}
       data-touch-target
       aria-label="Suggestions"
-      aria-disabled={Boolean(unavailable) || undefined}
-      aria-description={unavailable || undefined}
-      data-disabled={Boolean(unavailable) || undefined}
+      disabled={unavailable}
       loading={loading}
     >
       <icons.assistant size={sideIconSize} />
     </ActionIcon>
   );
-  if (unavailable) return <Tooltip label={unavailable}>{trigger}</Tooltip>;
+  if (unavailable) return trigger;
   return (
     <>
       <Menu {...menuBounds} position="top-end" width={menuWidth} onChange={setOpened}>
