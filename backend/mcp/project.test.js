@@ -198,7 +198,8 @@ test("projectPatch refuses unknown fields and values outside the constraints", (
 
 /** The project tool over a real project store, answering its Studio routes in process. */
 function projectTool(t, chat = "chat-a") {
-  const projects = createProjects({ dataDir: dataDir(t) });
+  const clock = { now: Date.parse("2026-01-01T00:00:00Z") };
+  const projects = createProjects({ dataDir: dataDir(t), now: () => clock.now });
   const owner = "alice";
   const media = {
     profiles: async () => [turbo, quality, video],
@@ -206,7 +207,13 @@ function projectTool(t, chat = "chat-a") {
       const [, id, action] = /^\/api\/dream\/projects(?:\/([^/?]+))?(?:\/(\w+))?/.exec(route);
       if (id === "attach") return { project: projects.attach(owner, body.chat, body.projectId) };
       if (id === "activity") return { project: projects.activity(owner, body.chat) };
-      if (method === "GET") return { projects: projects.list(owner) };
+      if (method === "GET") {
+        const asking = new URLSearchParams(route.split("?")[1]).get("chat");
+        return {
+          projects: projects.list(owner),
+          ...(asking !== null && { project: projects.chatProject(owner, asking) }),
+        };
+      }
       if (method === "POST" && !id) return { project: projects.create(owner, projectPatch(body)) };
       if (method === "PUT")
         return {
@@ -227,7 +234,7 @@ function projectTool(t, chat = "chat-a") {
     }),
   });
   const call = async (args) => JSON.parse((await run(args)).content[0].text);
-  return { call, projects, owner };
+  return { call, projects, owner, clock };
 }
 
 test("the project tool creates, attaches, updates and shows a chat's project", async (t) => {
@@ -268,6 +275,17 @@ test("the project tool creates, attaches, updates and shows a chat's project", a
   assert.deepEqual((await call({ action: "detach" })).project, null);
   assert.equal((await call({ action: "attach", project: "coast" })).project.name, "Coast");
   await assert.rejects(call({ action: "attach", project: "Harbour" }), /No project "Harbour"/);
+});
+
+test("showing a chat's project leaves its activity as it was, so Dream's turns resume on time", async (t) => {
+  const { call, projects, owner, clock } = projectTool(t);
+  await call({ action: "create", name: "Coast" });
+  const attached = projects.chats(owner)["chat-a"].at;
+  clock.now += 60_000;
+  assert.equal((await call({ action: "show" })).project.name, "Coast");
+  assert.equal(projects.chats(owner)["chat-a"].at, attached);
+  await call({ action: "update", avoid: "people" });
+  assert.equal(projects.chats(owner)["chat-a"].at, new Date(clock.now).toISOString());
 });
 
 test("project names stay unique per account, in any case", (t) => {

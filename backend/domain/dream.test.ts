@@ -380,6 +380,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dream,
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
+    notes,
     now: () => state.clock,
   });
   /** Finishes a job and its tile, as saving its outputs would. */
@@ -2059,7 +2060,7 @@ test("The Inbox offers liked chat work from separate generations and attaches it
   assert.deepEqual(projects.chats("alice"), {});
   await inbox.accept("alice", { userId: "alice", role: "user" }, proposal.id);
   assert.equal(projects.chats("alice")["recent-chat"].projectId, projects.list("alice")[0].id);
-  inbox.undo("alice", proposal.id);
+  await inbox.undo("alice", proposal.id);
   assert.deepEqual(projects.chats("alice"), {});
   assert.deepEqual(projects.list("alice"), []);
 });
@@ -2094,6 +2095,55 @@ test("Project results and stats use the project's own finished results window", 
     stats[quiet.id].results.map((item: DreamItem) => item.id),
     ["coast"],
   );
+});
+
+test("Deleting a project stops its Dream work and leaves its results, chats and notes without it", async (t) => {
+  const fx = fixture(t);
+  const { projects, notes, state, store, live } = fx;
+  const coast = projects.create("alice", { name: "Coast" });
+  const city = projects.create("alice", { name: "City" });
+  const mark = (projectId: string) => ({ prompt: "", why: "", at: "", projectId });
+  const kept = (projectId: string) => ({ state: "kept" as const, ...mark(projectId) });
+  state.items.push(
+    { id: "coast-1", ownerId: "alice", type: "image", status: "done", dream: kept(coast.id) },
+    { id: "city-1", ownerId: "alice", type: "image", status: "done", dream: kept(city.id) },
+  );
+  const session = store.createSession("alice").id;
+  const queue = (projectId: string) =>
+    store.enqueue(
+      "alice",
+      session,
+      { kind: "image", prompt: "" },
+      "image",
+      undefined,
+      undefined,
+      undefined,
+      {
+        priority: queuePriority.dream,
+        dream: mark(projectId),
+      },
+    );
+  queue(coast.id);
+  const other = queue(city.id);
+  projects.attach("alice", "chat", coast.id);
+  notes.add("alice", { text: "Grey skies", project: coast.id });
+  const request = await serve(t, fx);
+  assert.equal((await request(`/projects/${coast.id}`, {}, "DELETE")).status, 200);
+  assert.deepEqual(
+    projects.list("alice").map((project) => project.name),
+    ["City"],
+  );
+  assert.deepEqual(
+    state.items.map((item) => item.dream?.projectId),
+    [undefined, city.id],
+  );
+  assert.deepEqual(
+    live("alice").map((job) => job.id),
+    [other.id],
+  );
+  assert.deepEqual(projects.chats("alice"), {});
+  assert.equal(notes.list("alice")[0].project, undefined);
+  assert.equal((await request(`/projects/${coast.id}`, {}, "DELETE")).status, 404);
 });
 
 test("Undo returns judged results and takes back what they taught", async (t) => {
@@ -2832,13 +2882,22 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     ["Rooftops", "Mara on rooftops", "dream"],
   );
   assert.equal(dream.unseen("alice").filter((item) => item.dream?.projectId === made.id).length, 3);
-  // Dismissing deletes a project's samples, and its reason teaches the next batch.
-  const dismissed = await request(`/inbox/${harbours.id}/dismiss`, { reason: "too quiet" });
-  assert.deepEqual(
-    dismissed.body.proposals.map((proposal: { title: string }) => proposal.title),
-    ["Mara"],
-  );
-  assert.equal(state.items.filter((item) => item.dream?.state === "draft").length, 0);
+  // Declining keeps a project's samples while its Undo lasts, which brings it back as it was.
+  const titles = (answer: { body: { proposals: { title: string }[] } }) =>
+    answer.body.proposals.map((proposal) => proposal.title);
+  const drafted = () => state.items.filter((item) => item.dream?.state === "draft").length;
+  assert.deepEqual(titles(await request(`/inbox/${harbours.id}/dismiss`, { reason: "dull" })), [
+    "Mara",
+  ]);
+  assert.equal(drafted(), 3);
+  assert.deepEqual(titles(await request(`/inbox/${harbours.id}/undo`, {})), ["Harbours", "Mara"]);
+  assert.equal(proposals()[0].drafts!.length, 3);
+  // Then its samples go once Undo has passed, and its reason teaches the next batch.
+  await request(`/inbox/${harbours.id}/dismiss`, { reason: "too quiet" });
+  state.clock += 60_000;
+  await inbox.propose("alice");
+  assert.equal(drafted(), 0);
+  assert.equal((await request(`/inbox/${harbours.id}/undo`, {})).status, 409);
   // Undo preserves attached chats and keeps the promoted media once its project is removed.
   projects.attach("alice", "chat", made.id);
   assert.equal((await request(`/inbox/${rooftops.id}/undo`, {})).status, 409);
@@ -2885,6 +2944,7 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
   await dream.tick();
   const again = state.calls.filter((call) => call.system.startsWith("You find")).at(-1)!;
   assert.match(again.user, /- Harbours: too quiet/);
+  assert.doesNotMatch(again.user, /dull/);
   assert.deepEqual(
     proposals().map((proposal) => proposal.title),
     ["Rooftops"],
@@ -2950,7 +3010,7 @@ test("Independent matching named results save a card with Undo, while weaker evi
   );
   assert.equal(settled.savedCards?.[0].title, "Green Wool Coat");
   assert.deepEqual(state.cards!.scenes, []);
-  inbox.undo("alice", settled.savedCards![0].id);
+  await inbox.undo("alice", settled.savedCards![0].id);
   state.clock += 6 * 3_600_000;
   await inbox.propose("alice", account);
   assert.deepEqual(state.cards!.outfits, []);

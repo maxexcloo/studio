@@ -4275,10 +4275,14 @@ export function createDream(options: {
         status: "done",
         limit,
       }),
-    /** Leaves a removed project's results in the deck or gallery without its project id. */
-    detachProject(ownerId: string, projectId: string) {
-      if (store.openDreamJobs(ownerId).some((job) => job.projectId === projectId))
-        throw failure("Wait for the project's active generations before undoing it.", 409);
+    /** Stops a removed project's open work and leaves its results in the deck or gallery without it. */
+    async detachProject(ownerId: string, projectId: string) {
+      await Promise.all(
+        store
+          .openDreamJobs(ownerId)
+          .filter((job) => job.projectId === projectId)
+          .map((job) => options.cancel(ownerId, job.id).catch(() => undefined)),
+      );
       for (const item of options.gallery(ownerId, { dreamProject: projectId })) {
         const { projectId: _projectId, ...mark } = item.dream!;
         options.mark(ownerId, String(item.id), mark, item.rating);

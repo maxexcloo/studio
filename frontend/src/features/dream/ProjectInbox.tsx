@@ -71,37 +71,47 @@ function useSettled() {
   };
 }
 
-/** Accepts a proposal, as proposed or with the person's edits, then offers Undo. */
-function useAccept() {
+/** A timed banner saying what happened to a proposal, with Undo, which takes it back. */
+function useUndoBanner() {
   const settled = useSettled();
   const undo = useMutation({
     mutationFn: (proposal: Shown) => post<Inbox<DreamItem>>(proposalPath(proposal, "undo"), {}),
     onSuccess: (inbox, proposal) => settled(inbox, proposal),
   });
+  return (message: string, proposal: Shown) => {
+    const notification = notifications.show({
+      autoClose: 10000,
+      message: (
+        <Group justify="space-between" wrap="nowrap">
+          <Text size="sm">{message}</Text>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            style={{ flexShrink: 0 }}
+            onClick={() => {
+              notifications.hide(notification);
+              undo.mutate(proposal);
+            }}
+          >
+            Undo
+          </Button>
+        </Group>
+      ),
+    });
+  };
+}
+
+/** Accepts a proposal, as proposed or with the person's edits, then offers Undo. */
+function useAccept() {
+  const settled = useSettled();
+  const banner = useUndoBanner();
   return useMutation({
     meta: { inlineError: true },
     mutationFn: ({ proposal, change }: { proposal: Shown; change?: ProposalChange }) =>
       post<Accepted<DreamItem>>(proposalPath(proposal, "accept"), change ? { change } : {}),
     onSuccess: ({ accepted, ...inbox }, { proposal }) => {
       settled(inbox, proposal);
-      const notification = notifications.show({
-        autoClose: 10000,
-        message: (
-          <Group justify="space-between" wrap="nowrap">
-            <Text size="sm">Accepted {accepted.title}</Text>
-            <Button
-              size="compact-sm"
-              variant="subtle"
-              onClick={() => {
-                notifications.hide(notification);
-                undo.mutate(proposal);
-              }}
-            >
-              Undo
-            </Button>
-          </Group>
-        ),
-      });
+      banner(`Accepted ${accepted.title}`, proposal);
     },
   });
 }
@@ -432,12 +442,13 @@ function ProposalCard({
 
 /**
  * Proposals as cards, each accepted as proposed, edited then accepted, or declined: at once, or
- * with a reason that teaches Dream after a hold. `projects` give brief edits their current text
+ * with a reason that teaches Dream after a hold. Accepting and declining both offer Undo. `projects` give brief edits their current text
  * to compare with.
  */
 export function ProposalList({ proposals, projects }: { proposals: Shown[]; projects: Project[] }) {
   const accept = useAccept();
   const settled = useSettled();
+  const banner = useUndoBanner();
   const [editing, setEditing] = useState<Shown | null>(null);
   const [reasoning, setReasoning] = useState<Shown | null>(null);
   const decline = useMutation({
@@ -447,6 +458,7 @@ export function ProposalList({ proposals, projects }: { proposals: Shown[]; proj
     onSuccess: (inbox, { proposal }) => {
       settled(inbox, proposal);
       setReasoning(null);
+      banner(`Declined ${proposal.title}`, proposal);
     },
   });
   return (
@@ -506,7 +518,7 @@ export function ProposalList({ proposals, projects }: { proposals: Shown[]; proj
   );
 }
 
-/** Dream › Projects' Inbox: what Dream proposes, above the projects; nothing shows when empty. */
+/** Dream › Projects' Inbox: what Dream proposes, below the projects; nothing shows when empty. */
 export function ProjectInbox({ projects }: { projects: Project[] }) {
   const inbox = useQuery(inboxQuery);
   const client = useQueryClient();

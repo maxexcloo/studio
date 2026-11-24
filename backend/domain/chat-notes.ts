@@ -64,6 +64,14 @@ export function createChatNotes({
       };
       return write(ownerId, [note, ...notes.filter((other) => other !== same)]);
     },
+    /** Leaves a deleted project's notes to the account's other work. */
+    untie: (ownerId: string, projectId: string) =>
+      write(
+        ownerId,
+        list(ownerId).map(({ project, ...note }) =>
+          project === projectId ? note : { project, ...note },
+        ),
+      ),
     remove: (ownerId: string, id: string) =>
       write(
         ownerId,
