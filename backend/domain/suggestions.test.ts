@@ -560,7 +560,10 @@ test("viewer next steps vary across relevant areas, specific, and uncensored onl
   assert.match(calls[0][0].content, /Keep the subject's identity/);
   assert.doesNotMatch(calls[0][0].content, /non-graphic body alternatives/);
   await labels("bob", "job-b");
-  assert.match(calls[1][0].content, /clearly adult human subject.*non-graphic body alternatives/);
+  assert.match(
+    calls[1][0].content,
+    /clearly adult human subject.*changes to how they look.*non-graphic body alternatives/,
+  );
 });
 
 test("viewer generates mode-specific options without replacing a result's saved mixed ideas", async () => {
@@ -641,9 +644,9 @@ test("all creative suggestion surfaces share context and variety while motion ke
       assert.match(context.content, /35-year-old woman with a broad build/);
       if (surface === "animate" || kind === "video") {
         assert.match(system.content, /Vary motion, subject action/);
-        assert.doesNotMatch(system.content, /include one or two non-graphic body alternatives/);
+        assert.doesNotMatch(system.content, /one or two non-graphic body alternatives/);
       } else {
-        assert.match(system.content, /include one or two non-graphic body alternatives/);
+        assert.match(system.content, /one or two non-graphic body alternatives/);
       }
     }
   }
