@@ -97,7 +97,7 @@ interface Router {
 const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
-const suggestionRevision = { image: 4, video: 3 } as const;
+const suggestionRevision = { image: 5, video: 3 } as const;
 const motionRevision = 5;
 const savedRevision = (field: "nextSteps" | "motionIdeas", item?: SuggestionItem) =>
   field === "motionIdeas"
