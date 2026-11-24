@@ -1571,6 +1571,32 @@ test("Dream fullscreen closes from the letterbox and a tap shows or hides all it
   expect(verdicts(dream)).toEqual([]);
 });
 
+test("A card heads with its subject and keeps how a clip was made in the reason", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await serveDream(page, {
+    unseen: [
+      dreamItem("clip", {
+        title: "Laugh at the Mirror",
+        dream: {
+          ...dreamItem("clip").dream,
+          why: "Extended with FastH3 v2 · Arcing handheld camera to the mirror.",
+        },
+      }),
+    ],
+  });
+  await page.goto("/dream");
+  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  await expect(preview.getByText("Laugh at the Mirror", { exact: true }).first()).toBeVisible();
+  await expect(
+    preview.getByText("Extended with FastH3 v2 · Arcing handheld camera to the mirror.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
 test("A comparison keeps its layout while its pictures load", async ({ page }) => {
   await fixtures(page);
   let release!: () => void;
