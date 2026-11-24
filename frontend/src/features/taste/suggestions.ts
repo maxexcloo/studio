@@ -3,8 +3,8 @@ import { queryOptions } from "@tanstack/react-query";
 import {
   type Change,
   type ChangeAction,
-  type ImageInspection,
   type ImageChangeAction,
+  type ImageInspection,
   type NextStep,
   type PromptIdea,
   type Suggestions,
