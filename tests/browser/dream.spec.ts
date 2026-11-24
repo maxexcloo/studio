@@ -673,7 +673,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect.poll(() => dream.settings.useLoadedProfile).toBe(false);
   const imagesGroup = settings.getByRole("region", { name: "Images", exact: true });
   const videosGroup = settings.getByRole("region", { name: "Videos", exact: true });
-  const videos = videosGroup.getByRole("switch", { name: "Generate Videos", exact: true });
+  const videos = videosGroup.getByRole("switch", { name: "Enabled", exact: true });
   const videoAmount = videosGroup.getByRole("textbox", { name: "Daily Videos", exact: true });
   await expect(videoAmount).toBeEnabled();
   await videos.click({ force: true });
@@ -693,9 +693,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
       { videos: false },
       { dailyImages: 200 },
     ]);
-  await imagesGroup
-    .getByRole("switch", { name: "Generate Images", exact: true })
-    .click({ force: true });
+  await imagesGroup.getByRole("switch", { name: "Enabled", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
 });
@@ -1806,7 +1804,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await enabled.click({ force: true });
   await expect(harbour).toContainText("More Turns");
 
-  // The detail view switches both, and deletes it from its Danger Zone.
+  // The detail view switches both; the card's menu deletes it.
   await harbour.getByRole("button", { name: "Open Harbour", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Harbour", exact: true });
   await expect(sheet.getByRole("switch", { name: "Enabled", exact: true })).toBeChecked();
@@ -1819,7 +1817,10 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
     path: "/api/dream/projects/project-2",
     body: { favoured: false },
   });
-  await sheet.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Project", exact: true })
     .getByRole("button", { name: "Delete", exact: true })

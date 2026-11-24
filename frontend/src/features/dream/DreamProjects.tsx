@@ -182,7 +182,6 @@ export function DreamProjects({
         projects={projects.data && list}
         profileLabel={profileLabel}
         onEdit={setEditing}
-        onDelete={startDeleting}
         onClose={closeSheet}
       />
       {phone ? (
