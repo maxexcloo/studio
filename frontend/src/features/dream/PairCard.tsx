@@ -39,9 +39,6 @@ export function PairContent({
         <Text fw={600} size="sm" ta="center" lineClamp={sideways ? undefined : 1}>
           {card.question}
         </Text>
-        <Text size="xs" c="dimmed" ta="center">
-          Alike but for one thing
-        </Text>
       </div>
       <div
         ref={pair}

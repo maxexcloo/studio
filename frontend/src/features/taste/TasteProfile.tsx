@@ -383,9 +383,7 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
         size="lg"
         fullScreen={phone}
       >
-        {editing && data && (
-          <TasteEditor data={data} onClose={() => setEditing(false)} saved={saved} />
-        )}
+        {data && <TasteEditor data={data} onClose={() => setEditing(false)} saved={saved} />}
       </Modal>
       <ConfirmDialog
         opened={clearing}

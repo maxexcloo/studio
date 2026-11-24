@@ -29,7 +29,17 @@ const client = new QueryClient({
       if (!mutation.meta?.inlineError && error.name !== "AbortError") failure(error);
     },
   }),
-  defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
+  defaultOptions: {
+    queries: {
+      staleTime: 10_000,
+      // Reads ride out a restart (server errors and unreachable Studio); refusals fail at once.
+      retry: (count, error) => {
+        const { status } = error as { status?: number };
+        return count < 2 && (status === undefined || status >= 500);
+      },
+      refetchOnWindowFocus: true,
+    },
+  },
 });
 function AccountAppearance({ children }: { children: ReactNode }) {
   return <AppearanceProvider {...useAppearancePreference()}>{children}</AppearanceProvider>;

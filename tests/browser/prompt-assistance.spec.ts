@@ -540,7 +540,9 @@ test("Recent Prompts likes and switches at once, and a refused change is undone"
   await save.click();
   await expect(save).not.toBeChecked();
   await save.click();
-  await expect(page.getByText("Studio returned 502", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Studio is restarting. Try again in a moment.", { exact: true }),
+  ).toBeVisible();
   await expect(save).not.toBeChecked();
   await expect(panel.getByRole("option", { name: "Use Prompt: Earlier landscape" })).toBeVisible();
 });

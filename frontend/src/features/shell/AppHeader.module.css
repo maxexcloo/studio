@@ -22,6 +22,17 @@
   background: var(--mantine-primary-color-light);
   pointer-events: none;
 }
+/* A one-digit count is a circle and longer counts a pill, the digits centred on their cap height
+   rather than the font's taller line box. */
+.count {
+  min-width: var(--indicator-size);
+  padding-inline: 4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.count > span {
+  text-box: trim-both cap alphabetic;
+}
 .mode {
   position: relative;
   z-index: 1;

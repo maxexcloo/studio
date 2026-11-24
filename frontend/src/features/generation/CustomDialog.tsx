@@ -6,6 +6,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { TextEntrySheet } from "../../ui/TextEntrySheet";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 
 import textClasses from "../../ui/TextBox.module.css";
@@ -18,7 +19,7 @@ export function CustomDialog({
   opened,
   onClose,
   title,
-  action,
+  action: current,
   label,
   placeholder = "What should change, like “make it night”",
   onSend,
@@ -41,6 +42,8 @@ export function CustomDialog({
   const phone = usePhone();
   const id = useId();
   const [request, setRequest] = useState("");
+  // Callers clear the record their action reads as they close.
+  const action = useLastWhileClosing(opened ? current : null) ?? current;
   const send = (text: string) => {
     onClose();
     onSend(text);

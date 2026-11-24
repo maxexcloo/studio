@@ -51,14 +51,13 @@
 .card:active {
   cursor: grabbing;
 }
-/* Comparisons use the width wide screens give them, side by side. */
+/* A phone held sideways gives a comparison's sides its full width. */
 .card[data-pair] {
   max-width: 1200px;
 }
+/* Wider screens give single cards and comparisons one width, wide enough for sides beside each
+   other, so the card keeps its size from one to the next. */
 :where(:root:not([data-phone])) .stage > .card {
-  max-width: 64rem;
-}
-:where(:root:not([data-phone])) .stage > .card[data-pair] {
   max-width: 96rem;
 }
 .card[data-depth="1"] {
@@ -192,7 +191,8 @@
 .card[data-pair] .hint[data-hint="right"] {
   color: var(--mantine-primary-color-filled);
 }
-/* The Deck's own look: large round answers floating under the card. */
+/* The Deck's own look: large round answers floating under the card, which stay round however
+   little room the row has. */
 .buttons {
   flex-shrink: 0;
   display: flex;
@@ -203,9 +203,12 @@
 }
 .answer {
   --answer-size: 58px;
+  flex: none;
   width: var(--answer-size);
   height: var(--answer-size);
   min-width: var(--answer-size);
+  min-height: var(--answer-size);
+  aspect-ratio: 1;
   border-color: var(--mantine-color-default-border);
   box-shadow: var(--mantine-shadow-sm);
   transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
@@ -237,8 +240,9 @@
 .buttons[data-comparison-size="3"] .answer {
   --answer-size: 44px;
 }
+/* The smallest phones fit five answers beside Undo and Suggestions, their touch targets kept. */
 :where(:root[data-phone]) .buttons[data-comparison-size="3"] .answer {
-  --answer-size: 38px;
+  --answer-size: clamp(38px, 11vw, 44px);
 }
 .thumb {
   display: block;
@@ -355,6 +359,10 @@
   position: relative;
   min-height: 0;
   overflow: hidden;
+}
+/* Focused only to keep shortcuts while the chrome is hidden. */
+.previewStage:focus {
+  outline: none;
 }
 .card[data-full] {
   max-width: none;
