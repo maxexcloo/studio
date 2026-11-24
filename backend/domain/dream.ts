@@ -17,17 +17,20 @@ import {
   type DreamCounts,
   type DreamInputs,
   type DreamLikedPrompt,
+  type DreamLimits,
   type DreamPassReason,
   type DreamResultSet,
   type DreamSettings,
   type KeepCount,
   type KeepRates,
   type PairAnswer,
+  defaultDreamLimits,
   dreamCardCounts,
   dreamDefaults,
   dreamLimitReached,
   dreamSeriesLength,
   dreamSet,
+  withinDreamLimits,
 } from "../../shared/dream.ts";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import {
@@ -516,8 +519,8 @@ const shapeWeights: Record<string, number> = { "0.67": 0.5 };
  * Too Similar and Glitch say nothing about taste.
  */
 const disliking = (reason: DreamPassReason) => reason === "taste" || reason === "skip";
-/** Dream stops making new results while this many wait unseen, until some are judged. */
-const unseenLimit = 60;
+/** Fresh ideas Dream draws for one job before setting it aside when each is unusable. */
+const ideaDraws = 3;
 /** Percent of Dream's images that start a series, where the account has a liked or kept image. */
 const seriesShare = 2;
 /** Percent of videos that extend one of the account's videos rather than animate a still. */
@@ -846,6 +849,8 @@ export function createDream(options: {
   idleMinutes(kind: Kind): number;
   /** The settings an administrator forces on every account, over its own choice. */
   overrides?(): Partial<DreamSettings>;
+  /** The most each account may choose for each amount; read settings stay within them. */
+  limits?(): DreamLimits;
   store: Store;
   taste: Taste;
   owners(): string[];
@@ -973,6 +978,7 @@ export function createDream(options: {
   const chance = (percent: number) => random(100) < percent;
   const pick = <T>(items: T[]) => items[random(items.length)];
   const name = (ownerId: string) => `dream:${ownerId}`;
+  const limits = () => options.limits?.() ?? defaultDreamLimits;
   function read(ownerId: string): DreamRecord {
     const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
       | Partial<DreamRecord>
@@ -981,12 +987,15 @@ export function createDream(options: {
     return {
       recent: [],
       ...saved,
-      settings: Object.fromEntries(
-        (Object.keys(dreamDefaults) as (keyof DreamSettings)[]).map((key) => [
-          key,
-          overrides[key] ?? saved?.settings?.[key] ?? dreamDefaults[key],
-        ]),
-      ) as DreamSettings,
+      settings: withinDreamLimits(
+        Object.fromEntries(
+          (Object.keys(dreamDefaults) as (keyof DreamSettings)[]).map((key) => [
+            key,
+            overrides[key] ?? saved?.settings?.[key] ?? dreamDefaults[key],
+          ]),
+        ) as DreamSettings,
+        limits(),
+      ),
     };
   }
   const write = (ownerId: string, record: DreamRecord, patch?: Partial<DreamSettings>) => {
@@ -2047,17 +2056,28 @@ export function createDream(options: {
   const failures = new Map<string, { count: number; until: number }>();
   /**
    * Dream's writing stage (queue.ts): one new idea for the job's profile from the person's taste,
-   * streamed into the queue item. A repeated idea is rewritten once; an unusable or still repeated
-   * one fails the job, and each failure in a row holds the account's next idea back longer.
+   * streamed into the queue item. A repeated idea is rewritten once; one still unusable is set aside
+   * for a freshly drawn idea, up to `ideaDraws`, after which the job is discarded rather than failed
+   * (only generation failures fail Dream's jobs). Each failure in a row holds the account's next
+   * idea back longer.
    */
   async function writeJob(
     job: OwnedJob,
     progress: Parameters<PromptWriter>[1],
   ): Promise<WrittenPrompt> {
     try {
-      const written = await writeIdea(job, progress);
-      failures.delete(job.ownerId);
-      return written;
+      for (let draw = 1; ; draw++) {
+        try {
+          const written = await writeIdea(job, progress);
+          failures.delete(job.ownerId);
+          return written;
+        } catch (error) {
+          if (!(error as { unusable?: true }).unusable || progress.signal.aborted) throw error;
+          if (draw >= ideaDraws) throw Object.assign(error as Error, { discard: true });
+          progress.onThinking("\n");
+          progress.onDelta("\n");
+        }
+      }
     } catch (error) {
       if (!progress.signal.aborted) {
         const count = (failures.get(job.ownerId)?.count || 0) + 1;
@@ -2590,7 +2610,10 @@ export function createDream(options: {
           ...(Object.keys(inputs).length ? { inputs } : {}),
         };
       }
-      if (attempt) throw new Error(`The text model's idea was unusable: ${wrong}`);
+      if (attempt)
+        throw Object.assign(new Error(`The text model's idea was unusable: ${wrong}`), {
+          unusable: true,
+        });
       onThinking("\n");
       onDelta("\n");
       messages = [
@@ -2615,7 +2638,8 @@ export function createDream(options: {
     const record = read(ownerId);
     const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
-    if (options.count(ownerId, { dreamState: "unseen" }) >= unseenLimit)
+    const unseenLimit = record.settings.pauseAfterUnseen;
+    if (unseenLimit && options.count(ownerId, { dreamState: "unseen" }) >= unseenLimit)
       return {
         status: "waiting",
         reason: `Dream waits while ${unseenLimit} results are unseen; judge some to continue.`,
@@ -4133,6 +4157,8 @@ export function createDream(options: {
     read,
     /** The settings an administrator forces, which accounts can't change. */
     locked: () => Object.keys(options.overrides?.() ?? {}) as (keyof DreamSettings)[],
+    /** The most each account may choose for each amount. */
+    limits,
     exploring,
     history(ownerId: string): DreamActivity[] {
       const labels = {

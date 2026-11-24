@@ -66,7 +66,12 @@ import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion, dataDir, projectRoot } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-settings.js";
+import {
+  dreamLimits,
+  dreamOverrides,
+  dreamTimingMinutes,
+  flagEnabled,
+} from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { createChatNotes } from "./domain/chat-notes.ts";
@@ -1022,6 +1027,7 @@ const dream = createDream({
   idleMinutes: (kind) =>
     dreamTimingMinutes(kind === "image" ? "imageIdleMinutes" : "videoIdleMinutes"),
   overrides: dreamOverrides,
+  limits: dreamLimits,
   store,
   taste,
   projects: (ownerId) => projects.list(ownerId),

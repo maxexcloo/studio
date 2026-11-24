@@ -400,7 +400,8 @@ export class GenerationQueue {
   /**
    * The writing stage: the prompt assistant writes the job's prompt, its streamed thinking and
    * prompt gathered into `progress`; the written prompt then becomes the input and the job queues on its
-   * resource. A failure fails the job with the reason; a cancellation aborts the writing.
+   * resource. A failure fails the job with the reason, unless the writer marks it `discard`: then
+   * the job ends cancelled, as no generation failed; a cancellation aborts the writing.
    */
   private write(initial: OwnedJob) {
     const controller = new AbortController();
@@ -439,14 +440,21 @@ export class GenerationQueue {
         clearTimeout(pending);
         const latest = current();
         if (!latest) return;
-        const failed = this.store.save({
+        const discard = (error as { discard?: true }).discard;
+        if (discard)
+          logEvent("Writing set a job aside", {
+            job: latest.id,
+            owner: latest.ownerId,
+            reason: (error as Error).message,
+          });
+        const ended = this.store.save({
           ...latest,
-          status: "failed",
+          status: discard ? "cancelled" : "failed",
           progress: undefined,
           reason: `Writing the prompt failed: ${(error as Error).message}`,
           ...((error as { permanent?: true }).permanent && { permanent: true }),
         });
-        await this.adapter.settled?.(failed);
+        await this.adapter.settled?.(ended);
       } finally {
         this.writing.delete(initial.id);
         // The written job queues for its worker, and the freed slot starts the next write.

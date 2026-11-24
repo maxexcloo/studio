@@ -1,7 +1,9 @@
 import {
+  dreamLimitSettings,
   dreamOverrideKeys,
   dreamSettingError,
   dreamTimingSettings,
+  dreamUnseenOffKey,
   maxDreamIdleMinutes,
 } from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
@@ -76,6 +78,23 @@ export function registerDeploymentRoutes(
           error: `Set the delay to a whole number from 0 to ${maxDreamIdleMinutes}.`,
         });
       saveDeploymentSetting(key, value === timing.defaultValue ? "" : value);
+      res.json({ ok: true, dream: describeDreamPolicy() });
+      return;
+    }
+    const limit = Object.values(dreamLimitSettings).find((setting) => setting.key === key);
+    if (limit) {
+      if (!Number.isInteger(value) || value < 0 || value > limit.bound)
+        return res.status(400).json({
+          ok: false,
+          error: `Set the limit to a whole number from 0 to ${limit.bound}.`,
+        });
+      saveDeploymentSetting(key, value === limit.defaultValue ? "" : value);
+      res.json({ ok: true, dream: describeDreamPolicy() });
+      return;
+    }
+    if (key === dreamUnseenOffKey) {
+      if (typeof value !== "boolean") throw new Error("Choose on or off.");
+      saveDeploymentSetting(key, value ? "1" : "");
       res.json({ ok: true, dream: describeDreamPolicy() });
       return;
     }

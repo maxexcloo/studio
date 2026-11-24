@@ -1,7 +1,7 @@
 import { Alert, SegmentedControl, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { dreamSettingMaxima, dreamVideoSeconds } from "../../../../shared/dream";
+import { type DreamLimit, dreamSettingMaxima, dreamVideoSeconds } from "../../../../shared/dream";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
@@ -39,7 +39,7 @@ export function DreamPreferences() {
   const save = useDreamSettings();
   if (dream.isPending) return <LoadingState label="Loading Dream" fill />;
   if (dream.error) return <Alert color="red">{dream.error.message}</Alert>;
-  const { settings, locked: lockedKeys } = dream.data;
+  const { settings, limits, locked: lockedKeys } = dream.data;
   const locked = (key: keyof DreamSettings) => lockedKeys.includes(key);
   const note = (key: keyof DreamSettings) => (locked(key) ? ` ${lockedByAdministrator}` : "");
   const toggle = (
@@ -57,7 +57,7 @@ export function DreamPreferences() {
     </SettingRow>
   );
   const number = (
-    key: keyof typeof dreamSettingMaxima,
+    key: keyof typeof dreamSettingMaxima | DreamLimit,
     label: string,
     description: string,
     disabled: boolean,
@@ -67,8 +67,12 @@ export function DreamPreferences() {
         key={settings[key]}
         label={label}
         value={settings[key]}
-        min={0}
-        max={dreamSettingMaxima[key]}
+        min={key === "pauseAfterUnseen" && !limits.unseenOff ? 1 : 0}
+        max={
+          key in limits
+            ? limits[key as DreamLimit]
+            : dreamSettingMaxima[key as keyof typeof dreamSettingMaxima]
+        }
         disabled={disabled}
         onSave={(value) => save.mutate({ [key]: value })}
       />
@@ -85,6 +89,12 @@ export function DreamPreferences() {
           </Text>
         )}
         {toggle("enabled", "Dream", "Make new media from your taste while Studio is idle.")}
+        {number(
+          "pauseAfterUnseen",
+          "Pause After Unseen",
+          `Dream waits while this many results are unseen, up to ${limits.pauseAfterUnseen}.${limits.unseenOff ? " 0 never waits." : ""}`,
+          !settings.enabled,
+        )}
         {toggle(
           "useLoadedProfile",
           "Run on Loaded Profile",
@@ -117,7 +127,7 @@ export function DreamPreferences() {
         {number(
           "dailyImages",
           "Daily Images",
-          "The most images Dream makes a day.",
+          `The most images Dream makes a day, up to ${limits.dailyImages}.`,
           !settings.images,
         )}
       </SettingGroup>
@@ -144,7 +154,7 @@ export function DreamPreferences() {
         {number(
           "dailyVideos",
           "Daily Videos",
-          "The most videos Dream makes a day.",
+          `The most videos Dream makes a day, up to ${limits.dailyVideos}.`,
           !settings.videos,
         )}
       </SettingGroup>

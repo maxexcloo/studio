@@ -18,12 +18,12 @@ export const dreamDefaults = {
   mixExisting: 30,
   /** Percent of ideas written uncensored, where `uncensored` and Uncensored Models allow. */
   uncensoredShare: 40,
+  /** Dream waits while this many results are unseen; 0 never waits, where an administrator allows. */
+  pauseAfterUnseen: 60,
 };
 export type DreamSettings = typeof dreamDefaults;
-/** The largest value of each numeric Dream setting, all from 0. */
+/** The largest value of each percentage Dream setting, all from 0. */
 export const dreamSettingMaxima = {
-  dailyImages: 500,
-  dailyVideos: 100,
   mixNew: 100,
   mixComparisons: 100,
   mixExisting: 100,
@@ -117,13 +117,56 @@ export const dreamOverrideKeys = {
   videoBackend: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
 };
 export type DreamOverride = keyof typeof dreamOverrideKeys;
-export function dreamSettingError(key: keyof DreamSettings, value: unknown): string {
+/**
+ * The most an account may choose for each Dream amount, which an administrator sets for everyone
+ * (Settings › Administration › Dream › Limits), up to `bound`.
+ */
+export const dreamLimitSettings = {
+  dailyImages: { key: "STUDIO_DREAM_MAX_DAILY_IMAGES", defaultValue: 500, bound: 10_000 },
+  dailyVideos: { key: "STUDIO_DREAM_MAX_DAILY_VIDEOS", defaultValue: 100, bound: 2_000 },
+  pauseAfterUnseen: { key: "STUDIO_DREAM_MAX_UNSEEN", defaultValue: 60, bound: 2_000 },
+};
+/** Whether accounts may turn Pause After Unseen off; it stays on unless an administrator allows. */
+export const dreamUnseenOffKey = "STUDIO_DREAM_ALLOW_UNSEEN_OFF";
+export type DreamLimit = keyof typeof dreamLimitSettings;
+export type DreamLimits = Record<DreamLimit, number> & { unseenOff: boolean };
+export const defaultDreamLimits: DreamLimits = {
+  dailyImages: dreamLimitSettings.dailyImages.defaultValue,
+  dailyVideos: dreamLimitSettings.dailyVideos.defaultValue,
+  pauseAfterUnseen: dreamLimitSettings.pauseAfterUnseen.defaultValue,
+  unseenOff: false,
+};
+/** An account's settings within the limits: a lowered limit applies at once to every account. */
+export function withinDreamLimits(settings: DreamSettings, limits: DreamLimits): DreamSettings {
+  const unseen = settings.pauseAfterUnseen;
+  return {
+    ...settings,
+    dailyImages: Math.min(settings.dailyImages, limits.dailyImages),
+    dailyVideos: Math.min(settings.dailyVideos, limits.dailyVideos),
+    pauseAfterUnseen:
+      unseen === 0 && limits.unseenOff
+        ? 0
+        : Math.min(unseen || limits.pauseAfterUnseen, limits.pauseAfterUnseen),
+  };
+}
+export function dreamSettingError(
+  key: keyof DreamSettings,
+  value: unknown,
+  limits: DreamLimits = defaultDreamLimits,
+): string {
   if (key === "imageBackend" || key === "videoBackend")
     return value === "local" || value === "cloud" ? "" : `Choose Local or Cloud for ${key}.`;
   if (key === "videoSeconds")
     return (dreamVideoSeconds as readonly unknown[]).includes(value)
       ? ""
       : "Choose Auto, 5, 8 or 10 seconds for videoSeconds.";
+  if (key in dreamLimitSettings) {
+    const max = limits[key as DreamLimit];
+    const min = key === "pauseAfterUnseen" && !limits.unseenOff ? 1 : 0;
+    return Number.isInteger(value) && Number(value) >= min && Number(value) <= max
+      ? ""
+      : `Set ${key} to a whole number from ${min} to ${max}.`;
+  }
   if (key in dreamSettingMaxima) {
     const max = dreamSettingMaxima[key as keyof typeof dreamSettingMaxima];
     return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= max
