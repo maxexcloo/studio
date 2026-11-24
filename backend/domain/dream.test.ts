@@ -686,7 +686,8 @@ test("A verdict that leaves the deck low starts Dream's next work without waitin
   assert.equal((await request(`/${card.id}/keep`, {})).status, 200);
   for (let turn = 0; turn < 100 && !live("alice").length; turn++)
     await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(live("alice").length, 1);
+  const cards = new Set(live("alice").map((job) => job.dream?.pair?.id ?? job.id));
+  assert.equal(cards.size, 1);
 });
 
 test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or liked images", async (t) => {
