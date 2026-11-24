@@ -223,11 +223,15 @@ function where(query = {}) {
     const pending =
       (query.status === undefined || [query.status].flat().includes("pending")) &&
       ![query.notStatus].flat().includes("pending");
-    // Two seeks, as an OR across columns would walk the whole gallery for a few recent items.
+    // Recent rows by seeking the times index: a walk in gallery order would otherwise read each
+    // older record's JSON for its time, all of them once it has passed the recent ones. Pending rows
+    // are a second seek, as an OR across columns would walk the whole gallery for a few recent items.
+    const recent =
+      "SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_created WHERE created_ms >= ?";
     add(
       pending
-        ? "rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending' UNION SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_created WHERE created_ms >= ?)"
-        : "created_ms >= ?",
+        ? `rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending' UNION ${recent})`
+        : `rowid IN (${recent})`,
       Number(query.since),
     );
   }
