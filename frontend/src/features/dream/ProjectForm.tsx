@@ -11,7 +11,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 
 import { type CardKind, cardKinds } from "../../../../shared/characters";
 import { loraName } from "../../../../shared/profiles";
@@ -413,15 +413,16 @@ export function ProjectForm({
             {!field && alert}
           </Stack>
           <div className={classes.footer}>
+            {/* Keyed apart, so the click that ends typing can't land on Create as it replaces Done. */}
             {field ? (
-              <DialogFooter>
+              <DialogFooter key="typing">
                 <div className={classes.tools} ref={setToolsBar} />
                 <Button onMouseDown={(event) => event.preventDefault()} onClick={typing.done}>
                   Done
                 </Button>
               </DialogFooter>
             ) : (
-              footer
+              <Fragment key="form">{footer}</Fragment>
             )}
           </div>
         </>

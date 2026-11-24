@@ -906,7 +906,7 @@ test("Details shows the source, exact set, original chat and applied reference",
     },
   );
   await page.getByRole("button", { name: "Generation Details", exact: true }).click();
-  const source = page.getByRole("link", { name: "Grey Heron", exact: true });
+  const source = page.getByRole("link", { name: "Made From Grey Heron", exact: true });
   await expect(source).toHaveAttribute("href", "/images/parent");
   await expect(source.locator("img")).toHaveAttribute("src", image);
   await expect(page.getByText("Seed: 0 → 25", { exact: true })).toBeVisible();
