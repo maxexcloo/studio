@@ -177,13 +177,13 @@ export function GalleryToolbar({
       >
         <GalleryFilterPanel kind={kind} value={value} onChange={onChange} toggles={toggles} />
       </ChipPopup>
-      {/* Desktop chips fill the row's free width; either way the actions end the row. */}
-      {phone || !chips.length ? <div className={classes.chips} /> : filterChips}
       {results && !phone && (
         <Text size="sm" c="dimmed" className={classes.count}>
           {results}
         </Text>
       )}
+      {/* Desktop chips fill the row's free width; either way the actions end the row. */}
+      {phone || !chips.length ? <div className={classes.chips} /> : filterChips}
       <SortMenu
         label="Sort Gallery"
         groups={gallerySortGroups}
