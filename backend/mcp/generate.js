@@ -143,15 +143,10 @@ const chatContext = z
     character: cardContext.optional(),
     outfit: cardContext.optional(),
     scene: cardContext.optional(),
-    series: z
-      .string()
-      .optional()
-      .describe("The user's theme or series name, shared across its sets."),
+    series: z.string().optional().describe("The user's theme, shared across sets."),
     notes: z.string().max(maxContextNotes).optional(),
   })
-  .describe(
-    "Who and what it shows; series names the user's theme; notes explain the direction for this set.",
-  );
+  .describe("Who and what it shows; notes: direction and background, kept for Dream.");
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
@@ -626,6 +621,25 @@ export function registerGenerateTools({
             if (turnRuns.size >= 1000) turnRuns.delete(turnRuns.keys().next().value);
             turnRuns.set(turnKey, run);
           }
+          // The chat's context, kept for Dream (Dream › Taste › Chat Notes) with the results it came with.
+          const text = [input.context?.series, input.context?.notes].filter(Boolean).join(": ");
+          const results = accepted.entries.flatMap(({ queued }) =>
+            (queued.jobs || []).map((job) => job.job_id),
+          );
+          if (text && results.length)
+            media
+              .request(
+                "POST",
+                "/api/dream/notes",
+                {
+                  text,
+                  chat: conversation,
+                  results,
+                  card: accepted.entries[0].plan.result_set?.character?.id,
+                },
+                owner,
+              )
+              .catch(() => {});
         },
         () => {
           if (recentGenerates.get(key) === entry) recentGenerates.delete(key);

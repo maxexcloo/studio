@@ -467,13 +467,18 @@ export function registerManageTools({
     server,
     "taste",
     "taste & lora ratings",
-    "The user's learnt taste, when asked: read, refresh or reset. rate_lora sets a LoRA (name from models) like, dislike or none.",
+    "The user's taste, when asked: read, refresh or reset. rate_lora: a LoRA from models, like, dislike or none. note: context for Dream.",
     {
-      action: z.enum(["read", "refresh", "reset", "rate_lora"]).default("read"),
+      action: z.enum(["read", "refresh", "reset", "rate_lora", "note"]).default("read"),
       lora: z.string().trim().min(1).max(400).optional(),
       rating: z.enum(["like", "dislike", "none"]).optional(),
+      note: z.string().optional(),
     },
-    async ({ action, lora, rating }, signal) => {
+    async ({ action, lora, rating, note }, signal) => {
+      if (action === "note") {
+        const { notes } = await api("POST", "/api/dream/notes", { text: note ?? "", chat }, signal);
+        return mcpJson({ saved: notes[0].text, notes: notes.length });
+      }
       if (action === "rate_lora") {
         if (!lora || !rating) throw new Error("Pass lora (its name from models) and rating.");
         const { library = {} } = await api(

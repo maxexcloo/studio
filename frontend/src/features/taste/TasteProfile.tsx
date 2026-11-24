@@ -24,6 +24,7 @@ import { ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { ChatNotes } from "../dream/ChatNotes";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { isProfile, profileName } from "../generation/payload";
@@ -357,6 +358,7 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
         </Stack>
       </SettingGroup>
       <TasteReflection />
+      <ChatNotes />
       <SettingGroup title="Danger Zone" danger>
         <SettingRow
           label="Clear Taste Profile"

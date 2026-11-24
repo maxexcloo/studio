@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import type { DreamCounts, DreamDigest, DreamSettings } from "../../../../shared/dream";
+import type { ChatNote, DreamCounts, DreamDigest, DreamSettings } from "../../../../shared/dream";
 import type { Inbox } from "../../../../shared/inbox";
 import type { Project, ProjectStats } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
@@ -130,6 +130,12 @@ export const projectResultsQuery = (projectId: string) =>
     queryKey: ["dream", "projects", projectId, "results"],
     queryFn: () => api<{ items: DreamItem[] }>(projectPath({ id: projectId }, "results")),
   });
+
+/** The context chats gave Studio, which Dream may draw on (backend/domain/chat-notes.ts). */
+export const chatNotesQuery = queryOptions({
+  queryKey: ["dream", "notes"],
+  queryFn: () => api<{ notes: ChatNote[] }>("/api/dream/notes"),
+});
 
 /** What Dream proposes in Dream › Projects' Inbox (backend/domain/inbox.ts). */
 export const inboxQuery = queryOptions({
