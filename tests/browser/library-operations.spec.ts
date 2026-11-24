@@ -633,12 +633,7 @@ test("LoRA row actions start with Edit and end with Delete, and deletion require
   await page.goto("/library#loras");
   const actions = page.getByRole("button", { name: "Actions for Soft Texture", exact: true });
   await actions.click();
-  await expect(page.getByRole("menuitem")).toHaveText([
-    "Edit",
-    "Copy File Name",
-    "Test LoRA",
-    "Delete",
-  ]);
+  await expect(page.getByRole("menuitem")).toHaveText(["Edit", "Copy File Name", "Test", "Delete"]);
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Delete LoRA", exact: true });
   await expect(dialog).toBeVisible();

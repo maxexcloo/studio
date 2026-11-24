@@ -472,7 +472,7 @@ export function usePromptAssistant({
       opened={asking}
       onClose={() => setAsking(false)}
       title="Custom Improvement"
-      action="Improve Prompt"
+      action="Improve"
       onSend={ask}
     />
   );

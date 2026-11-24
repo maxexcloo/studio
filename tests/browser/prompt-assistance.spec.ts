@@ -359,7 +359,7 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
   const request = dialog.getByRole("textbox", { name: "Change", exact: true });
   await expect(request).toBeVisible();
   if (phone) await expect(request).not.toBeFocused();
-  await expect(dialog.getByRole("button", { name: "Improve Prompt", exact: true })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Improve", exact: true })).toBeDisabled();
   await dialog
     .getByRole("button", { name: phone ? "Close Custom Improvement" : "Cancel", exact: true })
     .click();
@@ -401,7 +401,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   const request = dialog.getByRole("textbox", { name: "Change", exact: true });
   await request.fill("make it night");
-  await dialog.getByRole("button", { name: "Improve Prompt", exact: true }).click();
+  await dialog.getByRole("button", { name: "Improve", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(prompt).toHaveValue("A castle at night");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
