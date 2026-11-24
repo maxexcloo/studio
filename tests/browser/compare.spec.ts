@@ -570,7 +570,12 @@ test("Recreate On runs each selected image again on another model beside its ori
     ["tin", "A tin owl"],
     ["felt", "A felt owl"],
   ]) {
-    const settings = { profileId: "image:test", profileName: "Image Quality", seed: 7, count: 2 };
+    const settings = {
+      profileId: "retired-model",
+      profileName: "Image Quality",
+      seed: 7,
+      count: 2,
+    };
     const item = {
       id,
       jobId: `job-${id}`,

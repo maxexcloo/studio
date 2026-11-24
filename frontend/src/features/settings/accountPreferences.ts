@@ -51,11 +51,14 @@ export const preferencesQuery = queryOptions({
 });
 
 /** Saves preferences at once; a failure refetches the saved ones and reports through the default notification. */
-export function useSavePreferences() {
+export function useSavePreferences(previousGalleryViews?: SavedGalleryView[]) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (patch: Partial<Preferences>) =>
-      api<PreferencesStatus>("/api/preferences", { method: "PATCH", body: JSON.stringify(patch) }),
+      api<PreferencesStatus>("/api/preferences", {
+        method: "PATCH",
+        body: JSON.stringify(previousGalleryViews ? { ...patch, previousGalleryViews } : patch),
+      }),
     onMutate: (patch) =>
       client.setQueryData(
         preferencesQuery.queryKey,

@@ -275,8 +275,9 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/preferences") {
       if (method === "PATCH") {
-        Object.assign(preferences.preferences, body);
-        preferences.saved = [...new Set([...preferences.saved, ...Object.keys(body)])];
+        const { previousGalleryViews: _previousGalleryViews, ...patch } = body;
+        Object.assign(preferences.preferences, patch);
+        preferences.saved = [...new Set([...preferences.saved, ...Object.keys(patch)])];
       }
       return respond(preferences);
     }
@@ -560,7 +561,31 @@ export async function fixtures(page: Page) {
       const job = recordGeneration(body, sessionId);
       return respond({ jobId: job.id, sessionId, status: "queued" });
     }
-    // Compare Selected and Recreate On record chosen gallery images; an empty one is its job's first.
+    if (path === "/api/comparisons/recreate" && method === "POST") {
+      const original = gallery.find(({ id }) => id === body.itemId)!;
+      const source = jobs.find(({ id }) => id === original.jobId)!;
+      const job = recordGeneration(
+        { ...body.input, parentJobId: source.id, parentItemId: original.id },
+        source.sessionId,
+      );
+      const comparison = {
+        id: `compare-${comparisons.length + 1}`,
+        seed: String(body.input.seed),
+        jobIds: [source.id, job.id],
+        itemIds: [original.id, ""],
+        labels: body.labels,
+        variants: [original, ...job.items].map((item, index) => ({
+          jobId: item.jobId,
+          label: body.labels[index],
+          item,
+        })),
+        createdAt: stamp,
+        vote: null,
+      };
+      comparisons.push(comparison);
+      return respond(comparison);
+    }
+    // Compare Selected records chosen gallery images.
     if (path === "/api/comparisons" && method === "POST") {
       const comparison = {
         id: `compare-${comparisons.length + 1}`,

@@ -1,10 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type { StudioSession } from "../../../../shared/queue";
 import { post } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { inputForProfile, modelsQuery } from "../generation/GenerationProvider";
-import { generationInput, profileName } from "../generation/payload";
+import {
+  generationInput,
+  isProfile,
+  profileForBackend,
+  profileName,
+  runReferenceSlots,
+  splitReferenceSlots,
+} from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 import { mediaProfileName } from "./mediaLabels";
 import { galleryKey } from "./queries";
@@ -25,30 +31,38 @@ export function useRecreateOn() {
     mutationFn: async ({ items, profile }: { items: MediaItem[]; profile: Profile }) => {
       const { profiles } = await client.ensureQueryData(modelsQuery);
       const comparisons: string[] = [];
-      const failed: string[] = [];
+      const failed = items.slice(recreateOnLimit).map(({ id }) => id);
       let error: unknown;
       for (const item of items.slice(0, recreateOnLimit)) {
         try {
-          const { draft, seed, profile: original } = await mediaDraft(item, "image", client);
+          const { draft, seed } = await mediaDraft(
+            item,
+            "image",
+            client,
+            undefined,
+            undefined,
+            profile.id,
+          );
+          const run = profileForBackend(profile, undefined, Boolean(draft.references.length));
+          const original = profiles.find((candidate) =>
+            isProfile(candidate, String(item.settings?.profileId || item.model || "")),
+          );
+          const { unused } = splitReferenceSlots(draft.references, runReferenceSlots(run));
+          if (unused.length)
+            throw new Error(
+              "The selected model cannot use all of this image's saved reference slots.",
+            );
           const input = {
             ...inputForProfile(draft.input, profile),
             seed: seed ?? "",
             count: 1,
             ...(item.width && item.height ? { width: item.width, height: item.height } : {}),
-            loras: original.family === profile.family ? draft.input.loras : [],
+            loras:
+              run?.capabilities.lora && original?.family === run.family ? draft.input.loras : [],
           };
-          const session =
-            draft.sessionId || (await post<{ session: StudioSession }>("/api/sessions")).session.id;
-          const { jobId } = await post<{ jobId: string }>(`/api/sessions/${session}/generations`, {
-            ...generationInput(input, profile, draft.references),
-            operation: "image",
-            parentJobId: draft.parentJobId,
-            parentItemId: draft.parentItemId,
-          });
-          // The new run's image is its job's first, chosen once it exists.
-          const comparison = await post<{ id: string }>("/api/comparisons", {
-            jobIds: [item.jobId, jobId],
-            itemIds: [item.id, ""],
+          const comparison = await post<{ id: string }>("/api/comparisons/recreate", {
+            itemId: item.id,
+            input: generationInput(input, profile, draft.references),
             labels: [mediaProfileName(item, profiles) || "Original", profileName(profile)].map(
               (label) => label.slice(0, 80),
             ),

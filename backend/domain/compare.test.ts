@@ -320,6 +320,26 @@ test("compare runs queue one seeded set, read back per owner and record the star
     ["w-1", "o-0"],
   );
 
+  const beforeRecreate = records.length;
+  const body = {
+    itemId: "w-1",
+    labels: ["Original", "Replacement"],
+    input: { profileId: "broken", seed: "7" },
+  };
+  assert.equal((await request("/recreate", body)).status, 400);
+  assert.equal(records.length, beforeRecreate);
+  assert.equal((await request("/recreate", body, "POST", "bob")).status, 404);
+  const replacement = await request("/recreate", {
+    ...body,
+    input: { ...body.input, profileId: "replacement", count: 3, prompt: "A replacement" },
+  });
+  assert.equal(replacement.status, 201);
+  const job = store.job("alice", replacement.body.variants[1].jobId)!;
+  assert.equal(job.parentItemId, "w-1");
+  assert.equal(job.input.count, 1);
+  assert.equal(job.input.profileId, "replacement");
+  assert.equal(replacement.body.variants[0].item.id, "w-1");
+
   // Variants with seeds of their own keep them, and no shared seed is recorded.
   const seeded = await request("/run", {
     variants: [variant("Seed 1", { seed: "1" }), variant("Seed 2", { seed: 2 })],

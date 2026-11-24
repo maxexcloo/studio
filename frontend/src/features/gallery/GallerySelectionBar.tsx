@@ -471,6 +471,7 @@ export function GallerySelectionBar({
                 setChoosingModel(false);
                 if (error) failure(error);
                 settle(failed);
+                if (failed.length) return;
                 // One comparison opens; several wait in Comparisons.
                 if (comparisons.length === 1) navigate(`/compare/${comparisons[0]}`);
                 else if (comparisons.length) navigate(galleryViewPath("image", "comparisons"));

@@ -18,7 +18,7 @@ import { identityNote } from "./identity";
 import type { CharacterCard } from "./queries";
 
 /**
- * Face Check for one character: every result made with its card and how closely each face
+ * Face Check for one character: recent results made with its card and how closely each face
  * matches it, worst first. Recreate runs an off-character result again as Run Again does: its
  * prompt, card and settings with a new seed, as a version of it.
  */
@@ -47,14 +47,17 @@ function FaceCheckResults({ card, onClose }: { card: CharacterCard; onClose: () 
   });
   const items = results.data || [];
   const drifted = items.filter((item) => item.identity?.drifted).length;
+  const missing = items.filter((item) => item.identity?.score == null).length;
+  const checked = items.length - missing;
   return (
     <Stack gap="md">
       {results.error && <Alert color="red">{results.error.message}</Alert>}
       {results.data && items.length > 0 && (
         <Text size="sm" c="dimmed">
-          {drifted
-            ? `${drifted} of ${items.length} off-character, worst first.`
-            : `All ${items.length} match ${card.name}.`}
+          {drifted > 0 && `${drifted} of ${checked} scored results off-character, worst first. `}
+          {checked > 0 && !drifted && `All ${checked} scored results match ${card.name}. `}
+          {missing > 0 && `${missing} with no face detected. `}
+          {items.length === 200 && "Showing the 200 most recent results."}
         </Text>
       )}
       <DataTable

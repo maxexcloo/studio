@@ -41,7 +41,7 @@ const matches = (view: SavedGalleryView, shown: Shown) =>
  */
 export function useSavedViews(kind: MediaKind, shown: Shown, counted: boolean) {
   const views = useQuery(preferencesQuery).data?.preferences.galleryViews ?? [];
-  const save = useSavePreferences();
+  const save = useSavePreferences(views);
   const counts = useQueries({
     queries: views.map((view) => ({
       ...galleryListingCountQuery({
