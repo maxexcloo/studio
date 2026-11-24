@@ -147,7 +147,7 @@ export function runSeeds(variants: Variant[]) {
 
 /**
  * Each variant named by what sets it apart from the others ("Flux Dev · 30 Steps"), or by its
- * letter when nothing recorded here does.
+ * letter when nothing recorded here does. Its first part is its title, the rest its subtitle.
  */
 export function variantLabels(
   variants: Variant[],
@@ -168,11 +168,11 @@ export function variantLabels(
   const differs = (facet: Facet) =>
     new Set(variants.map((variant, index) => facet(variant, index))).size > 1;
   const profile: Facet = ({ input }) => names.profile(input);
+  const steps: Facet = ({ input }) => plural(Number(input.steps), "Step");
   // Another profile brings its own settings, so they name a variant only on the same profile.
   const settings: Facet[] = differs(profile)
     ? []
     : [
-        ({ input }) => plural(Number(input.steps), "Step"),
         ({ input }) => `Guidance ${input.cfg}`,
         ({ input }) =>
           typeof input.resolution === "string" && input.resolution
@@ -189,11 +189,14 @@ export function variantLabels(
           return `${names.lora(name)} ${value === undefined ? "Off" : value}`;
         })
         .join(", "),
+    steps,
     ...settings,
     (_, index) => `Seed ${seeds[index]}`,
-    ({ references }) => plural(references.length, "Reference"),
   ];
+  // References name variants only when nothing else does.
+  const references: Facet = ({ references }) => plural(references.length, "Reference");
   const differing = facets.filter(differs);
+  if (!differing.length && differs(references)) differing.push(references);
   return variants.map(
     (variant, index) =>
       variant.label ||

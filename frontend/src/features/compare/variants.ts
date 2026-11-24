@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { compareVariants, letter } from "../../../../shared/compare";
-import { isCloudProfile, loraName, loraStrengthSweep } from "../../../../shared/profiles";
+import {
+  isCloudProfile,
+  loraName,
+  loraStrengthSweep,
+  profileNameParts,
+} from "../../../../shared/profiles";
 import { selectedResolution } from "../../../../shared/resolution";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
@@ -87,7 +92,8 @@ export function useDraftComparison() {
   const labels = variantLabels(variants, {
     profile: (input) => {
       const profile = profileOf(input);
-      return profile ? profileName(profile) : input.profileId;
+      // The model alone; steps name the speed where variants differ in it.
+      return profile ? profileNameParts(profileName(profile))[0] : input.profileId;
     },
     lora: (name) => loraName(name, lora?.[name]),
   });
