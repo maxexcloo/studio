@@ -1,5 +1,5 @@
 import { Button, ComboboxPopover, SegmentedControl, Tooltip } from "@mantine/core";
-import { Brush, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { type ReactNode, memo } from "react";
 
 import { isCloudVideoProfile } from "../../../../shared/profiles";
@@ -93,7 +93,7 @@ function ReferenceRole({
       {mask?.painted && (
         <Tooltip label="Edit Mask">
           <Button {...iconChipProps} aria-label="Edit Mask" onClick={mask.onPaint}>
-            <Brush size={15} />
+            <icons.mask size={15} />
           </Button>
         </Tooltip>
       )}

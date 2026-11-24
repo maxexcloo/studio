@@ -100,6 +100,7 @@ import {
 } from "./taste.ts";
 import {
   americanEnglish,
+  australianEnglish,
   contentRule,
   keepDescriptions,
   precedence,
@@ -2196,7 +2197,7 @@ export function createDream(options: {
       : [];
     const collectCards = media === "image" && !reword;
     const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"`;
-    const language = `Write "why" and "title" in Australian English (colour, centre); only "prompt" uses American English.`;
+    const language = `Write "why" and "title" in ${australianEnglish}; only "prompt" uses American English.`;
     const reply = `Reply with JSON only: {${replyShape}}. ${language}`;
     let messages: { role: "system" | "user"; content: string }[];
     /** The liked items whose prompts the writer sees, recorded once the idea is written. */
@@ -2293,6 +2294,7 @@ export function createDream(options: {
         {
           role: "system",
           content: promptInstruction("dream-reword", {
+            australianEnglish,
             media,
             model: profile.label || profile.id,
             writingRules: writingRules.join("\n"),

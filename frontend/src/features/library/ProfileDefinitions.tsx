@@ -61,7 +61,7 @@ function profileUse(stats?: ProfileStats) {
   if (!stats) return "No Runs in 30 Days";
   const done = stats.runs - stats.failed;
   return [
-    `${stats.runs} ${stats.runs === 1 ? "Run" : "Runs"} in 30 Days`,
+    `${plural(stats.runs, "Run")} in 30 Days`,
     stats.failed && `${percent(stats.failed, stats.runs)} Failed`,
     done > 0 && `${percent(stats.liked, done)} Liked`,
     stats.medianQueueMs !== undefined && `${Math.round(stats.medianQueueMs / 1000)} s Queue`,

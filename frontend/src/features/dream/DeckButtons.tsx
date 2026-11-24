@@ -1,7 +1,8 @@
 import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
-import { Check, Heart, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { likeColour } from "../../theme";
 import { icons } from "../../ui/icons";
 import { useHold } from "../../ui/useHold";
 import { type Choice, dreamChoices } from "./choices";
@@ -12,7 +13,7 @@ import classes from "./DreamPage.module.css";
 /** Each answer's round button: its glyph, or a comparison side's letter, and its tint. */
 const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   discard: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
-  like: { glyph: <Heart size={28} strokeWidth={2.5} />, color: "pink" },
+  like: { glyph: <icons.superLike size={28} strokeWidth={2.5} />, color: likeColour },
   keep: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
   neither: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
   both: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
@@ -61,14 +62,7 @@ export function DeckButtons({
   quickRating?: boolean;
 }) {
   const comparison = card.kind === "pair" && !singleImageComparison;
-  const answers = dreamChoices(card, singleImageComparison).at(-1)!;
-  const labels: Record<string, string> = {
-    both: expanded ? (card.kind === "pair" && card.items.length > 2 ? "All" : "Both") : "Accept",
-    discard: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
-    keep: "Accept",
-    like: "Super Like",
-    neither: "Pass",
-  };
+  const answers = dreamChoices(card, singleImageComparison, quickRating).at(-1)!;
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
   const { consumeClick, ...hold } = useHold(card.key, askPass);
   return (
@@ -83,9 +77,8 @@ export function DeckButtons({
       inert={hidden}
     >
       {leading}
-      {answers.map(({ choice, id, label }) => {
+      {answers.map(({ choice, id, label: title }) => {
         const side = id === "a" || id === "b" || id === "c";
-        const title = labels[id] ?? label;
         const pass =
           !quickRating && (id === "neither" || (id === "discard" && card.kind !== "set"));
         const description = pass
@@ -115,10 +108,8 @@ export function DeckButtons({
             >
               {side ? (
                 <Text fw={700} fz={26}>
-                  {label}
+                  {title}
                 </Text>
-              ) : expanded && id === "both" ? (
-                <icons.compare size={24} />
               ) : (
                 looks[id].glyph
               )}

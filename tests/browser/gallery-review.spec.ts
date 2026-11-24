@@ -102,7 +102,7 @@ test("Gallery Review accepts without rating, supports Undo and keeps the gallery
   await deck.getByRole("button", { name: "Rating", exact: true }).click();
   await page.getByRole("menuitem", { name: "Liked", exact: true }).click();
   await deck.getByRole("button", { name: "Time", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Last 24 Hours", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Today", exact: true }).click();
   await expect(deck.getByText("Common Bird", { exact: true })).toBeVisible();
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeHidden();
   await showGalleryView(page, "Gallery");

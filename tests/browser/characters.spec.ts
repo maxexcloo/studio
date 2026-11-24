@@ -107,7 +107,10 @@ test("Library bulk actions undo a dislike and keep the card that failed deletion
   const list = page.getByRole("list", { name: "Characters", exact: true });
   const selection = page.getByRole("group", { name: "Card Selection", exact: true });
   const select = async () => {
-    await page.getByRole("button", { name: "Select", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Select Items", exact: true })
+      .click();
     await selection.getByRole("checkbox", { name: "Select All", exact: true }).check();
   };
   await select();

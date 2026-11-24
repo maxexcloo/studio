@@ -699,12 +699,10 @@ test("Liked narrows the reference choices, and Uploads leaves the Show filters o
   await expect(choice("Beta")).toBeVisible();
   await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
   const filters = page.getByRole("dialog", { name: "Filter Gallery", exact: true });
-  const liked = filters
-    .getByRole("group", { name: "Show", exact: true })
-    .getByRole("button", { name: "Liked", exact: true });
-  await liked.click();
-  await expect(liked).toHaveAttribute("aria-pressed", "true");
-  await liked.press("Escape");
+  const rating = filters.getByRole("radiogroup", { name: "Rating", exact: true });
+  await rating.getByText("Liked", { exact: true }).click();
+  await expect(rating.getByRole("radio", { name: "Liked", exact: true })).toBeChecked();
+  await page.keyboard.press("Escape");
   await expect(filters).toBeHidden();
   await expect(choice("Beta")).toHaveCount(0);
   await expect(choice("Alpha")).toBeVisible();

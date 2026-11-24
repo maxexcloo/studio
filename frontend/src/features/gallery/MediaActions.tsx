@@ -103,7 +103,7 @@ function useRetryAction(
   const job = queue.data?.jobs.find((job) => job.id === item.jobId);
   if (queue.error)
     return itemAction("retry", {
-      label: "Reload Status",
+      label: "Refresh",
       icon: icons.refresh,
       onClick: () => void queue.refetch(),
     });
@@ -293,7 +293,7 @@ export function useMediaActions(
     : {
         id: "prompt-composer",
         label: "Recreate in Composer",
-        icon: icons.prompt,
+        icon: icons.recreate,
         disabled: action.isPending,
         onClick: () => action.mutate({ operation: "image", prompt: changedPrompt }),
       };
@@ -604,7 +604,7 @@ export function useMediaActions(
               : {
                   id: "animate-composer",
                   label: "Animate in Composer",
-                  icon: icons.prompt,
+                  icon: icons.animate,
                   disabled: animateDisabled,
                   onClick: () =>
                     action.mutate({ operation: "animate", profileId: animationProfileId }),

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { recreationPrompt } from "../../../../shared/media";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
+import { plural } from "../../ui/plural";
 import { useDraft, useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
@@ -72,9 +73,7 @@ export function useRecreateMany() {
       notifications.show({
         color: failed.length ? "red" : undefined,
         message: [
-          queued
-            ? `Queued ${queued} ${queued === 1 ? "recreation" : "recreations"}.`
-            : "Nothing was queued.",
+          queued ? `Queued ${plural(queued, "recreation")}.` : "Nothing was queued.",
           waiting > 0 &&
             `${waiting} ${waiting === 1 ? "upload has" : "uploads have"} no saved prompt or caption yet.`,
           failed.length > 0 && `${failed.length} failed: ${failed[0].reason}`,

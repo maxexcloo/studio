@@ -11,7 +11,7 @@ export const maxTasteGuidance = 300;
  * What Studio learnt of a person's taste: words the summariser writes (likes, what it leans away
  * from as `avoid`, styles and the note) and favourites read from scores (model profile ids, LoRA
  * names, shapes as width-over-height ratios such as "0.67", caption tags). Only learning changes
- * them; the person steers it with More Like This, Less Like This and Never.
+ * them; the person steers it by adding values to Favourites, Less Of and Exclusions.
  */
 export interface TasteFields {
   likes: string[];
@@ -24,13 +24,13 @@ export interface TasteFields {
   tags: string[];
 }
 export type TasteWords = Pick<TasteFields, "likes" | "avoid" | "styles" | "note">;
-/** What More and Less Like This mark: learnt words (likes, styles) or a model, LoRA, shape or tag. */
+/** What Favourites and Less Of mark: learnt words (likes, styles) or a model, LoRA, shape or tag. */
 export const tasteMarkKinds = ["words", "models", "loras", "shapes", "tags"] as const;
 export type TasteMarkKind = (typeof tasteMarkKinds)[number];
 export type TasteMarks = Partial<Record<TasteMarkKind, string[]>>;
 /**
- * The person's own taste: My Preferences (`prefer`, free text), Favourites (More Like This), Less Of
- * (Less Like This, a soft down-weight) and Exclusions (Never: hard, everywhere).
+ * The person's own taste: My Preferences (`prefer`, free text), Favourites, Less Of (a soft
+ * down-weight) and Exclusions (hard, everywhere).
  */
 export interface TastePreferences {
   prefer?: string;

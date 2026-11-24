@@ -18,7 +18,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { History } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { api, post } from "../../api";
@@ -27,6 +26,7 @@ import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SearchInput } from "../../ui/SearchInput";
 
 type PromptKind = "positive" | "negative";
@@ -178,7 +178,7 @@ export function usePromptHistory({
   const action: Action = {
     id: "history",
     label: title,
-    icon: History,
+    icon: icons.history,
     onClick: () => setOpened(true),
   };
   const popup = (
@@ -261,7 +261,7 @@ export function usePromptHistory({
                       </Text>
                       <Text size="xs" c="dimmed">
                         {entry.liked ? "Liked · " : ""}
-                        {entry.uses} {entry.uses === 1 ? "Use" : "Uses"}
+                        {plural(entry.uses, "Use")}
                       </Text>
                     </Combobox.Option>
                     <Tooltip label="Like Prompt">

@@ -302,7 +302,7 @@ export function TextBox({
         })
       }
     >
-      <PopupTooltip disabled={ai} label={busy || "More Actions"}>
+      <PopupTooltip disabled={ai} label={busy || "Actions"}>
         <Menu.Target>
           {phone && !ai ? (
             <Button
@@ -311,7 +311,7 @@ export function TextBox({
               variant="subtle"
               color="gray"
               size="compact-xs"
-              aria-label={`More ${title} Actions`}
+              aria-label={`Actions for ${title}`}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
               leftSection={busy ? <Loader size={16} /> : undefined}
@@ -324,7 +324,7 @@ export function TextBox({
               onMouseDown={focusTool}
               variant="subtle"
               color="gray"
-              aria-label={menuLabel || `${ai ? "AI" : "More"} ${title} Actions`}
+              aria-label={menuLabel || (ai ? `AI ${title} Actions` : `Actions for ${title}`)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
             >

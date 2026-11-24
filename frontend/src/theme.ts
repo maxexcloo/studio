@@ -65,6 +65,8 @@ export const backgrounds = {
 } as const satisfies Record<Background, { label: string; light: string; dark: string }>;
 /** Every action and row menu's width; their icons are 16px. */
 export const menuWidth = 220;
+/** Like's tint wherever a rating is coloured: Super Like, a set member's Like and a LoRA's Like. */
+export const likeColour = "pink";
 /** Popups flip and shift to stay 12 px inside the screen. */
 export const popupMiddlewares = { flip: true, shift: { padding: 12, crossAxis: true } };
 export type MotionSpeed = Appearance["motion"];
@@ -603,6 +605,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--studio-ease-enter": easing.enter,
       "--studio-ease-exit": easing.exit,
       "--studio-scroll-behavior": theme.other.motionDuration ? "smooth" : "auto",
+      "--studio-like": `var(--mantine-color-${likeColour}-5)`,
       "--studio-glass-filter": transparency ? "blur(24px) saturate(1.5)" : "none",
       "--mantine-color-placeholder": "var(--mantine-color-dimmed)",
       "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),

@@ -30,6 +30,7 @@ import { DataTable, HistoryTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { useSettingsSection } from "../settings/SettingsNavigation";
@@ -280,7 +281,7 @@ function gpuPresets({ workloads, pools }: RuntimeStatus) {
     return [...counts]
       .sort(([a], [b]) => a - b)
       .map(([count, target]) => ({
-        label: `${label} · ${count} ${count === 1 ? "GPU" : "GPUs"}`,
+        label: `${label} · ${plural(count, "GPU")}`,
         value: target.join(","),
         target,
       }));

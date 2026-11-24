@@ -306,7 +306,7 @@ test("every tenth signal summarises the words in the background, at most every t
   assert.deepEqual(taste.read("alice").learnt.likes, ["misty harbours"]);
 });
 
-test("More and Less Like This steer what Studio learnt, and each area receives only what it uses", async (t) => {
+test("Favourites and Less Of steer what Studio learnt, and each area receives only what it uses", async (t) => {
   const sent: string[] = [];
   let areas = {};
   const taste = tasteFixture(t, {

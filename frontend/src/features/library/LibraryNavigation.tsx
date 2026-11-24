@@ -1,5 +1,3 @@
-import { BookOpen, Boxes, FileCog } from "lucide-react";
-
 import { cardKinds } from "../../../../shared/characters";
 import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -36,7 +34,7 @@ export const librarySections = {
     label: "Files",
     description:
       "Manage the shared checkpoints, diffusion models, text encoders and VAEs profiles use.",
-    icon: Boxes,
+    icon: icons.files,
     admin: true,
     group: "Models",
   },
@@ -58,7 +56,7 @@ export const librarySections = {
     label: "Profiles",
     description:
       "Manage the shared generation profiles and workflows. Every saved version is kept.",
-    icon: FileCog,
+    icon: icons.profile,
     admin: true,
     group: "Models",
   },
@@ -66,7 +64,7 @@ export const librarySections = {
     label: "Guides",
     description:
       "Manage the prompting guides profiles and families use. Every saved version is kept.",
-    icon: BookOpen,
+    icon: icons.guide,
     admin: true,
     group: "Prompting",
   },
@@ -82,7 +80,7 @@ export const librarySections = {
     label: "Prompt Styles",
     description:
       "Manage the assistant's styles and templates for Improve Prompt, Animate and Edit.",
-    icon: icons.assistant,
+    icon: icons.promptStyles,
     admin: true,
     group: "Prompting",
   },
@@ -90,7 +88,7 @@ export const librarySections = {
     label: "Suggestion Instructions",
     description:
       "Manage the instructions behind Suggestions and the changes, ideas and proposals Studio offers. Every saved version is kept.",
-    icon: icons.assistant,
+    icon: icons.suggestionInstructions,
     admin: true,
     group: "Prompting",
   },

@@ -28,6 +28,7 @@ import {
   loraStrengthRange,
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
+import { likeColour } from "../../theme";
 import type { GenerationInput, Profile, Rating } from "../../types";
 import { ChipPopup, PopupHeading } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
@@ -35,6 +36,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { OrderedItems } from "../../ui/OrderedItems";
+import { plural } from "../../ui/plural";
 import { SortMenu, nameSortLabels } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
@@ -304,7 +306,7 @@ export function LoraRatings({ file, title }: { file: string; title: string }) {
     <Group gap={4} wrap="nowrap">
       {(
         [
-          ["liked", "Like", icons.like, "green"],
+          ["liked", "Like", icons.like, likeColour],
           ["disliked", "Dislike", icons.dislike, "red"],
         ] as const
       ).map(([rating, label, Icon, color]) => (
@@ -538,7 +540,6 @@ const storedLora = (lora: Lora) => ({
 });
 const sameLoras = (a: Lora[], b: Lora[]) =>
   JSON.stringify(a.map(storedLora)) === JSON.stringify(b.map(storedLora));
-const loraCount = (count: number) => `${count} ${count === 1 ? "LoRA" : "LoRAs"}`;
 
 /**
  * The draft with the presets holding LoRAs for its family: `current` is the preset whose LoRAs it
@@ -554,7 +555,7 @@ function useStackDraft({ value, onChange, picker }: LoraPickerProps) {
     context.profiles.find((profile) => isProfile(profile, preset.input.profileId))?.family;
   const records = presets.records
     .filter((preset) => preset.input.loras?.length && familyOf(preset) === family)
-    .map((preset) => ({ ...preset, detail: loraCount(preset.input.loras.length) }));
+    .map((preset) => ({ ...preset, detail: plural(preset.input.loras.length, "LoRA") }));
   const loras = draft.input.loras;
   const loaded = records.find((preset) => preset.id === picker.presetId);
   const matched = !loras.length

@@ -14,7 +14,7 @@ import {
   useMantineTheme,
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
-import { Check, Palette } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   type ReactNode,
   createContext,
@@ -36,6 +36,7 @@ import {
   studioTheme,
 } from "../theme";
 import { PopupHeading } from "./ChipPopup";
+import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
@@ -296,7 +297,7 @@ export function AppearanceMenu() {
       <PopupTooltip label="Appearance">
         <Popover.Target>
           <ActionIcon aria-label="Appearance" variant="subtle" color="gray">
-            <Palette size={19} />
+            <icons.appearance size={19} />
           </ActionIcon>
         </Popover.Target>
       </PopupTooltip>

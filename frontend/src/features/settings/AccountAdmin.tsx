@@ -345,7 +345,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
                   {group.allModels
                     ? "All local models"
                     : `${group.generationProfiles.length} local ${group.generationProfiles.length === 1 ? "model" : "models"}`}{" "}
-                  · {users(group)} {users(group) === 1 ? "user" : "users"}
+                  · {plural(users(group), "user")}
                 </Text>
               </>
             ),
@@ -829,7 +829,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                     leftSection={<icons.delete size={16} />}
                     onClick={act("delete")}
                   >
-                    Delete User
+                    Delete
                   </Menu.Item>
                 </>
               )}
@@ -894,9 +894,9 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           resetTaste.reset();
         }}
       >
-        Reset {target?.username}'s learnt taste? Studio forgets the summary, likes, dislikes and
-        styles it learnt and learns them again from their signals. Their edits, exclusions, rules
-        and signals stay.
+        Reset {target?.username}'s learnt taste? Studio forgets the note, likes, styles and leanings
+        it learnt and learns them again from their likes, comparisons and other signals. Their
+        preferences, favourites and exclusions stay.
       </ConfirmDialog>
       <ConfirmDialog
         opened={acting?.action === "disable"}

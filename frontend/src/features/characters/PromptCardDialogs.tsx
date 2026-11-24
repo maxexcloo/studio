@@ -7,6 +7,7 @@ import type { ReferenceAsset } from "../../types";
 import { ActionMenuItems } from "../../ui/ActionBar";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { itemAction, itemActionGroups } from "../gallery/itemActions";
 import { CardDialog, CardFields, CardForm, useReferenceAction } from "./CardImages";
 import {
@@ -173,11 +174,13 @@ export function PromptCardMenu({
   const ratings = useCardRating(kind, card);
   return (
     <Menu position="bottom-end" width={menuWidth} withinPortal={withinPortal}>
-      <Menu.Target>
-        <ActionIcon variant="default" aria-label={`Actions for ${card.name}`}>
-          <icons.more size={14} />
-        </ActionIcon>
-      </Menu.Target>
+      <PopupTooltip label="Actions">
+        <Menu.Target>
+          <ActionIcon variant="default" aria-label={`Actions for ${card.name}`}>
+            <icons.more size={14} />
+          </ActionIcon>
+        </Menu.Target>
+      </PopupTooltip>
       <Menu.Dropdown>
         <ActionMenuItems
           groups={[

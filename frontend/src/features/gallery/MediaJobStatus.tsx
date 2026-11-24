@@ -3,6 +3,7 @@ import { CircleAlert } from "lucide-react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
+import { icons } from "../../ui/icons";
 import { JobProgressBar, jobReason, jobStatus, statusLabels } from "../generation/JobProgress";
 import { WritingStream } from "../generation/PromptWriting";
 import { QueueJobAction, useQueue } from "../generation/Queue";
@@ -66,8 +67,13 @@ export function MediaJobStatus({
         </Stack>
         {queueError ? (
           <Group justify="flex-end">
-            <Button size="sm" loading={queue.isFetching} onClick={() => void queue.refetch()}>
-              Reload Status
+            <Button
+              size="sm"
+              leftSection={<icons.refresh size={16} />}
+              loading={queue.isFetching}
+              onClick={() => void queue.refetch()}
+            >
+              Refresh
             </Button>
           </Group>
         ) : job?.status === "failed" ? (
@@ -115,10 +121,11 @@ export function MediaJobStatus({
             <Button
               variant="subtle"
               size="compact-sm"
+              leftSection={<icons.refresh size={16} />}
               loading={queue.isFetching}
               onClick={() => void queue.refetch()}
             >
-              Reload Status
+              Refresh
             </Button>
           </Stack>
         </Alert>

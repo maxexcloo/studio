@@ -20,6 +20,7 @@ import { menuWidth } from "../theme";
 import { EmptyState } from "./EmptyState";
 import { icons } from "./icons";
 import { LoadingState } from "./LoadingState";
+import { PopupTooltip } from "./PopupTooltip";
 import { usePhone } from "./usePhone";
 
 import classes from "./DataTable.module.css";
@@ -307,15 +308,17 @@ export function DataTable<T>({
                 <Table.Td ta="end">
                   {actions && (
                     <Menu position="bottom-end" width={menuWidth}>
-                      <Menu.Target>
-                        <ActionIcon
-                          variant="subtle"
-                          color="gray"
-                          aria-label={`Actions for ${name}`}
-                        >
-                          <icons.more size={18} />
-                        </ActionIcon>
-                      </Menu.Target>
+                      <PopupTooltip label="Actions">
+                        <Menu.Target>
+                          <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            aria-label={`Actions for ${name}`}
+                          >
+                            <icons.more size={18} />
+                          </ActionIcon>
+                        </Menu.Target>
+                      </PopupTooltip>
                       <Menu.Dropdown>{actions}</Menu.Dropdown>
                     </Menu>
                   )}

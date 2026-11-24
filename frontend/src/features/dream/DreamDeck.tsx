@@ -27,7 +27,7 @@ import { usePrefetchResultSuggestions } from "../gallery/usePrefetchResultSugges
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
-import type { Verdict } from "./choices";
+import { type Verdict, verdictLabels } from "./choices";
 import { type DeckCard, type PairDeckCard, cardIds, deckCards, deckPrefetch } from "./deck";
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
@@ -461,6 +461,7 @@ export function DreamDeck({
   const swipeCard = (card: DeckCard) => {
     const isTop = card === top;
     const playing = isTop && !viewing;
+    const verdicts = verdictLabels(card, quickRating);
     return (
       <SwipeCard
         key={card.key}
@@ -500,11 +501,7 @@ export function DreamDeck({
                 up: "Accept",
                 down: "Pass",
               }
-            : {
-                left: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
-                right: "Accept",
-                up: "Super Like",
-              }
+            : { left: verdicts.discard, right: verdicts.keep, up: verdicts.like }
         }
         onTap={(target) => openPressed(card, target)}
         onHold={(target) => openPressed(card, target)}
@@ -566,6 +563,7 @@ export function DreamDeck({
         </Box>
       </>
     );
+  const labels = verdictLabels(top, quickRating);
   return (
     <>
       <div className={classes.stage} ref={stage} aria-hidden={!!viewing} inert={!!viewing}>
@@ -599,7 +597,7 @@ export function DreamDeck({
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
             ? `${top.items.length === 2 ? "← A · → B · " : ""}↑ Accept · ↓ Pass · U Undo`
-            : `← ${quickRating ? "Dislike" : top.kind === "set" ? "Deny All" : "Pass"} · → Accept · ↑ Super Like · U Undo`}
+            : `← ${labels.discard} · → ${labels.keep} · ↑ ${labels.like} · U Undo`}
         </Text>
       )}
       {viewing && (
@@ -621,7 +619,7 @@ export function DreamDeck({
         />
       )}
       {passing === top.key && (
-        <Modal id={passDialogId} opened onClose={closePass} title="Why Pass?" size="xs">
+        <Modal id={passDialogId} opened onClose={closePass} title="Pass Reason" size="xs">
           <Radio.Group
             aria-label="Pass Reason"
             value={passReason}

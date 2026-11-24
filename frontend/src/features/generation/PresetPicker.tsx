@@ -10,6 +10,7 @@ import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { useRemembered } from "../auth/useRemembered";
 import { iconChipProps } from "./chip";
 import { defaultProfile, initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
@@ -76,8 +77,7 @@ export function useDeletePresets() {
           failures++;
         }
       }
-      if (failures)
-        throw new Error(`Couldn't restore ${failures} ${failures === 1 ? "preset" : "presets"}.`);
+      if (failures) throw new Error(`Couldn't restore ${plural(failures, "preset")}.`);
     },
     onSettled: () => client.invalidateQueries({ queryKey: presetsQuery.queryKey }),
   });

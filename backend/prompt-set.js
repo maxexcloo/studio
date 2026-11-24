@@ -5,6 +5,7 @@ import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
 import {
   americanEnglish,
+  australianEnglish,
   keepDescriptions,
   precedence,
   standalonePrompt,
@@ -47,6 +48,7 @@ export async function writeSetPrompt({
       {
         role: "system",
         content: promptInstruction("vary-set", {
+          australianEnglish,
           sourceContext:
             scope === "image"
               ? promptInstruction("vary-selected-image", { model: profile.label || profile.id })

@@ -36,6 +36,7 @@ import {
   tasteMarkKinds,
 } from "../../../../shared/taste";
 import { api, post } from "../../api";
+import { menuWidth } from "../../theme";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
@@ -317,7 +318,7 @@ function OwnPills({
   );
 }
 
-/** A learnt value's actions: More Like This, Less Like This and, for words and tags, Never. */
+/** A learnt value's actions: Add to Favourites, Add to Less Of and, for words and tags, Add to Exclusions. */
 function MarkItems({
   kind,
   value,
@@ -339,14 +340,14 @@ function MarkItems({
         disabled={pending || full(taste.preferences.favourites)}
         onClick={() => mark(kind, value, "favourites")}
       >
-        More Like This
+        Add to Favourites
       </Menu.Item>
       <Menu.Item
         leftSection={<icons.less size={16} />}
         disabled={pending || full(taste.preferences.less)}
         onClick={() => mark(kind, value, "less")}
       >
-        Less Like This
+        Add to Less Of
       </Menu.Item>
       {(kind === "words" || kind === "tags") && (
         <Menu.Item
@@ -356,41 +357,45 @@ function MarkItems({
           }
           onClick={() => mark(kind, value, "never")}
         >
-          Never
+          Add to Exclusions
         </Menu.Item>
       )}
     </>
   );
 }
 
-/** A learnt word, its actions behind it. */
-function LearntWords({
+/** Learnt words or shapes as chips, each value's actions behind it. */
+function LearntValues({
   label,
-  words,
+  values,
+  kind = "words",
+  name = (value) => value,
   ...marks
 }: {
   label: string;
-  words: string[];
+  values: string[];
+  kind?: "words" | "shapes";
+  name?: (value: string) => string;
 } & Omit<Parameters<typeof MarkItems>[0], "kind" | "value">) {
   return (
     <SettingRow
       label={label}
       description={
-        words.length ? (
+        values.length ? (
           <Group component="span" gap={4} mt={4}>
-            {words.map((word) => (
-              <Menu key={word} position="bottom-start">
+            {values.map((value) => (
+              <Menu key={value} position="bottom-start" width={menuWidth}>
                 <Menu.Target>
                   <Button
                     size="compact-xs"
                     variant="default"
                     rightSection={<ChevronDown size={12} />}
                   >
-                    {word}
+                    {name(value)}
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
-                  <MarkItems {...marks} kind="words" value={word} />
+                  <MarkItems {...marks} kind={kind} value={value} />
                 </Menu.Dropdown>
               </Menu>
             ))}
@@ -492,7 +497,8 @@ function KeepRateTable({
 
 /**
  * Settings › Taste: where taste applies, the person's own preferences and exclusions, and what
- * Studio learnt from their ratings, which they steer with More Like This, Less Like This and Never.
+ * Studio learnt from their ratings, which they steer by adding values to Favourites, Less Of and
+ * Exclusions.
  */
 export function TasteProfile({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
@@ -648,7 +654,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               label="Favourites"
               description={
                 <OwnPills
-                  hint="Added with More Like This on a learnt value below."
+                  hint="Added from a learnt value below."
                   values={favourites}
                   name="Favourites"
                   pending={change.isPending}
@@ -663,7 +669,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               label="Less Of"
               description={
                 <OwnPills
-                  hint="Added with Less Like This on a learnt value below."
+                  hint="Added from a learnt value below."
                   values={less}
                   name="Less Of"
                   pending={change.isPending}
@@ -714,37 +720,15 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
                 </Text>
               }
             />
-            <LearntWords {...shared!} label="Likes" words={data.learnt.likes} />
-            <LearntWords {...shared!} label="Styles" words={data.learnt.styles} />
-            <LearntWords {...shared!} label="Leans Away From" words={data.learnt.avoid} />
-            <SettingRow
+            <LearntValues {...shared!} label="Likes" values={data.learnt.likes} />
+            <LearntValues {...shared!} label="Styles" values={data.learnt.styles} />
+            <LearntValues {...shared!} label="Leans Away From" values={data.learnt.avoid} />
+            <LearntValues
+              {...shared!}
               label="Shapes"
-              description={
-                data.learnt.shapes.length ? (
-                  <Group component="span" gap={4} mt={4}>
-                    {data.learnt.shapes.slice(0, 3).map((shape) => (
-                      <Menu key={shape} position="bottom-start">
-                        <Menu.Target>
-                          <Button
-                            size="compact-xs"
-                            variant="default"
-                            rightSection={<ChevronDown size={12} />}
-                          >
-                            {shapeName(shape)}
-                          </Button>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                          <MarkItems {...shared!} kind="shapes" value={shape} />
-                        </Menu.Dropdown>
-                      </Menu>
-                    ))}
-                  </Group>
-                ) : (
-                  <Text span size="sm" c="text">
-                    None
-                  </Text>
-                )
-              }
+              values={data.learnt.shapes.slice(0, 3)}
+              kind="shapes"
+              name={shapeName}
             />
           </SettingGroup>
           {rates && ratedTables(data, rates)}
@@ -752,7 +736,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
       )}
       <TasteReflection />
       <ChatNotes />
-      <SettingGroup title="Danger Zone" danger>
+      <SettingGroup danger>
         <SettingRow
           label="Reset Learnt Taste"
           description="Forget the learnt note, likes, styles and leanings and learn them again from your ratings. Your preferences, favourites and exclusions stay."

@@ -46,7 +46,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
   return {
     id: "prompt-composer",
     label: "Recreate in Composer",
-    icon: icons.prompt,
+    icon: icons.recreate,
     disabled: recreate.isPending,
     loading: recreate.isPending,
     onClick: () => recreate.mutate(),
