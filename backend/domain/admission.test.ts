@@ -49,6 +49,31 @@ test("a profile that can't batch queues Count as separate seeded runs in one set
   assert.equal(batched[0].queueBatch, undefined);
 });
 
+test("Dream's work queues in one set, while the account's own work stays alone", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const admit = createGenerationAdmission({
+    store,
+    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    validate: async () => ({ status: 200, payload: { ok: true } }),
+    resourceFor: async () => "local-media",
+    pendingItems: () => [],
+    revision: () => 0,
+  });
+  const account = { userId: "alice", role: "user" };
+  try {
+    for (const id of ["dream-a", "dream-b"])
+      await admit({ kind: "image", prompt: id, clientJobId: id } as never, account, undefined, {
+        priority: queuePriority.dream,
+      });
+    await admit({ kind: "image", prompt: "own", clientJobId: "own" } as never, account);
+    assert.equal(store.job("alice", "dream-a")?.queueSet, "dream");
+    assert.equal(store.job("alice", "dream-b")?.queueSet, "dream");
+    assert.equal(store.job("alice", "own")?.queueSet, undefined);
+  } finally {
+    store.close();
+  }
+});
+
 test("MCP's later runs reserve the first run's worker without conflating different prompts", async () => {
   const store = new Store(openDatabase(":memory:"));
   let routes = 0;
