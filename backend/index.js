@@ -16,6 +16,7 @@ import {
   loraDefaultStrength,
   loraName,
   loraStrengthRange,
+  loraStrengthSpread,
 } from "../shared/profiles.ts";
 import { clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
@@ -1112,6 +1113,7 @@ const dream = createDream({
         ? []
         : [{ ...lora, strength }];
     }),
+  loraStrengths: (name, current) => loraStrengthSpread(catalogueLoraInfo(name), current),
   // Library imports and their Inspiration are administration, shared across Studio, so only an
   // administrator's Dream, or single-user mode's, draws on them. A saved Civitai image is listed
   // once, by its gallery copy; files that are not installed drop out where Dream fits the LoRAs to

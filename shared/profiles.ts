@@ -241,6 +241,25 @@ export function loraStrengthChoices(info: LoraStrengthInfo) {
   return [...values].sort((a, b) => a - b);
 }
 
+/**
+ * Three strengths to compare a LoRA at, spread across its range and including `current`: a quarter
+ * of the way in from each end, with `current` in the middle, or replacing the nearer end where it
+ * lies beyond it. Fewer where the range offers fewer distinct values.
+ */
+export function loraStrengthSpread(info: LoraStrengthInfo, current: number) {
+  const choices = loraStrengthChoices(info);
+  const last = choices.length - 1;
+  const low = choices[Math.floor(last / 4)];
+  const high = choices[Math.ceil((3 * last) / 4)];
+  const spread =
+    current <= low
+      ? [current, choices[Math.round(last / 2)], high]
+      : current >= high
+        ? [low, choices[Math.round(last / 2)], current]
+        : [low, current, high];
+  return [...new Set(spread)];
+}
+
 /** A strength sweep's starting picks: without the LoRA, then its default and the choices beside it. */
 export function loraStrengthSweep(info: LoraStrengthInfo) {
   const choices = loraStrengthChoices(info);

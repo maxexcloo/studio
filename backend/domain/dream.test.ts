@@ -16,6 +16,7 @@ import {
   dreamSettingError,
   dreamTimingSettings,
 } from "../../shared/dream.ts";
+import { loraStrengthSpread } from "../../shared/profiles.ts";
 import { dreamVideoProfile } from "../animate-profile.js";
 import {
   closeRuntimeDatabase,
@@ -309,6 +310,8 @@ function fixture(t: TestContext, catalogue = profiles) {
           ...lora,
           strength: lora.strength ?? (lora.name === "film.safetensors" ? 0.6 : 1),
         })),
+    // A LoRA without a published range: 0 to 2, as the Library's default.
+    loraStrengths: (_name, current) => loraStrengthSpread({}, current),
     loraName: (name) => name.replace(/\.safetensors$/, ""),
     inspiration: () => state.inspiration,
     reference: (_account, itemId, frame) => {
@@ -2561,7 +2564,10 @@ test("Dream mostly compares models and LoRAs, rarely steps or guidance, and step
   assert.deepEqual(await asked(0), ["Which Model?", "FLUX", "Qwen"]);
   assert.deepEqual(await asked(340_000), ["Which Model?", "FLUX", "Qwen"]);
   assert.deepEqual(await asked(360_000), ["Which LoRA?", "With fox", "Without fox"]);
-  assert.deepEqual(await asked(700_000), ["Which LoRA Strength?", "fox 1", "fox 0.65"]);
+  // Strength spreads across the LoRA's range, three ways when the day has room, in any order.
+  const [strengthQuestion, ...strengthSides] = await asked(700_000);
+  assert.equal(strengthQuestion, "Which LoRA Strength?");
+  assert.deepEqual(strengthSides.sort(), ["fox 0.5", "fox 1", "fox 1.75"]);
   assert.deepEqual(await asked(920_000), ["Which Wording?", "Original Wording", "New Wording"]);
   assert.deepEqual(await asked(960_000), ["Which Steps?", "20 Steps", "10 Steps"]);
   assert.deepEqual(await asked(990_000), ["Which Guidance?", "Guidance 3.5", "Guidance 5.5"]);
@@ -2573,6 +2579,81 @@ test("Dream mostly compares models and LoRAs, rarely steps or guidance, and step
     "Original Wording",
     "New Wording",
   ]);
+});
+
+test("A LoRA's strengths compare spread across its range, around the strength it ran at", () => {
+  // 0 to 2 without a published range: a quarter of the way in from each end, the base between.
+  assert.deepEqual(loraStrengthSpread({}, 1), [0.5, 1, 1.75]);
+  // A base beyond those replaces the nearer end.
+  assert.deepEqual(loraStrengthSpread({}, 0.25), [0.25, 1.25, 1.75]);
+  assert.deepEqual(loraStrengthSpread({}, 2), [0.5, 1.25, 2]);
+  // A published range is followed.
+  assert.deepEqual(
+    loraStrengthSpread({ strengthRange: { min: 0.4, max: 1.2 } }, 0.8),
+    [0.6, 0.8, 1],
+  );
+});
+
+test("A LoRA strength comparison runs three strengths on one seed, two when the day is nearly full", async (t) => {
+  const run = async (dailyImages: number) => {
+    const fx = fixture(t, [{ ...profiles[0], capabilities: { steps: true } }, profiles[1]]);
+    const { dream, state, store, live, dreamOnce } = fx;
+    const session = store.createSession("alice", "Gallery").id;
+    const base = store.enqueue(
+      "alice",
+      session,
+      {
+        kind: "image",
+        profileId: "flux",
+        prompt: "a fox in snow",
+        loras: [{ name: "fox.safetensors", strength: 1, enabled: true }],
+      },
+      "image",
+    );
+    store.save({ ...base, status: "completed" });
+    state.items.push({
+      id: "base",
+      jobId: base.id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      rating: "liked",
+      prompt: "a fox in snow",
+      settings: { profileId: "flux" },
+    });
+    await dream.save("alice", { enabled: true, dailyImages });
+    assert.ok(await dreamOnce());
+    state.draws[1_000_000] = [700_000];
+    await dream.tick();
+    return { fx, jobs: live("alice").filter((job) => job.dream?.pair?.axis === "strength") };
+  };
+  const { fx, jobs: three } = await run(10);
+  assert.deepEqual(
+    three.map((job) => (job.input.loras as { strength: number }[])[0].strength).sort(),
+    [0.5, 1, 1.75],
+  );
+  assert.equal(new Set(three.map((job) => job.input.seed)).size, 1);
+  assert.deepEqual(
+    three.map((job) => job.dream?.pair?.size),
+    [3, 3, 3],
+  );
+  // Choosing a strength teaches taste that strength over the others.
+  const request = await serve(t, fx);
+  for (const job of three) fx.finish("alice", job.id);
+  const chosen = three.find((job) => job.dream?.pair?.value === 0.5)!;
+  const letter = "abc"[chosen.dream!.pair!.side];
+  const pair = chosen.dream!.pair!.id;
+  assert.equal((await request(`/pairs/${pair}/answer`, { answer: letter })).status, 200);
+  const signal = fx.taste.read("alice").signals.find((entry) => entry.axis === "strength")!;
+  assert.equal(signal.kind, "preferred");
+  assert.equal(signal.value, 0.5);
+  assert.deepEqual([signal.over?.value, signal.third?.value].sort(), [1, 1.75]);
+  // Room for two only: the base against the farthest strength.
+  const { jobs: two } = await run(3);
+  assert.deepEqual(
+    two.map((job) => (job.input.loras as { strength: number }[])[0].strength).sort(),
+    [1, 1.75],
+  );
 });
 
 test("Three-way Dream comparisons settle together, teach one choice and fall back to singles on failure", async (t) => {
