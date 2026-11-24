@@ -203,26 +203,31 @@ export function ServiceHealthSummary() {
   const cloud = usage && (
     <SummaryLine
       label="Cloud"
-      detail={usage
+      detail={`${usage
         .map(
           (account) =>
             `${account.label} · ${account.used === undefined ? "Unknown" : `${Math.round(account.used)}% Used`}`,
         )
-        .join(", ")}
+        .join(", ")}${status.data?.cloudHeld ? " · Local Only" : ""}`}
       colour={
         usage.some((account) => account.used === undefined)
           ? healthColour("unknown")
           : usage.some((account) => account.used! >= 100)
             ? healthColour("offline")
-            : healthColour("healthy")
+            : status.data?.cloudHeld
+              ? healthColour("waiting")
+              : healthColour("healthy")
       }
-      reason={usage
-        .map((account) =>
+      reason={[
+        ...usage.map((account) =>
           account.resetsAt
             ? `${account.reason} Resets ${new Date(account.resetsAt).toLocaleString()}.`
             : account.reason,
-        )
-        .join(" ")}
+        ),
+        ...(status.data?.cloudHeld
+          ? ["Near the limit, Dream and chats run new work on local models."]
+          : []),
+      ].join(" ")}
     />
   );
   return (

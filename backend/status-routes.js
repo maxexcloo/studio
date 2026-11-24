@@ -12,6 +12,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { earliest } from "./domain/eta.ts";
 import { queuePriority } from "./domain/store.ts";
 import { galleryItems } from "./gallery/store.js";
+import { cloudHeld } from "./providers/cloud-usage.ts";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats, recentRuns } from "./stats.js";
@@ -66,7 +67,11 @@ export function registerStatusRoutes(app, { cloudUsage, observeServices, queue }
       }),
       cloudUsage?.(),
     ]);
-    res.json({ ...status, ...(cloud?.length ? { cloud } : {}) });
+    res.json({
+      ...status,
+      ...(cloud?.length ? { cloud } : {}),
+      ...(cloudHeld(cloud) ? { cloudHeld: true } : {}),
+    });
   });
 
   // Liveness, for the container health check and the test servers.

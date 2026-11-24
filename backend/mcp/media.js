@@ -257,8 +257,10 @@ export class McpMedia {
     // Studio's routes, called in process (mcp/studio-requests.js createMcpDomainRequest).
     domainRequest,
     cloudVideoFailures = () => [],
+    cloudHeld = async () => false,
     profileTtl = 60000,
   }) {
+    this.cloudHeld = cloudHeld;
     this.profileTtl = profileTtl;
     this.prompting = prompting;
     this.publicBase = publicUrl;
@@ -453,7 +455,13 @@ export class McpMedia {
     const models = await this.catalogue(owner);
     const ready = await this.profiles(kind, owner);
     const defaultId = models.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
-    const cloudDefault = isCloudProfile(ready.find((profile) => profile.id === defaultId));
+    const defaultSide = isCloudProfile(ready.find((profile) => profile.id === defaultId));
+    // Near the cloud's usage limit a cloud default gives way to a local profile; asked for, it still runs.
+    const held =
+      (cloud || defaultSide) &&
+      ready.some((profile) => !isCloudProfile(profile)) &&
+      (await this.cloudHeld());
+    const cloudDefault = defaultSide && !held;
     let profiles = ready;
     if (!cloud && !cloudDefault) {
       profiles = ready.filter((profile) => !isCloudProfile(profile));
@@ -487,7 +495,11 @@ export class McpMedia {
     const options = { kind, tier, references, defaultId };
     const profile = chooseProfile(profiles, options);
     // The default's note holds for any pick on its side.
-    const note = isCloudProfile(profile) === cloudDefault ? models.defaultNotes?.[kind] : "";
+    const note = held
+      ? `Grok is near its weekly usage limit, so ${isCloudProfile(profile) ? "this still uses it as asked" : "this runs locally"}.`
+      : isCloudProfile(profile) === cloudDefault
+        ? models.defaultNotes?.[kind]
+        : "";
     return {
       pool: choicePool(profiles, options),
       profile,

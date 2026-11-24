@@ -30,6 +30,7 @@ import { DreamDeck, type Judgement } from "./DreamDeck";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
+import { DreamWeek } from "./DreamWeek";
 import {
   type Dream,
   type DreamItem,
@@ -114,6 +115,7 @@ const views = [
   [
     { value: "discarded", label: "Discards" },
     { value: "history", label: "History" },
+    { value: "week", label: "This Week" },
   ],
 ] as const;
 const mediaLabels = { image: "Images", video: "Videos" };
@@ -202,7 +204,7 @@ export function DreamPage() {
   const waitingId = useId();
   const waiting =
     count && `${plural(count.images, "image")} and ${plural(count.videos, "video")} waiting`;
-  const selector = view !== "projects" && view !== "taste" && (
+  const selector = view !== "projects" && view !== "taste" && view !== "week" && (
     <SegmentedControl
       aria-label="Dream Media"
       size={phone ? "xs" : undefined}
@@ -287,6 +289,10 @@ export function DreamPage() {
         <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (
         <DreamHistory media={media} />
+      ) : view === "week" ? (
+        <ScrollArea flex={1} mih={0} classNames={{ viewport: classes.workspace }}>
+          <DreamWeek />
+        </ScrollArea>
       ) : view === "projects" || view === "taste" ? (
         <ScrollArea flex={1} mih={0} classNames={{ viewport: classes.workspace }}>
           <Stack flex={1} gap="lg" pb="md">
