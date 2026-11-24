@@ -264,8 +264,12 @@ const stopping = new AbortController();
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
 app.set("case sensitive routing", true);
 app.use((req, res, next) => {
+  // Retry-After tells the page this request went unhandled, so it may send it again (api.ts).
   if (stopping.signal.aborted)
-    return res.status(503).set("Connection", "close").json({ error: "Studio is stopping." });
+    return res
+      .status(503)
+      .set({ Connection: "close", "Retry-After": "1" })
+      .json({ error: "Studio is stopping." });
   res.once(
     "close",
     track(() => routeLabel(req.method, req.originalUrl)),

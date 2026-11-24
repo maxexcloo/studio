@@ -33,7 +33,6 @@ interface AccountStatus {
 export const accountQuery = queryOptions({
   queryKey: ["account"],
   queryFn: () => api<AccountStatus>("/api/accounts/status"),
-  retry: false,
 });
 export function useAccount() {
   return useQuery(accountQuery);

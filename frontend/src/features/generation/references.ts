@@ -40,7 +40,6 @@ export const referenceAssetQuery = (id: string) =>
       api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(id)}`).then(
         ({ asset }) => asset,
       ),
-    retry: false,
     staleTime: Infinity,
   });
 export function referenceLabel(asset: ReferenceAsset, index: number, profile?: SlotLayout) {
