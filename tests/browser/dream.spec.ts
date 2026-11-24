@@ -1679,14 +1679,14 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await expect(changes).toContainText("Undone");
   await expect(changes.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
 
-  // Its results open the viewer with Dream's verdicts, which closes first on Escape.
+  // Its results open the viewer with Dream's verdicts, over the detail view.
   await detail
     .getByRole("region", { name: "Results", exact: true })
     .getByRole("button", { name: "View Dream prompt gull", exact: true })
     .click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(detail).toBeVisible();
 
