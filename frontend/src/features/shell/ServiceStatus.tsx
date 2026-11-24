@@ -65,7 +65,11 @@ export function StatusAction() {
   const jobs = queue.data?.jobs ?? [];
   // Work a paused queue holds is waiting, not generating.
   const unfinished = jobs.filter((job) => !terminalStatuses.has(job.status));
-  const pending = unfinished.length;
+  const title = "Queue";
+  const downloads = useModelDownloads();
+  // The header's count is the popup's: every entry it lists.
+  const count = queueEntries(jobs).length + downloads.length;
+  const pending = count;
   const progress = queueProgress(jobs, unfinished);
   const progressLabel =
     progress &&
@@ -84,9 +88,6 @@ export function StatusAction() {
   useEffect(() => {
     void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });
   }, [client, runningKey]);
-  const title = "Queue";
-  const downloads = useModelDownloads();
-  const count = queueEntries(jobs).length + downloads.length;
   const heading = count ? `${title} (${count})` : title;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);

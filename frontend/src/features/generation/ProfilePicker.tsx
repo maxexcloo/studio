@@ -3,13 +3,11 @@ import { notifications } from "@mantine/notifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { keptLabel } from "../../../../shared/dream";
 import { isCloudProfile, slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, Models, Profile } from "../../types";
 import { compareNames } from "../../ui/DataTable";
 import { plural } from "../../ui/plural";
 import { useIsAdmin } from "../auth/AccountGate";
-import { keepRatesQuery } from "../dream/queries";
 import { servicesStatusQuery } from "../runtime/RuntimePanel";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect, type ChipSelectProps } from "./ChipSelect";
@@ -66,15 +64,15 @@ function profileAbilities(profile: Profile) {
   );
   return [
     references > 0 && plural(references, "Reference"),
-    profile.kind === "image" && references > 0 && (profile.editReferences ? "Edit" : "Img2Img"),
+    profile.kind === "image" && references > 0 && profile.editReferences && "Edit",
     can.inpaint && "Inpaint",
     profile.kind === "image" && can.negativePrompt !== false && "Negative",
     can.lora && "LoRAs",
     can.sound && "Sound",
     can.transparent && "Transparent",
     profile.native?.["4k"] === "yes"
-      ? "Native 4K"
-      : profile.native?.["2k"] === "yes" && "Native 2K",
+      ? "4K"
+      : profile.native?.["2k"] === "yes" && "2K",
     isCloudProfile(profile) && "Cloud",
   ];
 }
@@ -134,7 +132,6 @@ export function ProfileSelect({
   >
 >) {
   const readinessOf = useReadiness();
-  const keepRates = useQuery(keepRatesQuery).data;
   const selected = profiles.find((profile) => isProfile(profile, value ?? undefined));
   const selectedLabel = selected && profileLabel(selected, profiles);
   const readiness = selected && readinessOf(selected);
@@ -152,16 +149,14 @@ export function ProfileSelect({
       renderOption={({ option, checked }) => {
         const profile = profiles.find((profile) => profile.id === option.value);
         const status = profile && readinessOf(profile);
-        // Its name's first part titles it; the rest (speed, steps), its abilities and keep rate follow.
+        // Its name's first part titles it; the rest (speed, steps) and its abilities follow.
         const [title, ...rest] = option.label.split(" · ");
         return (
           <ChipOption
             label={title}
             description={
               profile &&
-              [...rest, ...profileAbilities(profile), keptLabel(keepRates?.profiles[profile.id])]
-                .filter(Boolean)
-                .join(" · ")
+              [...rest, ...profileAbilities(profile)].filter(Boolean).join(" · ")
             }
             checked={checked}
             badges={
