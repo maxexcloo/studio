@@ -4,10 +4,11 @@ import {
   dreamTimingSettings,
   dreamUnseenOffKey,
 } from "../shared/dream.ts";
-import { defaultTextProfileKey } from "./account-preferences.js";
+import { workSettings } from "../shared/work-defaults.ts";
 import { dataDir } from "./data-dir.js";
-import { mediaDefaultProfileKeys } from "./generation-defaults.js";
+import { defaultTextProfileKey, mediaDefaultProfileKeys } from "./generation-defaults.js";
 import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { workDefaults } from "./work-defaults.js";
 
 /**
  * Settings a deployment can own. A value from the environment (compose,
@@ -106,6 +107,7 @@ const known = new Set([
   ...Object.values(dreamLimitSettings).map(({ key }) => key),
   dreamUnseenOffKey,
   ...catalogueFlags.map((item) => item.key),
+  ...Object.values(workSettings).map(({ key }) => key),
 ]);
 
 let saved = {};
@@ -176,7 +178,7 @@ export function dreamOverrides() {
     Object.entries(dreamOverrideKeys).flatMap(([name, key]) => {
       const value = process.env[key];
       if (!value) return [];
-      return [[name, name.endsWith("Backend") ? value : value !== "0"]];
+      return [[name, value !== "0"]];
     }),
   );
 }
@@ -198,6 +200,17 @@ export function dreamLimits() {
     pauseAfterUnseen: limit(dreamLimitSettings.pauseAfterUnseen),
     unseenOff: process.env[dreamUnseenOffKey] === "1",
   };
+}
+
+/** Settings › Where Work Runs' values, each with where it comes from. */
+export function describeWork() {
+  const values = workDefaults();
+  return Object.fromEntries(
+    Object.entries(workSettings).map(([name, { key }]) => [
+      name,
+      { key, value: values[name], ...settingSource(key) },
+    ]),
+  );
 }
 
 export function describeDreamPolicy() {

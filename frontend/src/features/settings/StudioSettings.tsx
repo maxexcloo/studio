@@ -5,17 +5,8 @@ import type { ComponentProps } from "react";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
-import { modelsQuery } from "../generation/GenerationProvider";
-import { ProfileSelect } from "../generation/ProfilePicker";
-import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
 import { DeleteFailedItems } from "./DeleteFailedItems";
-import {
-  type Flag,
-  type Setting,
-  deploymentQuery,
-  lockedNote,
-  useDeploymentSetting,
-} from "./deployment";
+import { type Flag, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 import { GalleryPass } from "./GalleryPass";
 
 /** Background features with a catch-up pass over the gallery, each a row in Catch Up. */
@@ -41,37 +32,14 @@ const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> 
   },
 };
 
-/** Settings › Studio: Studio-wide defaults, the work Studio does on its own, and failed items. */
+/** Settings › Studio: the work Studio does on its own, and failed items. */
 export function StudioSettings() {
   const multiUser = useAccount().data?.mode === "multi-user";
   const deployment = useQuery(deploymentQuery);
-  const profiles = useQuery(modelsQuery).data?.profiles ?? [];
   const save = useDeploymentSetting();
   if (deployment.isPending) return <LoadingState label="Loading Studio" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
-  const { defaults, catalogue } = deployment.data;
-  const profileSelect = (kind: "image" | "video", setting: Setting) => {
-    const label = kind === "image" ? "Image Model" : "Video Model";
-    const offered = defaults.profiles.filter((profile) => profile.kind === kind);
-    const effective = offered.find((profile) => profile.id === setting.effective);
-    return (
-      <SettingRow
-        wide
-        label={label}
-        description={`New drafts start on ${effective?.label || "the first ready model"}.${lockedNote(setting)}`}
-      >
-        <ProfileSelect
-          field
-          name={label}
-          unset="Default (First Ready)"
-          profiles={profiles.filter((profile) => offered.some((item) => item.id === profile.id))}
-          value={setting.configured || null}
-          onChange={(profile) => save.mutate({ key: setting.key, value: profile?.id ?? "" })}
-          disabled={setting.locked}
-        />
-      </SettingRow>
-    );
-  };
+  const { catalogue } = deployment.data;
   const flagRow = (flag: Flag) => (
     <SettingRow
       key={flag.key}
@@ -97,30 +65,6 @@ export function StudioSettings() {
     <Stack gap="lg">
       <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
       {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
-      <SettingGroup title="Defaults">
-        {profileSelect("image", defaults.image)}
-        {profileSelect("video", defaults.video)}
-        <SettingRow
-          wide
-          label="Text Model"
-          description={
-            (defaults.text.effective
-              ? `Default for prompt writing and other text work. Uses ${textModelName(defaults.text.effective)} when available.`
-              : "Default for prompt writing and other text work.") + lockedNote(defaults.text)
-          }
-        >
-          <TextModelSelect
-            name="Text Model"
-            models={defaults.textModels}
-            unset="Default (Gateway)"
-            value={defaults.text.configured || null}
-            onChange={(model) => save.mutate({ key: defaults.text.key, value: model ?? "" })}
-            disabled={
-              defaults.text.locked || (!defaults.textModels.length && !defaults.text.configured)
-            }
-          />
-        </SettingRow>
-      </SettingGroup>
       <SettingGroup danger>
         <DeleteFailedItems />
       </SettingGroup>

@@ -48,7 +48,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
-Administrators set the default profiles in **Settings › Studio** and Dream's delays and account overrides in **Settings › Dream** under Administration; accounts choose Cloud or Local for Dream in **Settings › Where Work Runs**. [Settings](#settings) lists the matching variables.
+Administrators set each kind's default model (which decides whether it runs locally or in the cloud), the Video Length new videos start at, and where Dream runs in **Settings › Where Work Runs**, and Dream's delays and account overrides in **Settings › Dream**, both under Administration. [Settings](#settings) lists the matching variables.
 
 ### Radiance
 
@@ -145,68 +145,69 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 
 `HOST` and `PORT` set the listening address: `0.0.0.0:8787` in the image, else `127.0.0.1:8787`. A setting with a Settings section can also be saved there unless the deployment sets it. Switches take `1` or `0`.
 
-| Setting                               | Purpose                                                                                     | Default                                      | Settings               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------- |
-| `STUDIO_ALLOWED_HOSTS`                | Hostnames Studio answers to, comma-separated ([Accounts](#accounts--single-sign-on))        | localhost and this machine's addresses       |                        |
-| `STUDIO_ASSISTANT_CLOUD_MODEL`        | Prompt assistant model ID ([Prompt Assistant](#prompt-assistant))                           | none                                         |                        |
-| `STUDIO_ASSISTANT_KEY`                | Prompt assistant API key                                                                    | none                                         |                        |
-| `STUDIO_ASSISTANT_URL`                | Prompt assistant Chat Completions endpoint                                                  | none: no assistant                           |                        |
-| `STUDIO_BENCHMARK_IMAGE`              | BetterBench image for text model benchmarks ([Runtime Control](#runtime-control))           | none: no benchmarks                          |                        |
-| `STUDIO_BENCHMARK_SECRET`             | Secret holding the benchmarked workload's key in `API_KEY`                                  | none                                         |                        |
-| `STUDIO_CARD_IMAGES`                  | MCP `generate` also sends the images of the outfit and scene cards its shots name           | `0`                                          |                        |
-| `STUDIO_CHAT_IMAGES_DIR`              | Folder `chat-uploads.js` watches ([MCP & Chat Gateway](#mcp--chat-gateway))                 | required by `chat-uploads.js`                |                        |
-| `STUDIO_CHAT_URL`                     | Chat site the navigation's Chat item opens                                                  | none: no Chat item                           |                        |
-| `STUDIO_CLIPROXYAPI_IMAGE_MODEL`      | Image model for a cloud profile that names none ([Cloud Models](#cloud-models))             | the provider's advertised Grok image model   |                        |
-| `STUDIO_CLIPROXYAPI_KEY`              | CLIProxyAPI key                                                                             | required with `STUDIO_CLIPROXYAPI_URL`       |                        |
-| `STUDIO_CLIPROXYAPI_MANAGEMENT_KEY`   | CLIProxyAPI management key, to show Grok's weekly usage in Status                           | none: usage reads Unknown                    |                        |
-| `STUDIO_CLIPROXYAPI_URL`              | CLIProxyAPI base URL                                                                        | none: no cloud models                        |                        |
-| `STUDIO_CLIPROXYAPI_VIDEO_MODEL`      | Video model for a cloud profile that names none                                             | the provider's advertised Grok video model   |                        |
-| `STUDIO_CLOUD_USAGE_LIMIT`            | Percent of Grok's weekly credits past which Dream and chats run new work locally            | `80`                                         |                        |
-| `STUDIO_CONTROL_MCP_API_KEY`          | Key for the MCP GPU control tools                                                           | none                                         |                        |
-| `STUDIO_DATA_DIR`                     | Data folder                                                                                 | `/data` in the image, else `data/`           |                        |
-| `STUDIO_DEFAULT_IMAGE_PROFILE`        | Profile ID new image drafts start on                                                        | the first ready profile                      | Studio                 |
-| `STUDIO_DEFAULT_TEXT_PROFILE`         | Text model for prompt writing and other text work                                           | the gateway's default                        | Studio                 |
-| `STUDIO_DEFAULT_VIDEO_PROFILE`        | Profile ID new video drafts start on                                                        | the first ready profile                      | Studio                 |
-| `STUDIO_DREAM_IMAGE_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its images          | `0`                                          | Dream (Administration) |
-| `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `5`                                          | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_ENABLED`       | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` | `local` or `cloud` for every account's Dream images                                         | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_UNCENSORED`    | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND` | `local` or `cloud` for every account's Dream videos                                         | each account's choice                        | Dream (Administration) |
-| `STUDIO_DREAM_VIDEO_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its videos          | `5`                                          | Dream (Administration) |
-| `STUDIO_ENV_FILE`                     | Settings file read on startup                                                               | `/data/.env` in the image, else `.env`       |                        |
-| `STUDIO_FACE_CHECK`                   | Compare the face in each character result with the character's                              | `1`                                          | Studio                 |
-| `STUDIO_FACE_REDO`                    | Run a recent result Face Check marks as drifted once more                                   | `1`                                          | Studio                 |
-| `STUDIO_GALLERY_CAPTIONS`             | Caption and tag new images for gallery search                                               | `1`                                          | Studio                 |
-| `STUDIO_GALLERY_TITLES`               | Title finished images and videos                                                            | `1`                                          | Studio                 |
-| `STUDIO_GALLERY_WHILE_BUSY`           | Run gallery work while Studio is generating                                                 | `0`                                          | Studio                 |
-| `STUDIO_IMAGE_SEARCH`                 | Gallery search also finds images that look like the words                                   | `1`                                          | Studio                 |
-| `STUDIO_KUBERNETES_GPUS`              | GPUs per node pool, as JSON                                                                 | required with `STUDIO_KUBERNETES_NAMESPACES` |                        |
-| `STUDIO_KUBERNETES_NAMESPACES`        | Namespaces whose labelled deployments Studio controls ([Runtime Control](#runtime-control)) | none: no runtime control                     |                        |
-| `STUDIO_KUBERNETES_URL`               | Kubernetes API address, such as `kubectl proxy`                                             | the in-cluster API                           |                        |
-| `STUDIO_LOCAL_TEXT_MODEL`             | Gateway model ID that text workloads serve                                                  | required with a `text` workload              |                        |
-| `STUDIO_MCP_API_KEY`                  | Shared key for a trusted chat gateway and `chat-uploads.js`                                 | none                                         |                        |
-| `STUDIO_MCP_PUBLIC_URL`               | Internet-facing base URL for personal tokens and signed links                               | the address Studio is reached at             |                        |
-| `STUDIO_MCP_SIGNING_KEY`              | Key that signs result, upload and export links                                              | generated and kept in the data folder        |                        |
-| `STUDIO_MCP_URL`                      | Studio's MCP address for `chat-uploads.js`                                                  | required by `chat-uploads.js`                |                        |
-| `STUDIO_MEDIA_DIR`                    | Where outputs are saved                                                                     | `<STUDIO_DATA_DIR>/media`                    |                        |
-| `STUDIO_MODEL_LIBRARY_URL`            | Model library worker that receives downloads ([Studio Worker](worker/README.md))            | the `models` worker                          |                        |
-| `STUDIO_MODEL_MANIFEST_PREFIX`        | Folder stripped from `config/models.json` paths ([Workers](#workers))                       | none                                         |                        |
-| `STUDIO_MULTI_USER`                   | `1` turns on accounts ([Accounts](#accounts--single-sign-on))                               | single-user                                  |                        |
-| `STUDIO_NEXT_STEPS`                   | Prepare suggestions for finished images and videos                                          | `1`                                          | Studio                 |
-| `STUDIO_OIDC_CLIENT_ID`               | Single sign-on client ID                                                                    | none: no single sign-on                      |                        |
-| `STUDIO_OIDC_CLIENT_SECRET`           | Single sign-on client secret, for confidential clients                                      | none                                         |                        |
-| `STUDIO_OIDC_ISSUER`                  | Single sign-on issuer URL                                                                   | none                                         |                        |
-| `STUDIO_OIDC_LABEL`                   | Single sign-on button label                                                                 | Single Sign-On                               |                        |
-| `STUDIO_OIDC_REDIRECT_URI`            | `https://<studio>/api/accounts/oidc/callback`                                               | none                                         |                        |
-| `STUDIO_PROMPT_IDEAS`                 | Offer ideas in the composer's AI menu                                                       | `1`                                          | Studio                 |
-| `STUDIO_RADIANCE_KEY`                 | API key Studio sends to Radiance                                                            | none                                         |                        |
-| `STUDIO_REDLIB_URL`                   | Redlib front end for Reddit imports                                                         | none: Reddit imports refused                 |                        |
-| `STUDIO_SELF_REVIEW`                  | Score recent Dream project images against their project's brief                             | `1`                                          | Studio                 |
-| `STUDIO_SUGGESTED_PROMPTS`            | Write prompts for uploads and other items without one                                       | `1`                                          | Studio                 |
-| `STUDIO_TASTE_UPDATES`                | Summarise each account's taste as it rates                                                  | `1`                                          | Studio                 |
-| `STUDIO_WORKERS`                      | Workers as a JSON array ([Workers](#workers))                                               | discovered by runtime control, else none     |                        |
-| `STUDIO_WORKER_TOKEN`                 | Token shared with the packaged ComfyUI worker                                               | none                                         |                        |
+| Setting                             | Purpose                                                                                     | Default                                      | Settings               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------- |
+| `STUDIO_ALLOWED_HOSTS`              | Hostnames Studio answers to, comma-separated ([Accounts](#accounts--single-sign-on))        | localhost and this machine's addresses       |                        |
+| `STUDIO_ASSISTANT_CLOUD_MODEL`      | Prompt assistant model ID ([Prompt Assistant](#prompt-assistant))                           | none                                         |                        |
+| `STUDIO_ASSISTANT_KEY`              | Prompt assistant API key                                                                    | none                                         |                        |
+| `STUDIO_ASSISTANT_URL`              | Prompt assistant Chat Completions endpoint                                                  | none: no assistant                           |                        |
+| `STUDIO_BENCHMARK_IMAGE`            | BetterBench image for text model benchmarks ([Runtime Control](#runtime-control))           | none: no benchmarks                          |                        |
+| `STUDIO_BENCHMARK_SECRET`           | Secret holding the benchmarked workload's key in `API_KEY`                                  | none                                         |                        |
+| `STUDIO_CARD_IMAGES`                | MCP `generate` also sends the images of the outfit and scene cards its shots name           | `0`                                          |                        |
+| `STUDIO_CHAT_IMAGES_DIR`            | Folder `chat-uploads.js` watches ([MCP & Chat Gateway](#mcp--chat-gateway))                 | required by `chat-uploads.js`                |                        |
+| `STUDIO_CHAT_URL`                   | Chat site the navigation's Chat item opens                                                  | none: no Chat item                           |                        |
+| `STUDIO_CLIPROXYAPI_IMAGE_MODEL`    | Image model for a cloud profile that names none ([Cloud Models](#cloud-models))             | the provider's advertised Grok image model   |                        |
+| `STUDIO_CLIPROXYAPI_KEY`            | CLIProxyAPI key                                                                             | required with `STUDIO_CLIPROXYAPI_URL`       |                        |
+| `STUDIO_CLIPROXYAPI_MANAGEMENT_KEY` | CLIProxyAPI management key, to show Grok's weekly usage in Status                           | none: usage reads Unknown                    |                        |
+| `STUDIO_CLIPROXYAPI_URL`            | CLIProxyAPI base URL                                                                        | none: no cloud models                        |                        |
+| `STUDIO_CLIPROXYAPI_VIDEO_MODEL`    | Video model for a cloud profile that names none                                             | the provider's advertised Grok video model   |                        |
+| `STUDIO_CLOUD_USAGE_LIMIT`          | Percent of Grok's weekly credits past which Dream and chats run new work locally            | `80`                                         |                        |
+| `STUDIO_CONTROL_MCP_API_KEY`        | Key for the MCP GPU control tools                                                           | none                                         |                        |
+| `STUDIO_DATA_DIR`                   | Data folder                                                                                 | `/data` in the image, else `data/`           |                        |
+| `STUDIO_DEFAULT_IMAGE_PROFILE`      | Profile ID new image drafts, chat runs and Dream start on; its side is where images run     | the first ready profile                      | Where Work Runs        |
+| `STUDIO_DEFAULT_TEXT_PROFILE`       | Text model for prompt writing and other text work; a `local/` one runs text locally         | the gateway's default                        | Where Work Runs        |
+| `STUDIO_DEFAULT_VIDEO_PROFILE`      | Profile ID new video drafts, chat runs and Dream start on; its side is where videos run     | the first ready profile                      | Where Work Runs        |
+| `STUDIO_DREAM_IMAGE_BACKEND`        | `local` or `cloud`: where every account's Dream images run                                  | `local`                                      | Where Work Runs        |
+| `STUDIO_DREAM_IMAGE_IDLE_MINUTES`   | Minutes after an account's latest generation request before Dream makes its images          | `0`                                          | Dream (Administration) |
+| `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `5`                                          | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_ENABLED`     | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_OVERRIDE_UNCENSORED`  | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
+| `STUDIO_DREAM_VIDEO_BACKEND`        | `local` or `cloud`: where every account's Dream videos run                                  | `local`                                      | Where Work Runs        |
+| `STUDIO_DREAM_VIDEO_IDLE_MINUTES`   | Minutes after an account's latest generation request before Dream makes its videos          | `5`                                          | Dream (Administration) |
+| `STUDIO_ENV_FILE`                   | Settings file read on startup                                                               | `/data/.env` in the image, else `.env`       |                        |
+| `STUDIO_FACE_CHECK`                 | Compare the face in each character result with the character's                              | `1`                                          | Studio                 |
+| `STUDIO_FACE_REDO`                  | Run a recent result Face Check marks as drifted once more                                   | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_CAPTIONS`           | Caption and tag new images for gallery search                                               | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_TITLES`             | Title finished images and videos                                                            | `1`                                          | Studio                 |
+| `STUDIO_GALLERY_WHILE_BUSY`         | Run gallery work while Studio is generating                                                 | `0`                                          | Studio                 |
+| `STUDIO_IMAGE_SEARCH`               | Gallery search also finds images that look like the words                                   | `1`                                          | Studio                 |
+| `STUDIO_KUBERNETES_GPUS`            | GPUs per node pool, as JSON                                                                 | required with `STUDIO_KUBERNETES_NAMESPACES` |                        |
+| `STUDIO_KUBERNETES_NAMESPACES`      | Namespaces whose labelled deployments Studio controls ([Runtime Control](#runtime-control)) | none: no runtime control                     |                        |
+| `STUDIO_KUBERNETES_URL`             | Kubernetes API address, such as `kubectl proxy`                                             | the in-cluster API                           |                        |
+| `STUDIO_LOCAL_TEXT_MODEL`           | Gateway model ID that text workloads serve                                                  | required with a `text` workload              |                        |
+| `STUDIO_MCP_API_KEY`                | Shared key for a trusted chat gateway and `chat-uploads.js`                                 | none                                         |                        |
+| `STUDIO_MCP_PUBLIC_URL`             | Internet-facing base URL for personal tokens and signed links                               | the address Studio is reached at             |                        |
+| `STUDIO_MCP_SIGNING_KEY`            | Key that signs result, upload and export links                                              | generated and kept in the data folder        |                        |
+| `STUDIO_MCP_URL`                    | Studio's MCP address for `chat-uploads.js`                                                  | required by `chat-uploads.js`                |                        |
+| `STUDIO_MEDIA_DIR`                  | Where outputs are saved                                                                     | `<STUDIO_DATA_DIR>/media`                    |                        |
+| `STUDIO_MODEL_LIBRARY_URL`          | Model library worker that receives downloads ([Studio Worker](worker/README.md))            | the `models` worker                          |                        |
+| `STUDIO_MODEL_MANIFEST_PREFIX`      | Folder stripped from `config/models.json` paths ([Workers](#workers))                       | none                                         |                        |
+| `STUDIO_MULTI_USER`                 | `1` turns on accounts ([Accounts](#accounts--single-sign-on))                               | single-user                                  |                        |
+| `STUDIO_NEXT_STEPS`                 | Prepare suggestions for finished images and videos                                          | `1`                                          | Studio                 |
+| `STUDIO_OIDC_CLIENT_ID`             | Single sign-on client ID                                                                    | none: no single sign-on                      |                        |
+| `STUDIO_OIDC_CLIENT_SECRET`         | Single sign-on client secret, for confidential clients                                      | none                                         |                        |
+| `STUDIO_OIDC_ISSUER`                | Single sign-on issuer URL                                                                   | none                                         |                        |
+| `STUDIO_OIDC_LABEL`                 | Single sign-on button label                                                                 | Single Sign-On                               |                        |
+| `STUDIO_OIDC_REDIRECT_URI`          | `https://<studio>/api/accounts/oidc/callback`                                               | none                                         |                        |
+| `STUDIO_PROMPT_IDEAS`               | Offer ideas in the composer's AI menu                                                       | `1`                                          | Studio                 |
+| `STUDIO_RADIANCE_KEY`               | API key Studio sends to Radiance                                                            | none                                         |                        |
+| `STUDIO_REDLIB_URL`                 | Redlib front end for Reddit imports                                                         | none: Reddit imports refused                 |                        |
+| `STUDIO_SELF_REVIEW`                | Score recent Dream project images against their project's brief                             | `1`                                          | Studio                 |
+| `STUDIO_SUGGESTED_PROMPTS`          | Write prompts for uploads and other items without one                                       | `1`                                          | Studio                 |
+| `STUDIO_TASTE_UPDATES`              | Summarise each account's taste as it rates                                                  | `1`                                          | Studio                 |
+| `STUDIO_VIDEO_SECONDS`              | Video Length in seconds for new video drafts and Dream, and Animate until someone picks one | each profile's own (Auto)                    | Where Work Runs        |
+| `STUDIO_WORKERS`                    | Workers as a JSON array ([Workers](#workers))                                               | discovered by runtime control, else none     |                        |
+| `STUDIO_WORKER_TOKEN`               | Token shared with the packaged ComfyUI worker                                               | none                                         |                        |
 
 ## Troubleshooting
 

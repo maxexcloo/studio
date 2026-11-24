@@ -6,6 +6,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { projectsSimplify } from "./projects-simplify.js";
 import { tasteSimplify } from "./taste-simplify.js";
 import { uncensoredNames } from "./uncensored-names.js";
+import { whereWorkRunsServerWide } from "./work-defaults-migration.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -43,6 +44,20 @@ const steps = [
     run: projectsSimplify,
     changes: (plan) => plan.projects.length + plan.proposals.length,
     online: true,
+  },
+  {
+    name: "whereWorkRunsServerWide",
+    run: whereWorkRunsServerWide,
+    changes: (plan) =>
+      Object.keys(plan.settings).length +
+      plan.accounts.length +
+      plan.dreams.length +
+      plan.retiredOverrides.length,
+    online: true,
+    reload: () => {
+      reloadDeploymentSettings();
+      reloadAccountPreferences();
+    },
   },
 ];
 

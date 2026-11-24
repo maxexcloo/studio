@@ -1461,14 +1461,12 @@ async function offline(page: Page) {
 }
 
 test("Animate can pick a compatible profile over the saved default route", async ({ page }) => {
-  const { state, viewer } = await seed(page, {}, async (page, fixture) => {
-    fixture.preferences.preferences.videos = "cloud";
+  const { state, viewer } = await seed(page, {}, async (page) => {
     await serveProfiles(page, [...profiles, grok]);
+    // Studio's default video model runs in the cloud.
     await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
       const chosen = new URL(route.request().url()).searchParams.get("profileId");
-      const cloud = chosen
-        ? chosen === grok.id
-        : fixture.preferences.preferences.videos === "cloud";
+      const cloud = chosen ? chosen === grok.id : true;
       return route.fulfill({
         json: {
           profileId: cloud ? grok.id : "video:test",

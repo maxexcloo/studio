@@ -97,7 +97,7 @@ const listedProfile: Profile = {
   capabilities: {},
 };
 
-test("new image drafts select a supported preset for their profile and account defaults", () => {
+test("new image drafts select a supported preset for their profile", () => {
   const portrait: Profile = {
     ...listedProfile,
     defaults: { width: 864, height: 1152 },
@@ -108,21 +108,11 @@ test("new image drafts select a supported preset for their profile and account d
   };
   const configured = profileStartingSize(portrait);
   assert.deepEqual(configured, { width: 864, height: 1152, resolutionTier: "1K" });
-  const square = profileStartingSize({
-    ...portrait,
-    imagePreference: { imageAspect: "1:1", imageResolution: "1K" },
-  });
   // The profile's own tier keeps its presets' sizes; another tier scales them to its edge.
   assert.deepEqual(withResolution({ kind: "image", ...configured }, portrait), {
     kind: "image",
     width: 864,
     height: 1152,
-    resolutionTier: "1K",
-  });
-  assert.deepEqual(withResolution({ kind: "image", ...square }, portrait), {
-    kind: "image",
-    width: 992,
-    height: 992,
     resolutionTier: "1K",
   });
   const larger = withResolution(
@@ -133,81 +123,12 @@ test("new image drafts select a supported preset for their profile and account d
     },
   );
   assert.deepEqual([larger.width, larger.height], [1536, 2048]);
-  const unavailable = profileStartingSize({
-    ...portrait,
-    imagePreference: { imageAspect: "16:9", imageResolution: "4K" },
-  });
-  assert.deepEqual(unavailable, configured);
-  const native = profileStartingSize({
-    ...portrait,
-    options: { resolutions: ["1k", "2k"] },
-    imagePreference: { imageAspect: "1:1", imageResolution: "2K" },
-  });
-  assert.deepEqual(native, { width: 992, height: 992, resolution: "2k" });
+  const native = profileStartingSize({ ...portrait, options: { resolutions: ["1k", "2k"] } });
+  assert.deepEqual(native, { width: 864, height: 1152, resolution: "1k" });
   assert.deepEqual(profileStartingSize({ ...portrait, kind: "video" }), {
     width: 864,
     height: 1152,
   });
-});
-
-test("video drafts apply supported native choices or pixel sizes on the profile's grid", () => {
-  const video = {
-    kind: "video",
-    defaults: { width: 1280, height: 736 },
-    aspectPresets: [
-      { label: "16:9", w: 1280, h: 736 },
-      { label: "9:16", w: 736, h: 1280 },
-    ],
-    constraints: {
-      width: { min: 256, max: 1920, step: 32 },
-      height: { min: 256, max: 1920, step: 32 },
-    },
-  };
-  const preference = { videoAspect: "9:16", videoResolution: "1080p" } as const;
-  const ready = { ...video, videoPreference: preference };
-  assert.deepEqual(
-    profileStartingSize({
-      ...ready,
-      options: { resolutions: ["720p", "1080p"] },
-    }),
-    { width: 736, height: 1280, resolution: "1080p" },
-  );
-  assert.deepEqual(
-    profileStartingSize({
-      ...ready,
-      options: { resolutions: ["480p", "720p"] },
-    }),
-    { width: 736, height: 1280 },
-  );
-  assert.deepEqual(
-    profileStartingSize({
-      ...ready,
-      aspectPolicy: "fixed",
-    }),
-    video.defaults,
-  );
-  assert.deepEqual(
-    profileStartingSize({
-      ...ready,
-      constraints: {},
-    }),
-    video.defaults,
-  );
-  assert.deepEqual(
-    profileStartingSize({
-      ...ready,
-      videoSizeLimits: { maxPixels: 1344 * 768 },
-    }),
-    { width: 736, height: 1280 },
-  );
-  assert.deepEqual(
-    profileStartingSize({
-      ...ready,
-      videoPreference: { ...preference, videoResolution: "720p" },
-      videoSizeLimits: { maxPixels: 1920 * 1088, upscale: { abovePixels: 960 * 544, step: 64 } },
-    }),
-    { width: 704, height: 1280 },
-  );
 });
 
 const draft: GenerationInput = {

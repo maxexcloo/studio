@@ -16,10 +16,6 @@ const onOff = [
   { value: "true", label: "On" },
   { value: "false", label: "Off" },
 ];
-const backends = [
-  { value: "cloud", label: "Cloud" },
-  { value: "local", label: "Local" },
-];
 
 export function DreamAdministration() {
   const deployment = useQuery(deploymentQuery);
@@ -59,12 +55,7 @@ export function DreamAdministration() {
     );
   };
   const unseenOff = deployment.data.dream.unseenOff;
-  const row = (
-    name: DreamOverride,
-    label: string,
-    description: string,
-    choices: { value: string; label: string }[],
-  ) => {
+  const row = (name: DreamOverride, label: string, description: string) => {
     const setting = deployment.data.dream[name];
     return (
       <SettingRow wide label={label} description={description + lockedNote(setting)}>
@@ -74,12 +65,9 @@ export function DreamAdministration() {
           fullWidth
           value={setting.value === null ? "account" : String(setting.value)}
           disabled={setting.locked}
-          data={[{ value: "account", label: "Per Account" }, ...choices]}
+          data={[{ value: "account", label: "Per Account" }, ...onOff]}
           onChange={(value) =>
-            save.mutate({
-              key: setting.key,
-              value: value === "account" ? null : choices === onOff ? value === "true" : value,
-            })
+            save.mutate({ key: setting.key, value: value === "account" ? null : value === "true" })
           }
         />
       </SettingRow>
@@ -88,24 +76,11 @@ export function DreamAdministration() {
   return (
     <Stack gap="lg">
       <SettingGroup title="Account Overrides">
-        {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
+        {row("enabled", "Enabled", "Make new media from each account's taste.")}
         {row(
           "uncensored",
           "Uncensored",
           "Allow explicit themes, only for accounts with Uncensored Models access.",
-          onOff,
-        )}
-        {row(
-          "imageBackend",
-          "Images",
-          "Where Dream's images run; waits if it is unavailable.",
-          backends,
-        )}
-        {row(
-          "videoBackend",
-          "Videos",
-          "Where Dream's videos run; waits if it is unavailable.",
-          backends,
         )}
       </SettingGroup>
       <SettingGroup title="Delays">

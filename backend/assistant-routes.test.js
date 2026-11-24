@@ -391,7 +391,7 @@ test("LoRA suggestions read the selected backend's catalogue and reference mode"
   assert.equal(response.status, 200);
   assert.deepEqual(available, ["cabin.safetensors"]);
   assert.deepEqual(requested.profile.loraBase, referenceBase);
-  assert.equal(requested.writer.side, "cloud");
+  assert.deepEqual(requested.writer, { uncensored: true });
 });
 
 test("Settings shows the model Studio's own text calls use", async () => {

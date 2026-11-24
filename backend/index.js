@@ -25,7 +25,7 @@ import {
   mayUseGenerationProfile,
   promptWriter,
 } from "./account-policy.js";
-import { accountPreferences, kindDefaults } from "./account-preferences.js";
+import { accountPreferences } from "./account-preferences.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -239,6 +239,7 @@ import { createLocalText, createServicesObserver, parkedWorkers } from "./runtim
 import { installShutdown } from "./shutdown.js";
 import { registerStatusRoutes } from "./status-routes.js";
 import { registerUpscaleRoutes } from "./upscale/routes.js";
+import { defaultSides, dreamWorkSettings } from "./work-defaults.js";
 import {
   dedicatedModelLibrary,
   installedWorkerFiles,
@@ -668,9 +669,9 @@ registerLoraRoutes(app, { installedLoras });
 // A gone or disabled account's prompts never reach the text model.
 const tasteWriter = (ownerId) =>
   ownerId && !accountAccessForId(ownerId)?.authenticated ? null : assistantEngine;
-/** Where the owner's text runs and on which models (account-policy.js `promptWriter`). */
+/** What the owner's text work may use (account-policy.js `promptWriter`). */
 const textWriter = (ownerId = "") =>
-  promptWriter(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
+  promptWriter(ownerId ? accountAccessForId(ownerId) : undefined);
 // Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
@@ -852,11 +853,10 @@ registerResultSetRoutes(app, {
   store,
   admit: admitGeneration,
   item: resultItem,
-  defaultImageProfile: async (ownerId, account) => {
+  defaultImageProfile: async (_ownerId, account) => {
     const { models } = await mediaModels(false);
     const { profiles, defaults } = withPreferredDefaults(
       modelsForAccount(models, { studioAccount: account }),
-      accountPreferences(ownerId),
     );
     return profiles.find(
       (profile) => profile.kind === "image" && profile.id === defaults.imageModel,
@@ -1026,7 +1026,8 @@ const dream = createDream({
   dataDir,
   idleMinutes: (kind) =>
     dreamTimingMinutes(kind === "image" ? "imageIdleMinutes" : "videoIdleMinutes"),
-  overrides: dreamOverrides,
+  // Where Dream runs and its video length are Studio's for every account (Settings › Where Work Runs).
+  overrides: () => ({ ...dreamOverrides(), ...dreamWorkSettings() }),
   limits: dreamLimits,
   store,
   taste,
@@ -1040,17 +1041,9 @@ const dream = createDream({
     if (ownerId && !mayUseFeature(account, "dream")) return null;
     return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
-  catalogue: async (ownerId, account) => {
-    const preferences = accountPreferences(ownerId);
-    return {
-      ...dreamCatalogue(
-        modelsForAccount((await mediaModels(false)).models, { studioAccount: account }),
-      ),
-      preferred: {
-        image: kindDefaults(preferences, "images"),
-        video: kindDefaults(preferences, "videos"),
-      },
-    };
+  catalogue: async (_ownerId, account) => {
+    const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
+    return { ...dreamCatalogue(models), preferred: defaultSides(models.profiles) };
   },
   cloudHeld: cloudLocalOnly,
   online: async (kind, backend) => {
@@ -1159,13 +1152,11 @@ const dream = createDream({
   },
   reference: (account, itemId, frame) =>
     referenceAssetForAccount(account, itemId, frame ? { frame } : undefined),
-  videoProfile: async (ownerId, account, choice) => {
+  videoProfile: async (_ownerId, account, choice) => {
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
     return dreamVideoProfile(dreamCatalogue(models).profiles, {
       ...choice,
-      defaultId:
-        kindDefaults(accountPreferences(ownerId), "videos")[choice.backend] ||
-        models.defaults?.videoModel,
+      defaultId: defaultSides(models.profiles).video[choice.backend] || models.defaults?.videoModel,
       localRunning: models.backends?.video?.available !== false,
       localParked: models.backends?.video?.parked === true,
     });

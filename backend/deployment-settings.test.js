@@ -80,9 +80,8 @@ test("saving writes SQLite, refuses deployment values and clears back to the def
 test("Dream overrides force only what is set, off included, and deployment locks apply", () => {
   assert.deepEqual(settings.dreamOverrides(), {});
   settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_UNCENSORED", "0");
-  settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND", "cloud");
-  assert.deepEqual(settings.dreamOverrides(), { uncensored: false, imageBackend: "cloud" });
-  assert.equal(settings.describeDreamPolicy().imageBackend.source, "studio");
+  assert.deepEqual(settings.dreamOverrides(), { uncensored: false });
+  assert.equal(settings.describeDreamPolicy().uncensored.source, "studio");
   assert.equal(settings.describeDreamPolicy().enabled.value, null);
   process.env.STUDIO_DREAM_OVERRIDE_ENABLED = "1";
   try {
@@ -159,24 +158,23 @@ test("Generation administration validates and applies Dream overrides and the de
     for (const [key, value] of [
       // Paused is each account's own; it is not an override.
       ["STUDIO_DREAM_OVERRIDE_PAUSED", false],
-      ["STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND", "auto"],
+      ["STUDIO_DREAM_VIDEO_BACKEND", "auto"],
+      ["STUDIO_VIDEO_SECONDS", 7],
       // Only the overridable settings are here; daily caps stay each account's.
       ["STUDIO_DREAM_DAILY_IMAGES", 10],
     ]) {
       assert.equal((await request("POST", { key, value })).statusCode, 400);
     }
-    const saved = await request("POST", {
-      key: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
-      value: "cloud",
-    });
-    assert.equal(saved.body.dream.videoBackend.value, "cloud");
+    // Where Work Runs is Studio's: Dream's video side and the one Video Length.
+    const saved = await request("POST", { key: "STUDIO_DREAM_VIDEO_BACKEND", value: "cloud" });
+    assert.equal(saved.body.work.dreamVideoBackend.value, "cloud");
+    await request("POST", { key: "STUDIO_VIDEO_SECONDS", value: 8 });
     const read = await request("GET");
-    assert.equal(read.body.dream.videoBackend.value, "cloud");
-    const cleared = await request("POST", {
-      key: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
-      value: null,
-    });
-    assert.equal(cleared.body.dream.videoBackend.value, null);
+    assert.equal(read.body.work.dreamVideoBackend.value, "cloud");
+    assert.equal(read.body.work.videoSeconds.value, 8);
+    const cleared = await request("POST", { key: "STUDIO_DREAM_VIDEO_BACKEND", value: null });
+    assert.equal(cleared.body.work.dreamVideoBackend.value, "local");
+    await request("POST", { key: "STUDIO_VIDEO_SECONDS", value: null });
 
     for (const [name, { key, defaultValue }] of Object.entries(dreamTimingSettings)) {
       assert.equal(read.body.dream[name].value, defaultValue);
@@ -204,19 +202,15 @@ test("Generation administration validates and applies Dream overrides and the de
     assert.equal((await request("GET")).body.defaults.text.configured, "local/text-default");
     assert.equal(readRuntimeDocument(temporary, "settings")[key], "local/text-default");
 
-    const model = (preferences = {}) =>
-      assistantEngine.model("rewrite", false, promptWriter(undefined, preferences));
-    assert.equal(await model({ textCloud: "cloud/personal" }), "cloud/personal");
+    // The default text model decides the side text runs on, for everyone.
+    const model = () => assistantEngine.model("rewrite", false, promptWriter(undefined));
     local = { model: "local/auto" };
     assert.equal(await model(), "local/text-default");
-    assert.equal(await model({ textLocal: "local/personal" }), "local/personal");
-    assert.equal(await model({ text: "cloud" }), "cloud/uncensored");
     await request("POST", { key, value: "cloud/text-default" });
     assert.equal(await model(), "cloud/text-default");
-    assert.equal(await model({ text: "local" }), "local/auto");
     await request("POST", { key, value: "" });
     assert.equal((await request("GET")).body.defaults.text.configured, "");
-    assert.equal(await model({ textCloud: "cloud/personal" }), "cloud/personal");
+    assert.equal(await model(), "cloud/uncensored");
   } finally {
     if (process.env.STUDIO_DEFAULT_TEXT_PROFILE)
       settings.saveDeploymentSetting("STUDIO_DEFAULT_TEXT_PROFILE", "");

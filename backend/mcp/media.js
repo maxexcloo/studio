@@ -410,13 +410,11 @@ export class McpMedia {
   profileForBackend(profile, backend) {
     const option = profile.backendOptions?.find((option) => option.id === backend);
     if (!option?.profile) return profile;
-    const { backendOptions, failing, imagePreference, workerIds, availability, readiness } =
-      profile;
+    const { backendOptions, failing, workerIds, availability, readiness } = profile;
     return this.profileWithPrompting({
       ...option.profile,
       backendOptions,
       failing,
-      imagePreference,
       workerIds,
       availability,
       readiness,
@@ -517,7 +515,7 @@ export class McpMedia {
     // Concurrent submissions share discovery; do not queue repeated catalogue scans.
     if (stale && !this.profileRequests.has(owner)) {
       const generation = this.profileGeneration || 0;
-      const pending = this.request("GET", "/api/models?cached=1&preferences=0", undefined, owner)
+      const pending = this.request("GET", "/api/models?cached=1", undefined, owner)
         .then((result) => {
           // A scan that overlapped a model-list change is used once but not cached.
           if ((this.profileGeneration || 0) === generation) {

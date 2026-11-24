@@ -856,8 +856,8 @@ export function createDream(options: {
   owners(): string[];
   access(ownerId: string): DreamAccess | null;
   /**
-   * The account's ready, granted profiles, the deployment's default model per kind and the
-   * account's own default per kind and side (account-preferences.js `kindDefaults`).
+   * The account's ready, granted profiles, the deployment's default model per kind and that
+   * default by the side it runs on (work-defaults.js `defaultSides`).
    */
   catalogue(
     ownerId: string,

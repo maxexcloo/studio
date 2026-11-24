@@ -13,7 +13,6 @@
  * prompt into the item; a failure throws with the reason, which fails the item.
  */
 import { mayUseFeature, promptWriter } from "./account-policy.js";
-import { accountPreferences } from "./account-preferences.js";
 import { promptAssistantOff } from "./assistant-routes.js";
 import { dreamRequest } from "./domain/dream.ts";
 import { tasteLines } from "./domain/taste.ts";
@@ -80,9 +79,7 @@ export function createPromptStage({
     const listed = (await profiles(access)).find((item) => item.id === job.input.profileId);
     if (!listed) throw new Error("The model is no longer available to this account.");
     const profile = runProfile(listed, job.input.profileBackend);
-    const writer = job.dream
-      ? dream().text(job.ownerId)
-      : promptWriter(access, accountPreferences(job.ownerId || ""));
+    const writer = job.dream ? dream().text(job.ownerId) : promptWriter(access);
     // The story an MCP chat gave its result set, which its variations and clips keep to.
     const story = storyContext(job.input.resultSet?.context);
     if (writing.kind === "set")

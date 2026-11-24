@@ -13,6 +13,7 @@ import {
   dreamUnseenOffKey,
 } from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
+import { workSettings } from "../../shared/work-defaults";
 
 const noKeepRates: KeepRates = { profiles: {}, loras: {}, tags: {} };
 
@@ -204,6 +205,7 @@ export async function fixtures(page: Page) {
   };
 
   const deploymentDream = dreamPolicyFixture();
+  const deploymentWork = workFixture();
   let deploymentTextProfile = "";
   const administration = {
     accounts: [
@@ -291,7 +293,9 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/settings/deployment") {
       if (method === "POST") {
-        const setting = Object.values(deploymentDream).find((entry) => entry.key === body.key);
+        const setting = [...Object.values(deploymentDream), ...Object.values(deploymentWork)].find(
+          (entry) => entry.key === body.key,
+        );
         if (setting) setting.value = body.value;
         if (body.key === "STUDIO_DEFAULT_TEXT_PROFILE") deploymentTextProfile = body.value;
       }
@@ -325,6 +329,7 @@ export async function fixtures(page: Page) {
           },
         ],
         dream: deploymentDream,
+        work: deploymentWork,
       });
     }
     if (path.match(/^\/api\/accounts\/profiles\/[^/]+$/) && method === "DELETE") {
@@ -1942,6 +1947,19 @@ export function videoClip() {
 }
 
 /** Dream administration with shared default delays and no account overrides. */
+/** Settings › Where Work Runs' values, all unset (Dream on Local). */
+export const workFixture = () =>
+  Object.fromEntries(
+    Object.entries(workSettings).map(([name, { key }]) => [
+      name,
+      {
+        key,
+        value: name.startsWith("dream") ? "local" : null,
+        source: "default",
+        locked: false,
+      } as { key: string; value: unknown; source: string; locked: boolean },
+    ]),
+  );
 export const dreamPolicyFixture = () =>
   Object.fromEntries([
     ...Object.entries(dreamOverrideKeys).map(

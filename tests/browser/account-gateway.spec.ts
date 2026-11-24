@@ -435,19 +435,6 @@ test("Administrators change roles, reset passwords and delete galleries, account
   expect(state.administration.accessProfiles.map((group) => group.id)).toEqual(["users"]);
 });
 
-test("Where Work Runs shows local defaults for accounts without cloud access", async ({ page }) => {
-  const state = await fixtures(page);
-  await signIn(page, { id: "member", role: "user", features: { cloudModels: false } });
-  state.preferences.preferences.images = "cloud";
-  await page.goto("/settings#where-work-runs");
-  const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
-  const videos = where.getByRole("region", { name: "Videos", exact: true });
-  await expect(videos.getByRole("combobox", { name: "Local Model", exact: true })).toBeVisible();
-  await expect(where.getByRole("region", { name: "Dream", exact: true })).toHaveCount(0);
-  await expect(where.getByRole("radiogroup")).toHaveCount(0);
-  await expect(where.getByRole("combobox", { name: "Cloud Model", exact: true })).toHaveCount(0);
-});
-
 test("Account menu names the account by its email and opens the account workspace", async ({
   page,
 }, testInfo) => {
