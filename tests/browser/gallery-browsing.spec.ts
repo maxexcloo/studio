@@ -1779,6 +1779,7 @@ test("Returning to Gallery resets filters while closing an image keeps them", as
   await expect(liked).toBeVisible();
 
   await showGalleryView(page, "Comparisons");
+  await expect(page.getByRole("heading", { name: "Comparisons", exact: true })).toBeAttached();
   await showGalleryView(page, "Gallery");
   await expect(liked).toHaveCount(0);
 
