@@ -247,7 +247,6 @@ export class GenerationQueue {
     for (const job of store.openJobs()) {
       if (started(job) || job.providerJobId) this.acceptedIds.add(job.id);
     }
-    this.loaded = new Map(store.loadedJobs().map((job) => [job.resource, job]));
   }
 
   /** Each resource's load, for routing new work (comfy/backends.js routeJob). */
@@ -364,7 +363,19 @@ export class GenerationQueue {
     if (!this.timer) {
       this.timer = setInterval(() => void tracked("Queue", () => this.tick()), 1000);
       this.timer.unref();
-      void this.tick();
+      void this.restoreLoaded().then(() => this.tick());
+    }
+  }
+
+  /**
+   * Each resource's last started job, read one resource at a time between turns of the event loop:
+   * the whole queue's records are too many to read in one go as Studio starts.
+   */
+  async restoreLoaded() {
+    for (const resource of this.store.jobResources()) {
+      const job = this.store.loadedJob(resource);
+      if (job && !this.loaded.has(resource)) this.loaded.set(resource, job);
+      await new Promise((resolve) => setImmediate(resolve));
     }
   }
 

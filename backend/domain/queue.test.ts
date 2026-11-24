@@ -644,6 +644,7 @@ test("restart follows only recorded provider jobs and never resubmits uncertain 
   first.store.close();
   const restored = fixture(filename);
   try {
+    await restored.queue.restoreLoaded();
     assert.equal(restored.queue.loads().get("worker:idle")?.model, "loaded-model");
     await restored.queue.tick();
     assert.deepEqual(restored.submitted, []);

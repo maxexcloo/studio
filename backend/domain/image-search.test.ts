@@ -19,20 +19,27 @@ const along = (axis: number, lean = 0) => {
   return vector;
 };
 
-test("vectors keep in float16 across restarts and drop another model's", () => {
+test("vectors keep in float16 across restarts and drop another model's", async () => {
   const db = new DatabaseSync(":memory:");
   const first = createImageVectors(db, "v1");
   first.set(item("a"), along(0, 0.3));
   assert.equal(first.has(item("a")), true);
   const again = createImageVectors(db, "v1");
+  await again.ready;
   assert.ok(Math.abs(again.get(item("a"))![1] - 0.3) < 0.001, "float16 is close enough");
   again.set(item("b"), along(1));
   again.set(item("c"), along(2));
   again.delete([item("a")]);
   again.retain([item("b")]);
-  assert.equal(createImageVectors(db, "v1").size, 1, "deleted and orphaned vectors are gone");
-  assert.equal(createImageVectors(db, "v2").size, 0, "another model starts again");
-  assert.equal(createImageVectors(db, "v1").size, 0, "and the old rows are gone");
+  const kept = createImageVectors(db, "v1");
+  await kept.ready;
+  assert.equal(kept.size, 1, "deleted and orphaned vectors are gone");
+  const other = createImageVectors(db, "v2");
+  await other.ready;
+  assert.equal(other.size, 0, "another model starts again");
+  const old = createImageVectors(db, "v1");
+  await old.ready;
+  assert.equal(old.size, 0, "and the old rows are gone");
 });
 
 test("idle work reads finished images once and search matches those that look alike", async () => {

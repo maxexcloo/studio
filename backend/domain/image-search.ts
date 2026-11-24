@@ -48,10 +48,23 @@ export function createImageVectors(db: DatabaseSync, version: string) {
   );
   db.prepare("DELETE FROM studio_image_vectors WHERE version != ?").run(version);
   const vectors = new Map<string, Float32Array>();
-  for (const row of db.prepare("SELECT key, vector FROM studio_image_vectors").iterate()) {
-    const bytes = row.vector as Uint8Array;
-    vectors.set(row.key as string, Float32Array.from(new Float16Array(bytes.slice().buffer)));
-  }
+  // Read in pages between turns of the event loop: tens of thousands of rows would stall Studio's start.
+  const page = db.prepare(
+    "SELECT key, vector FROM studio_image_vectors WHERE key > ? ORDER BY key LIMIT 1000",
+  );
+  let loaded = false;
+  const ready = (async () => {
+    for (let after = ""; ;) {
+      const rows = page.all(after) as { key: string; vector: Uint8Array }[];
+      for (const row of rows)
+        if (!vectors.has(row.key))
+          vectors.set(row.key, Float32Array.from(new Float16Array(row.vector.slice().buffer)));
+      if (rows.length < 1000) break;
+      after = rows[rows.length - 1].key;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    loaded = true;
+  })();
   const remove = db.prepare("DELETE FROM studio_image_vectors WHERE key = ?");
   const save = db.prepare(
     "INSERT INTO studio_image_vectors (key, version, vector) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET version = excluded.version, vector = excluded.vector",
@@ -59,6 +72,11 @@ export function createImageVectors(db: DatabaseSync, version: string) {
   return {
     get: (item: IdleItem) => vectors.get(key(item)),
     has: (item: IdleItem) => vectors.has(key(item)),
+    /** Settles once every stored vector is in memory; until then `has` and `size` are partial. */
+    ready,
+    get loaded() {
+      return loaded;
+    },
     get size() {
       return vectors.size;
     },
@@ -108,7 +126,7 @@ export function createImageSearch(options: {
     off: "Image Search is off in Settings › Studio.",
     allowed: () => true,
     unavailable: async () => encoder.unavailable(),
-    wanted: (item) => pictured(item) && !vectors.has(item),
+    wanted: (item) => pictured(item) && vectors.loaded && !vectors.has(item),
     async run(item) {
       // Once read, the vector is kept even if other work arrived meanwhile.
       vectors.set(item, await encoder.embedImage(await options.image(item)));
@@ -118,10 +136,13 @@ export function createImageSearch(options: {
   let failed = "";
   return {
     ...work,
-    /** Loads the text encoder as Studio starts, so the first search doesn't wait seconds for it. */
+    /** Loads the text encoder soon after Studio starts, so the first search doesn't wait seconds for it. */
     start() {
       work.start();
-      if (options.enabled() && encoder.downloaded()) encoder.embedText("").catch(() => {});
+      // Building its tokenizer blocks the event loop for about a second, so it waits out the start.
+      setTimeout(() => {
+        if (options.enabled() && encoder.downloaded()) encoder.embedText("").catch(() => {});
+      }, 30_000).unref();
     },
     /** A pass first forgets vectors of images that left the gallery. */
     startPass(scope: PassScope) {
