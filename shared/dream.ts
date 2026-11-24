@@ -16,8 +16,6 @@ export const dreamDefaults = {
   mixNew: 40,
   mixComparisons: 30,
   mixExisting: 30,
-  /** Percent of ideas written uncensored, where `uncensored` and Uncensored Models allow. */
-  uncensoredShare: 40,
   /** Dream waits while this many results are unseen; 0 never waits, where an administrator allows. */
   pauseAfterUnseen: 60,
 };
@@ -27,7 +25,6 @@ export const dreamSettingMaxima = {
   mixNew: 100,
   mixComparisons: 100,
   mixExisting: 100,
-  uncensoredShare: 100,
 };
 /** The clip lengths Dream offers; 0 is Auto. Each model clamps to its own frame limits. */
 export const dreamVideoSeconds = [0, 5, 8, 10] as const;
