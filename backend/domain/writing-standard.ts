@@ -67,6 +67,9 @@ export function suggestionChoices(kind: "image" | "video" | "card", uncensored: 
       : kind === "video"
         ? promptInstruction("suggestion-video")
         : uncensored && promptInstruction("suggestion-appearance"),
+    kind === "video" &&
+      !uncensored &&
+      "Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose.",
     uncensored && kind !== "card" && promptInstruction("suggestion-extended"),
     uncensored &&
       "Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",

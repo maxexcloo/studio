@@ -766,7 +766,7 @@ Candidates: {{candidates}}`,
 Offer {{maxSuggestions}} distinct ideas. Anchor each in an existing subject, object or visible relationship. Give it a plausible trigger or first motion and a visible end state. Think in one short shot that can begin from this frame, with one main action and at most one supporting motion.
 {{contentRule}}
 {{suggestionChoices}}
-Include a camera move only when it reveals or follows something specific, and say what becomes visible or worth following. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
+Include a camera move only when it reveals or follows something specific, and say what becomes visible or worth following. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
 {{americanEnglish}}
 {{avoidFiller}}
 Name the distinctive action in a Title Case label of at most four words. Give one short sentence naming the anchor, the motion and its visible ending. Leave prompt syntax, shot timings and technical settings to the video prompt writer.
