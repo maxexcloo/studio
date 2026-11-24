@@ -1,6 +1,5 @@
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { mayUseFeature, visibleGenerationProfiles } from "../account-policy.js";
-import { kindDefaults } from "../account-preferences.js";
 import {
   allowedProfile,
   forgetWorkerProfiles,
@@ -22,6 +21,7 @@ import { RadianceClient, radianceInfo } from "../providers/radiance.ts";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
 import { profileStats, recentRuns } from "../stats.js";
+import { workDefaults } from "../work-defaults.js";
 import {
   dedicatedModelLibrary,
   installedWorkerFiles,
@@ -407,21 +407,23 @@ export function dreamCatalogue(models) {
 }
 
 /**
- * The account's default image and video profiles on the side its Images and Videos preferences
- * choose (account-preferences.js `kindDefaults`; Local unless Cloud): its own default for that side
- * where it can run, else the deployment's default where it is on that side and can run, else that
- * side's first on Radiance, else its first that can. A side with none that can run (no cloud profile for the account, or local
- * ones not installed or their workers Offline or Stopped) gives way to the other, and
- * `defaultNotes` says so; with neither, the deployment's default stays and its jobs wait. A profile
- * the person picks always wins over these.
+ * Each kind's default image and video profile for the account, on the side Studio's default model
+ * runs (Settings › Where Work Runs): that default where the account may use it and it can run, else
+ * that side's first on Radiance, else its first that can. A side with none that can run (no cloud
+ * profile for the account, or local ones not installed or their workers Offline or Stopped) gives
+ * way to the other, and `defaultNotes` says so; with neither, the deployment's default stays and
+ * its jobs wait. A profile the person picks always wins over these. Video profiles carry Studio's
+ * Video Length (`videoPreference`).
  */
-export function withPreferredDefaults(models, preferences) {
+export function withPreferredDefaults(models) {
   const defaults = { ...models.defaults };
   const defaultNotes = {};
   for (const kind of ["image", "video"]) {
     const key = `${kind}Model`;
-    const own = kindDefaults(preferences, `${kind}s`);
-    const cloudFirst = own.side === "cloud";
+    const wanted = process.env[mediaDefaultProfileKeys[kind]] || defaults[key];
+    const cloudFirst = isCloudProfile(
+      (models.profiles || []).find((profile) => profile.id === wanted) ?? { id: wanted },
+    );
     const runnable = (models.profiles || []).filter(
       (profile) =>
         profile.kind === kind &&
@@ -430,10 +432,8 @@ export function withPreferredDefaults(models, preferences) {
     );
     const pick = (cloud) => {
       const side = runnable.filter((profile) => isCloudProfile(profile) === cloud);
-      const chosen = own[cloud ? "cloud" : "local"];
       return (
-        side.find((profile) => profile.id === chosen) ||
-        side.find((profile) => profile.id === defaults[key]) ||
+        side.find((profile) => profile.id === wanted) ||
         side.find((profile) => profile.backend === "radiance") ||
         side[0]
       );
@@ -446,17 +446,12 @@ export function withPreferredDefaults(models, preferences) {
         ? `No cloud ${kind} model is available, so this runs locally.`
         : `No local ${kind} model is running, so this runs in the cloud.`;
   }
-  const { imageAspect, imageCount, imageResolution, videoAspect, videoResolution } = preferences;
-  const profiles =
-    imageAspect || imageCount || imageResolution || videoAspect || videoResolution
-      ? models.profiles?.map((profile) => {
-          if (profile.kind === "image" && (imageAspect || imageCount || imageResolution))
-            return { ...profile, imagePreference: { imageAspect, imageCount, imageResolution } };
-          if (profile.kind === "video" && (videoAspect || videoResolution))
-            return { ...profile, videoPreference: { videoAspect, videoResolution } };
-          return profile;
-        })
-      : models.profiles;
+  const { videoSeconds } = workDefaults();
+  const profiles = videoSeconds
+    ? models.profiles?.map((profile) =>
+        profile.kind === "video" ? { ...profile, videoPreference: { videoSeconds } } : profile,
+      )
+    : models.profiles;
   return { ...models, ...(profiles && { profiles }), defaults, defaultNotes };
 }
 

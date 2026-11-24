@@ -6,23 +6,25 @@ import {
   dreamUnseenOffKey,
   maxDreamIdleMinutes,
 } from "../shared/dream.ts";
-import { defaultTextProfileKey } from "./account-preferences.js";
+import { workSettings } from "../shared/work-defaults.ts";
 import { deploymentTextModel, textModels } from "./assistant-routes.js";
 import {
   catalogueFlags,
   defaultProfileKeys,
   describeDreamPolicy,
   describeFlag,
+  describeWork,
   isCatalogueFlag,
   saveDeploymentSetting,
   saveFlag,
   settingSource,
 } from "./deployment-settings.js";
-import { mediaDefaultProfileKeys } from "./generation-defaults.js";
+import { defaultTextProfileKey, mediaDefaultProfileKeys } from "./generation-defaults.js";
 import { requireAdmin } from "./route-access.js";
+import { workSettingError } from "./work-defaults.js";
 
 /**
- * Settings › Studio and Dream. `mediaModels` and `unavailableModels` are model/catalogue.js's;
+ * Settings › Studio, Dream and Where Work Runs. `mediaModels` and `unavailableModels` are model/catalogue.js's;
  * `assistantEngine` is the prompt assistant, or undefined without one.
  */
 export function registerDeploymentRoutes(
@@ -63,6 +65,7 @@ export function registerDeploymentRoutes(
       },
       catalogue: catalogueFlags.map(describeFlag),
       dream: describeDreamPolicy(),
+      work: describeWork(),
     });
   });
 
@@ -105,6 +108,15 @@ export function registerDeploymentRoutes(
       if (error) return res.status(400).json({ ok: false, error });
       saveDeploymentSetting(key, typeof value === "boolean" ? (value ? "1" : "0") : value);
       res.json({ ok: true, dream: describeDreamPolicy() });
+      return;
+    }
+    const workName = Object.keys(workSettings).find((name) => workSettings[name].key === key);
+    if (workName) {
+      // null clears it: a profile's own default applies, or Local for Dream.
+      const error = value === null ? "" : workSettingError(workName, value);
+      if (error) return res.status(400).json({ ok: false, error });
+      saveDeploymentSetting(key, value === null ? "" : value);
+      res.json({ ok: true, work: describeWork() });
       return;
     }
     if (isCatalogueFlag(key)) {

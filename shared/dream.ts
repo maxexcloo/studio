@@ -113,8 +113,6 @@ export function dreamCardCounts(
 export const dreamOverrideKeys = {
   enabled: "STUDIO_DREAM_OVERRIDE_ENABLED",
   uncensored: "STUDIO_DREAM_OVERRIDE_UNCENSORED",
-  imageBackend: "STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND",
-  videoBackend: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
 };
 export type DreamOverride = keyof typeof dreamOverrideKeys;
 /**

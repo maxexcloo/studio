@@ -28,9 +28,6 @@ interface DefaultSizedProfile extends SizedProfile {
   aspectDefault?: string;
   aspectPresets?: { label: string; w: number; h: number }[];
   defaults?: { width?: unknown; height?: unknown; resolution?: unknown; resolutionTier?: unknown };
-  imagePreference?: ImagePreference;
-  videoPreference?: VideoPreference;
-  videoSizeLimits?: VideoSizeLimits;
 }
 
 /** The workflow's configured canvas or its family's starting preset. */
@@ -134,27 +131,15 @@ export function resolutionSize(
 }
 
 export const imageAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"] as const;
-/** Most images one composer run makes, and so the most an account's Default Count may be. */
+/** Most images one composer run makes. */
 export const maxImageCount = 8;
-/** The account's starting values for new image drafts (backend/account-preferences.js). */
-export type ImagePreference = {
-  imageAspect?: (typeof imageAspects)[number] | null;
-  imageCount?: number | null;
-  imageResolution?: Resolution | null;
-};
 export const grokVideoAspects = [...imageAspects, "21:9", "5:2"] as const;
 export const videoResolutions = ["480p", "720p", "1080p"] as const;
 export const grokVideoDefaultResolution = videoResolutions[1];
 export const grokPinnedResolutions: string[] = [videoResolutions[0], grokVideoDefaultResolution];
 
-export type VideoPreference = {
-  videoAspect?: (typeof grokVideoAspects)[number] | null;
-  videoResolution?: (typeof videoResolutions)[number] | null;
-};
-export type VideoSizeLimits = {
-  maxPixels: number;
-  upscale?: { abovePixels: number; step: number };
-};
+/** Studio's Video Length for new video drafts (backend/work-defaults.js); unset for Auto. */
+export type VideoPreference = { videoSeconds?: number | null };
 
 export function grokVideoAspect(width: number, height: number) {
   const distance = (aspect: string) => {
@@ -178,41 +163,6 @@ export function orderedAspects<T extends { label: string }>(presets: T[]) {
 export const isResolution = (value: unknown): value is Resolution =>
   resolutions.includes(value as Resolution);
 
-function videoStartingSize(
-  profile: DefaultSizedProfile,
-  canvas: { width: number; height: number },
-) {
-  const { videoAspect, videoResolution } = profile.videoPreference ?? {};
-  if ((!videoAspect && !videoResolution) || profile.aspectPolicy === "fixed") return canvas;
-  const native = profile.options?.resolutions;
-  const width = profile.constraints?.width;
-  const height = profile.constraints?.height;
-  const pixels = adjustable(width) && adjustable(height);
-  const aspect =
-    (native?.length || pixels) && profile.aspectPresets?.find(({ label }) => label === videoAspect);
-  const size = aspect ? { width: aspect.w, height: aspect.h } : canvas;
-  if (native?.length) {
-    const resolution = native.find((option) => option.toLowerCase() === videoResolution);
-    return resolution ? { ...size, resolution } : size;
-  }
-  if (!pixels || !videoResolution) return size;
-
-  const [w, h] =
-    aspect && videoAspect ? videoAspect.split(":").map(Number) : [size.width, size.height];
-  const scale = Number.parseInt(videoResolution, 10) / Math.min(w, h);
-  const { maxPixels, upscale } = profile.videoSizeLimits ?? {};
-  const step = upscale && w * h * scale ** 2 > upscale.abovePixels ? upscale.step : undefined;
-  const wide = snapDimension(w * scale, { step: step ?? width?.step });
-  const tall = snapDimension(h * scale, { step: step ?? height?.step });
-  if (
-    wide !== snapDimension(wide, { ...width, step: step ?? width?.step }) ||
-    tall !== snapDimension(tall, { ...height, step: step ?? height?.step }) ||
-    (maxPixels !== undefined && wide * tall > maxPixels)
-  )
-    return size;
-  return { width: wide, height: tall };
-}
-
 /** A fresh draft opens on a supported aspect and resolution for its profile. */
 export function profileStartingSize(profile: DefaultSizedProfile): {
   width: number;
@@ -221,34 +171,22 @@ export function profileStartingSize(profile: DefaultSizedProfile): {
   resolutionTier?: Resolution;
 } {
   const canvas = profileImageSize(profile);
-  if (profile.kind === "video") return videoStartingSize(profile, canvas);
-  const { aspectPresets: presets, imagePreference: preference } = profile;
+  const presets = profile.aspectPresets;
   if (profile.kind !== "image" || !presets?.length || profile.aspectPolicy === "fixed")
     return canvas;
   const native = profile.options?.resolutions;
   const pixelSize =
     adjustable(profile.constraints?.width) && adjustable(profile.constraints?.height);
   if (!native?.length && !pixelSize) return canvas;
-  const aspect = preference?.imageAspect;
-  const [ratioWidth, ratioHeight] = aspect?.split(":").map(Number) ?? [];
-  const preferred =
-    aspect &&
-    (presets.find(({ label }) => label === aspect) ||
-      presets.find(({ w, h }) => w * ratioHeight === h * ratioWidth));
   const exact = presets.find(({ w, h }) => w === canvas.width && h === canvas.height);
   const distance = ({ w, h }: (typeof presets)[number]) =>
     Math.abs(Math.log(w / h) - Math.log(canvas.width / canvas.height));
   const preset =
-    preferred ||
     exact ||
     presets.reduce((closest, option) => (distance(option) < distance(closest) ? option : closest));
   const size = { width: preset.w, height: preset.h };
-  const preferredTier = preference?.imageResolution;
   if (native?.length) {
-    const resolution =
-      native.find((value) => value.toUpperCase() === preferredTier) ??
-      native.find((value) => value === profile.defaults?.resolution) ??
-      native[0];
+    const resolution = native.find((value) => value === profile.defaults?.resolution) ?? native[0];
     return { ...size, resolution };
   }
   const tiers = availableResolutions(profile, size);
@@ -257,7 +195,6 @@ export function profileStartingSize(profile: DefaultSizedProfile): {
   const longEdge = Math.max(canvas.width, canvas.height);
   const distanceFromTier = (tier: Resolution) => Math.abs(Math.log(longEdges[tier] / longEdge));
   const resolutionTier =
-    tiers.find((tier) => tier === preferredTier) ||
     tiers.find((tier) => tier === configuredTier) ||
     tiers.reduce((closest, tier) =>
       distanceFromTier(tier) < distanceFromTier(closest) ? tier : closest,

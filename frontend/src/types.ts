@@ -2,12 +2,7 @@ import type { CardKind, ResultContext } from "../../shared/characters";
 import type { LoraBase } from "../../shared/profiles";
 import type { Review } from "../../shared/projects";
 import type { QueueJob as SharedQueueJob } from "../../shared/queue";
-import type {
-  ImagePreference,
-  Resolution,
-  VideoPreference,
-  VideoSizeLimits,
-} from "../../shared/resolution";
+import type { Resolution, VideoPreference } from "../../shared/resolution";
 import type { UpscaleQuality } from "../../shared/upscale";
 export type MediaKind = "image" | "video";
 export interface Profile {
@@ -52,9 +47,7 @@ export interface Profile {
   /** Why it isn't ready, such as its backend's missing nodes. */
   readyReason?: string;
   defaults: Record<string, string | number>;
-  imagePreference?: ImagePreference;
   videoPreference?: VideoPreference;
-  videoSizeLimits?: VideoSizeLimits;
   capabilities: Record<string, boolean>;
   /** What a workflow's text-to-image and with-reference modes change (`defaults` is `generate`'s). */
   imageModes?: Partial<

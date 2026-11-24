@@ -121,19 +121,13 @@ test(
       body: { cloudModels: false },
     });
     assert.equal(retired.status, 400);
-    // Where videos run is one of its choices, not on or off.
+    // Where work runs is Studio's, not an account's.
     const videos = await call("/api/preferences", {
       method: "PATCH",
       cookie,
       body: { videos: "local" },
     });
-    assert.equal(videos.body.preferences.videos, "local");
-    const wrong = await call("/api/preferences", {
-      method: "PATCH",
-      cookie,
-      body: { videos: true },
-    });
-    assert.equal(wrong.status, 400);
+    assert.equal(videos.status, 400);
     // Appearance follows the account, one of each setting's choices.
     const appearance = await call("/api/preferences", {
       method: "PATCH",

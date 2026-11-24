@@ -65,30 +65,28 @@ test("settings read the gateway, whose model is the cloud model", async () => {
       "cloud/auto",
     ],
   );
-  // Cloud unless the account runs text locally, and then only while a local text workload runs.
+  // Cloud unless Studio's default text model is local, and then only while a local text workload runs.
   const environment = gateway();
   let local = null;
   const engine = createAssistant(environment, { localText: async () => local });
-  const onLocal = { side: "local", uncensored: false };
+  const writer = { uncensored: false };
+  environment.STUDIO_DEFAULT_TEXT_PROFILE = "local/auto";
   assert.deepEqual(
-    [await engine.model("title", false, onLocal), await engine.supportsVision(onLocal)],
+    [await engine.model("title", false, writer), await engine.supportsVision(writer)],
     ["cloud/auto", true],
   );
   local = { model: "local/auto", vision: false };
   assert.deepEqual(
-    [
-      await engine.model("title"),
-      await engine.model("title", false, { side: "cloud", uncensored: false }),
-    ],
-    ["cloud/auto", "cloud/auto"],
-  );
-  assert.deepEqual(
-    [await engine.model("title", false, onLocal), await engine.supportsVision(onLocal)],
+    [await engine.model("title", false, writer), await engine.supportsVision(writer)],
     ["local/auto", false],
   );
-  assert.equal(await engine.supportsVision(), true);
   // local/auto is uncensored itself.
-  assert.equal(await engine.model("caption", true, onLocal), "local/auto");
+  assert.equal(await engine.model("caption", true, writer), "local/auto");
+  delete environment.STUDIO_DEFAULT_TEXT_PROFILE;
+  assert.deepEqual(
+    [await engine.model("title"), await engine.supportsVision()],
+    ["cloud/auto", true],
+  );
   local = null;
   assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
@@ -96,60 +94,36 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   assert.equal(createAssistant({}), null);
 });
 
-test("text asks for the default on the account's Text side, uncensored only where it may", async () => {
+test("text asks for Studio's default text model, uncensored only where it may", async () => {
   const environment = gateway();
   let local = { model: "local/auto", vision: false };
   const engine = createAssistant(environment, { localText: async () => local });
-  const write = (writer) => engine.model("rewrite", false, { side: "cloud", ...writer });
-  assert.deepEqual(
-    [await write({ uncensored: true }), await write({ uncensored: false })],
-    ["cloud/uncensored", "cloud/auto"],
-  );
-  assert.deepEqual(
-    [
-      await write({ cloud: "cloud/vision", uncensored: false }),
-      await write({ side: "local", local: "local/qwen3.8-27b-uncensored", uncensored: true }),
-    ],
-    ["cloud/vision", "local/qwen3.8-27b-uncensored"],
-  );
-  // An uncensored default the account may no longer use gives way.
-  assert.equal(
-    await write({ side: "local", local: "local/qwen3.8-27b-uncensored", uncensored: false }),
-    "local/auto",
-  );
+  const write = (uncensored) => engine.model("rewrite", false, { uncensored });
+  assert.deepEqual([await write(true), await write(false)], ["cloud/uncensored", "cloud/auto"]);
+  environment.STUDIO_DEFAULT_TEXT_PROFILE = "cloud/vision";
+  assert.equal(await write(false), "cloud/vision");
+  environment.STUDIO_DEFAULT_TEXT_PROFILE = "local/qwen3.8-27b-uncensored";
+  assert.equal(await write(true), "local/qwen3.8-27b-uncensored");
+  // An uncensored default an account may not use gives way.
+  assert.equal(await write(false), "local/auto");
+  assert.equal(await engine.supportsVision({ uncensored: false }), false);
   // Local's default waits for a running local text workload; until then Cloud's is used.
   local = null;
-  assert.equal(
-    await write({ side: "local", local: "local/auto", cloud: "cloud/vision", uncensored: false }),
-    "cloud/vision",
-  );
-  local = { model: "local/auto", vision: false };
-  assert.deepEqual(
-    [
-      await engine.supportsVision({ side: "local", uncensored: false }),
-      await engine.supportsVision({ side: "cloud", uncensored: false }),
-    ],
-    [false, true],
-  );
+  assert.equal(await write(false), "cloud/auto");
 });
 
-test("Dream's restricted text uses a permitted model only on the selected side", async () => {
-  const engine = createAssistant(gateway(), {
+test("Dream's restricted text uses a permitted model only on the default text model's side", async () => {
+  const environment = gateway();
+  const engine = createAssistant(environment, {
     localText: async () => ({ model: "local/auto", vision: false }),
   });
-  const writer = {
-    side: "local",
-    local: "local/auto",
-    cloud: "cloud/uncensored",
-    uncensored: false,
-    censoredOnly: true,
-  };
+  const writer = { uncensored: false, censoredOnly: true };
+  environment.STUDIO_DEFAULT_TEXT_PROFILE = "local/auto";
   await assert.rejects(engine.model("dream", false, writer), /No text model is available/);
-  assert.equal(
-    await engine.model("animate", false, { ...writer, local: "local/standard" }),
-    "local/standard",
-  );
-  assert.equal(await engine.model("dream", false, { ...writer, side: "cloud" }), "cloud/auto");
+  environment.STUDIO_DEFAULT_TEXT_PROFILE = "local/standard";
+  assert.equal(await engine.model("animate", false, writer), "local/standard");
+  environment.STUDIO_DEFAULT_TEXT_PROFILE = "cloud/uncensored";
+  assert.equal(await engine.model("dream", false, writer), "cloud/auto");
 });
 
 test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {
@@ -400,7 +374,7 @@ test("references go to a vision model as image parts; a text-only model gets non
   assert.match(seen.calls[0].body.messages[0].content, /2 reference images are attached: describe/);
   // A local text model without `vision: true` is text-only.
   const text = fakeGateway(() => json("A cabin."));
-  const blind = createAssistant(gateway(), {
+  const blind = createAssistant(gateway({ STUDIO_DEFAULT_TEXT_PROFILE: "local/auto" }), {
     fetchImpl: text.fetchImpl,
     log: quiet,
     localText: async () => ({ model: "local/auto", vision: false }),
@@ -409,7 +383,7 @@ test("references go to a vision model as image parts; a text-only model gets non
     profile,
     prompt: "a cabin",
     references,
-    writer: { side: "local", uncensored: false },
+    writer: { uncensored: false },
   });
   assert.equal(unread.referencesRead, false);
   assert.equal(typeof text.calls[0].body.messages[1].content, "string");

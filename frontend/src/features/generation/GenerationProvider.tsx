@@ -14,8 +14,9 @@ import { profileStartingSize } from "../../../../shared/resolution";
 import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { useRememberedKey } from "../auth/useRemembered";
+import { withLength } from "./length";
 import { setFamilyLabels } from "./modelFamily";
-import { generationCountLimit, isProfile, profileForBackend, referencePatch } from "./payload";
+import { isProfile, profileForBackend, referencePatch } from "./payload";
 
 export async function fetchModels(cached: boolean) {
   const models = await api<Models>(cached ? "/api/models?cached=1" : "/api/models");
@@ -43,13 +44,12 @@ export const initialInput: GenerationInput = {
   loras: [],
   referenceAssets: [],
 };
+/** A draft on `profile` at its own starting size and Studio's Video Length, keeping the prompt and references. */
 export function inputForProfile(previous: GenerationInput, profile: Profile): GenerationInput {
-  const count = profile.imagePreference?.imageCount;
-  return {
+  const input: GenerationInput = {
     ...initialInput,
     ...profile.defaults,
     ...profileStartingSize(profile),
-    ...(count && { count: Math.min(count, generationCountLimit(profile, profile.kind)) }),
     prompt: previous.prompt,
     cardParts: previous.cardParts,
     negative: previous.negative,
@@ -61,6 +61,7 @@ export function inputForProfile(previous: GenerationInput, profile: Profile): Ge
     workflow: profile.workflow,
     loras: previous.loras,
   };
+  return withLength(input, profile, profile.videoPreference?.videoSeconds);
 }
 /** The configured default for an output, else its first ready profile, else any. */
 export function defaultProfile(models: Models | undefined, kind: MediaKind) {

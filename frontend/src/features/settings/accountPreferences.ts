@@ -1,8 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Appearance } from "../../../../shared/appearance";
-import { defaultModelKeys } from "../../../../shared/profiles";
-import type { ImagePreference, VideoPreference } from "../../../../shared/resolution";
 import type { TasteArea, TasteAreaSetting } from "../../../../shared/taste";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
@@ -10,26 +8,18 @@ import { galleryKey } from "../gallery/queries";
 import type { SavedGalleryView } from "../gallery/SavedViews";
 import { modelsQuery } from "../generation/GenerationProvider";
 
-/** Where the account prefers a kind to run; the other side takes over, saying so, when it can't. */
-export type SidePreference = "cloud" | "local";
-/** The kinds of work whose side and default models the account chooses. */
-export type WorkKind = "images" | "text" | "videos";
-type DefaultModelKey = (typeof defaultModelKeys)[WorkKind][SidePreference];
 /** Which unfinished work the gallery shows: none, work in progress, or queued work too. */
 export type GalleryWorkPreference = "none" | "running" | "queued";
-/** The account's own preferences (backend/account-preferences.js). */
-interface PreferenceValues {
+/**
+ * The account's own preferences (backend/account-preferences.js); where work runs and how it
+ * starts are Studio's (Settings › Where Work Runs).
+ */
+export interface Preferences {
   loras: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
   /** Which unfinished work the gallery shows; unsaved, none. */
   galleryWork?: GalleryWorkPreference;
-  /** Where images run by default; unsaved, Local. */
-  images?: SidePreference;
-  /** Where text runs; unsaved, the side of Studio's default text model. */
-  text?: SidePreference;
-  /** Where videos and Animate run by default; unsaved, Local. */
-  videos?: SidePreference;
   /** The header's Appearance settings; unsaved, the browser's. */
   appearance?: Partial<Appearance>;
   /** The gallery's saved views, in the order saved. */
@@ -37,11 +27,6 @@ interface PreferenceValues {
   /** Where Taste Applies (Settings › Taste); unsaved areas take `tasteAreasOf`'s defaults. */
   tasteAreas?: Partial<Record<TasteArea, Partial<TasteAreaSetting>>>;
 }
-/** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
-export type Preferences = PreferenceValues &
-  ImagePreference &
-  VideoPreference &
-  Partial<Record<DefaultModelKey, string | null>>;
 interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
@@ -83,21 +68,6 @@ export function useSavePreferences(previousGalleryViews?: SavedGalleryView[], in
         void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.
       if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: galleryKey });
-      // Default models follow where the account prefers each kind to run and its chosen defaults.
-      const changed = (kind: WorkKind) =>
-        kind in patch || Object.values(defaultModelKeys[kind]).some((key) => key in patch);
-      if (
-        changed("images") ||
-        changed("videos") ||
-        "imageAspect" in patch ||
-        "imageCount" in patch ||
-        "imageResolution" in patch ||
-        "videoAspect" in patch ||
-        "videoResolution" in patch
-      )
-        void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
-      if (changed("videos")) void client.invalidateQueries({ queryKey: ["animate-profile"] });
-      if (changed("text")) void client.invalidateQueries({ queryKey: ["assistant"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   });
@@ -110,15 +80,6 @@ export function useTileCaptions() {
   return [
     preferences.data?.preferences.tileCaptions ?? false,
     (tileCaptions: boolean) => save.mutate({ tileCaptions }),
-  ] as const;
-}
-
-/** Where the account prefers videos to run, as Animate's menus and Settings show it. */
-export function useVideosPreference() {
-  const save = useSavePreferences();
-  return [
-    useQuery(preferencesQuery).data?.preferences.videos,
-    (videos: SidePreference) => save.mutate({ videos }),
   ] as const;
 }
 

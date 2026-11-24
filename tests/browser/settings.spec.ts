@@ -1,15 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  dreamPolicyFixture,
-  fixtures,
-  image,
-  openTheme,
-  section,
-  serveDream,
-  signIn,
-  stamp,
-} from "./fixtures";
+import { dreamPolicyFixture, fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -35,11 +26,11 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Dream",
     "Preferences",
     "Taste",
-    "Where Work Runs",
     "Dream",
     "Groups",
     "Studio",
     "Users",
+    "Where Work Runs",
     "Workers",
     "About",
   ];
@@ -54,7 +45,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(5, -1));
+    ).toHaveText(order.slice(4, -1));
   await section(page, "Settings", "Studio");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
@@ -318,78 +309,44 @@ test("An administrator turns LoRAs and Uncensored off for itself in Preferences"
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
-test("Where Work Runs saves each group’s processing and default models", async ({ page }) => {
-  const state = await fixtures(page);
-  const dream = await serveDream(page, { enabled: true });
-  await signIn(page, { id: "member", role: "user" });
-  state.preferences.preferences.videos = "local";
-  await page.route("**/api/assistant", (route) =>
-    route.fulfill({
-      json: {
-        available: true,
-        presets: [],
-        writingModel: "cloud/uncensored",
-        models: ["cloud/auto", "cloud/deepseek-flash-uncensored", "cloud/uncensored", "local/auto"],
-      },
-    }),
-  );
-  await page.goto("/settings#preferences");
-  const prompts = page.getByRole("region", { name: "Prompts", exact: true });
-  await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Prompt Assistant" })).toHaveCount(0);
-
-  await section(page, "Settings", "Where Work Runs");
+test("Where Work Runs saves Studio's Video Length and Dream's side for everyone", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const saved: { key: string; value: unknown }[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/api/settings/deployment"
+    )
+      saved.push(request.postDataJSON());
+  });
+  await page.goto("/settings#where-work-runs");
   const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
   const group = (kind: string) => where.getByRole("region", { name: kind, exact: true });
   const workGroups = where.getByRole("region", { name: /^(Images|Videos|Text|Dream)$/ });
   await expect
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
     .toEqual(["Images", "Videos", "Dream", "Text"]);
-  const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
-  await expect(textCloud).toHaveText("Default (Studio)");
-  await textCloud.click();
-  const options = page
-    .getByRole("listbox")
-    .getByRole("group", { name: "Cloud", exact: true })
-    .getByRole("option");
-  await expect(options).toHaveText(["Auto", "DeepSeek Flash Uncensored", "Uncensored"]);
-  // The list scrolls inside the Settings modal and its choice applies at once.
-  await options.last().scrollIntoViewIfNeeded();
-  await options.last().click();
-  await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
-  await expect(textCloud).toHaveText("Cloud · Uncensored");
-  await textCloud.click();
-  await page.getByRole("option", { name: "Default (Studio)", exact: true }).click();
-  await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
-  await expect(textCloud).toHaveText("Default (Studio)");
-  const area = (kind: string) =>
-    group(kind).getByRole("radiogroup", { name: `${kind} Run On`, exact: true });
-  const choose = (name: string, choice: string) =>
-    area(name).locator("label").filter({ hasText: choice }).click();
-  await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
-  // Text runs on Cloud until the account picks Local.
-  await expect(area("Text").getByRole("radio", { name: "Cloud" })).toBeChecked();
-  await choose("Text", "Local");
-  await expect.poll(() => state.preferences.preferences.text).toBe("local");
-  await expect(area("Videos").getByRole("radio", { name: "Local" })).toBeChecked();
-  await choose("Images", "Cloud");
-  await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
-  await choose("Videos", "Cloud");
-  await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
-  await choose("Videos", "Local");
-  await expect.poll(() => state.preferences.preferences.videos).toBe("local");
-  await group("Images").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
-  await page.getByRole("option", { name: "16:9", exact: true }).click();
-  await expect.poll(() => state.preferences.preferences.imageAspect).toBe("16:9");
-  await group("Videos").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
-  await page.getByRole("option", { name: "9:16", exact: true }).click();
-  await expect.poll(() => state.preferences.preferences.videoAspect).toBe("9:16");
-  await group("Videos").getByRole("combobox", { name: "Default Resolution", exact: true }).click();
-  await page.getByRole("option", { name: "720p", exact: true }).click();
-  await expect.poll(() => state.preferences.preferences.videoResolution).toBe("720p");
-  const dreamImages = group("Dream").getByRole("radiogroup", { name: "Dream Images" });
-  await dreamImages.getByText("Cloud", { exact: true }).click();
-  await expect.poll(() => dream.settings.imageBackend).toBe("cloud");
+  await group("Videos")
+    .getByRole("radiogroup", { name: "Video Length", exact: true })
+    .getByText("8 s", { exact: true })
+    .click();
+  await group("Dream")
+    .getByRole("radiogroup", { name: "Dream Images", exact: true })
+    .getByText("Cloud", { exact: true })
+    .click();
+  await expect
+    .poll(() => saved)
+    .toEqual([
+      { key: "STUDIO_VIDEO_SECONDS", value: 8 },
+      { key: "STUDIO_DREAM_IMAGE_BACKEND", value: "cloud" },
+    ]);
+  // A person's own Settings no longer offer any of these.
+  await signIn(page, { id: "member", role: "user" });
+  await page.goto("/settings#preferences");
+  await expect(page.getByRole("link", { name: "Where Work Runs" })).toHaveCount(0);
 });
 
 test("Header appearance preferences persist across reloads", async ({ page }) => {
@@ -1043,32 +1000,28 @@ test("Administration › Dream saves shared queue delays and hands an override b
   const idle = page.getByRole("textbox", { name: "Video Idle Delay", exact: true });
   await idle.fill("12");
   await idle.press("Enter");
-  const images = page.getByRole("radiogroup", { name: "Dream Images", exact: true });
   const uncensored = page.getByRole("radiogroup", { name: "Dream Uncensored" });
-  const choice = (group: typeof images, name: string) =>
+  const choice = (group: typeof uncensored, name: string) =>
     group.getByRole("radio", { name, exact: true });
-  await expect(choice(images, "Per Account")).toBeChecked();
-  await images.getByText("Cloud", { exact: true }).click();
+  await expect(choice(uncensored, "Per Account")).toBeChecked();
   await uncensored.getByText("Off", { exact: true }).click();
-  await expect(choice(images, "Cloud")).toBeChecked();
   await page.reload();
   await expect(delay).toHaveValue("8");
   await expect(idle).toHaveValue("12");
-  await expect(choice(images, "Cloud")).toBeChecked();
   await expect(choice(uncensored, "Off")).toBeChecked();
   await expect(
-    choice(page.getByRole("radiogroup", { name: "Dream Videos", exact: true }), "Per Account"),
+    choice(page.getByRole("radiogroup", { name: "Dream Enabled", exact: true }), "Per Account"),
   ).toBeChecked();
   await uncensored.getByText("Per Account", { exact: true }).click();
   await page.reload();
   await expect(choice(uncensored, "Per Account")).toBeChecked();
 });
 
-test("Settings › Studio saves and clears the default Text Profile", async ({ page }) => {
+test("Where Work Runs saves and clears the default text model", async ({ page }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  await page.goto("/settings#studio");
-  const text = page.getByRole("combobox", { name: "Text Model", exact: true });
+  await page.goto("/settings#where-work-runs");
+  const text = page.getByRole("combobox", { name: "Default Text Model", exact: true });
   await expect(text).toHaveText("Default (Gateway)");
   await text.click();
   const saved = page.waitForResponse(

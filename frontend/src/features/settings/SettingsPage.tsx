@@ -9,7 +9,6 @@ import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { ownAccountQuery } from "../auth/AccountGate";
 import { DreamPreferences } from "../dream/DreamSettings";
 import { dreamQuery } from "../dream/queries";
-import { assistantQuery } from "../generation/PromptAssistant";
 import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { runtimeQueueQuery, runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { TasteProfile, tasteQuery } from "../taste/TasteProfile";
@@ -89,7 +88,7 @@ export function SettingsPage() {
           studio: [deploymentQuery],
           taste: [tasteQuery, preferencesQuery],
           users: [accountAdminQuery],
-          "where-work-runs": [assistantQuery, dreamQuery, preferencesQuery],
+          "where-work-runs": [deploymentQuery],
         }}
         content={{
           account: <OwnAccount />,

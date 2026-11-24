@@ -40,3 +40,17 @@ export function lengthChoices(input: GenerationInput, profile?: Profile) {
       }),
   };
 }
+
+/**
+ * The input at `seconds` long, on the profile's duration or frame grid; unchanged without a length,
+ * or where the profile can't run it, so a length chosen for another profile never breaks this one.
+ */
+export function withLength(input: GenerationInput, profile: Profile, seconds?: number | null) {
+  const choices = lengthChoices(input, profile);
+  if (!choices || !seconds) return input;
+  const fps = choices.key === "duration" ? 1 : input.fps;
+  const range = profile.constraints?.[choices.key] || {};
+  const { min = 1, max = Infinity, step = 1, offset = min } = range;
+  const value = offset + step * Math.round((seconds * fps - offset) / step);
+  return value >= min && value <= max ? { ...input, [choices.key]: value } : input;
+}
