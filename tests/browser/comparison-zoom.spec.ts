@@ -72,11 +72,14 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
   else await page.mouse.wheel(0, -120);
   await expect.poll(async () => (await upscaled.boundingBox())!.width).toBeGreaterThan(beforeWheel);
   const beforePan = (await upscaled.boundingBox())!;
-  await page.mouse.move(frame.x + frame.width / 2, frame.y + frame.height / 2);
+  // Pan from visible image content, clear of the divider across the middle.
+  const x = Math.max(frame.x, beforePan.x);
+  const y = Math.max(frame.y, beforePan.y);
+  const panX = x + (Math.min(frame.x + frame.width, beforePan.x + beforePan.width) - x) / 4;
+  const panY = y + (Math.min(frame.y + frame.height, beforePan.y + beforePan.height) - y) / 4;
+  await page.mouse.move(panX, panY);
   await page.mouse.down();
-  await page.mouse.move(frame.x + frame.width / 2 + 40, frame.y + frame.height / 2 + 30, {
-    steps: 4,
-  });
+  await page.mouse.move(panX + 40, panY + 30, { steps: 4 });
   await page.mouse.up();
   await expect
     .poll(async () => {
@@ -110,6 +113,21 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
   await expect.poll(fitted).toBe(true);
   const bounds = (await upscaled.boundingBox())!,
     area = (await viewport.boundingBox())!;
+  const handle = (await viewport.locator("[data-comparison-divider] > span").boundingBox())!;
+  const vertical = (await slider.getAttribute("aria-orientation")) === "vertical";
+  const handleX = handle.x + handle.width / 2;
+  const handleY = handle.y + handle.height / 2;
+  await page.mouse.move(handleX, handleY);
+  await page.mouse.down();
+  await page.mouse.move(
+    vertical ? handleX : bounds.x + bounds.width * 0.75,
+    vertical ? bounds.y + bounds.height * 0.25 : handleY,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await expect(slider).toHaveAttribute("aria-valuenow", "75");
+  await expect(viewport).toHaveAttribute("data-zoom-mode", "Fit");
+
   const blank =
     bounds.x - area.x > 4
       ? { x: area.x + 2, y: area.y + area.height / 2 }

@@ -192,8 +192,10 @@ import { enforceMultiUserRequest } from "./multi-user-gate.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { mcpOwnership } from "./persistence/mcp-ownership.ts";
 import {
+  ownerDocumentName,
   readRuntimeDocument,
   runtimeDatabase,
+  runtimeTransaction,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
 import { registerPreferenceRoutes } from "./preference-routes.js";
@@ -856,6 +858,16 @@ const comparisons = registerCompareRoutes(app, {
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
   read: () => readRuntimeDocument(dataDir, "comparisons") ?? [],
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
+  ratings: (ownerId) =>
+    readRuntimeDocument(dataDir, ownerDocumentName("comparison-ratings", ownerId)) ?? {},
+  rate: (ownerId, id, rating) =>
+    runtimeTransaction(dataDir, () => {
+      const name = ownerDocumentName("comparison-ratings", ownerId);
+      const ratings = readRuntimeDocument(dataDir, name) ?? {};
+      if (rating === null) delete ratings[id];
+      else ratings[id] = rating;
+      writeRuntimeDocument(dataDir, name, ratings);
+    }),
   gallery: (req, { jobIds = [], itemIds = [], unseenSourceId }) => {
     // A dislike hides a variant from the gallery but not from its comparison.
     const items = visibleGallery({ jobIds }, { disliked: true }).concat(

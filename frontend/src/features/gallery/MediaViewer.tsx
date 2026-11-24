@@ -751,8 +751,12 @@ export function MediaViewer({
                       <div className={classes.comparison}>
                         <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
                           <MediaComparison
-                            original={item.url}
-                            upscale={item.upscale.url}
+                            first={{ src: item.url, label: "Original", alt: "Original Result" }}
+                            second={{
+                              src: item.upscale.url,
+                              label: "Upscale",
+                              alt: "Upscaled Result",
+                            }}
                             width={item.width}
                             height={item.height}
                           />

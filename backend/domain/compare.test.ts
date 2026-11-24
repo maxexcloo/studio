@@ -5,6 +5,7 @@ import test from "node:test";
 
 import express from "express";
 
+import type { ComparisonRating } from "../../shared/compare.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { type ComparisonRecord, registerCompareRoutes } from "./compare.ts";
@@ -64,6 +65,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
     ],
     revision: () => 0,
   });
+  const ratings = new Map<string, Record<string, ComparisonRating>>();
   const votes: string[][] = [];
   const picks: string[][] = [];
   const app = express();
@@ -79,6 +81,13 @@ test("compare runs queue one seeded set, read back per owner and record the star
     read: () => structuredClone(records),
     write: (next) => {
       records = structuredClone(next);
+    },
+    ratings: (ownerId) => ratings.get(ownerId) ?? {},
+    rate: (ownerId, id, rating) => {
+      const saved = ratings.get(ownerId) ?? {};
+      if (rating === null) delete saved[id];
+      else saved[id] = rating;
+      ratings.set(ownerId, saved);
     },
     gallery: (req) =>
       gallery.filter((item) => item.ownerId === (req.studioAccount?.userId || "")) as never,
@@ -382,7 +391,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.ok("payload" in foreignRead);
   assert.deepEqual(foreignRead.payload, { comparisons: [] });
 
-  // A kept Dream comparison is read-only, with its kept side as the winner.
+  // A kept Dream comparison retains its winning side when the comparison itself is rated.
   const dream = await request("/dream-kept");
   assert.deepEqual(
     [dream.body.dream, dream.body.seed, dream.body.vote, dream.body.winnerItemId],
@@ -401,6 +410,25 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.equal((await request("/dream-foreign")).status, 404);
   assert.equal((await request("/dream-kept", undefined, "GET", "bob")).status, 404);
   assert.equal((await request("/dream-kept/vote", { itemId: "kept-0" }, "PUT")).status, 404);
+
+  const rate = (id: string, rating: unknown, user = "alice") =>
+    request(`/${id}/rating`, { rating }, "PUT", user);
+  assert.equal((await rate("legacy", "liked", "bob")).status, 404);
+  assert.equal((await rate("dream-foreign", "liked")).status, 404);
+  assert.equal((await rate("dream-neither", "liked")).status, 404);
+  assert.equal((await rate("legacy", "winning")).status, 400);
+  assert.equal((await rate("legacy", "liked")).body.rating, "liked");
+  assert.equal((await rate("dream-kept", "disliked")).body.rating, "disliked");
+  const list = (await request("")).body.comparisons;
+  const liked = list.find((entry: { id: string }) => entry.id === "legacy");
+  const disliked = list.find((entry: { id: string }) => entry.id === "dream-kept");
+  assert.deepEqual(
+    [liked.rating, liked.variants[0].item.rating, liked.winnerItemId],
+    ["liked", undefined, null],
+  );
+  assert.deepEqual([disliked.rating, disliked.winnerItemId], ["disliked", "kept-1"]);
+  assert.equal((await rate("dream-kept", null)).body.rating, null);
+  assert.equal((await request("/dream-kept")).body.rating, null);
 
   // Comparison iterations retain their exact source, without grouping unrelated session work.
   const iteration = await request("/run", {

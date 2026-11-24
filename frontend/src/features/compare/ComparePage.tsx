@@ -4,6 +4,7 @@ import {
   Button,
   Group,
   SegmentedControl,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -13,8 +14,16 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import {
+  type CSSProperties,
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { Link, useLocation, useParams } from "react-router";
 
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -25,16 +34,23 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { inboxQuery } from "../dream/queries";
+import { mediaSource } from "../gallery/mediaSource";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { type GalleryState, galleryViewPath } from "../gallery/viewerLink";
+import { ComparisonRatingButtons } from "./ComparisonRatingButtons";
 import { type Comparison, comparisonQuery, comparisonTitle, comparisonsQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
+
+const MediaComparison = lazy(() =>
+  import("../gallery/MediaComparison").then((module) => ({ default: module.MediaComparison })),
+);
+type SplitImage = { value: string; label: string; src: string; width?: number; height?: number };
 
 /**
  * A compare set side by side, labelled by what sets each variant apart: pick the winner (liking it), take one
@@ -42,6 +58,9 @@ import classes from "./ComparePage.module.css";
  */
 export function ComparePage() {
   const id = useParams().id!;
+  const location = useLocation();
+  const comparisonSearch = (location.state as { comparisonSearch?: string } | null)
+    ?.comparisonSearch;
   const comparison = useQuery(comparisonQuery(id));
   const client = useQueryClient();
   const stage = useStageComparison();
@@ -110,7 +129,22 @@ export function ComparePage() {
       </Alert>
     );
   const { variants, seed, prompt, negative, set, axis, dream, card } = comparison.data;
+  const gallerySet = comparisonSearch === undefined ? set : undefined;
+  const backLabel = gallerySet ? "Show in Gallery" : "Back to Comparisons";
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
+  const splitImages = variants.flatMap(({ label, item }) => {
+    if (item?.type !== "image" || item.status !== "done" || !item.url) return [];
+    const source = mediaSource(item);
+    return [
+      {
+        value: item.id,
+        label,
+        src: source.displayUrl || source.url,
+        width: source.width,
+        height: source.height,
+      },
+    ];
+  });
   // Compare Again brings back every finished variant, the winner first.
   const again = items
     .filter((item) => item.status === "done")
@@ -124,14 +158,18 @@ export function ComparePage() {
     <Stack gap="md" className={classes.page}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
-          <Tooltip label={set ? "Show in Gallery" : "Back to Comparisons"}>
+          <Tooltip label={backLabel}>
             <ActionIcon
               component={Link}
-              to={set ? "/images" : galleryViewPath("image", "comparisons")}
-              state={set ? ({ set } satisfies GalleryState) : undefined}
+              to={
+                gallerySet
+                  ? "/images"
+                  : `${galleryViewPath("image", "comparisons")}${comparisonSearch || ""}`
+              }
+              state={gallerySet ? ({ set: gallerySet } satisfies GalleryState) : undefined}
               variant="subtle"
               color="gray"
-              aria-label={set ? "Show in Gallery" : "Back to Comparisons"}
+              aria-label={backLabel}
             >
               <ArrowLeft size={18} />
             </ActionIcon>
@@ -140,9 +178,14 @@ export function ComparePage() {
             {comparisonTitle({ axis, dream })}
           </Title>
         </Group>
-        <Text size="sm" c="dimmed" ta="right">
-          {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
-        </Text>
+        <Group gap="xs" justify="flex-end" wrap="nowrap">
+          <Text size="sm" c="dimmed" ta="right">
+            {[plural(variants.length, "Variant"), seed && `Seed ${seed}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+          <ComparisonRatingButtons comparison={comparison.data} />
+        </Group>
       </Group>
       {card && (
         <Text size="sm" c="dimmed">
@@ -163,7 +206,7 @@ export function ComparePage() {
           )}
         </Stack>
       )}
-      <Variants count={variants.length} aspect={aspect}>
+      <Variants count={variants.length} aspect={aspect} splitImages={splitImages}>
         {variants.map(({ jobId, label, item }) => {
           const won = comparison.data.winnerItemId === item?.id;
           return (
@@ -261,31 +304,77 @@ export function ComparePage() {
   );
 }
 
-type Layout = "side" | "scroll";
+type Layout = "side" | "scroll" | "split";
+
+function SplitVariants({ images }: { images: SplitImage[] }) {
+  const [firstId, setFirst] = useState<string>();
+  const [secondId, setSecond] = useState<string>();
+  const first = images.find(({ value }) => value === firstId) ?? images[0];
+  const others = images.filter(({ value }) => value !== first.value);
+  const second = others.find(({ value }) => value === secondId) ?? others[0];
+  return (
+    <Stack gap="xs">
+      {images.length > 2 && (
+        <SimpleGrid cols={2} spacing="xs" className={classes.splitChoices}>
+          <Select
+            label="First Variant"
+            data={images}
+            value={first.value}
+            onChange={(value) => value && setFirst(value)}
+            allowDeselect={false}
+          />
+          <Select
+            label="Second Variant"
+            data={others}
+            value={second.value}
+            onChange={(value) => value && setSecond(value)}
+            allowDeselect={false}
+          />
+        </SimpleGrid>
+      )}
+      <div className={classes.split}>
+        <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
+          <MediaComparison
+            key={JSON.stringify([first.value, second.value])}
+            first={first}
+            second={second}
+            inPage
+            width={second.width}
+            height={second.height}
+          />
+        </Suspense>
+      </div>
+    </Stack>
+  );
+}
 
 /**
- * The variants side by side in the gallery's columns, or one at a time in a swiped row. Phones
- * start with the swiped row. Layouts can scroll vertically when the viewport is short.
+ * The variants side by side, one at a time in a swiped row, or two finished images under one split.
  */
 function Variants({
   count,
   aspect,
+  splitImages,
   children,
 }: {
   count: number;
   aspect: number;
+  splitImages: SplitImage[];
   children: ReactNode;
 }) {
   const phone = usePhone();
   const { columns: gallery } = useGalleryColumns();
   const [saved, setLayout] = useRemembered<Layout | null>("compare-layout", null);
-  const layout = saved ?? (phone ? "scroll" : "side");
+  const canSplit = splitImages.length >= 2;
+  const layout = saved && (saved !== "split" || canSplit) ? saved : phone ? "scroll" : "side";
   const track = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(0);
   const columns = Math.min(count, gallery);
   const move = (step: number) => {
     const element = track.current!;
-    element.scrollTo({ left: (shown + step) * element.clientWidth });
+    const index = Math.max(0, Math.min(count - 1, shown + step));
+    element.scrollTo({ left: index * element.clientWidth, behavior: "instant" });
+    setShown(index);
   };
   return (
     <Stack gap="xs">
@@ -301,6 +390,7 @@ function Variants({
           data={[
             { value: "side", label: "Side by Side" },
             { value: "scroll", label: "Scroll" },
+            ...(canSplit ? [{ value: "split", label: "Split" }] : []),
           ]}
         />
         {layout === "scroll" && (
@@ -327,7 +417,9 @@ function Variants({
           </Group>
         )}
       </Group>
-      {layout === "side" ? (
+      {layout === "split" ? (
+        <SplitVariants images={splitImages} />
+      ) : layout === "side" ? (
         <SimpleGrid
           cols={columns}
           spacing="sm"
@@ -344,6 +436,8 @@ function Variants({
         <div
           ref={track}
           className={classes.track}
+          role="region"
+          aria-label="Comparison Variants"
           style={{ "--compare-aspect": aspect } as CSSProperties}
           onScroll={(event) =>
             setShown(
