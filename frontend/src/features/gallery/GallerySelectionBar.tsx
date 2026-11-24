@@ -1,5 +1,6 @@
 import { Button, Divider, Menu, Text } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -457,7 +458,14 @@ export function GallerySelectionBar({
           {menuAt && (
             <ActionMenuItems
               groups={actions}
-              leading={<Menu.Label>{selected.length} Selected</Menu.Label>}
+              leading={
+                <>
+                  <Menu.Item leftSection={<X size={16} />} onClick={selection.end}>
+                    Exit Selection
+                  </Menu.Item>
+                  <Menu.Divider />
+                </>
+              }
             />
           )}
         </Menu.Dropdown>
