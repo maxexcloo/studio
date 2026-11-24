@@ -193,172 +193,180 @@ export function GallerySelectionBar({
   }
   const pending = busy !== null;
   // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
-  // Every action stays in place, greyed out with its reason while it can't apply.
+  // Only the actions that apply to what's selected show.
   const selectionActions = [
-    itemAction("retry", {
-      disabled: pending || !retryJobs.size,
-      description: retryJobs.size ? undefined : "Nothing selected has failed.",
-      loading: busy === "retry",
-      onClick: () => void retrySelected(),
-    }),
-    itemAction("stop", {
-      disabled: pending || !runningJobs.length,
-      description: runningJobs.length ? undefined : "Nothing selected is running.",
-      loading: busy === "stop",
-      onClick: () => void stopSelected(),
-    }),
-    itemAction("animate", {
-      disabled: !finishedImages.length || !templates.length,
-      description: finishedImages.length ? undefined : "Select finished images to animate.",
-      loading: animate.isPending,
-      menu: assistMenu({
-        settings: [length, ...profiles],
-        templates: templates
-          .filter((template) => template.id !== "custom")
-          .map((template) => ({
-            id: `animate-${template.id}`,
-            label: template.label,
-            marker: template.uncensored ? icons.uncensored : undefined,
-            disabled: animate.isPending || length.loading,
-            onClick: () => animate.mutate({ theme: template.id, profileId }),
-          })),
-        last: [],
+    (retryJobs.size > 0 || busy === "retry") &&
+      itemAction("retry", {
+        disabled: pending,
+        loading: busy === "retry",
+        onClick: () => void retrySelected(),
       }),
-    }),
+    (runningJobs.length > 0 || busy === "stop") &&
+      itemAction("stop", {
+        disabled: pending,
+        loading: busy === "stop",
+        onClick: () => void stopSelected(),
+      }),
+    finishedImages.length > 0 &&
+      templates.length > 0 &&
+      itemAction("animate", {
+        loading: animate.isPending,
+        menu: assistMenu({
+          settings: [length, ...profiles],
+          templates: templates
+            .filter((template) => template.id !== "custom")
+            .map((template) => ({
+              id: `animate-${template.id}`,
+              label: template.label,
+              marker: template.uncensored ? icons.uncensored : undefined,
+              disabled: animate.isPending || length.loading,
+              onClick: () => animate.mutate({ theme: template.id, profileId }),
+            })),
+          last: [],
+        }),
+      }),
     // Each image upscales with Upscale's remembered settings.
-    itemAction("upscale", {
-      disabled: !upscale.available && !upscale.isPending,
-      description: upscale.available ? undefined : "Upscaling isn't available.",
-      loading: upscale.isPending,
-      menu: [
-        upscale.settings,
-        [
-          {
-            id: "upscale-run",
-            label: "Upscale",
-            icon: icons.upscale,
-            disabled: upscale.isPending || !upscale.canQueue,
-            onClick: () =>
-              upscale.mutate(undefined, {
-                onSuccess: ({ failed, error }) => {
-                  if (error) failure(error);
-                  settle(failed);
-                },
-              }),
-          },
+    (upscale.available || upscale.isPending) &&
+      itemAction("upscale", {
+        loading: upscale.isPending,
+        menu: [
+          upscale.settings,
+          [
+            {
+              id: "upscale-run",
+              label: "Upscale",
+              icon: icons.upscale,
+              disabled: upscale.isPending || !upscale.canQueue,
+              onClick: () =>
+                upscale.mutate(undefined, {
+                  onSuccess: ({ failed, error }) => {
+                    if (error) failure(error);
+                    settle(failed);
+                  },
+                }),
+            },
+          ],
         ],
-      ],
-    }),
+      }),
     // Selected uploads run their suggested prompts, one run queued for each; 2–4 images compare;
     // finished images run again on another model, each beside its original.
-    itemAction("recreate", {
-      disabled: !images && !recreatable.length && !uploads.length,
-      description:
-        images || recreatable.length || uploads.length
-          ? undefined
-          : "Select finished images or uploads.",
-      loading: recreate.isPending || compare.isPending || recreateOn.isPending,
-      menu: [
-        [
-          {
-            id: "compare",
-            label: "Compare",
-            icon: icons.compare,
-            disabled: !images || !comparable || compare.isPending || pending,
-            onClick: () => compare.mutate(),
-          },
-          {
-            id: "recreate-on",
-            label: "Recreate On…",
-            icon: icons.compare,
-            disabled: !recreatable.length || recreateOn.isPending || pending,
-            onClick: () => setChoosingModel(true),
-          },
-          {
-            id: "run-suggested",
-            label: "Run Suggested Prompts",
-            icon: icons.shuffle,
-            disabled: !uploads.length || recreate.isPending,
-            onClick: () =>
-              recreate.mutate(uploads, {
-                onSuccess: ({ failed }) => settle(failed.map((entry) => entry.id)),
-              }),
-          },
-        ],
-      ],
-    }),
-    // Phones that share natively offer Download and Share; elsewhere Share is Download itself.
-    phone && typeof navigator.share === "function"
-      ? itemAction("share", {
-          loading: download.isPending || prepare.isPending,
-          menu: [
-            [
-              {
-                id: "download",
-                label: "Download",
-                icon: icons.download,
-                disabled: !ready.length || download.isPending,
-                onClick: () => download.mutate(),
-              },
-              {
-                id: "share-file",
-                label: "Share",
-                icon: icons.share,
-                disabled: !ready.length || ready.length > shareLimit || prepare.isPending,
-                keepOpen: !prepared,
-                onClick: () => void share(),
-              },
-            ],
+    (images || recreatable.length > 0 || uploads.length > 0) &&
+      itemAction("recreate", {
+        loading: recreate.isPending || compare.isPending || recreateOn.isPending,
+        menu: [
+          [
+            ...(images
+              ? [
+                  {
+                    id: "compare",
+                    label: "Compare",
+                    icon: icons.compare,
+                    disabled: !comparable || compare.isPending || pending,
+                    onClick: () => compare.mutate(),
+                  },
+                ]
+              : []),
+            ...(recreatable.length
+              ? [
+                  {
+                    id: "recreate-on",
+                    label: "Recreate On…",
+                    icon: icons.compare,
+                    disabled: recreateOn.isPending || pending,
+                    onClick: () => setChoosingModel(true),
+                  },
+                ]
+              : []),
+            ...(uploads.length
+              ? [
+                  {
+                    id: "run-suggested",
+                    label: "Run Suggested Prompts",
+                    icon: icons.shuffle,
+                    disabled: recreate.isPending,
+                    onClick: () =>
+                      recreate.mutate(uploads, {
+                        onSuccess: ({ failed }) => settle(failed.map((entry) => entry.id)),
+                      }),
+                  },
+                ]
+              : []),
           ],
-        })
-      : itemAction("share", {
-          label: "Download",
-          icon: icons.download,
-          disabled: !ready.length || download.isPending,
-          loading: download.isPending,
-          onClick: () => download.mutate(),
-        }),
-    itemAction("like", {
-      pressed: allLiked,
-      disabled: !ready.length || pending,
-      description: ready.length ? undefined : "Nothing selected has finished.",
-      onClick: () =>
-        ratings.mutate(
-          { ids: ready.map((item) => item.id), rating: allLiked ? null : "liked" },
-          { onSuccess: () => settle() },
-        ),
-    }),
+        ],
+      }),
+    // Phones that share natively offer Download and Share; elsewhere Share is Download itself.
+    ready.length > 0 &&
+      (phone && typeof navigator.share === "function"
+        ? itemAction("share", {
+            loading: download.isPending || prepare.isPending,
+            menu: [
+              [
+                {
+                  id: "download",
+                  label: "Download",
+                  icon: icons.download,
+                  disabled: !ready.length || download.isPending,
+                  onClick: () => download.mutate(),
+                },
+                {
+                  id: "share-file",
+                  label: "Share",
+                  icon: icons.share,
+                  disabled: !ready.length || ready.length > shareLimit || prepare.isPending,
+                  keepOpen: !prepared,
+                  onClick: () => void share(),
+                },
+              ],
+            ],
+          })
+        : itemAction("share", {
+            label: "Download",
+            icon: icons.download,
+            disabled: !ready.length || download.isPending,
+            loading: download.isPending,
+            onClick: () => download.mutate(),
+          })),
+    ready.length > 0 &&
+      itemAction("like", {
+        pressed: allLiked,
+        disabled: pending,
+        onClick: () =>
+          ratings.mutate(
+            { ids: ready.map((item) => item.id), rating: allLiked ? null : "liked" },
+            { onSuccess: () => settle() },
+          ),
+      }),
     // In the Disliked view, Dislike restores the selection.
-    itemAction("dislike", {
-      pressed: allDisliked,
-      disabled: !ready.length || pending,
-      description: ready.length ? undefined : "Nothing selected has finished.",
-      onClick: () => {
-        const ids = ready.map((item) => item.id);
-        const was = new Map(ready.map((item) => [item.id, item.rating ?? null]));
-        ratings.mutate(
-          { ids, rating: allDisliked ? null : "disliked" },
-          {
-            onSuccess: () => {
-              settle();
-              // Undo gives each item back the rating it had.
-              if (!allDisliked)
-                showDisliked(ids.length, () =>
-                  (["liked", null] as const).forEach((rating) => {
-                    const back = ids.filter((id) => was.get(id) === rating);
-                    if (back.length) ratings.mutate({ ids: back, rating });
-                  }),
-                );
+    ready.length > 0 &&
+      itemAction("dislike", {
+        pressed: allDisliked,
+        disabled: pending,
+        onClick: () => {
+          const ids = ready.map((item) => item.id);
+          const was = new Map(ready.map((item) => [item.id, item.rating ?? null]));
+          ratings.mutate(
+            { ids, rating: allDisliked ? null : "disliked" },
+            {
+              onSuccess: () => {
+                settle();
+                // Undo gives each item back the rating it had.
+                if (!allDisliked)
+                  showDisliked(ids.length, () =>
+                    (["liked", null] as const).forEach((rating) => {
+                      const back = ids.filter((id) => was.get(id) === rating);
+                      if (back.length) ratings.mutate({ ids: back, rating });
+                    }),
+                  );
+              },
             },
-          },
-        );
-      },
-    }),
-    itemAction("delete", {
-      disabled: !deletable.length || pending,
-      description: deletable.length ? undefined : "Stop work in progress before deleting it.",
-      onClick: () => setConfirm(true),
-    }),
+          );
+        },
+      }),
+    deletable.length > 0 &&
+      itemAction("delete", {
+        disabled: pending,
+        onClick: () => setConfirm(true),
+      }),
   ];
   const actions = itemActionGroups(selectionActions);
   useEffect(() => {
