@@ -10,8 +10,11 @@ import { mediaSource } from "./mediaSource";
 
 import classes from "./MediaViewer.module.css";
 
-/** Its model and steps, then its size and length, under the viewer header's title. */
-export function ViewerMetadata({ item }: { item: MediaItem }) {
+/**
+ * Its model and steps, then its size and length, under its title in the viewer header and
+ * Details; `full` wraps rather than truncating.
+ */
+export function ViewerMetadata({ item, full }: { item: MediaItem; full?: boolean }) {
   const { profiles } = useGenerationActions();
   const summary = modelSummary(item, profiles);
   const { width, height } = mediaSource(item);
@@ -27,7 +30,7 @@ export function ViewerMetadata({ item }: { item: MediaItem }) {
     .join(" · ");
   return (
     line && (
-      <Text size="xs" lh={1.25} truncate title={line}>
+      <Text size="xs" lh={1.25} truncate={!full} title={full ? undefined : line}>
         {line}
       </Text>
     )

@@ -7,7 +7,7 @@ import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
-import { ViewerTitle } from "./ViewerChrome";
+import { ViewerMetadata, ViewerTitle } from "./ViewerChrome";
 
 import classes from "./MediaViewer.module.css";
 
@@ -73,7 +73,10 @@ export function ViewerDetails({
         <Drawer.Content {...swipe} aria-label={title}>
           <FocusTrap.InitialFocus />
           <Drawer.Header>
-            <ViewerTitle component="h2" item={item} title={title} fw={600} lh={1.2} lineClamp={2} />
+            <Stack gap={4}>
+              <ViewerTitle component="h2" item={item} title={title} fw={600} lh={1.2} />
+              <ViewerMetadata item={item} full />
+            </Stack>
             <Drawer.CloseButton aria-label="Close Details" />
           </Drawer.Header>
           <Drawer.Body>
@@ -103,7 +106,10 @@ export function ViewerDetails({
       >
         <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
-            <ViewerTitle item={item} title={title} fw={600} lineClamp={2} lh={1.2} />
+            <Stack gap={4}>
+              <ViewerTitle item={item} title={title} fw={600} lh={1.2} />
+              <ViewerMetadata item={item} full />
+            </Stack>
             {shown && details(shown)}
           </Stack>
         </ScrollArea>
