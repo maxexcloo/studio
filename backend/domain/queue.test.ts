@@ -1430,7 +1430,7 @@ test("narrow reads: unfinished jobs and jobs since a time", () => {
     };
     enqueue("alice", 1, "completed");
     const waiting = enqueue("alice", 2, "waiting");
-    enqueue("alice", 3, "failed");
+    const failed = enqueue("alice", 3, "failed");
     const cleared = enqueue("alice", 4, "failed", true);
     const running = enqueue("alice", 5, "running");
     const recent = enqueue("alice", 6, "cancelled");
@@ -1439,6 +1439,8 @@ test("narrow reads: unfinished jobs and jobs since a time", () => {
     const ids = (jobs: OwnedJob[]) => jobs.map((job) => job.id);
     assert.deepEqual(ids(store.openJobs()), [waiting, running, bobs]);
     assert.deepEqual(ids(store.openJobs("alice")), [waiting, running]);
+    // Older than a day: only the unfinished and uncleared failed jobs still list.
+    assert.deepEqual(ids(store.queueJobs("alice")), [waiting, failed, running]);
     assert.deepEqual(ids(store.jobsSince("alice", "2026-11-04T10:04:00.000Z")), [
       cleared,
       running,
