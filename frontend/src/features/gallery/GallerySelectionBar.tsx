@@ -18,12 +18,15 @@ import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
 import { useActionProfile } from "./mediaProfiles";
 import { prepareMediaShare } from "./mediaShare";
 import { finished } from "./MediaTile";
+import { RecreateOnDialog } from "./RecreateOnDialog";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
 import { useAnimateLengthSetting, useAnimateTemplates, useIterate } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 import { useRecreateMany } from "./useRecreateMany";
+import { useRecreateOn } from "./useRecreateOn";
 import type { useTryAgain } from "./useTryAgain";
+import { galleryViewPath } from "./viewerLink";
 
 import classes from "./GallerySelectionBar.module.css";
 
@@ -52,6 +55,7 @@ export function GallerySelectionBar({
   // The menu stays where it opened while it fades out.
   const menuAt = useLastWhileClosing(menu);
   const [confirm, setConfirm] = useState(false);
+  const [choosingModel, setChoosingModel] = useState(false);
   const cancel = useQueueAction();
   const [busy, setBusy] = useState<"retry" | "stop" | null>(null);
   const latestSelection = useRef(selection);
@@ -91,6 +95,9 @@ export function GallerySelectionBar({
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
   const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
+  // Recreate On compares each with its own run, so it needs one.
+  const recreatable = finishedImages.filter((item) => item.jobId);
+  const recreateOn = useRecreateOn();
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
   const templates = useAnimateTemplates();
@@ -238,10 +245,11 @@ export function GallerySelectionBar({
           ],
         ],
       }),
-    // Selected uploads run their suggested prompts, one run queued for each; 2–4 images compare.
-    (uploads.length > 0 || images) &&
+    // Selected uploads run their suggested prompts, one run queued for each; 2–4 images compare;
+    // finished images run again on another model, each beside its original.
+    (uploads.length > 0 || images || recreatable.length > 0) &&
       itemAction("recreate", {
-        loading: recreate.isPending || compare.isPending,
+        loading: recreate.isPending || compare.isPending || recreateOn.isPending,
         menu: [
           [
             ...(images
@@ -252,6 +260,17 @@ export function GallerySelectionBar({
                     icon: icons.compare,
                     disabled: !comparable || compare.isPending || pending,
                     onClick: () => compare.mutate(),
+                  },
+                ]
+              : []),
+            ...(recreatable.length
+              ? [
+                  {
+                    id: "recreate-on",
+                    label: "Recreate On…",
+                    icon: icons.compare,
+                    disabled: recreateOn.isPending || pending,
+                    onClick: () => setChoosingModel(true),
                   },
                 ]
               : []),
@@ -442,6 +461,28 @@ export function GallerySelectionBar({
           )}
         </Menu.Dropdown>
       </Menu>
+      <RecreateOnDialog
+        opened={choosingModel}
+        count={recreatable.length}
+        pending={recreateOn.isPending}
+        onClose={() => setChoosingModel(false)}
+        onRecreate={(profile) =>
+          recreateOn.mutate(
+            { items: recreatable, profile },
+            {
+              onSuccess: ({ comparisons, failed, error }) => {
+                setChoosingModel(false);
+                if (error) failure(error);
+                settle(failed);
+                if (failed.length) return;
+                // One comparison opens; several wait in Comparisons.
+                if (comparisons.length === 1) navigate(`/compare/${comparisons[0]}`);
+                else if (comparisons.length) navigate(galleryViewPath("image", "comparisons"));
+              },
+            },
+          )
+        }
+      />
       <DeleteMediaDialog
         opened={confirm}
         ids={deletable.map((item) => item.id)}

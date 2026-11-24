@@ -6,6 +6,7 @@ import type { ImagePreference } from "../../../../shared/resolution";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
+import type { SavedGalleryView } from "../gallery/SavedViews";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 /** Where the account prefers a kind to run; the other side takes over, saying so, when it can't. */
@@ -30,6 +31,8 @@ interface PreferenceValues {
   videos?: SidePreference;
   /** The header's Appearance settings; unsaved, the browser's. */
   appearance?: Partial<Appearance>;
+  /** The gallery's saved views, in the order saved. */
+  galleryViews?: SavedGalleryView[];
 }
 /** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
 export type Preferences = PreferenceValues &
@@ -48,11 +51,14 @@ export const preferencesQuery = queryOptions({
 });
 
 /** Saves preferences at once; a failure refetches the saved ones and reports through the default notification. */
-export function useSavePreferences() {
+export function useSavePreferences(previousGalleryViews?: SavedGalleryView[]) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (patch: Partial<Preferences>) =>
-      api<PreferencesStatus>("/api/preferences", { method: "PATCH", body: JSON.stringify(patch) }),
+      api<PreferencesStatus>("/api/preferences", {
+        method: "PATCH",
+        body: JSON.stringify(previousGalleryViews ? { ...patch, previousGalleryViews } : patch),
+      }),
     onMutate: (patch) =>
       client.setQueryData(
         preferencesQuery.queryKey,

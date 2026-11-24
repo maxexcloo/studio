@@ -27,8 +27,16 @@ export function registerPreferenceRoutes(app) {
     res.json(show(req));
   });
   app.patch("/api/preferences", (req, res) => {
-    const { grants } = show(req);
-    const patch = req.body || {};
+    const { grants, preferences } = show(req);
+    const { previousGalleryViews, ...patch } = req.body || {};
+    if (
+      patch.galleryViews !== undefined &&
+      JSON.stringify(previousGalleryViews) !== JSON.stringify(preferences.galleryViews || [])
+    )
+      return res.status(409).json({
+        ok: false,
+        error: "Saved views changed in another window. Reopen the view menu and try again.",
+      });
     for (const feature of personalFeatures)
       if (patch[feature] !== undefined && !grants[feature])
         return res.status(400).json({

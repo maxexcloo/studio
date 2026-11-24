@@ -1,4 +1,5 @@
 import { appearanceChoices } from "../shared/appearance.ts";
+import { gallerySortLabels } from "../shared/gallery-sort.ts";
 import { defaultModelKeys } from "../shared/profiles.ts";
 import { imageAspects, maxImageCount, resolutions } from "../shared/resolution.ts";
 import { dataDir } from "./data-dir.js";
@@ -19,7 +20,8 @@ import {
  * model the person picks always wins. `imageAspect`, `imageCount` and `imageResolution` start new
  * image drafts and MCP runs that name none (model/catalogue.js). `galleryWork` is which unfinished
  * work the gallery shows: none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
- * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
+ * settings (shared/appearance.ts). `galleryViews` are the gallery's saved views, each a name with
+ * the search, filters and sort it restores (frontend gallery/savedViews.ts). Keys Studio no longer knows are dropped as the document is read.
  */
 const preferenceDefaults = Object.freeze({
   loras: true,
@@ -44,9 +46,29 @@ const known = (key) =>
   Object.hasOwn(imageSizeChoices, key) ||
   key === "imageCount" ||
   modelKeys.has(key) ||
-  key === "appearance";
+  key === "appearance" ||
+  key === "galleryViews";
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
+
+const maxGalleryViews = 30;
+const text = (value, max) => typeof value === "string" && value.length <= max;
+/** A saved view's filters: lists of values, a choice or an on/off filter, as the gallery sends them. */
+const viewFilter = (value) =>
+  typeof value === "boolean" ||
+  text(value, 40) ||
+  (Array.isArray(value) && value.length <= 50 && value.every((item) => text(item, 200)));
+const galleryView = (view) =>
+  Boolean(view) &&
+  text(view.id, 64) &&
+  view.id !== "" &&
+  text(view.name, 80) &&
+  view.name.trim() !== "" &&
+  text(view.search, 200) &&
+  Object.hasOwn(gallerySortLabels, view.sort) &&
+  Boolean(view.filters) &&
+  typeof view.filters === "object" &&
+  Object.values(view.filters).every(viewFilter);
 
 /** The values the account has saved, without defaults. */
 function saved(ownerId = "") {
@@ -110,6 +132,16 @@ export function saveAccountPreferences(ownerId, patch) {
           !appearanceChoices[setting].includes(choice)
         )
           throw new Error(`Set appearance ${setting} to one of its choices.`);
+      continue;
+    }
+    if (key === "galleryViews") {
+      if (
+        !Array.isArray(value) ||
+        value.length > maxGalleryViews ||
+        !value.every(galleryView) ||
+        new Set(value.map((view) => view.id)).size !== value.length
+      )
+        throw new Error(`Save up to ${maxGalleryViews} named gallery views.`);
       continue;
     }
     if (modelKeys.has(key)) {
