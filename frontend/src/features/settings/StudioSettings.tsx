@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { useAccount } from "../auth/AccountGate";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
 import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
@@ -18,6 +19,8 @@ import {
 import { GalleryPass } from "./GalleryPass";
 
 /** Background features with a catch-up pass over the gallery, each a row in Catch Up. */
+const captionsRoute = "/api/gallery/captions";
+const personalCaptionsRoute = `${captionsRoute}/me`;
 const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> = {
   STUDIO_FACE_CHECK: {
     route: "/api/gallery/faces",
@@ -26,7 +29,7 @@ const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> 
     progressLabel: "Face Check Progress",
   },
   STUDIO_GALLERY_CAPTIONS: {
-    route: "/api/gallery/captions",
+    route: captionsRoute,
     description: "Caption existing gallery images.",
     remaining: "to caption",
     progressLabel: "Caption Progress",
@@ -42,6 +45,7 @@ const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> 
 
 /** Settings › Studio: Studio-wide defaults, the work Studio does on its own, and failed items. */
 export function StudioSettings() {
+  const multiUser = useAccount().data?.mode === "multi-user";
   const deployment = useQuery(deploymentQuery);
   const profiles = useQuery(modelsQuery).data?.profiles ?? [];
   const save = useDeploymentSetting();
@@ -84,11 +88,31 @@ export function StudioSettings() {
       />
     </SettingRow>
   );
-  const passRows = catalogue.flatMap((flag) =>
-    passes[flag.key]
-      ? [<GalleryPass key={flag.key} {...passes[flag.key]} label={flag.label} />]
-      : [],
-  );
+  const passRows = catalogue.flatMap((flag) => {
+    const info = passes[flag.key];
+    if (!info) return [];
+    if (!multiUser || flag.key !== "STUDIO_GALLERY_CAPTIONS")
+      return [<GalleryPass key={flag.key} {...info} label={flag.label} />];
+    return [
+      <GalleryPass
+        key={personalCaptionsRoute}
+        {...info}
+        route={personalCaptionsRoute}
+        pairedRoute={captionsRoute}
+        label="My Gallery Captions"
+        description="Caption existing images in your gallery."
+        progressLabel="My Caption Progress"
+        scopeLabel="My Images to Caption"
+      />,
+      <GalleryPass
+        key={flag.key}
+        {...info}
+        label={flag.label}
+        pairedRoute={personalCaptionsRoute}
+        description="Caption existing images across all accounts."
+      />,
+    ];
+  });
   return (
     <Stack gap="lg">
       <SettingGroup title="Defaults">

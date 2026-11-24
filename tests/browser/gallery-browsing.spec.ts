@@ -478,8 +478,9 @@ test("Closing a navigated viewer reveals and focuses its current virtualised gal
   await expect(current).toBeInViewport();
 });
 
-test("The installed iOS app opens and closes the viewer without adding history entries", async ({
+test("The installed iOS app keeps its header solid and opens the viewer without adding history entries", async ({
   page,
+  isMobile,
 }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "standalone", { value: true });
@@ -489,6 +490,20 @@ test("The installed iOS app opens and closes the viewer without adding history e
     route.fulfill({ json: { items: results(3), nextCursor: "", hasMore: false } }),
   );
   await page.goto("/images");
+  if (isMobile) {
+    const header = page.getByRole("banner");
+    await expect
+      .poll(() =>
+        header.evaluate((element) => {
+          const background = getComputedStyle(element).backgroundColor;
+          return {
+            solid: background === getComputedStyle(document.body).backgroundColor,
+            glass: getComputedStyle(element, "::after").content,
+          };
+        }),
+      )
+      .toEqual({ solid: true, glass: "none" });
+  }
   const entries = await page.evaluate(() => history.length);
   await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Generation", exact: true });

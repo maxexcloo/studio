@@ -235,22 +235,15 @@ export function assertProjectReuse(project, profile, input, known) {
   }
 }
 
-/**
- * The account's rules (Dream › Taste): limits every prompt keeps. Learnt taste stays out of MCP;
- * an account without taste has none.
- */
-export async function accountTaste(media, owner, signal) {
+/** The only Dream Taste constraint on generation submitted through MCP. */
+export async function accountExclusions(media, owner, signal) {
   const taste = await media
     .request("GET", "/api/taste", undefined, owner, { signal })
     .catch(() => null);
-  return {
-    rules: taste?.rules || [],
-    avoid: taste?.preferences?.avoid || [],
-    exclusions: taste?.exclusions || [],
-  };
+  return taste?.exclusions || [];
 }
 
-export function assertTasteExclusions({ rules, avoid, exclusions }, prompts) {
+export function assertTasteExclusions(exclusions, prompts) {
   const explicit = exclusions.map((entry) => [entry, explicitExclusions([entry])]);
   for (const [index, prompt] of prompts.entries())
     for (const [entry, motifs] of explicit)
@@ -258,24 +251,7 @@ export function assertTasteExclusions({ rules, avoid, exclusions }, prompts) {
         throw new Error(
           `Prompt ${index + 1} conflicts with "${entry}", which your Taste Profile excludes. If you introduced it while writing the prompt, remove only that detail and keep the rest as written. If the user expressly requested it, tell them before changing their prompt. They can edit exclusions in Dream › Taste.`,
         );
-  const older = [...new Set([...avoid, ...forbiddenMotifs([], rules)])];
-  if (older.length)
-    assertAvoided({ name: "your Taste Profile", brief: { avoid: older.join("\n") } }, prompts);
 }
-
-/** Whether the account's recent results are converging on one look (domain/reflection.ts). */
-export async function converging(media, owner, signal) {
-  const reflection = await media
-    .request("GET", "/api/taste/reflection?view=convergence", undefined, owner, { signal })
-    .catch(() => null);
-  return Boolean(reflection?.converging);
-}
-
-/** The rules as generate's reply gives them, or "" when there are none. */
-export const rulesLine = (rules) =>
-  rules.length
-    ? `The user's rules, limits every prompt keeps unless they lift one in this chat (never a look to aim for; vary what they leave open): ${rules.join("; ")}. Studio runs the submitted prompts as written. If a preview misses a rule, tell the user what needs to change before offering to queue it. `
-    : "";
 
 /** Registers project: a chat attaches to one so generate keeps to its brief and constraints. */
 export function registerProjectTool({ tool, server, media, owner, chat, namedInTier }) {

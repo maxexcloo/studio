@@ -8,3 +8,12 @@ export const displayEdge = 2560;
 export function videoPosterUrl(url?: string) {
   return url?.startsWith("/comfy/view?") ? url.replace("/comfy/view?", "/comfy/thumb?") : undefined;
 }
+
+/** Saved text a result can be recreated from without asking the assistant to describe it. */
+export function recreationPrompt(item: {
+  prompt?: string;
+  suggestedPrompt?: string;
+  caption?: { text?: string };
+}) {
+  return item.prompt?.trim() || item.suggestedPrompt?.trim() || item.caption?.text?.trim() || "";
+}

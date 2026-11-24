@@ -1,20 +1,29 @@
 // Variations of a selected image or its set, written by the queue's prompt stage.
+import { recreationPrompt } from "../shared/media.ts";
 import { directRoute } from "./domain/direct-route.ts";
+import { recreateSource } from "./gallery/recreate.js";
 
 const variations = 2;
 const imagePrompt = (selected, source) =>
-  selected.prompt || source.input.prompt || selected.settings?.typedPrompt;
+  selected.jobId
+    ? selected.prompt || source.input.prompt || selected.settings?.typedPrompt
+    : recreationPrompt(selected) || source.input.prompt;
 
 /** The exact selected image, or a set's source lineage, with earlier variations for variety. */
 export function setPrompts(store, job, item) {
   if (job.input.writing?.scope === "image") {
     const source = store.job(job.ownerId, job.parentJobId);
     const selected = item(job.ownerId, job.parentItemId);
+    const sourceMatches =
+      selected?.jobId === source?.id ||
+      (!selected?.jobId &&
+        source?.resource === "studio" &&
+        source.outputs?.[0]?.id === selected?.id);
     if (
       !source ||
       source.sessionId !== job.sessionId ||
-      selected?.jobId !== source.id ||
-      selected.type !== "image"
+      !sourceMatches ||
+      selected?.type !== "image"
     )
       throw new Error("That source image is unavailable.");
     const prompt = imagePrompt(selected, source);
@@ -67,7 +76,7 @@ export function setPrompts(store, job, item) {
  * anchors variations to that exact image instead, including images outside a result set. `item(ownerId, id)` is
  * the owner's visible gallery item; `admit` is domain/admission.ts's.
  */
-export function registerResultSetRoutes(app, { store, admit, item }) {
+export function registerResultSetRoutes(app, { store, admit, item, defaultImageProfile }) {
   directRoute(app, "POST", "/api/result-sets/more", async (account, { body }) => {
     if (body?.scope !== undefined && !["image", "set"].includes(body.scope))
       return { status: 400, payload: { ok: false, error: "Choose image or set scope." } };
@@ -75,10 +84,20 @@ export function registerResultSetRoutes(app, { store, admit, item }) {
     const ownerId = account?.userId || "";
     const found = item(ownerId, String(body?.itemId || ""));
     const set = found?.resultSet;
-    const job =
+    let job =
       found?.jobId && (image ? found.type === "image" && !found.uploaded : set)
         ? store.job(ownerId, found.jobId)
         : undefined;
+    let profile;
+    if (image && found?.type === "image" && !found.jobId && found.status === "done" && found.url) {
+      const prompt = recreationPrompt(found);
+      if (!prompt)
+        return { status: 400, payload: { ok: false, error: "That image has no source prompt." } };
+      profile = await defaultImageProfile(ownerId, account);
+      if (!profile)
+        return { status: 409, payload: { ok: false, error: "No image model is available." } };
+      job = recreateSource(store, found, prompt);
+    }
     if (!job)
       return {
         status: 404,
@@ -109,6 +128,13 @@ export function registerResultSetRoutes(app, { store, admit, item }) {
       const result = await admit(
         {
           ...input,
+          ...(profile && {
+            kind: "image",
+            profileId: profile.id,
+            model: profile.model,
+            workflow: profile.workflow,
+            count: 1,
+          }),
           prompt: "",
           seed: "",
           writing: { kind: "set", ...(image ? { scope: "image" } : {}) },

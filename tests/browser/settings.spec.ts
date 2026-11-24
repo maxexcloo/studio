@@ -93,7 +93,7 @@ test("Gallery Captions in Settings › Studio catches up, shows its progress and
     scope: "outdated",
     scopes: { all: 12_000, outdated: 9000, missing: 7000 },
     perMinute: 0,
-    etaSeconds: null,
+    etaSeconds: null as number | null,
   };
   const running = {
     ...idle,
@@ -106,34 +106,65 @@ test("Gallery Captions in Settings › Studio catches up, shows its progress and
     perMinute: 30,
     etaSeconds: 13_760,
   };
-  let status: Record<string, unknown> = idle;
+  const mineIdle = {
+    ...idle,
+    remaining: 12,
+    total: 12,
+    scopes: { all: 15, outdated: 12, missing: 1 },
+  };
+  const mineRunning = { ...mineIdle, state: "running", active: true, done: 3, remaining: 9 };
+  const status = { all: idle, mine: mineIdle };
   const actions: unknown[] = [];
   await page.route("**/api/gallery/captions**", (route) => {
-    const action = new URL(route.request().url()).pathname.split("/").pop();
-    if (action === "start") status = running;
-    if (action === "stop") status = { ...running, state: "stopped", active: false, perMinute: 0 };
-    if (action !== "captions") actions.push([action, route.request().postDataJSON()]);
-    return route.fulfill({ json: status });
+    const path = new URL(route.request().url()).pathname.split("/");
+    const key = path.includes("me") ? "mine" : "all";
+    const action = path.at(-1);
+    const runningPass = key === "mine" ? mineRunning : running;
+    if (action === "start") status[key] = runningPass;
+    if (action === "stop")
+      status[key] = { ...runningPass, state: "stopped", active: false, perMinute: 0 };
+    if (route.request().method() === "POST")
+      actions.push([key, action, route.request().postDataJSON()]);
+    const other = status[key === "mine" ? "all" : "mine"];
+    return route.fulfill({
+      json: other.active
+        ? {
+            ...status[key],
+            blocked: true,
+            state: "unavailable",
+            reason: "Another catch-up pass is running.",
+          }
+        : status[key],
+    });
   });
   await page.goto("/settings#studio");
   const row = page.getByRole("region", { name: "Catch Up", exact: true });
+  const globalStart = row.getByRole("button", { name: "Catch Up Gallery Captions", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
+  await expect(row.getByText("Ready · 12 to caption", { exact: true })).toBeVisible();
+  await row.getByRole("button", { name: "Catch Up My Gallery Captions", exact: true }).click();
+  await expect(row.getByRole("progressbar", { name: "My Caption Progress" })).toBeVisible();
+  await expect(globalStart).toBeDisabled();
+  await row.getByRole("button", { name: "Stop My Gallery Captions", exact: true }).click();
+  await expect(row.getByText("Stopped · 3 of 12", { exact: true })).toBeVisible();
+  await expect(globalStart).toBeEnabled();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
   await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
   await expect(row.getByText("Ready · 7,000 to caption", { exact: true })).toBeVisible();
   // Each feature's catch-up shares its row and name.
-  const start = row.getByRole("button", { name: "Catch Up Gallery Captions", exact: true });
-  await start.click();
+  await globalStart.click();
   await expect(
     row.getByText("Running · 120 of 7,000 · 30 a minute · about 3 h 49 min left", { exact: true }),
   ).toBeVisible();
   await expect(row.getByRole("progressbar", { name: "Caption Progress" })).toBeVisible();
   await row.getByRole("button", { name: "Stop Gallery Captions", exact: true }).click();
   await expect(row.getByText("Stopped · 120 of 7,000", { exact: true })).toBeVisible();
-  await expect(start).toBeEnabled();
+  await expect(globalStart).toBeEnabled();
   expect(actions).toEqual([
-    ["start", { scope: "missing" }],
-    ["stop", {}],
+    ["mine", "start", { scope: "outdated" }],
+    ["mine", "stop", {}],
+    ["all", "start", { scope: "missing" }],
+    ["all", "stop", {}],
   ]);
 });
 

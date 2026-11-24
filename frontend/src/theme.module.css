@@ -242,15 +242,13 @@
   backdrop-filter: var(--studio-glass-filter);
 }
 
-@media (display-mode: standalone) {
-  :where(:root[data-phone]) .shellHeader {
-    background: var(--mantine-color-body);
-  }
+:where(:root[data-phone][data-standalone]) .shellHeader {
+  background: var(--mantine-color-body);
+}
 
-  :where(:root[data-phone]) .shellHeader::before,
-  :where(:root[data-phone]) .shellHeader::after {
-    content: none;
-  }
+:where(:root[data-phone][data-standalone]) .shellHeader::before,
+:where(:root[data-phone][data-standalone]) .shellHeader::after {
+  content: none;
 }
 
 /* Inputs, dividers, tables and tabs draw the theme's one hairline instead of Mantine's greys; focus

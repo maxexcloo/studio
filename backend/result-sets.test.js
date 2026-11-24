@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { findDirectRoute } from "./domain/direct-route.ts";
+import { Store } from "./domain/store.ts";
+import { openDatabase } from "./persistence/runtime.ts";
 import { createPromptStage, writingRequest } from "./prompt-stage.js";
 import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 
@@ -322,6 +324,64 @@ test("image scope works outside result sets, and still enforces assistant access
     account: () => ({ authenticated: true, features: { promptAssistant: false } }),
   });
   await assert.rejects(stage(queued, {}), /prompt assistant is off/);
+});
+
+test("More Like This queues a jobless import's caption in its exact original's session", async (t) => {
+  const store = new Store(openDatabase(":memory:"));
+  t.after(() => store.close());
+  const found = {
+    id: "harbour",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    uploaded: true,
+    url: "/test/harbour.png",
+    caption: { text: "A cluster of trawlers in a misty harbour." },
+  };
+  const item = (ownerId, id) => {
+    if (ownerId === found.ownerId && id === found.id) return found;
+    if (ownerId === found.ownerId && id === "other-import") return { ...found, id };
+  };
+  const admitted = [];
+  const app = { post() {} };
+  const profile = { id: "image:test", model: "image.safetensors", workflow: "image-test" };
+  registerResultSetRoutes(app, {
+    store,
+    item,
+    defaultImageProfile: async (ownerId, account) => {
+      assert.equal(ownerId, "alice");
+      assert.equal(account.userId, "alice");
+      return profile;
+    },
+    admit: async (input, account, scope) => {
+      admitted.push({ input, scope });
+      return { status: 200, payload: { jobId: `new-${admitted.length}` } };
+    },
+  });
+  const { run } = findDirectRoute(app, "POST", "/api/result-sets/more");
+  const request = { body: { itemId: found.id, scope: "image" } };
+  assert.equal((await run({ userId: "bob" }, request)).status, 404);
+  assert.equal(store.jobs().length, 0);
+  assert.deepEqual((await run({ userId: "alice" }, request)).payload.jobIds, ["new-1", "new-2"]);
+  assert.equal((await run({ userId: "alice" }, request)).status, 200);
+  assert.equal(store.jobs("alice").length, 1, "the import keeps the same source across requests");
+  const original = store.uploadJob("alice", found.id);
+  for (const { input, scope } of admitted) {
+    assert.equal(input.profileId, profile.id);
+    assert.deepEqual(input.writing, { kind: "set", scope: "image" });
+    assert.deepEqual(scope, {
+      operation: "image",
+      sessionId: original.sessionId,
+      parentJobId: original.id,
+      parentItemId: found.id,
+    });
+    const queued = { ...original, ...scope, input };
+    assert.equal(setPrompts(store, queued, item).source, found.caption.text);
+    assert.throws(
+      () => setPrompts(store, { ...queued, parentItemId: "other-import" }, item),
+      /source image is unavailable/,
+    );
+  }
 });
 
 test("image scope uses only its selected image's caption for a writer without vision", async () => {
