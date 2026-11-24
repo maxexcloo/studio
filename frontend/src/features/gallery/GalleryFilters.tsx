@@ -302,7 +302,7 @@ export function FilterChips({
             color="gray"
             onClick={onClear}
           >
-            Clear All
+            Clear Filters
           </Button>
         )}
       </Group>

@@ -211,7 +211,7 @@ export function WorkflowConnections({
           <Stack gap="xs">
             <Text size="sm">{preview.error.message}</Text>
             <Button variant="default" size="compact-sm" onClick={() => void preview.refetch()}>
-              Retry Connections
+              Retry
             </Button>
           </Stack>
         </Alert>

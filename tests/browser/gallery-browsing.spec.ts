@@ -1316,7 +1316,7 @@ test("Gallery filters submit repeated models and origins together with LoRA, siz
   // Closing the phone's search clears it; desktop keeps its box and query.
   const expected = test.info().project.use.isMobile ? "" : "bird";
   await search.press("Escape");
-  await page.getByRole("button", { name: "Clear All", exact: true }).click();
+  await page.getByRole("button", { name: "Clear Filters", exact: true }).first().click();
   await expect(removable).toHaveCount(0);
   // The cleared search is served fresh from cache or requested again, never with the old facets.
   await expect
@@ -1752,8 +1752,8 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     .getByText("Week", { exact: true })
     .click();
   await page.keyboard.press("Escape");
-  // Clear All takes every filter, Disliked included.
-  await page.getByRole("button", { name: "Clear All", exact: true }).click();
+  // Clear Filters takes every filter, Disliked included.
+  await page.getByRole("button", { name: "Clear Filters", exact: true }).first().click();
   await expect(dislikedChip).toHaveCount(0);
   await filterGalleryRating(page, "Liked");
   await filter.click();
