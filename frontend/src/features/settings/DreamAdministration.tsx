@@ -25,7 +25,7 @@ const backendNote =
 export function DreamAdministration() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  if (deployment.isPending) return <LoadingState label="Loading Dream Defaults" fill />;
+  if (deployment.isPending) return <LoadingState label="Loading Dream" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const delay = (name: DreamTiming, label: string, description: string) => {
     const setting = deployment.data.dream[name];
@@ -71,6 +71,17 @@ export function DreamAdministration() {
   };
   return (
     <Stack gap="lg">
+      <SettingGroup title="Account Overrides">
+        {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
+        {row(
+          "uncensored",
+          "Uncensored",
+          "Allow explicit themes, only for accounts with Uncensored Models access.",
+          onOff,
+        )}
+        {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
+        {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
+      </SettingGroup>
       <SettingGroup title="Delays">
         {delay(
           "imageIdleMinutes",
@@ -87,17 +98,6 @@ export function DreamAdministration() {
           "Model & LoRA Switch Delay",
           "Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.",
         )}
-      </SettingGroup>
-      <SettingGroup title="Account Overrides">
-        {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
-        {row(
-          "uncensored",
-          "Uncensored",
-          "Allow explicit themes, only for accounts with Uncensored Models access.",
-          onOff,
-        )}
-        {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
-        {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
       </SettingGroup>
     </Stack>
   );

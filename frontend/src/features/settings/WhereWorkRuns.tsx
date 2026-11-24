@@ -35,13 +35,13 @@ const sides: { value: SidePreference; label: string }[] = [
 const kinds: { kind: WorkKind | "dream"; label: string; description?: string }[] = [
   { kind: "images", label: "Images" },
   { kind: "videos", label: "Videos", description: "Applies to video generation and Animate." },
-  { kind: "dream", label: "Dream" },
   {
     kind: "text",
     label: "Text",
     description:
       "Applies to writing and captions, including Dream. Local shares a GPU with images.",
   },
+  { kind: "dream", label: "Dream" },
 ];
 
 function DreamProcessing({ label }: { label: string }) {
