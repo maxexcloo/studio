@@ -277,9 +277,7 @@ export function ComparePage() {
                 } as CSSProperties
               }
             >
-              <Text size="sm" fw={600} truncate title={label}>
-                {label}
-              </Text>
+              <VariantHeading label={label} />
               {item ? (
                 <MediaTile
                   item={item}
@@ -503,5 +501,22 @@ function Variants({
         </div>
       )}
     </Stack>
+  );
+}
+
+/** A variant's label as a title, its first part, over the rest as a subtitle. */
+function VariantHeading({ label }: { label: string }) {
+  const [title, ...rest] = label.split(" · ");
+  return (
+    <div title={label}>
+      <Text size="sm" fw={600} truncate>
+        {title}
+      </Text>
+      {rest.length > 0 && (
+        <Text size="xs" c="dimmed" truncate>
+          {rest.join(" · ")}
+        </Text>
+      )}
+    </div>
   );
 }
