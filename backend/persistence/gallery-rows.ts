@@ -91,7 +91,7 @@ const galleryIndexes: [name: string, keys: string, condition?: string][] = [
   ["studio_gallery_created", "created_ms"],
   [
     "studio_gallery_runs",
-    "created_ms, key, unlisted, status, rating, json_extract(value, '$.settings.profileId'), json_extract(value, '$.timing.runMs')",
+    "created_ms, key, unlisted, status, rating, json_extract(value, '$.settings.profileId'), json_extract(value, '$.timing.queueMs'), json_extract(value, '$.timing.runMs')",
   ],
   [
     "studio_gallery_summary",

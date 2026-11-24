@@ -40,12 +40,24 @@ test("a reference mapped in a mode's graph is found there", () => {
   assert.deepEqual(warnings, []);
 });
 
-test("a Grok profile's single cloud node needs no Save Image", () => {
-  const { warnings } = validateWorkflow({
-    kind: "image",
-    graph: { 1: { class_type: "GrokMedia", inputs: { prompt: "", model: "grok" } } },
-  });
-  assert.deepEqual(warnings, []);
+test("Grok and Radiance profiles take references by role and need no ComfyUI", () => {
+  const end = { id: "end", role: "end", min: 0, max: 1, control: { node: "4", input: "image" } };
+  for (const class_type of ["GrokMedia", "RadianceVideoGenerate"])
+    assert.deepEqual(
+      validateWorkflow({
+        kind: "video",
+        graph: { 1: { class_type, inputs: { prompt: "" } } },
+        mediaInputs: [end],
+      }),
+      {
+        ok: true,
+        unverified: false,
+        issues: [],
+        warnings: [],
+        missingNodes: [],
+        missingParts: [],
+      },
+    );
 });
 
 test("last use keeps only profiles that still exist", () => {

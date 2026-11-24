@@ -29,6 +29,7 @@ export function galleryStats(items = []) {
 }
 
 const dayMs = 86_400_000;
+const median = (values) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 /** The runs profileStats counts, those of its last 30 days, read a page per event loop turn. */
 export async function recentRuns() {
@@ -42,8 +43,8 @@ export async function recentRuns() {
 
 /**
  * Each profile's last 30 days: finished and failed runs (cancelled ones say nothing about the model),
- * how many finished ones were liked, the median run time, and `failing` when at least half of five
- * or more runs in the last week failed.
+ * how many finished ones were liked, the median time waiting in the queue and running, and `failing`
+ * when at least half of five or more runs in the last week failed.
  */
 export function profileStats(items = [], now = Date.now()) {
   const stats = new Map();
@@ -57,7 +58,8 @@ export function profileStats(items = [], now = Date.now()) {
       runs: 0,
       failed: 0,
       liked: 0,
-      times: [],
+      queued: [],
+      ran: [],
       week: 0,
       weekFailed: 0,
       lastAt: "",
@@ -66,8 +68,9 @@ export function profileStats(items = [], now = Date.now()) {
     if (item.status === "failed") entry.failed += 1;
     else {
       if (item.rating === "liked") entry.liked += 1;
-      const ms = Number(item.timing?.runMs);
-      if (ms > 0) entry.times.push(ms);
+      const { queueMs, runMs } = item.timing || {};
+      if (Number.isFinite(queueMs) && queueMs >= 0) entry.queued.push(queueMs);
+      if (runMs > 0) entry.ran.push(runMs);
     }
     if (now - at < 7 * dayMs) {
       entry.week += 1;
@@ -77,16 +80,14 @@ export function profileStats(items = [], now = Date.now()) {
     stats.set(profile, entry);
   }
   return Object.fromEntries(
-    [...stats].map(([profile, { times, week, weekFailed, ...entry }]) => {
-      const sorted = times.sort((a, b) => a - b);
-      return [
-        profile,
-        {
-          ...entry,
-          ...(sorted.length ? { medianRunMs: sorted[Math.floor(sorted.length / 2)] } : {}),
-          failing: week >= 5 && weekFailed / week >= 0.5,
-        },
-      ];
-    }),
+    [...stats].map(([profile, { queued, ran, week, weekFailed, ...entry }]) => [
+      profile,
+      {
+        ...entry,
+        ...(queued.length ? { medianQueueMs: median(queued) } : {}),
+        ...(ran.length ? { medianRunMs: median(ran) } : {}),
+        failing: week >= 5 && weekFailed / week >= 0.5,
+      },
+    ]),
   );
 }
