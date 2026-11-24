@@ -185,7 +185,7 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
     },
   };
   await editor
-    .getByRole("textbox", { name: "Profile JSON", exact: true })
+    .getByRole("textbox", { name: "Model JSON", exact: true })
     .fill(JSON.stringify(changed));
   await editor.getByRole("tab", { name: "Connections", exact: true }).click();
   await editor.getByRole("combobox", { name: "Control prompt Input", exact: true }).click();
