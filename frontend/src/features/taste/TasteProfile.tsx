@@ -316,6 +316,7 @@ function KeepRateTable({
   include = () => true,
   edited,
   change,
+  pending,
 }: {
   title: string;
   field: "models" | "loras" | "tags";
@@ -325,6 +326,7 @@ function KeepRateTable({
   include?: (value: string) => boolean;
   edited: boolean;
   change: (changes: TastePreferenceChanges) => void;
+  pending: boolean;
 }) {
   let others = 0;
   const rows = [
@@ -395,6 +397,7 @@ function KeepRateTable({
           row.favourite ? (
             <Menu.Item
               leftSection={<icons.clear size={16} />}
+              disabled={pending}
               onClick={() => change({ [field]: favourites.filter((value) => value !== row.value) })}
             >
               Remove
@@ -402,7 +405,7 @@ function KeepRateTable({
           ) : (
             <Menu.Item
               leftSection={<icons.pin size={16} />}
-              disabled={full}
+              disabled={full || pending}
               onClick={() => change({ [field]: [...favourites, row.value] })}
             >
               Pin
@@ -457,7 +460,7 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
   const rates = keepRates.data;
   const ratedTables = (data: Taste, rates: KeepRates) => {
     const tags = fields.current(data, "tags");
-    const shared = { change: change.mutate };
+    const shared = { change: change.mutate, pending: change.isPending };
     return (
       <>
         <KeepRateTable
