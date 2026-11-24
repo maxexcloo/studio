@@ -149,7 +149,7 @@ function PromptCardForm({
           loading={save.isPending}
           disabled={!name.trim() || !description.trim()}
         >
-          Save
+          {card ? "Save" : "Create"}
         </Button>
       </DialogFooter>
     </CardForm>

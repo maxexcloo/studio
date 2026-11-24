@@ -377,12 +377,12 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(
     editor.getByText(`Keep the likes within ${maxCharacterTrait} characters.`, { exact: true }),
   ).toBeVisible();
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   expect(state.characters).toHaveLength(0);
   // Removing only the extra phrase makes the unchanged 500-character field saveable again.
   await likes.press("Backspace");
   await expect(likes).not.toHaveAttribute("aria-invalid", "true");
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(
     state.characters.map(({ name, description, referenceIds, likes, dislikes }) => [
@@ -435,7 +435,7 @@ test("A character written from a name and description is improved in place, then
   await expect(text).toHaveValue("red-haired woman in her thirties, freckles, slim build");
   await closeTextEditor(page, "Description");
   // A character needs an image to save on its own; Generate References saves it waiting on them.
-  await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await expect(editor.getByRole("button", { name: "Create", exact: true })).toBeDisabled();
   await editor.getByRole("button", { name: "Generate References", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   expect(
@@ -568,7 +568,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   await expect(ratings).toContainText("4/5");
   await expect(ratings).toContainText("Clear face");
   expect(rated).toEqual([{ kind: "characters", assetIds: ["asset-ranger"] }]);
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   const cards = page.getByRole("list", { name: "Characters", exact: true });
   await expect(cards.getByRole("listitem", { name: "Mara", exact: true })).toContainText(
@@ -628,7 +628,7 @@ test("A result's chat character offers Create Character in Details, starting the
   );
   await editor.getByRole("textbox", { name: "Age", exact: true }).fill("40");
   await editor.getByRole("textbox", { name: "Job", exact: true }).fill("Smith");
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(state.characters[0]).toMatchObject({ name: "Ivo", age: 40, job: "Smith" });
   await expect(
@@ -781,7 +781,7 @@ test("Outfits and scenes go into the prompt in order from the References sheet, 
     .getByRole("textbox", { name: "Description", exact: true })
     .last()
     .fill("an emerald gown and gold heels");
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(state.outfits.map((card) => [card.name, card.description])).toEqual([
     ["Raincoat", raincoat],

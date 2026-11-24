@@ -505,7 +505,7 @@ export function DefinitionEditor({
   useEffect(() => {
     if (loaded.error) void client.invalidateQueries({ queryKey: definitionsKey });
   }, [loaded.error, client]);
-  const title = `${creating ? "Create" : "Edit"} ${kind === "profile" ? "Model" : "Guide"}`;
+  const title = `${creating ? "New" : "Edit"} ${kind === "profile" ? "Model" : "Guide"}`;
   const meta = data?.version || data?.meta;
   // A guide's many text fields take the Library's room on desktop, its footer pinned below them.
   const roomy = kind === "guide" && !phone;
