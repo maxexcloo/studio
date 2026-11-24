@@ -915,6 +915,8 @@ export function createDream(options: {
    * one without a strength starts at its recommended one.
    */
   fitLoras(profile: DreamProfile, loras: DreamLoraPick[]): DreamLora[];
+  /** Strengths to compare a LoRA at, spread across its range around `current` (loraStrengthSpread). */
+  loraStrengths(name: string, current: number): number[];
   /** A LoRA's readable name, as the Library shows it. */
   loraName(name: string): string;
   /** The Library's imports and Inspiration images the account may see, none where it may not. */
@@ -3805,7 +3807,14 @@ export function createDream(options: {
       settings,
       ...extra,
     });
-    const choices: { question: string; axis: PairAxis; sides: [Side, Side]; third?: Side }[] = [];
+    // `wide` comparisons take their third side whenever the day has room for three.
+    const choices: {
+      question: string;
+      axis: PairAxis;
+      sides: [Side, Side];
+      third?: Side;
+      wide?: boolean;
+    }[] = [];
     const others = profiles.filter((entry) => kindOf(entry) === "image" && entry.id !== profile.id);
     if (others.length) {
       const other = others[random(others.length)];
@@ -3839,20 +3848,21 @@ export function createDream(options: {
           same(`Without ${options.loraName(first.name)}`, "none", { loras: loras.slice(1) }),
         ],
       });
-      const delta = first.strength >= 0.8 ? -0.35 : 0.35;
+      // The base strength against others spread across the LoRA's range, the farthest first.
       const strengths = new Set([first.strength]);
-      const [changed, third] = [delta, -delta].flatMap((offset) => {
-        const [candidate] = fit(profile, [
-          { ...first, strength: roundTo(first.strength + offset, 0.05) },
-        ]);
-        if (!candidate || strengths.has(candidate.strength)) return [];
-        strengths.add(candidate.strength);
-        return [
-          same(`${options.loraName(candidate.name)} ${candidate.strength}`, candidate.strength, {
-            loras: [candidate, ...loras.slice(1)],
-          }),
-        ];
-      });
+      const [changed, third] = options
+        .loraStrengths(first.name, first.strength)
+        .sort((a, b) => Math.abs(b - first.strength) - Math.abs(a - first.strength))
+        .flatMap((strength) => {
+          const [candidate] = fit(profile, [{ ...first, strength }]);
+          if (!candidate || strengths.has(candidate.strength)) return [];
+          strengths.add(candidate.strength);
+          return [
+            same(`${options.loraName(candidate.name)} ${candidate.strength}`, candidate.strength, {
+              loras: [candidate, ...loras.slice(1)],
+            }),
+          ];
+        });
       if (changed)
         choices.push({
           question: "Which LoRA Strength?",
@@ -3862,6 +3872,7 @@ export function createDream(options: {
             changed,
           ],
           third,
+          wide: true,
         });
     } else {
       // A liked LoRA, else one the account has not rated yet.
@@ -3879,26 +3890,29 @@ export function createDream(options: {
     // A fixed-step profile has no steps control, so both sides would render alike.
     const steps = Number(input.steps);
     if (steps > 0 && profile.capabilities?.steps) {
+      const stepsSide = (value: number) =>
+        same(`${value} Steps`, value, { settings: { ...settings, steps: value } });
       const next = steps <= 12 ? steps * 2 : Math.round(steps / 2);
+      // The other way too, where it stays a sensible count.
+      const other = steps <= 12 ? Math.round(steps / 2) : steps * 2;
       choices.push({
         question: "Which Steps?",
         axis: "steps",
-        sides: [
-          same(`${steps} Steps`, steps),
-          same(`${next} Steps`, next, { settings: { ...settings, steps: next } }),
-        ],
+        sides: [same(`${steps} Steps`, steps), stepsSide(next)],
+        ...(other >= 2 && other <= 60 && other !== steps && { third: stepsSide(other) }),
       });
     }
     const cfg = Number(input.cfg);
     if (cfg > 1) {
+      const cfgSide = (value: number) =>
+        same(`Guidance ${value}`, value, { settings: { ...settings, cfg: value } });
       const next = roundTo(cfg >= 4 ? cfg - 2 : cfg + 2, 0.5);
+      const other = roundTo(cfg >= 4 ? cfg + 2 : cfg - 2, 0.5);
       choices.push({
         question: "Which Guidance?",
         axis: "cfg",
-        sides: [
-          same(`Guidance ${cfg}`, cfg),
-          same(`Guidance ${next}`, next, { settings: { ...settings, cfg: next } }),
-        ],
+        sides: [same(`Guidance ${cfg}`, cfg), cfgSide(next)],
+        ...(other > 1 && other !== cfg && { third: cfgSide(other) }),
       });
     }
     choices.push({
@@ -3923,11 +3937,11 @@ export function createDream(options: {
     const base = await pairBase(ownerId, record, profiles);
     if (!base) return null;
     const choices = pairOptions(ownerId, base, profiles);
-    const { question, axis, sides, third } = drawn(
+    const { question, axis, sides, third, wide } = drawn(
       choices.map((choice) => [choice, pairWeights[choice.axis]]),
     )!;
     const ordered =
-      third && roomForThree && random(tripleEvery) === tripleEvery - 1
+      third && roomForThree && (wide || random(tripleEvery) === tripleEvery - 1)
         ? shuffled([...sides, third])
         : random(2)
           ? [sides[1], sides[0]]
