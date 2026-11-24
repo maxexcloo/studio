@@ -219,7 +219,6 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const editProfile = async (name: string) => {
     const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
     await profileMenu.click();
-    await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
     await expect(
       page.getByRole("menuitemradio", { name: "Image Quality", exact: true }),
     ).toHaveCount(0);

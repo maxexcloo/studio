@@ -311,13 +311,10 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
       },
     });
   });
-  const showSource = async () => {
-    await page.goto("/images");
-    await page
-      .getByRole("button", { name: "Open image: Original Amber Bird", exact: true })
-      .click();
-  };
-  await showSource();
+  const openSource = () =>
+    page.getByRole("button", { name: "Open image: Original Amber Bird", exact: true }).click();
+  await page.goto("/images");
+  await openSource();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   const openAI = async () => {
@@ -360,7 +357,9 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
     },
   });
 
-  await showSource();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await openSource();
   menu = await openAI();
   await menu.getByText("Edit", { exact: true }).click();
   await expect(menu.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
@@ -370,7 +369,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   await backToActionMenu(menu);
   await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
-  expect(suggestionActions).toEqual(["recreate", "edit", "recreate", "edit"]);
+  expect(suggestionActions).toEqual(["recreate", "edit"]);
   await expect(prompt).toHaveValue(instruction);
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
   expect(asked.at(-1)).toMatchObject({
@@ -393,7 +392,9 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
     },
   });
 
-  await showSource();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await openSource();
   menu = await openAI();
   await menu.getByText("Recreate", { exact: true }).click();
   await review().click();
