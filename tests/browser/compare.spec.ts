@@ -123,7 +123,7 @@ test("Every compared variant runs on the composer's settings, changing only the 
   await page.getByRole("button", { name: "Use Image Fast · 4 Steps", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(prompt(page)).toHaveValue("A silver fox");
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toContainText(
     "Image Fast",
   );
   await expect(page.getByRole("button", { name: "Clear Seed 4242", exact: true })).toBeVisible();

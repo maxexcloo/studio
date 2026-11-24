@@ -106,7 +106,7 @@ function lineageChanges(
   const modelChanged =
     recordedChange(parent.model, item.model) || recordedChange(before?.modelName, after?.modelName);
   if (modelChanged || recordedChange(before?.profileId, after?.profileId)) {
-    const label = modelChanged ? "Model" : "Profile";
+    const label = "Model";
     const from = mediaProfileName(parent, profiles);
     const to = mediaProfileName(item, profiles);
     changes.push(from && to && from !== to ? `${label}: ${from} → ${to}` : `${label} changed`);
@@ -301,7 +301,7 @@ export function useSettingsText(item: MediaItem) {
       item.prompt?.trim(),
       item.negative?.trim() && `Negative Prompt: ${item.negative.trim()}`,
       time(item.createdAt) && `${item.uploaded ? "Uploaded" : "Created"}: ${time(item.createdAt)}`,
-      details.profile && `Profile: ${details.profile}`,
+      details.profile && `Model: ${details.profile}`,
       details.loras.length &&
         `LoRAs: ${details.loras.map((lora) => `${lora.name} ${lora.strength}`).join(", ")}`,
       details.references.length &&

@@ -665,7 +665,7 @@ export function createImportEngine({
   /** Drafts the profile and guide; a failure is a warning on the record, never a failed import. */
   async function draftInto(record, { by = "", index = null, rethrow = false } = {}) {
     const target = draftTarget(record, index);
-    if (!target) throw new Error("Choose the model file to draft a profile for.");
+    if (!target) throw new Error("Choose the model file to draft a model from.");
     try {
       await draftProfile(record, { by, index: target.at });
       record.warnings = (record.warnings || []).filter(
@@ -688,10 +688,10 @@ export function createImportEngine({
   async function draft(id, { by = "", index = null } = {}) {
     const record = store.get(id);
     if (!record) throw new Error("That import is gone. Import the link again.");
-    if (!draftProfile) throw new Error("Profile drafts are unavailable here.");
+    if (!draftProfile) throw new Error("Model drafts are unavailable here.");
     if (record.state === "failed") throw new Error("This import failed. Import the link again.");
     if (record.results?.profileId)
-      throw new Error("This import already drafted a profile. Review it in Library › Profiles.");
+      throw new Error("This import already drafted a model. Review it in Library › Models.");
     try {
       await draftInto(record, { by, index, rethrow: true });
     } finally {

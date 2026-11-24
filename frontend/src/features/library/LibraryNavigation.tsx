@@ -3,8 +3,26 @@ import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Personal records first, then the shared Models, Prompting and Templates an administrator manages;
-// each group alphabetical, apart from Presets leading its own cards.
+/** Each instruction type's Prompting page, by the `area` its instructions carry. */
+export const instructionAreas = {
+  chatInstructions: { area: "Chat", icon: icons.chat },
+  composeInstructions: { area: "Compose", icon: icons.prompt },
+  dreamInstructions: { area: "Dream", icon: icons.dream },
+  galleryInstructions: { area: "Gallery", icon: icons.image },
+  libraryInstructions: { area: "Library", icon: icons.library },
+  writingInstructions: { area: "Writing Standard", icon: icons.writing },
+} as const;
+export type InstructionSection = keyof typeof instructionAreas;
+const instructionSection = (section: InstructionSection) => ({
+  label: instructionAreas[section].area,
+  description: `Manage the instructions Studio's ${instructionAreas[section].area} writers follow. Every saved version is kept.`,
+  icon: instructionAreas[section].icon,
+  admin: true,
+  group: "Prompting",
+});
+
+// Personal records first, then the shared Profiles, Prompting and Templates an administrator
+// manages; each group alphabetical, apart from Presets leading its own cards.
 export const librarySections = {
   presets: {
     label: "Presets",
@@ -30,52 +48,50 @@ export const librarySections = {
     icon: icons.scene,
     group: "Personal",
   },
-  files: {
-    label: "Files",
-    description:
-      "Manage the shared checkpoints, diffusion models, text encoders and VAEs profiles use.",
-    icon: icons.files,
-    admin: true,
-    group: "Models",
-  },
+  // Imports come first: they bring in what Files, LoRAs and Models then manage.
   imports: {
     label: "Imports",
     description: "Import shared models and recipes from Civitai, Hugging Face or recipe images.",
     icon: icons.import,
     admin: true,
-    group: "Models",
+    group: "Profiles",
+  },
+  files: {
+    label: "Files",
+    description:
+      "Manage the shared checkpoints, diffusion models, text encoders and VAEs that models use.",
+    icon: icons.files,
+    admin: true,
+    group: "Profiles",
   },
   loras: {
     label: "LoRAs",
     description: "Manage the shared style and subject adapters offered in Composer.",
     icon: icons.loras,
     admin: true,
-    group: "Models",
+    group: "Profiles",
   },
   profiles: {
-    label: "Profiles",
-    description:
-      "Manage the shared generation profiles and workflows. Every saved version is kept.",
+    label: "Models",
+    description: "Manage the shared models and their workflows. Every saved version is kept.",
     icon: icons.profile,
     admin: true,
-    group: "Models",
+    group: "Profiles",
   },
+  chatInstructions: instructionSection("chatInstructions"),
+  composeInstructions: instructionSection("composeInstructions"),
+  dreamInstructions: instructionSection("dreamInstructions"),
+  galleryInstructions: instructionSection("galleryInstructions"),
   guides: {
     label: "Guides",
     description:
-      "Manage the prompting guides profiles and families use. Every saved version is kept.",
+      "Manage the prompting guides models and families use. Every saved version is kept.",
     icon: icons.guide,
     admin: true,
     group: "Prompting",
   },
-  instructions: {
-    label: "Instructions",
-    description:
-      "Manage the instructions Studio's writers follow for prompts, suggestions, Dream, captions and reviews. Every saved version is kept.",
-    icon: icons.prompt,
-    admin: true,
-    group: "Prompting",
-  },
+  libraryInstructions: instructionSection("libraryInstructions"),
+  writingInstructions: instructionSection("writingInstructions"),
   animateTemplates: {
     label: "Animate",
     description: "Manage the templates Animate offers.",

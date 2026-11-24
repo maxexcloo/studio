@@ -232,7 +232,7 @@ for (const operation of ["Edit", "Animate"] as const) {
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.
     await expect(page).toHaveURL(operation === "Animate" ? /\/videos$/ : /\/images$/);
     // Either way the composer opens on the staged draft.
-    await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
       "A copper bird",
     );
@@ -289,7 +289,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
   await pressGenerate(page, "Edit Image");
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -440,7 +440,7 @@ for (const surface of ["tile", "viewer"]) {
     await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
     const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(prompt).toHaveValue("Keep this separate visual direction");
-    await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
+    await expect(page.getByRole("combobox", { name: "Model", exact: true })).toHaveText(
       "Image Fast",
     );
     await pressGenerate(page);

@@ -1,9 +1,9 @@
 import { ActionIcon, Menu } from "@mantine/core";
-import { Check } from "lucide-react";
 import { Fragment, type ReactElement } from "react";
 
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
+import { ChosenMark } from "./NameWithFlags";
 import { PopupTooltip } from "./PopupTooltip";
 
 export const nameSortLabels = {
@@ -33,7 +33,7 @@ export function SortMenu<Sort extends string>({
       position="bottom-end"
       width={menuWidth}
       withinPortal={withinPortal}
-      checkIcon={<Check size={14} />}
+      checkIcon={<ChosenMark chosen />}
     >
       <PopupTooltip label={selected || label}>
         <Menu.Target>

@@ -517,7 +517,7 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
     const store = read();
     if (!store?.packs?.[packId]) throw notFound("That guide was not found.");
     if (!/^[a-z0-9][a-z0-9._:-]{0,119}$/i.test(String(profileId || "")))
-      throw new Error("Choose a valid profile id.");
+      throw new Error("Choose a valid model ID.");
     const next = structuredClone(bindingsOf(store));
     next.profiles[profileId] = { pack: packId };
     writeBindings(store, next, {

@@ -141,12 +141,12 @@ export function validateReferenceSlots(references, profile) {
   const slots = profile.mediaInputs || [];
   // Plain img2img advertises one start image through its capability rather than named slots.
   if (!slots.length && profile.capabilities?.startImage) {
-    if (references.length > 1) throw new Error("The selected profile accepts at most 1 image.");
+    if (references.length > 1) throw new Error("The selected model accepts at most 1 image.");
     return;
   }
   for (const reference of references) {
     if (!slots.some((slot) => slot.id === reference.slot))
-      throw new Error(`The selected profile does not accept reference slot "${reference.slot}".`);
+      throw new Error(`The selected model does not accept reference slot "${reference.slot}".`);
   }
   for (const slot of slots) {
     const supplied = references.filter((reference) => reference.slot === slot.id).length;

@@ -125,7 +125,7 @@ async function setup(page: Page, { failPreview = false, conflict = false } = {})
       },
     });
   });
-  const editor = await editDefinition(page, "Profile");
+  const editor = await editDefinition(page, "Model");
   await editor.getByRole("tab", { name: "Connections", exact: true }).click();
   return { state, editor };
 }
@@ -165,7 +165,7 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
   expect(state.document).toEqual(expected);
   expect(state.writes[0].baseHash).toBe("opened-hash");
   expect(state.previews).toBe(1);
-  await editDefinition(page, "Profile");
+  await editDefinition(page, "Model");
   await editor.getByRole("tab", { name: "Connections", exact: true }).click();
   await expect(
     editor.getByRole("combobox", { name: "Control prompt Node", exact: true }),

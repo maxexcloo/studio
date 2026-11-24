@@ -114,13 +114,13 @@ export function registerDeploymentRoutes(
     }
     if (defaultProfileKeys.includes(key)) {
       const id = String(value || "").trim();
-      if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
+      if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid model.");
       if (
         key === defaultTextProfileKey &&
         id &&
         !/^(cloud|local)\/[A-Za-z0-9][A-Za-z0-9._:/@+-]*$/.test(id)
       )
-        return res.status(400).json({ ok: false, error: "Choose a valid text profile." });
+        return res.status(400).json({ ok: false, error: "Choose a valid text model." });
       res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
       return;
     }

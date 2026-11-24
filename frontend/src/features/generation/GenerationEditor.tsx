@@ -102,7 +102,7 @@ export function submitBlockedReason({
     (option) => option.id === (input.profileBackend || profile.backend),
   );
   return !profile
-    ? "Choose an available profile first."
+    ? "Choose an available model first."
     : (backend ? backend.ready === false : profile.ready === false)
       ? backend?.reason
         ? `${backend.label} isn't ready: ${backend.reason}`
@@ -316,7 +316,7 @@ export function GenerationEditor({
         : undefined,
     [inpaints, painted, maskOpen, paintable],
   );
-  if (models.isPending) return <LoadingState label="Loading Profiles" />;
+  if (models.isPending) return <LoadingState label="Loading Models" />;
   // Choosing Edit or Reference drops the mask; Paint on the same image brings it back to edit.
   if (inpaint?.mask) lastMask.current = inpaint;
   const editing = inpaint ?? lastMask.current;
@@ -351,7 +351,7 @@ export function GenerationEditor({
           {!profile && (
             <Alert color="yellow">
               {input.profileId && profiles.length
-                ? "The selected profile is unavailable. Choose another."
+                ? "The selected model is unavailable. Choose another."
                 : "No models are available. Check the workers."}
             </Alert>
           )}

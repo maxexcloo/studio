@@ -1,8 +1,9 @@
 import { Button, Group, Menu, Text } from "@mantine/core";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Fragment, type Ref } from "react";
 
 import { menuWidth } from "../theme";
+import { ChosenMark } from "./NameWithFlags";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone } from "./usePhone";
 
@@ -120,7 +121,7 @@ function Marks({ count, checked }: { count?: number; checked: boolean }) {
           {count.toLocaleString()}
         </Text>
       )}
-      <Check size={14} visibility={checked ? undefined : "hidden"} />
+      <ChosenMark chosen={checked} />
     </Group>
   );
 }

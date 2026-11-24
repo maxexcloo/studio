@@ -18,7 +18,7 @@ export function removeProfile(id, { baseHash = "", by = "" } = {}) {
   const { text, hash } = readEditableProfile(id);
   if (baseHash !== hash)
     throw Object.assign(
-      new Error("This profile changed since you opened it. Reload it, then remove it again."),
+      new Error("This model changed since you opened it. Reload it, then remove it again."),
       { status: 409 },
     );
   const store = profileStore({ workflowsDir: userWorkflowsDir });

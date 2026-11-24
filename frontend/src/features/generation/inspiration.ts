@@ -35,9 +35,9 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
   const resources = preset.resources || [];
   const loras = resources.filter((resource) => resource.folder === "loras");
   const settings = { ...preset.settings };
-  if (!profile) blockers.push("Choose a profile first.");
+  if (!profile) blockers.push("Choose a model first.");
   if (!preset.prompt) blockers.push("This inspiration has no prompt to apply.");
-  if (profile?.ready === false) blockers.push("This profile is missing compatible model parts.");
+  if (profile?.ready === false) blockers.push("This model is missing compatible parts.");
   if (resources.some((resource) => resource.status === "unsupported"))
     blockers.push("Some source files need a compatible model or a local filename match.");
   if (loras.some((resource) => !resource.localName))
@@ -46,21 +46,21 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
     blockers.push("The source did not include all LoRA weights.");
   if (profile) {
     if (loras.length && !profile.capabilities.lora)
-      blockers.push("This profile does not support LoRAs.");
+      blockers.push("This model does not support LoRAs.");
     if (
       loras.some(
         (resource) =>
           profile.options?.loras && !profile.options.loras.includes(resource.localName || ""),
       )
     )
-      blockers.push("This profile cannot load all source LoRAs.");
+      blockers.push("This model cannot load all source LoRAs.");
     const maximum = profile.maxLoras ?? maxLoras;
-    if (loras.length > maximum) blockers.push(`This profile supports up to ${maximum} LoRAs.`);
+    if (loras.length > maximum) blockers.push(`This model supports up to ${maximum} LoRAs.`);
     const checkpoint = resources.find((resource) =>
       ["checkpoints", "diffusion_models"].includes(resource.folder || ""),
     );
     if (checkpoint?.profileId && checkpoint.profileId !== profile.id)
-      warnings.push("This profile differs from the source image's.");
+      warnings.push("This model differs from the source image's.");
     for (const [field, options] of [
       ["sampler", "samplers"],
       ["scheduler", "schedulers"],
@@ -71,7 +71,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
         profile.options?.[options] &&
         !profile.options[options].includes(value)
       ) {
-        warnings.push(`${field} will use this profile's default.`);
+        warnings.push(`${field} will use this model's default.`);
         delete settings[field];
       }
     }
@@ -91,7 +91,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
         ).toFixed(6),
       );
       if (adjusted !== value)
-        warnings.push(`${field} will use ${adjusted}, within this profile's limits.`);
+        warnings.push(`${field} will use ${adjusted}, within this model's limits.`);
       settings[field] = adjusted;
     }
     if (
@@ -100,11 +100,11 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
           resource.folder === "vae" && (!resource.localName || !profile.capabilities.vae),
       )
     )
-      blockers.push("This profile cannot use the source VAE.");
+      blockers.push("This model cannot use the source VAE.");
     if (resources.some((resource) => resource.folder === "text_encoders" && !resource.localName))
       blockers.push("Download the source text encoders first.");
     if (preset.negative && profile.capabilities.negativePrompt === false)
-      warnings.push("This profile does not use a negative prompt.");
+      warnings.push("This model does not use a negative prompt.");
   }
   // The selected profile owns identity and routing; imported metadata cannot override them.
   for (const field of [

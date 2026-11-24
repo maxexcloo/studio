@@ -150,7 +150,7 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
   if (!plan.merges.length) return { merged: [] };
   if (hash !== plan.hash)
     throw Object.assign(
-      new Error("The duplicate profiles changed since the preview. Preview them again."),
+      new Error("The duplicate models changed since the preview. Preview them again."),
       { status: 409 },
     );
   const store = profileStore({ workflowsDir: userWorkflowsDir });
@@ -164,7 +164,7 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
   repointWorkflowPreferences((id) => kept.get(id) ?? id);
   guideStore().moveProfileBindings(
     { remove: plan.merges.map(({ from }) => `custom:${from}`) },
-    { by, note: "Merged duplicate profiles" },
+    { by, note: "Merged duplicate models" },
   );
   return {
     merged: plan.merges.map(({ from, to, name, kind }) => ({ from, to, name, kind })),

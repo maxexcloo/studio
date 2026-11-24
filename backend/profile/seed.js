@@ -39,7 +39,7 @@ export function seedSamples({
     fs.mkdirSync(workflowsDir, { recursive: true });
     fs.writeFileSync(path.join(workflowsDir, name), text, { flag: "wx" });
     const id = name.slice(0, -5);
-    store.record(id, text, { origin: "seed", by: "seed", note: "Sample profile" });
+    store.record(id, text, { origin: "seed", by: "seed", note: "Sample model" });
     added.push(id);
   }
   if (added.length) log.info?.(`[seed] Added the sample profiles: ${added.join(", ")}.`);

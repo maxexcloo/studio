@@ -1107,7 +1107,7 @@ export async function create(page: Page) {
 /** Expands the collapsed composer (on phones, the Generate sheet). */
 export async function expandComposer(page: Page) {
   await page.locator("[data-composer-prompt]").click();
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
   // The compact bar leaves once the composer has opened and focused its prompt.
   await expect(page.locator("[data-composer-prompt]")).toHaveCount(0);
 }
@@ -1298,8 +1298,8 @@ export async function section(page: Page, workspace: "Library" | "Settings", lab
       .click();
 }
 
-/** Opens Library › Profiles or Guides and the editor of the first listed profile or guide. */
-export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
+/** Opens Library › Models or Guides and the editor of the first listed model or guide. */
+export async function editDefinition(page: Page, kind: "Model" | "Guide") {
   const editor = page.getByRole("dialog", { name: `Edit ${kind}`, exact: true });
   const table = page.getByRole("table", { name: `Editable ${kind}s`, exact: true });
   if (!(await table.isVisible())) {

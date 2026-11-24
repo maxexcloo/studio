@@ -20,6 +20,7 @@ import { menuWidth } from "../theme";
 import { EmptyState } from "./EmptyState";
 import { icons } from "./icons";
 import { LoadingState } from "./LoadingState";
+import { NameWithFlags } from "./NameWithFlags";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone } from "./usePhone";
 
@@ -66,50 +67,54 @@ export const compareNames = new Intl.Collator(undefined, {
 }).compare;
 
 /**
- * A record's name and detail in its table's main cell; with `onOpen` the name opens the record
- * (its row menu's first action, named by `openLabel`) and shows any `tooltip` on hover or focus.
+ * A record's name, any `flags` after it and its detail in its table's main cell; with `onOpen` the
+ * name opens the record (its row menu's first action, named by `openLabel`) and shows any
+ * `tooltip` on hover or focus. Flags sit outside the name's link.
  */
 export function TableRecord({
   name,
+  flags,
   detail,
   onOpen,
   openLabel,
   tooltip,
 }: {
   name: ReactNode;
+  flags?: ReactNode;
   detail?: ReactNode;
   onOpen?: () => void;
   openLabel?: string;
   tooltip?: ReactNode;
 }) {
+  const title = onOpen ? (
+    <Tooltip
+      label={tooltip}
+      // Undefined keeps the theme's touch default.
+      disabled={tooltip ? undefined : true}
+      events={{ hover: true, focus: true, touch: false }}
+    >
+      <Anchor
+        component="button"
+        type="button"
+        size="sm"
+        fw={500}
+        maw="100%"
+        ta="start"
+        className={classes.recordText}
+        aria-label={openLabel}
+        onClick={onOpen}
+      >
+        {name}
+      </Anchor>
+    </Tooltip>
+  ) : (
+    <Text size="sm" fw={500} className={classes.recordText}>
+      {name}
+    </Text>
+  );
   return (
     <>
-      {onOpen ? (
-        <Tooltip
-          label={tooltip}
-          // Undefined keeps the theme's touch default.
-          disabled={tooltip ? undefined : true}
-          events={{ hover: true, focus: true, touch: false }}
-        >
-          <Anchor
-            component="button"
-            type="button"
-            size="sm"
-            fw={500}
-            maw="100%"
-            ta="start"
-            className={classes.recordText}
-            aria-label={openLabel}
-            onClick={onOpen}
-          >
-            {name}
-          </Anchor>
-        </Tooltip>
-      ) : (
-        <Text size="sm" fw={500} className={classes.recordText}>
-          {name}
-        </Text>
-      )}
+      <NameWithFlags name={title} flags={flags} />
       {detail && (
         <Text size="xs" c="dimmed" className={classes.recordText}>
           {detail}

@@ -18,13 +18,13 @@ import { type ReactNode, useState } from "react";
 import { promptVariable, promptVariables } from "../../../../shared/prompt-variables";
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
+import { DataTable, TableRecord } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useReturnFocus } from "../../ui/useReturnFocus";
-import { librarySections } from "./LibraryNavigation";
+import { type InstructionSection, instructionAreas } from "./LibraryNavigation";
 import { type PromptInstruction, promptInstructionsPath, promptInstructionsQuery } from "./queries";
 import { VersionTitle, VersionsDialog } from "./Versions";
 
@@ -213,12 +213,18 @@ function InstructionEditor({
   );
 }
 
-/** Library › Instructions: every writer's instruction, suggestion ones flagged, by type and name. */
-export function PromptInstructions({ heading }: { heading: ReactNode }) {
-  const { label } = librarySections.instructions;
+/** One instruction type's Library › Prompting page: its instructions, suggestion ones flagged, by name. */
+export function PromptInstructions({
+  section,
+  heading,
+}: {
+  section: InstructionSection;
+  heading: ReactNode;
+}) {
+  const { area } = instructionAreas[section];
+  const label = `${area} Instructions`;
   const list = useQuery(promptInstructionsQuery);
   const [query, setQuery] = useState("");
-  const [area, setArea] = useState<string | null>(null);
   const [suggests, setSuggests] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     instruction: PromptInstruction;
@@ -226,9 +232,10 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
   } | null>(null);
   const [versions, setVersions] = useState<PromptInstruction | null>(null);
   const instructions = (list.data?.instructions ?? []).filter(
-    ({ suggestions }) => !suggests || Boolean(suggestions) === (suggests === "suggestions"),
+    (instruction) =>
+      instruction.area === area &&
+      (!suggests || Boolean(instruction.suggestions) === (suggests === "suggestions")),
   );
-  const areas = [...new Set(instructions.map(({ area }) => area))].sort();
   const phone = usePhone();
   return (
     <Stack gap="md">
@@ -238,29 +245,18 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
           query={query}
           onQueryChange={setQuery}
           filters={
-            <>
-              <FilterChoices
-                label="Type"
-                data={areas.map((value) => ({ value, label: value }))}
-                value={area}
-                onChange={setArea}
-              />
-              <FilterChoices
-                label="Writes"
-                data={[
-                  { value: "prompts", label: "Prompts & Text" },
-                  { value: "suggestions", label: "Suggestions" },
-                ]}
-                value={suggests}
-                onChange={setSuggests}
-              />
-            </>
+            <FilterChoices
+              label="Writes"
+              data={[
+                { value: "prompts", label: "Prompts & Text" },
+                { value: "suggestions", label: "Suggestions" },
+              ]}
+              value={suggests}
+              onChange={setSuggests}
+            />
           }
-          filterCount={Number(area !== null) + Number(suggests !== null)}
-          onClearFilters={() => {
-            setArea(null);
-            setSuggests(null);
-          }}
+          filterCount={Number(suggests !== null)}
+          onClearFilters={() => setSuggests(null)}
         />
       </SectionHeader>
       {list.error ? (
@@ -268,28 +264,15 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
       ) : (
         <DataTable
           label={label}
-          // Sorted by name first, so the stable type sort leaves each type in name order.
-          rows={instructions
-            .filter((instruction) => !area || instruction.area === area)
-            .sort((a, b) => compareNames(a.label, b.label))}
+          rows={instructions}
           rowKey={({ id }) => id}
           rowName={({ label }) => label}
           loading={list.isPending && `Loading ${label}`}
           query={query}
-          searchText={({ label, area, text }) => [label, area, text]}
+          searchText={({ label, text }) => [label, text]}
           empty={`No ${label}`}
-          initialSort={{ key: "type", descending: false }}
+          initialSort={{ key: "name", descending: false }}
           columns={[
-            {
-              key: "type",
-              header: "Type",
-              sortValue: ({ area }) => area,
-              cell: ({ area }) => (
-                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
-                  {area}
-                </Text>
-              ),
-            },
             {
               key: "name",
               header: "Name",
@@ -297,15 +280,13 @@ export function PromptInstructions({ heading }: { heading: ReactNode }) {
               sortValue: ({ label }) => label,
               cell: (instruction) => (
                 <TableRecord
-                  name={
-                    <>
-                      {instruction.label}{" "}
-                      {instruction.suggestions && (
-                        <Badge component="span" size="sm" color="gray">
-                          Suggestions
-                        </Badge>
-                      )}
-                    </>
+                  name={instruction.label}
+                  flags={
+                    instruction.suggestions && (
+                      <Badge size="sm" color="gray">
+                        Suggestions
+                      </Badge>
+                    )
                   }
                   openLabel={`Edit ${instruction.label}`}
                   onOpen={() => setEditing({ instruction })}

@@ -69,7 +69,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
       },
     });
   });
-  const editor = await editDefinition(page, "Profile");
+  const editor = await editDefinition(page, "Model");
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("My Edited Profile");
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor.getByRole("alert")).toContainText("changed while you were editing");
@@ -83,7 +83,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   expect(requests[0].baseHash).toBe("opened-hash");
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(editor).toBeHidden();
-  await editDefinition(page, "Profile");
+  await editDefinition(page, "Model");
   await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
     "Changed by Another Editor",
   );
@@ -91,7 +91,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(requests[1].baseHash).toBe("latest-hash");
-  await editDefinition(page, "Profile");
+  await editDefinition(page, "Model");
   await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
     "My Edited Profile",
   );
@@ -179,14 +179,14 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     "Owned Guide",
   );
   // Its profile count reveals their names.
-  const usedBy = page.getByRole("button", { name: "2 Profiles", exact: true });
+  const usedBy = page.getByRole("button", { name: "2 Models", exact: true });
   await usedBy.click();
   await expect(
-    page.getByRole("dialog", { name: "Profiles Using Owned Guide", exact: true }),
+    page.getByRole("dialog", { name: "Models Using Owned Guide", exact: true }),
   ).toContainText("Fox QualityOwl Fast");
   // Escape from the count closes only the popover.
   await usedBy.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Profiles Using Owned Guide" })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Models Using Owned Guide" })).toBeHidden();
   await expect(page.getByRole("table", { name: "Editable Guides", exact: true })).toBeVisible();
   await editDefinition(page, "Guide");
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
@@ -336,10 +336,10 @@ test("A combined profile's Backend select is a saved edit that switches what the
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
-  const table = page.getByRole("table", { name: "Editable Profiles", exact: true });
+  await section(page, "Library", "Models");
+  const table = page.getByRole("table", { name: "Editable Models", exact: true });
   await expect(table).toContainText("Krea 2 Turbo · Fast");
-  const editor = await editDefinition(page, "Profile");
+  const editor = await editDefinition(page, "Model");
   const description = editor.getByRole("textbox", { name: "Description", exact: true });
   await expect(description).toHaveValue("Radiance runtime.");
   await editor.getByRole("combobox", { name: "Backend", exact: true }).click();
@@ -360,18 +360,18 @@ test("The Profiles toolbar gives Download All its own link beside Import", async
   await fixtures(page);
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
+  await section(page, "Library", "Models");
   const toolbar = page
-    .getByRole("button", { name: "Filter Profiles", exact: true })
+    .getByRole("button", { name: "Filter Models", exact: true })
     .locator("xpath=..");
-  const search = toolbar.getByRole("textbox", { name: "Search Profiles", exact: true });
-  const filter = toolbar.getByRole("button", { name: "Filter Profiles", exact: true });
+  const search = toolbar.getByRole("textbox", { name: "Search Models", exact: true });
+  const filter = toolbar.getByRole("button", { name: "Filter Models", exact: true });
   const download = toolbar.getByRole("link", { name: "Download All", exact: true });
   const importing = toolbar.getByRole("button", { name: "Import", exact: true });
   const controls = search.or(filter).or(download).or(importing);
   await expect(controls).toHaveCount(4);
-  await expect(controls.nth(0)).toHaveAccessibleName("Search Profiles");
-  await expect(controls.nth(1)).toHaveAccessibleName("Filter Profiles");
+  await expect(controls.nth(0)).toHaveAccessibleName("Search Models");
+  await expect(controls.nth(1)).toHaveAccessibleName("Filter Models");
   await expect(controls.nth(2)).toHaveAccessibleName("Download All");
   await expect(controls.nth(3)).toHaveAccessibleName("Import");
   await expect(download).toHaveAttribute("href", "/api/profiles/export");
@@ -406,11 +406,11 @@ test("Import opens a workflow, and a row's Duplicate copies its profile under a 
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
-  const editor = page.getByRole("dialog", { name: "Create Profile", exact: true });
+  await section(page, "Library", "Models");
+  const editor = page.getByRole("dialog", { name: "Create Model", exact: true });
   const chooser = page.waitForEvent("filechooser");
   await page
-    .getByRole("button", { name: "Filter Profiles", exact: true })
+    .getByRole("button", { name: "Filter Models", exact: true })
     .locator("xpath=..")
     .getByRole("button", { name: "Import", exact: true })
     .click();
@@ -460,16 +460,16 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
+  await section(page, "Library", "Models");
   for (const [part, row, item, file] of [
-    ["Profiles", "Owned Profile", "Download", "owned.json"],
+    ["Models", "Owned Profile", "Download", "owned.json"],
     ["Guides", "Krea 2", "Download", "krea2.json"],
   ]) {
     await section(page, "Library", part);
     await page.getByRole("button", { name: `Actions for ${row}`, exact: true }).click();
     const menu = page.getByRole("menu", { name: `Actions for ${row}`, exact: true });
     const entries =
-      part === "Profiles"
+      part === "Models"
         ? ["Edit", "Copy ID", "Download", "Duplicate…", "Delete"]
         : ["Edit", "Copy ID", "Download", "Delete"];
     await expect(menu.getByRole("menuitem")).toHaveText(entries);
@@ -589,8 +589,8 @@ test("Library edits a background prompt and reads the saved version back", async
   );
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Instructions");
-  const table = page.getByRole("table", { name: "Instructions", exact: true });
+  await section(page, "Library", "Dream");
+  const table = page.getByRole("table", { name: "Dream Instructions", exact: true });
   const open = async () => {
     await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();

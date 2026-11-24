@@ -635,7 +635,7 @@ function LoraStack(props: LoraPickerProps) {
             )}
             {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
               <Text size="xs" c="yellow">
-                This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the
+                This model takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the
                 extras.
               </Text>
             )}
@@ -764,7 +764,7 @@ function StackEntry({
         )}
         {!compatible && (
           <Text size="xs" c="yellow">
-            {unavailable || "This profile can't use this LoRA. Disable or remove it."}
+            {unavailable || "This model can't use this LoRA. Disable or remove it."}
           </Text>
         )}
         {!!triggers.length && (

@@ -1068,7 +1068,7 @@ test("Settings › Studio saves and clears the default Text Profile", async ({ p
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   await page.goto("/settings#studio");
-  const text = page.getByRole("combobox", { name: "Text Profile", exact: true });
+  const text = page.getByRole("combobox", { name: "Text Model", exact: true });
   await expect(text).toHaveText("Default (Gateway)");
   await text.click();
   const saved = page.waitForResponse(

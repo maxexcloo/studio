@@ -819,7 +819,7 @@ export class GenerationQueue {
                 if (latest.cancelRequested) {
                   const cancelled = this.store.save({ ...waiting, status: "cancelled" });
                   await this.adapter.settled?.(cancelled);
-                } else wait(waiting, observation.reason || "Waiting for a resident profile.");
+                } else wait(waiting, observation.reason || "Waiting for a resident model.");
                 skipped.push(job);
                 continue;
               }

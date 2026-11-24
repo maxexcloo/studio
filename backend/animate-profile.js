@@ -91,7 +91,7 @@ export function animateProfile(
   };
   if (profileId) {
     const profile = usable.find((item) => item.id === profileId);
-    if (!profile) refuse("This video profile is unavailable for animation.");
+    if (!profile) refuse("This video model is unavailable for animation.");
     return withSize(
       { profile, tier: tierOf(profile), cloud: isCloudProfile(profile), offers },
       width,

@@ -206,7 +206,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
     );
   const model = record.resources?.[at];
   if (!model || !["checkpoints", "diffusion_models"].includes(model.want?.folder))
-    throw new Error("Only a checkpoint or diffusion model gets a profile.");
+    throw new Error("Only a checkpoint or diffusion model file can become a model.");
   const modelFile = model.want.file;
   const families = [
     ...new Set(
@@ -326,7 +326,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
       version: "",
       status: "missing",
       supported: true,
-      note: "Needed by the drafted profile",
+      note: "Needed by the drafted model",
       want: {
         file: part.file,
         folder: part.folder,

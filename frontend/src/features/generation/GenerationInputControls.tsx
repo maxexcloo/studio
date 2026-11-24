@@ -30,7 +30,6 @@ function ChoiceChip({
   return (
     <ComboboxPopover
       allowDeselect={false}
-      withCheckIcon={false}
       comboboxProps={{ width: 160, position: "top-start", withinPortal: true }}
       data={data}
       value={value}

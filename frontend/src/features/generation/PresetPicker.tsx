@@ -1,7 +1,6 @@
 import { Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../api";
@@ -10,6 +9,7 @@ import { ChipPopup } from "../../ui/ChipPopup";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { ChosenMark } from "../../ui/NameWithFlags";
 import { plural } from "../../ui/plural";
 import { useRemembered } from "../auth/useRemembered";
 import { iconChipProps } from "./chip";
@@ -259,7 +259,7 @@ export function PresetPicker({
                       aria-checked={checked}
                       // A preset holds at least one part.
                       disabled={checked && parts.length === 1}
-                      rightSection={checked && <Check size={14} />}
+                      rightSection={<ChosenMark chosen={checked} />}
                       onClick={() =>
                         setParts(
                           checked

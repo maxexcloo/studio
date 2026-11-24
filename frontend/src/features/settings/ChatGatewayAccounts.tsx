@@ -61,7 +61,7 @@ export function ChatGateway({
           label="Admin Tools"
           description={
             adminTools
-              ? "Linked administrators can manage Library, catalogue and profiles from chat."
+              ? "Linked administrators can manage Library, catalogue and models from chat."
               : "Only an administrator's personal MCP token gets admin tools."
           }
         >

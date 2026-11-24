@@ -319,12 +319,12 @@ export function LibraryImportReview({
                 disabled={action.isPending}
                 onClick={() => run("draft-profile")}
               >
-                Draft Profile
+                Draft Model
               </Button>
             )}
             {record.results?.profileId && (
               <Text size="sm" c="dimmed">
-                Profile drafted. Review it in Library › Profiles.
+                Model drafted. Review it in Library › Models.
               </Text>
             )}
             {record.picture && !preset && (

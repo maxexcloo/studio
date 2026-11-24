@@ -29,7 +29,7 @@ import {
 
 /** The choice of no preference, listed first and shown selected. */
 const studioDefault = "Default (Studio)";
-const profileDefault = { value: "", label: "Default (Profile)" };
+const profileDefault = { value: "", label: "Default (Model)" };
 const runs = { images: "images run", text: "writing runs", videos: "videos run" } as const;
 const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },

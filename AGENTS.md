@@ -6,6 +6,7 @@
 - User-facing text, documentation, settings (`STUDIO_*`), headers, cookies, browser storage and internal identifiers say Studio. Every Studio setting starts with `STUDIO_` and old names are not read as aliases; third-party credentials keep their standard names (`HF_TOKEN`, `CIVITAI_API_TOKEN`), as do the platform's `HOST` and `PORT` and the worker's `RADIANCE_*` variables.
 - Text written for generation models (prompts and the styles, themes and guides that shape them) uses American English, as `americanEnglish` in `backend/domain/writing-standard.ts` tells every prompt writer; everything else stays Australian English.
 - Runtime state is authoritative. Studio reads and writes only Studio names on disk (`studio` media folder, the `studio` profile block); no legacy names or fallbacks. Runtime files are moved or renamed only by `migrate-runtime` ([Data & Migrations](CONFIGURATION.md#data--migrations)), never implicitly.
+- User-facing text calls generation profiles models; code, APIs and stored data keep `profile`.
 - Keep externally used names stable: MCP tool names (lowercase snake_case with lowercase titles, such as `generate` and `upload_link`), `/api` routes, the profile file format and result links, including the `heiss-mcp-result-link-v2` sealing label.
 - Studio owns live generation profiles, prompting guides and model/LoRA catalogue definitions in its runtime data folder, including uncensored content. Administrators edit and approve them in Studio. Live data is the only source: the sample profiles in `config/profiles/` seed only a data folder that has never held a profile. Keep deployment/workload configuration in kubelab.
 - The whole repository is AGPL-3.0 (`LICENSE`). Keep the MIT notices for HEISS UI, J-AI Studio and MantineHub in `NOTICE`, shipped in both images, and their credits in Settings › About and `README.md`.
@@ -82,7 +83,8 @@ recur across features.
 - Use one section heading and toolbar; group further parts with `SettingGroup`.
   Use compact `DataTable` rows for dense records and cards for visual content.
   Phone tables fold secondary information into the main cell. A record's flags
-  (AI, Failing, Default, Disabled) sit right after its name, never in their own
+  (AI, Failing, Default, Disabled) sit right after its name, outside the name's
+  link, through `NameWithFlags` (`TableRecord`'s `flags`), never in their own
   column or line; status columns hold values, not flags. Use headings
   rather than accordions, and popups to create or configure records.
 - Settings use `SettingGroup` and `SettingRow`. Switches apply on/off settings
@@ -92,8 +94,7 @@ recur across features.
   Selects and segmented choices sit in `wide` rows (segmented ones
   `fullWidth`): one width on desktop, the full row under the label on phones,
   where a picker and its row's buttons share that row, the picker filling it.
-  Profile and model choices use the composer's picker (`ProfileSelect`) as a
-  field. A row's actions are plain compact buttons named by their verb, never
+  Model choices use the composer's picker (`ProfileSelect`) as a field. A row's actions are plain compact buttons named by their verb, never
   a dropdown.
 - Every dialog, sheet and chip popup ends with one right-aligned
   `DialogFooter` of real buttons: any default secondary actions, Cancel, then
@@ -137,6 +138,8 @@ recur across features.
   Delete last, and share their sizing and item style. An action's settings sit
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action and assistant menus.
+  A chosen option shows a check after its name, in every list (`ChosenMark`;
+  the theme's Select, MultiSelect and ComboboxPopover defaults).
 - Media categories use Images, Videos, Text, with Cloud after Videos where it
   is their peer. Sized choices (resolutions, sizes, lengths) run small to large. Other unordered peers sort alphabetically, except settings
   first, Like before Dislike, Name A–Z and Name Z–A last in sort menus,
