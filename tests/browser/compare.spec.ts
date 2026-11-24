@@ -640,7 +640,7 @@ test("Variants of a result show their numbers, the axis they vary and propose a 
   page,
 }, testInfo) => {
   const state = await fixtures(page);
-  const names = ["Blue Hour", "Golden Dusk"];
+  const names = ["Blue Hour", "Golden Dusk", "Midday"];
   const items = names.map((name, index) => ({
     id: `variant-${index}:0`,
     jobId: `variant-${index}`,
@@ -666,7 +666,7 @@ test("Variants of a result show their numbers, the axis they vary and propose a 
     winnerItemId: winner?.id ?? null,
     variants: items.map((item, index) => ({
       jobId: item.jobId,
-      label: `${"AB"[index]} · ${names[index]}`,
+      label: `${"ABC"[index]} · ${names[index]}`,
       item,
     })),
     ...(proposal ? { proposal } : {}),
@@ -695,6 +695,42 @@ test("Variants of a result show their numbers, the axis they vary and propose a 
     await page.getByText("Scroll", { exact: true }).click();
     await page.setViewportSize(viewport);
   }
+
+  await page.getByText("Scroll", { exact: true }).click();
+  const next = page.getByRole("button", { name: "Next Variant", exact: true });
+  const track = page.getByRole("region", { name: "Comparison Variants", exact: true });
+  await expect(track).toBeVisible();
+  expect(
+    await next.evaluate((button) => {
+      if (!(button instanceof HTMLButtonElement)) return false;
+      const row = document.querySelector<HTMLElement>('[aria-label="Comparison Variants"]')!;
+      button.click();
+      return Math.round(row.scrollLeft) === row.clientWidth;
+    }),
+  ).toBe(true);
+  await expect(page.getByText("2 of 3", { exact: true })).toBeVisible();
+
+  await page.getByText("Split", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Second Variant", exact: true }).click();
+  await page.getByRole("option", { name: "C · Midday", exact: true }).click();
+  const comparisonImage = page.getByRole("img", { name: "C · Midday", exact: true });
+  await comparisonImage.scrollIntoViewIfNeeded();
+  const slider = page.getByRole("slider", { name: "Comparison Position", exact: true });
+  await expect(slider).toHaveAttribute("aria-valuenow", "50");
+  const handle = (await page.locator("[data-comparison-divider] > span").boundingBox())!;
+  const picture = (await comparisonImage.boundingBox())!;
+  const x = handle.x + handle.width / 2;
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(
+    testInfo.project.use.isMobile ? x : picture.x + picture.width * 0.75,
+    testInfo.project.use.isMobile ? picture.y + picture.height * 0.25 : y,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await expect(slider).toHaveAttribute("aria-valuenow", "75");
+  await page.getByText("Side by Side", { exact: true }).click();
 
   // Picking one proposes it for the chat's project brief in Dream's Inbox.
   await page.getByRole("button", { name: "Pick B · Golden Dusk as Winner", exact: true }).click();
