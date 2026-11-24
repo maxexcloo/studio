@@ -58,7 +58,7 @@ test("Returning to Gallery offers a jump only after an image arrives while away"
   await expect(deck.getByText("Old Bird", { exact: true })).toBeHidden();
 });
 
-test("Gallery review rates matching results with arrows and Undo and returns to the filter", async ({
+test("Gallery Review accepts without rating, supports Undo and keeps the gallery filter", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -75,14 +75,32 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await showGalleryView(page, "Review");
   const deck = page.getByRole("region", { name: "Review", exact: true });
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeVisible();
-  await page.keyboard.press("ArrowRight");
-  await expect.poll(() => state.gallery.find(({ id }) => id === "first")?.rating).toBe("liked");
-  await expect(deck.getByText("Bird at Sea", { exact: true })).toBeVisible();
+  const first = state.gallery[0];
+  const second = state.gallery[1];
+  const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
+  const box = (await card.boundingBox())!;
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(centre.x + box.width * 0.45, centre.y, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => first.libraryReviewedAt).toBeDefined();
+  expect(first.rating).toBeUndefined();
+  await deck.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => first.libraryReviewedAt).toBeUndefined();
+  await expect(card.getByText("Bird in Snow", { exact: true })).toBeVisible();
+  await deck.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect.poll(() => first.libraryReviewedAt).toBeDefined();
+  await expect(card.getByText("Bird at Sea", { exact: true })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect.poll(() => state.gallery.find(({ id }) => id === "second")?.rating).toBe("disliked");
+  await expect.poll(() => second.rating).toBe("disliked");
   await expect(deck.getByText("No Unrated Results")).toBeVisible();
   await deck.getByRole("button", { name: "Undo" }).click();
-  await expect(deck.getByText("Bird at Sea", { exact: true })).toBeVisible();
+  await expect.poll(() => second.rating).toBeUndefined();
+  await expect(card.getByText("Bird at Sea", { exact: true })).toBeVisible();
+  await deck.getByRole("button", { name: "Super Like", exact: true }).click();
+  await expect.poll(() => second.rating).toBe("liked");
+  await expect(deck.getByText("No Unrated Results")).toBeVisible();
   await deck.getByRole("button", { name: "Rating", exact: true }).click();
   await page.getByRole("menuitem", { name: "Liked", exact: true }).click();
   await deck.getByRole("button", { name: "Time", exact: true }).click();

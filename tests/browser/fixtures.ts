@@ -677,6 +677,14 @@ export async function fixtures(page: Page) {
         });
       return respond({ ok: true, items });
     }
+    const review = path.match(/^\/api\/gallery\/library-review\/([^/]+)$/);
+    if (review && method === "POST") {
+      const item = gallery.find((item) => item.id === decodeURIComponent(review[1]));
+      if (!item) return respond({ error: "Result not found" }, 404);
+      if (body.reviewed) item.libraryReviewedAt = Date.now();
+      else delete item.libraryReviewedAt;
+      return respond({ ok: true });
+    }
     if (path === "/api/gallery/delete" && method === "POST") {
       const removed = body.ids.filter((id: string) => gallery.some((item) => item.id === id));
       gallery.splice(0, gallery.length, ...gallery.filter((item) => !removed.includes(item.id)));
@@ -724,13 +732,15 @@ export async function fixtures(page: Page) {
       const sort = url.searchParams.get("sort");
       const similar = url.searchParams.get("similar");
       const unrated = url.searchParams.get("unrated") === "1";
-      const finished = unrated || url.searchParams.get("finished") === "1";
+      const unreviewed = url.searchParams.get("unreviewed") === "1";
+      const finished = unrated || unreviewed || url.searchParams.get("finished") === "1";
       const since = url.searchParams.get("since");
       const items = gallery.filter(
         (i) =>
           (url.searchParams.get("select") !== "failed" || i.status === "failed") &&
           (!finished || i.status === "done") &&
           (!unrated || !i.rating) &&
+          (!unreviewed || !i.libraryReviewedAt) &&
           (!since || Date.parse(i.createdAt) >= Date.parse(since)) &&
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&

@@ -65,8 +65,8 @@ export function DeckButtons({
   const labels: Record<string, string> = {
     both: expanded ? (card.kind === "pair" && card.items.length > 2 ? "All" : "Both") : "Accept",
     discard: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
-    keep: quickRating ? "Skip" : "Accept",
-    like: quickRating ? "Like" : "Super Like",
+    keep: "Accept",
+    like: "Super Like",
     neither: "Pass",
   };
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";

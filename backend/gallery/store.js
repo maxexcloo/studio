@@ -124,6 +124,8 @@ const parse = (row) => withLive(JSON.parse(row.value));
 /* ----------------------------------------------------------------- Queries */
 
 const list = (values) => JSON.stringify([...values].map(String));
+const libraryReviewCutoff = () => Date.now() - 30 * 24 * 60 * 60 * 1000;
+const unreviewedMedia = "coalesce(json_extract(value, '$.libraryReviewedAt'), 0) <= ?";
 
 /**
  * The SQL for a gallery query: each field narrows the rows. `ownerId` is exact ("" is the
@@ -165,6 +167,7 @@ function where(query = {}) {
   if (query.setId) add("set_id = ?", query.setId);
   if (query.rating) add("rating = ?", query.rating);
   if (query.unrated) add("rating IS NULL");
+  if (query.unreviewed) add(unreviewedMedia, libraryReviewCutoff());
   if (query.status !== undefined)
     add("status IN (SELECT value FROM json_each(?))", list([query.status].flat()));
   if (query.notStatus !== undefined)
@@ -789,7 +792,6 @@ export function setGalleryRatings(keys, rating, ownerId) {
   }));
 }
 
-const libraryReviewMs = 30 * 24 * 60 * 60 * 1000;
 const reviewable = `status = 'done' AND unlisted = 0 AND uploaded = 0
   AND type IN ('image', 'video') AND rating IS NULL AND json_extract(value, '$.url') <> ''`;
 
@@ -799,9 +801,9 @@ export function pageLibraryReview(ownerId, seed, cursor, limit, media) {
     `SELECT key, json_extract(value, '$.createdAt') AS createdAt
       FROM studio_gallery WHERE owner_id = ? AND ${reviewable}
       ${media ? "AND type = ?" : ""}
-      AND coalesce(json_extract(value, '$.libraryReviewedAt'), 0) <= ?`,
+      AND ${unreviewedMedia}`,
   )
-    .all(ownerId, ...(media ? [media] : []), Date.now() - libraryReviewMs)
+    .all(ownerId, ...(media ? [media] : []), libraryReviewCutoff())
     .filter(({ key, createdAt }) => hasGalleryMedia({ url: key, createdAt }))
     .map(({ key }) => ({
       key,
@@ -820,16 +822,13 @@ export function pageLibraryReview(ownerId, seed, cursor, limit, media) {
   };
 }
 
-/** Accept keeps a library item unrated. Undo clears that review so it is eligible again. */
+/** Accept records a review without changing the rating. Undo returns the item to Review. */
 export function setLibraryReviewed(ownerId, id, reviewed) {
-  const row = statement(
-    `SELECT value FROM studio_gallery WHERE owner_id = ? AND item_id = ? AND ${reviewable}`,
-  ).get(ownerId, id);
-  if (!row) return false;
-  const { libraryReviewedAt, ...item } = parse(row);
-  if (!hasGalleryMedia(item)) return false;
-  if (reviewed === Boolean(libraryReviewedAt && libraryReviewedAt > Date.now() - libraryReviewMs))
-    return true;
+  const result = findGalleryItem({ ownerId, ids: [id], status: "done", includeDisliked: true });
+  if (!result || !["image", "video"].includes(result.type) || !hasGalleryMedia(result))
+    return false;
+  const { libraryReviewedAt, ...item } = result;
+  if (reviewed === libraryReviewedAt > libraryReviewCutoff()) return true;
   putGalleryItems([reviewed ? { ...item, libraryReviewedAt: Date.now() } : item]);
   return true;
 }
