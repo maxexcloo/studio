@@ -50,7 +50,7 @@ export function ViewerTitle({
       {timestamp && (
         <>
           {" · "}
-          <Text component="time" dateTime={timestamp.value} size="xs" fw={400} c="dimmed">
+          <Text component="time" dateTime={timestamp.value} inherit fw={400} c="dimmed">
             {timestamp.label}
           </Text>
         </>
