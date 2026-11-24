@@ -160,7 +160,7 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
   const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card.getByText("Review Result 0", { exact: true })).toBeVisible();
   await expect.poll(() => asked).toEqual(results.slice(1, 6).map(({ id }) => id));
-  await deck.getByRole("button", { name: "Skip", exact: true }).click();
+  await deck.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(card.getByText("Review Result 1", { exact: true })).toBeVisible();
   await expect.poll(() => asked).toEqual(results.slice(1).map(({ id }) => id));
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
