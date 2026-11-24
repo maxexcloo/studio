@@ -560,7 +560,7 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const ideas = await promptMenu(page, "Prompt");
-  await expect(ideas.getByRole("menuitem", { name: "Recent Prompts", exact: true })).toBeVisible();
+  await expect(ideas.getByRole("menuitem", { name: "Recent", exact: true })).toBeVisible();
   await expect(ideas.getByRole("menuitem", { name: reason, exact: true })).toBeDisabled();
 });
 
