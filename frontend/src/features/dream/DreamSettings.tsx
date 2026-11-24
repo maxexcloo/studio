@@ -98,7 +98,7 @@ export function DreamPreferences() {
         {toggle(
           "useLoadedProfile",
           "Run on Loaded Model",
-          "Skip the idle delay when Studio can confirm that the model and its LoRA settings are already loaded.",
+          "Skip the idle delay when the model is already loaded.",
         )}
         {dream.data.uncensoredAvailable && (
           <>
