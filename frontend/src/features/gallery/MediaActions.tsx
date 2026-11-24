@@ -476,11 +476,13 @@ export function useMediaActions(
     mode: ViewerChange;
     prompt?: string;
   }>();
-  const suggestionPrompt = suggestions?.id === item.id ? suggestions.prompt : undefined;
+  const requested = suggestions?.id === item.id ? suggestions : undefined;
+  const suggestionPrompt = requested?.prompt;
+  const suggestionAction = requested?.mode;
   const steps = useChangeSuggestions({
-    query: nextStepsQuery(item, suggestionPrompt),
-    fresh: () => askNextSteps(item, true, suggestionPrompt),
-    enabled: assistedChanges && suggestions?.id === item.id,
+    query: nextStepsQuery(item, suggestionPrompt, suggestionAction),
+    fresh: () => askNextSteps(item, true, suggestionPrompt, suggestionAction),
+    enabled: assistedChanges && Boolean(requested),
     disabled: draft?.pending,
     onPick: (request) => {
       if (suggestions && !draft?.pending) pick(suggestions.mode, request);
@@ -528,6 +530,7 @@ export function useMediaActions(
             (request) => pick(mode, request),
             () => custom(mode),
             draft?.pending,
+            mode,
           )
         : { templates: [] }),
       others,

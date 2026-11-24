@@ -213,7 +213,14 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").last()).toHaveText("Edit in Composer");
   expect(asked).toEqual([
-    { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
+    {
+      surface: "viewer",
+      action: "edit",
+      jobId: "job-hub",
+      fresh: false,
+      prompt: "An amber bird",
+      itemId: "hub",
+    },
   ]);
   await refresh.click();
   await expect(refresh).toBeDisabled();
@@ -222,6 +229,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
   expect(asked.at(-1)).toEqual({
     surface: "viewer",
+    action: "edit",
     jobId: "job-hub",
     fresh: true,
     prompt: "An amber bird",
@@ -263,11 +271,38 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   const state = await openViewer(page);
   state.gallery[0].title = "Original Amber Bird";
   const asked: unknown[] = [];
+  const suggestionActions: string[] = [];
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        presets: [],
+        themes: [],
+        changes: [
+          {
+            id: "repair",
+            label: "Repair Detail",
+            instruction: "repair the detail",
+            actions: ["edit"],
+          },
+          {
+            id: "viewpoint",
+            label: "New Viewpoint",
+            instruction: "redesign the angle",
+            actions: ["recreate"],
+          },
+        ],
+      },
+    }),
+  );
   const instruction = "Warm the light on the bird, keeping everything else unchanged.";
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
     if (body.surface === "composer") return route.fallback();
-    if (body.surface !== "change") return route.fulfill({ json: { suggestions: steps } });
+    if (body.surface === "viewer") {
+      suggestionActions.push(body.action);
+      return route.fulfill({ json: { suggestions: steps } });
+    }
     asked.push(body);
     const [action] = body.actions;
     return route.fulfill({
@@ -293,7 +328,13 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   };
   let menu = await openAI();
   await expect(menu.getByRole("radio", { name: "Recreate", exact: true })).toBeChecked();
+  await expandAssistantMenu(menu, "Templates");
+  await expect(menu.getByRole("menuitem", { name: "New Viewpoint", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Repair Detail", exact: true })).toHaveCount(0);
+  await backToActionMenu(menu);
+  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
+  expect(suggestionActions).toEqual(["recreate"]);
   await expect(prompt).toHaveValue(steps[0].prompt);
   expect(asked).toEqual([
     expect.objectContaining({
@@ -320,7 +361,13 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   menu = await openAI();
   await menu.getByText("Edit", { exact: true }).click();
   await expect(menu.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
+  await expandAssistantMenu(menu, "Templates");
+  await expect(menu.getByRole("menuitem", { name: "Repair Detail", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "New Viewpoint", exact: true })).toHaveCount(0);
+  await backToActionMenu(menu);
+  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
+  expect(suggestionActions.at(-1)).toBe("edit");
   await expect(prompt).toHaveValue(instruction);
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
   expect(asked.at(-1)).toMatchObject({

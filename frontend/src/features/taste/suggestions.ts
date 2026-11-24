@@ -4,6 +4,7 @@ import {
   type Change,
   type ChangeAction,
   type ImageInspection,
+  type ImageChangeAction,
   type NextStep,
   type PromptIdea,
   type Suggestions,
@@ -58,19 +59,25 @@ type Result = Pick<MediaItem, "id" | "jobId">;
 const resultIds = ({ id, jobId }: Result) => ({ jobId, itemId: id });
 
 /** A finished image's next steps; `fresh` asks for different ones than those saved with it. */
-export const askNextSteps = (result: Result, fresh = false, prompt?: string) =>
+export const askNextSteps = (
+  result: Result,
+  fresh = false,
+  prompt?: string,
+  action?: ImageChangeAction,
+) =>
   post<Suggestions<NextStep>>("/api/suggestions", {
     surface: "viewer",
     ...resultIds(result),
     fresh,
     prompt,
+    action,
   });
 
 /** A finished image's next steps, which the viewer's Suggestions offers. */
-export const nextStepsQuery = (result: Result, prompt?: string) =>
+export const nextStepsQuery = (result: Result, prompt?: string, action?: ImageChangeAction) =>
   queryOptions({
-    queryKey: ["suggestions", "viewer", result.jobId, prompt, result.id],
-    queryFn: () => askNextSteps(result, false, prompt),
+    queryKey: ["suggestions", "viewer", result.jobId, prompt, result.id, action],
+    queryFn: () => askNextSteps(result, false, prompt, action),
     ...cached,
   });
 

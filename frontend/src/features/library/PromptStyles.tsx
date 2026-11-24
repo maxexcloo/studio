@@ -146,6 +146,25 @@ function StyleEditor({
               onChange={(value) => change({ kind: value as Kind })}
             />
           )}
+          {draft.kind === "change" && (
+            <Input.Wrapper label="Show In">
+              <SegmentedControl
+                aria-label="Show In"
+                fullWidth
+                data={[
+                  { value: "both", label: "Edit & Recreate" },
+                  { value: "edit", label: "Edit" },
+                  { value: "recreate", label: "Recreate" },
+                ]}
+                value={draft.actions?.length === 1 ? draft.actions[0]! : "both"}
+                onChange={(value) =>
+                  change({
+                    actions: value === "edit" || value === "recreate" ? [value] : undefined,
+                  })
+                }
+              />
+            </Input.Wrapper>
+          )}
           <TextInput
             label="Name"
             required

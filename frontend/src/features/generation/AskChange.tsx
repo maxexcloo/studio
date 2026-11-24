@@ -13,6 +13,7 @@ import { type PointerEvent, type ReactNode, useMemo, useState } from "react";
 import {
   type Change,
   type ChangeAction,
+  type ImageChangeAction,
   type NextStep,
   type Suggestions,
   maxSuggestions,
@@ -21,7 +22,7 @@ import { type Action, type ActionGroups } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { changeSummary } from "./changeSummary";
-import { type AssistantOption, assistantQuery } from "./PromptAssistant";
+import { type AssistantChangeOption, assistantQuery } from "./PromptAssistant";
 
 import classes from "./AskChange.module.css";
 
@@ -241,18 +242,21 @@ export function suggestionItems(action: Action): Action[] {
 }
 
 export function changeTemplates(
-  options: (AssistantOption & { instruction: string })[],
+  options: AssistantChangeOption[],
   pick: (request: string) => void,
   openCustom: () => void,
   disabled?: boolean,
+  action?: ImageChangeAction,
 ) {
   return {
-    templates: options.map((change): Action => ({
-      id: `change:${change.id}`,
-      label: change.label,
-      disabled,
-      onClick: () => pick(change.instruction),
-    })),
+    templates: options
+      .filter(({ actions }) => !action || !actions || actions.includes(action))
+      .map((change): Action => ({
+        id: `change:${change.id}`,
+        label: change.label,
+        disabled,
+        onClick: () => pick(change.instruction),
+      })),
     custom: [
       {
         id: "custom",
