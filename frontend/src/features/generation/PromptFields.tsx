@@ -16,7 +16,6 @@ import {
   draftSuggestionContext,
 } from "../taste/suggestions";
 import {
-  ChangeSuggestions,
   ProposalLabel,
   assistMenu,
   proposalUndo,
@@ -91,27 +90,9 @@ export function useGenerationPromptAssistant({
   ask,
   ...options
 }: Omit<Parameters<typeof usePromptAssistant>[0], "change"> & { ask?: DraftChange }) {
-  const { input } = options;
-  const context = draftSuggestionContext(input, options.references ?? []);
-  const prompt = (ask?.typed?.prompt ?? input.prompt).trim();
   return usePromptAssistant({
     ...options,
-    change: ask?.available
-      ? {
-          send: ask.sendRequest,
-          pending: ask.pending,
-          suggestions: (pick, render) => (
-            <ChangeSuggestions
-              query={draftStepsQuery(context, prompt)}
-              fresh={() => askDraftSteps(context, prompt, true)}
-              disabled={!prompt || ask.pending}
-              onPick={pick}
-            >
-              {render}
-            </ChangeSuggestions>
-          ),
-        }
-      : undefined,
+    change: ask?.available ? { send: ask.sendRequest, pending: ask.pending } : undefined,
   });
 }
 

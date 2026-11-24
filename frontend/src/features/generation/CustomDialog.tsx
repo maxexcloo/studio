@@ -1,7 +1,6 @@
 import { Button, Modal, Stack } from "@mantine/core";
-import { type ReactNode, useId, useState } from "react";
+import { useId, useState } from "react";
 
-import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
@@ -11,10 +10,7 @@ import { usePhone } from "../../ui/usePhone";
 
 import textClasses from "../../ui/TextBox.module.css";
 
-/**
- * Custom…'s request, sent with `action` or Enter. The last request stays for the next time.
- * Picking a suggestion fills the request and sends it at once.
- */
+/** Custom…'s request, sent with `action` or Enter; a plain box without text tools. */
 export function CustomDialog({
   opened,
   onClose,
@@ -23,7 +19,6 @@ export function CustomDialog({
   label,
   placeholder = "What should change, like “make it night”",
   onSend,
-  suggestions,
   zIndex,
 }: {
   opened: boolean;
@@ -33,10 +28,6 @@ export function CustomDialog({
   label?: string;
   placeholder?: string;
   onSend: (request: string) => void;
-  suggestions?: (
-    pick: (request: string) => void,
-    render: (action: Action) => ReactNode,
-  ) => ReactNode;
   zIndex?: number;
 }) {
   const phone = usePhone();
@@ -44,15 +35,13 @@ export function CustomDialog({
   const [request, setRequest] = useState("");
   // Callers clear the record their action reads as they close.
   const action = useLastWhileClosing(opened ? current : null) ?? current;
-  const send = (text: string) => {
-    onClose();
-    onSend(text);
-  };
   const trimmed = request.trim();
   const submit = () => {
-    if (trimmed) send(trimmed);
+    if (!trimmed) return;
+    onClose();
+    onSend(trimmed);
   };
-  const form = (tools: Action[] = []) => (
+  const content = (
     <form
       className={phone ? textClasses.body : undefined}
       data-text-box={phone ? "request" : undefined}
@@ -71,7 +60,6 @@ export function CustomDialog({
           autosize={!phone}
           minRows={3}
           inline
-          tools={tools}
           submit={phone ? [{ label: action, disabled: !trimmed, onSubmit: submit }] : undefined}
           data-autofocus={!phone || undefined}
           value={request}
@@ -93,15 +81,6 @@ export function CustomDialog({
       </Stack>
     </form>
   );
-  const content = suggestions
-    ? suggestions(
-        (picked) => {
-          setRequest(picked);
-          send(picked);
-        },
-        (action) => form([action]),
-      )
-    : form();
   return phone ? (
     <TextEntrySheet
       opened={opened}
