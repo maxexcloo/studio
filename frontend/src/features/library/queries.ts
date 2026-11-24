@@ -67,6 +67,7 @@ export interface ProfileStats {
   runs: number;
   failed: number;
   liked: number;
+  medianQueueMs?: number;
   medianRunMs?: number;
   failing: boolean;
 }

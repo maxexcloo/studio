@@ -26,8 +26,8 @@ test("profile stats count the last 30 days and flag a profile failing most of it
   });
   const stats = profileStats(
     [
-      run("steady", "done", 1, { rating: "liked", timing: { runMs: 9000 } }),
-      run("steady", "done", 2, { timing: { runMs: 11000 } }),
+      run("steady", "done", 1, { rating: "liked", timing: { queueMs: 400_000, runMs: 9000 } }),
+      run("steady", "done", 2, { timing: { queueMs: 0, runMs: 11000 } }),
       run("steady", "failed", 3),
       run("steady", "cancelled", 1),
       run("steady", "done", 40),
@@ -40,6 +40,7 @@ test("profile stats count the last 30 days and flag a profile failing most of it
     failed: 1,
     liked: 1,
     lastAt: new Date(now - 86_400_000).toISOString(),
+    medianQueueMs: 400_000,
     medianRunMs: 11000,
     failing: false,
   });

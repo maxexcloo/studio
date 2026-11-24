@@ -56,7 +56,7 @@ const kindLabels = { image: "Image", video: "Video" };
 
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
 
-/** The last 30 days' runs, failures, likes and typical time. */
+/** The last 30 days' runs, failures, likes and typical time waiting and running. */
 function profileUse(stats?: ProfileStats) {
   if (!stats) return "No Runs in 30 Days";
   const done = stats.runs - stats.failed;
@@ -64,7 +64,8 @@ function profileUse(stats?: ProfileStats) {
     `${stats.runs} ${stats.runs === 1 ? "Run" : "Runs"} in 30 Days`,
     stats.failed && `${percent(stats.failed, stats.runs)} Failed`,
     done > 0 && `${percent(stats.liked, done)} Liked`,
-    stats.medianRunMs && `${Math.round(stats.medianRunMs / 1000)} s`,
+    stats.medianQueueMs !== undefined && `${Math.round(stats.medianQueueMs / 1000)} s Queue`,
+    stats.medianRunMs && `${Math.round(stats.medianRunMs / 1000)} s Run`,
   ]
     .filter(Boolean)
     .join(" · ");

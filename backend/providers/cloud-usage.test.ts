@@ -70,6 +70,27 @@ test("Grok usage comes from its weekly credits and is read at most once a minute
   assert.equal(calls.length, 4);
 });
 
+test("A failed read keeps Grok's last usage until its window resets", async () => {
+  let time = 0;
+  let answer = { status_code: 200, body: JSON.stringify(billing) };
+  const usage = createCloudUsage({
+    base: "http://cliproxy",
+    managementKey: "management",
+    fetchImpl: management(() => answer).fetchImpl,
+    now: () => time,
+  });
+  const known = await usage();
+  answer = { status_code: 502, body: "" };
+  time = 60_000;
+  await usage();
+  await setImmediate();
+  assert.deepEqual(await usage(), known);
+  time = Date.parse(billing.config.currentPeriod.end);
+  await usage();
+  await setImmediate();
+  assert.deepEqual(await usage(), [{ label: "Grok", reason: "Grok's billing returned HTTP 502." }]);
+});
+
 test("Unreadable Grok usage reads as unknown", async () => {
   const { fetchImpl } = management(() => ({ status_code: 401, body: "" }));
   assert.deepEqual(

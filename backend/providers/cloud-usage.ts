@@ -28,7 +28,8 @@ const billing = {
 
 /**
  * Each Grok account's share of its weekly credits, read through CLIProxyAPI's management API at
- * most once per `cacheMs`. A failure reads as unknown; the last reading answers while the next loads.
+ * most once per `cacheMs`. The last reading answers while the next loads, and a failed read keeps an
+ * account's last usage until its window resets; without one it reads as unknown.
  */
 export function createCloudUsage({
   base,
@@ -42,7 +43,8 @@ export function createCloudUsage({
     const response = await fetchImpl(management + route, {
       method: body ? "POST" : "GET",
       redirect: "error",
-      signal: AbortSignal.timeout(5000),
+      // Grok's billing sometimes takes over five seconds to answer.
+      signal: AbortSignal.timeout(15_000),
       headers: {
         Authorization: `Bearer ${managementKey}`,
         ...(body ? { "content-type": "application/json" } : {}),
@@ -94,10 +96,15 @@ export function createCloudUsage({
   let current: CloudUsage[] | undefined;
   let until = 0;
   let pending: Promise<void> | undefined;
+  const lastKnown = (reading: CloudUsage) => {
+    const last = current?.find((item) => item.label === reading.label);
+    const live = last?.used !== undefined && !(last.resetsAt && Date.parse(last.resetsAt) <= now());
+    return reading.used === undefined && live ? last : reading;
+  };
   return async () => {
     if (now() >= until && !pending)
       pending = read().then((usage) => {
-        current = usage;
+        current = usage.map(lastKnown);
         until = now() + cacheMs;
         pending = undefined;
       });
