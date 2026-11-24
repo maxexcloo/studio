@@ -14,8 +14,8 @@ function radianceBase(model, family) {
 }
 
 /**
- * Noct takes no optional LoRAs and stays on its own base; its profile's fixed adapters (Lightning)
- * still run where the base takes them. Other Radiance models may have a separate LoRA model.
+ * Noct stays on its own base and takes LoRAs where that base does (bf16, not IQ8R).
+ * Other Radiance models may have a separate LoRA model.
  */
 export function workflowLoraBase(workflow, modelName = "") {
   const { defaults, family, graph, loraStack } = workflow;
@@ -24,8 +24,8 @@ export function workflowLoraBase(workflow, modelName = "") {
     Object.values(graph || {}).find((node) => isRadianceNode(node?.class_type));
   const declared = String(defaults?.model || node?.inputs?.model || "");
   const model = String(modelName || declared);
-  const noct = [declared, model].find(isNoct);
-  if (noct) return { model: noct, family, accepts: false };
+  const noct = [model, declared].find(isNoct);
+  if (noct) return radianceBase(noct, family);
   if (!isRadianceNode(node?.class_type)) return undefined;
   return radianceBase(String(loraStack?.model || model), family);
 }

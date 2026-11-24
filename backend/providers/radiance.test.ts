@@ -260,7 +260,7 @@ test("Radiance counts as idle only while its live view shows every card free and
 });
 
 test("one-GPU Qwen and Noct fit their actual conditioning limits without constraining FLUX3", () => {
-  for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-lightning-iq8r"]) {
+  for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-iq8r"]) {
     // 1792 × 1024 shrinks to 1344 × 768.
     const wide = imageRequest({ ...image, model, width: 1792 }).body as { size: string };
     assert.equal(wide.size, "1344x768");

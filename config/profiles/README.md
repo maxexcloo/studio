@@ -189,8 +189,8 @@ as `[{"name":"style.safetensors","strength":0.8}]`, or `[]` when none are
 chosen. The prompt text is left as written; Studio sends the LoRAs in the
 Radiance request's `loras` field, named without `.safetensors`.
 
-Radiance's IQ8R models and Noct bases take no LoRAs. For other bases, a stack's
-`model` names the (bf16) model
+Radiance's IQ8R models take no LoRAs, and Noct runs them only on its own bf16
+base. For other bases, a stack's `model` names the (bf16) model
 a run with LoRAs uses instead, and its `loras` the adapters that model runs
 ahead of the request's, such as a speed LoRA the default model has baked in:
 `"loraStack": {"adapter": "radiance-tags-v1", "node": "1", "max": 4, "model":
