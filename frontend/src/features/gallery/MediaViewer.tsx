@@ -28,6 +28,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { useRemembered } from "../auth/useRemembered";
 import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
@@ -46,18 +47,12 @@ import { VideoPlayButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
+import { zoomImage } from "./zoomImage";
 
 import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
   import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
 );
-// The image chunk loads once the page is idle; a viewer opened after that renders it directly
-// instead of flashing the Suspense fallback.
-let zoomImage: typeof import("./ZoomImage").ZoomImage | undefined;
-const loadZoomImage = () =>
-  import("./ZoomImage").then((module) => ({ default: (zoomImage = module.ZoomImage) }));
-const LazyZoomImage = lazy(loadZoomImage);
-(window.requestIdleCallback || setTimeout)(() => void loadZoomImage());
 
 // Versions don't depend on progress, so the viewer skips the queue's progress polls; the strips
 // read progress themselves.
@@ -209,37 +204,30 @@ function ViewerVideo({
 
 /**
  * Decodes the display copies (a video's still) two either side of the current one, so navigation
- * lands on a picture.
+ * lands on a picture, and downloads the videos either side so they start at once.
  */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
-  const held = useRef(new Map<string, HTMLImageElement>());
-  const urls =
+  const neighbours =
     index < 0 || items.length < 2
       ? []
       : [1, -1, 2, -2]
           .map((offset) => items[index + offset])
-          .filter((item) => item?.url && item.status === "done")
-          .map((item) =>
-            item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
-          )
-          .filter((url) => url !== undefined);
-  const key = urls.join("\n");
-  useEffect(() => {
-    const keep = new Map<string, HTMLImageElement>();
-    for (const url of urls) {
-      let image = held.current.get(url);
-      if (!image) {
-        image = new window.Image();
-        image.decoding = "async";
-        image.fetchPriority = "low";
-        image.src = url;
-        void image.decode().catch(() => {});
-      }
-      keep.set(url, image);
-    }
-    for (const [url, image] of held.current) if (!keep.has(url)) image.src = "";
-    held.current = keep;
-  }, [key]);
+          .filter((item) => item?.url && item.status === "done");
+  usePrefetchImages(
+    neighbours
+      .map((item) =>
+        item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
+      )
+      .filter((url) => url !== undefined),
+    4,
+  );
+  usePrefetchVideos(
+    neighbours
+      .slice(0, 2)
+      .filter((item) => item.type === "video")
+      .map((item) => playbackUrl(mediaSource(item).url)),
+    3,
+  );
 }
 
 export function MediaViewer({
@@ -352,7 +340,7 @@ export function MediaViewer({
     }
     shownId.current = item.id;
   }, [item.id]);
-  const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
+  const [ZoomImage] = useState(zoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join their source's strip.

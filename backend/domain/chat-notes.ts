@@ -43,16 +43,24 @@ export function createChatNotes({
       )
         throw failure("List the note's results by id.");
       const notes = list(ownerId);
-      // The same context again (each generate of a chat) is one note with all its results.
-      const same = notes.find((other) => other.text === text.trim());
+      const wording = text.trim();
+      const projectId = project || undefined;
+      const cardId = typeof card === "string" && card ? card : undefined;
+      const same = notes.find(
+        (other) =>
+          other.text === wording &&
+          other.project === projectId &&
+          other.card === cardId &&
+          Boolean(other.results?.length) === Boolean(results?.length),
+      );
       const all = [...new Set([...(results ?? []), ...(same?.results ?? [])])].slice(0, 30);
       const note: ChatNote = {
-        id: randomUUID(),
-        text: text.trim(),
+        id: same?.id ?? randomUUID(),
+        text: wording,
         at: new Date(now()).toISOString(),
-        ...(project ? { project } : {}),
+        ...(projectId ? { project: projectId } : {}),
         ...(all.length ? { results: all } : {}),
-        ...(typeof card === "string" && card ? { card } : {}),
+        ...(cardId ? { card: cardId } : {}),
       };
       return write(ownerId, [note, ...notes.filter((other) => other !== same)]);
     },

@@ -654,6 +654,8 @@ const taste = createTaste({
   promptWriter: textWriter,
   online: textOnline,
   updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
+  galleryLikes: (ownerId, count) =>
+    galleryItems({ ownerId, rating: "liked", status: "done", notDream: true, sample: count }),
 });
 /**
  * Hears which of an account's items were rated, by hand or by animating a photo: each with its
@@ -1108,8 +1110,9 @@ const dream = createDream({
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
     return dreamVideoProfile(dreamCatalogue(models).profiles, {
       ...choice,
-      preferred: kindDefaults(accountPreferences(ownerId), "videos"),
-      defaultId: models.defaults?.videoModel,
+      defaultId:
+        kindDefaults(accountPreferences(ownerId), "videos")[choice.backend] ||
+        models.defaults?.videoModel,
       localRunning: models.backends?.video?.available !== false,
       localParked: models.backends?.video?.parked === true,
     });

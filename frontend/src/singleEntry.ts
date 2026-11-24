@@ -1,6 +1,8 @@
 import type { HistoryRouterProps, Location } from "react-router";
 
 const key = "studio-history";
+/** How many left locations Back can return to. */
+const kept = 50;
 
 /**
  * Keeps the app in one browser history entry: pushes replace it and remember the location they
@@ -12,10 +14,17 @@ export function singleEntry(
   storage: Pick<Storage, "getItem" | "setItem">,
 ) {
   const behind: Location[] = JSON.parse(storage.getItem(key) ?? "[]");
-  const save = () => storage.setItem(key, JSON.stringify(behind));
+  const save = () => {
+    try {
+      storage.setItem(key, JSON.stringify(behind));
+    } catch {
+      /* A full storage only shortens Back after a reload. */
+    }
+  };
   const { replace } = history;
   history.push = (to, state) => {
     behind.push(history.location);
+    behind.splice(0, behind.length - kept);
     save();
     replace(to, state);
   };

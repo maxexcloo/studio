@@ -3,7 +3,7 @@ import type { QueueJob } from "../../types";
 export function queuePollInterval(jobs: Pick<QueueJob, "status" | "progress">[] = []) {
   let interval = 3000;
   for (const { status, progress } of jobs) {
-    if (status === "saving") return 350;
+    if (status === "saving") return 750;
     if (status === "running") {
       const { phase, steps, estimated, value = 0, max = 0 } = progress ?? {};
       if (
@@ -11,7 +11,7 @@ export function queuePollInterval(jobs: Pick<QueueJob, "status" | "progress">[] 
         phase === "Saving" ||
         (steps && !estimated && max > 0 && value >= max - 1)
       )
-        return 350;
+        return 750;
     }
     if (status === "running" || status === "starting" || status === "writing") interval = 1500;
     if (status === "queued" || status === "waiting") interval = Math.min(interval, 2000);

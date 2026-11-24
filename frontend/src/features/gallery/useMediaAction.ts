@@ -16,6 +16,7 @@ import type { Action } from "../../ui/ActionBar";
 import { useRemembered } from "../auth/useRemembered";
 import { initialInput, modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { lengthChoices } from "../generation/length";
+import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import {
   backendLabel,
@@ -23,6 +24,7 @@ import {
   generationInput,
   isProfile,
   profileForBackend,
+  profileForLoras,
   profileName,
   takesReferences,
 } from "../generation/payload";
@@ -30,7 +32,7 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
 import { animationInput, retainedAnimationProfile } from "./animateLength";
-import { automaticEditProfile } from "./mediaProfiles";
+import { automaticEditProfile, enabledLoras } from "./editProfile";
 import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";
@@ -247,6 +249,21 @@ export async function mediaDraft(
     operation === "animate" || operation === "extend"
       ? animationInput({ ...initialInput, kind: "video" }, profile, seconds)
       : undefined;
+  // A reference run without a denoise of its own (an edit model's) records none.
+  const run = profileForBackend(profile, profileBackend, true)!;
+  const reference = run.imageModes?.reference;
+  const takesDenoise =
+    (reference?.capabilities ?? run.capabilities).denoise === true ||
+    (reference?.defaults ?? run.defaults).denoise !== undefined;
+  // An edit keeps the source's LoRAs where its editor runs them (a model of the same family).
+  const sourceLoras = operation === "refine" ? enabledLoras(item.settings) : undefined;
+  const loraRun = sourceLoras?.length ? profileForLoras(profile, profileBackend, true) : undefined;
+  const loraInfo = loraRun?.capabilities.lora
+    ? (await client.ensureQueryData(loraInfoQuery)).loras
+    : undefined;
+  const loras = loraInfo
+    ? sourceLoras!.filter((lora) => compatibleLoras(loraRun, loraInfo).includes(lora.name))
+    : [];
   return {
     profile,
     choice,
@@ -267,6 +284,8 @@ export async function mediaDraft(
         ...(operation === "image"
           ? { ...source?.input, ...item.settings }
           : editProfile.imageModes?.reference?.defaults),
+        ...(operation !== "image" && !takesDenoise && { denoise: undefined }),
+        ...(operation === "refine" && { loras }),
         ...(timing ? { duration: timing.duration, frames: timing.frames, fps: timing.fps } : {}),
         kind: targetKind,
         profileId: profile.id,
