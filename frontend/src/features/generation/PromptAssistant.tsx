@@ -422,7 +422,7 @@ export function usePromptAssistant({
     if (style) setPresetId(style);
     assistance.mutate({ action, preset: style });
   };
-  const custom = info.presets.find((item) => item.id === "custom");
+  const custom = info.presets.some((item) => item.id === "custom");
   const styles = info.presets.filter((item) => item.id !== "custom");
   const templates: ToolAction[] = styles.map((item) => ({
     id: `style:${item.id}`,
@@ -439,7 +439,6 @@ export function usePromptAssistant({
           {
             id: "custom",
             label: "Custom…",
-            description: custom?.description ?? "Your own instruction",
             icon: icons.custom,
             // A change can write a prompt from nothing; the Custom style rewrites one.
             disabled: !change && disabled,

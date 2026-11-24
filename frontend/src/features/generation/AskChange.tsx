@@ -263,7 +263,6 @@ export function changeTemplates(
       {
         id: "custom",
         label: "Custom…",
-        description: "Your own instruction",
         icon: icons.custom,
         disabled,
         onClick: openCustom,
