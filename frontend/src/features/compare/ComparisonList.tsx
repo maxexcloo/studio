@@ -112,7 +112,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
         <Alert color="red" title="Couldn't Load Comparisons">
           <Stack gap="sm" align="flex-start">
             {comparisons.error.message}
-            <Button variant="subtle" onClick={() => void comparisons.refetch()}>
+            <Button size="compact-sm" variant="default" onClick={() => void comparisons.refetch()}>
               Retry
             </Button>
           </Stack>
