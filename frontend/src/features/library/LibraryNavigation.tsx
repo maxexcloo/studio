@@ -3,8 +3,8 @@ import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Personal records first, then the shared Models and Prompting an administrator manages; each
-// group alphabetical, apart from Presets leading its own cards.
+// Personal records first, then the shared Models, Prompting and Templates an administrator manages;
+// each group alphabetical, apart from Presets leading its own cards.
 export const librarySections = {
   presets: {
     label: "Presets",
@@ -68,29 +68,34 @@ export const librarySections = {
     admin: true,
     group: "Prompting",
   },
-  promptInstructions: {
-    label: "Prompt Instructions",
+  instructions: {
+    label: "Instructions",
     description:
-      "Manage the instructions Studio's writers follow for prompts, Dream, captions and reviews. Every saved version is kept.",
+      "Manage the instructions Studio's writers follow for prompts, suggestions, Dream, captions and reviews. Every saved version is kept.",
     icon: icons.prompt,
     admin: true,
     group: "Prompting",
   },
-  promptStyles: {
-    label: "Prompt Styles",
-    description:
-      "Manage the assistant's styles and templates for Improve Prompt, Animate and Edit.",
+  animateTemplates: {
+    label: "Animate",
+    description: "Manage the templates Animate offers.",
+    icon: icons.animate,
+    admin: true,
+    group: "Templates",
+  },
+  changeTemplates: {
+    label: "Edit & Recreate",
+    description: "Manage the templates Edit and Recreate offer.",
+    icon: icons.edit,
+    admin: true,
+    group: "Templates",
+  },
+  improveTemplates: {
+    label: "Improve Prompt",
+    description: "Manage the templates Improve Prompt offers.",
     icon: icons.promptStyles,
     admin: true,
-    group: "Prompting",
-  },
-  suggestionInstructions: {
-    label: "Suggestion Instructions",
-    description:
-      "Manage the instructions behind Suggestions and the changes, ideas and proposals Studio offers. Every saved version is kept.",
-    icon: icons.suggestionInstructions,
-    admin: true,
-    group: "Prompting",
+    group: "Templates",
   },
 };
 /** Administrators see the whole Library; other accounts only their Presets and cards. */

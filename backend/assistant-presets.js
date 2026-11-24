@@ -1,4 +1,4 @@
-// The built-in styles that seed Library › Prompt Styles (prompt-styles.js) in a data folder that has
+// The built-in styles that seed Library › Templates (prompt-styles.js) in a data folder that has
 // none: Improve Prompt's rewrite styles, Animate's themes (prompt-animate.js), then Edit and
 // Recreate's fixed AI changes, each asked for as a suggestion's request is. An Improve
 // Prompt style is an instruction block added after the profile's guide; a guide may replace one

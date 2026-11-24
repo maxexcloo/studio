@@ -263,7 +263,7 @@ export function registerAssistantRoutes(
         defaultTextSide: defaultTextSide(environment),
         models,
         defaultPreset: promptStyleStore().defaultId(),
-        // Library › Prompt Styles' menus: Improve Prompt's styles, Animate's themes and fixed AI edits.
+        // Library › Templates' menus: Improve Prompt's styles, Animate's themes and fixed AI edits.
         ...Object.fromEntries(
           [
             ["presets", "improve"],

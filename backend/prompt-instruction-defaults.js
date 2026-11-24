@@ -1,4 +1,4 @@
-// `suggestions` files an instruction under Library › Suggestion Instructions rather than Prompt Instructions.
+// `suggestions` flags an instruction as a Suggestions writer in Library › Instructions.
 export const promptInstructionDefaults = {
   animate: {
     label: "Animate & Extend",

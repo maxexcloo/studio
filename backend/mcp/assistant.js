@@ -100,7 +100,7 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
  * profile id or name the way generate does, and `memory` is createChatAssistantMemory's.
  */
 export function registerAssistantTools({ tool, server, media, owner, profileOf, memory }) {
-  // Library › Prompt Styles' enabled styles. Custom is the UI's free-text instruction; the chat
+  // Library › Templates' enabled styles. Custom is the UI's free-text instruction; the chat
   // restyles with its own words instead.
   const presetIds = () =>
     promptStyleStore()

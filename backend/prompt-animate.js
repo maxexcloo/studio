@@ -6,7 +6,7 @@ import { isCloudProfile } from "../shared/profiles.ts";
  * always knows the frame: it sees it when the running text model reads images, and otherwise reads
  * the frame's gallery caption; the prompt that made the frame is guidance on top. It also gets the
  * video profile's prompting guide, the clip's length and frame rate, and whether the model makes
- * sound. Its themes are Library › Prompt Styles' Animate records; an uncensored theme, and
+ * sound. Its themes are Library › Templates' Animate records; an uncensored theme, and
  * explicit wording in a Custom instruction, need Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }
@@ -30,7 +30,7 @@ import { families } from "./family-catalogue.js";
 import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
-/** An enabled Animate theme (Library › Prompt Styles) or Custom, by id; null otherwise. */
+/** An enabled Animate theme (Library › Templates) or Custom, by id; null otherwise. */
 const animateTheme = (id) => promptStyleStore().style("animate", id);
 
 // Phrases that tell a video model nothing; the writer is told to leave them out. Not "cinematic",
