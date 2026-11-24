@@ -58,7 +58,7 @@ const maxVideoReferences = 9;
 const maxImageReferences = 10;
 const maxVideoBytes = 2 * 1024 ** 3;
 
-/** FastH3, H3 distilled to eight steps: text to video only, with no LoRA slot. */
+/** FastH3, H3 distilled to eight steps, with no LoRA slot. */
 export const isFastH3 = (model: string) => model.toLowerCase().includes("fasth3");
 /** LTX-2.5: text or a first frame to video; the distilled release runs only its eight steps. */
 const isLtx = (model: string) => model.toLowerCase().startsWith("ltx-");
@@ -299,7 +299,6 @@ export function videoRequest(values: Values, images: RadianceReference[] = []) {
   const start = images.filter((image) => image.role === "start");
   const end = images.filter((image) => image.role === "end");
   const references = images.filter((image) => !["start", "end"].includes(image.role || ""));
-  if (images.length && isFastH3(model)) throw new Error("FastH3 makes text-to-video only.");
   if (start.length > 1 || end.length > 1) throw new Error("Choose one start and one end frame.");
   if (isLtx(model) && (end.length || references.length))
     throw new Error("LTX-2.5 starts from a first frame only.");
