@@ -90,15 +90,21 @@ const controlMotion = {
   transitionDuration: "var(--studio-motion-duration)",
   transitionTimingFunction: "var(--studio-ease-enter)",
 };
-// Phone overlays rise into place. Desktop overlays grow slightly from their trigger.
+// Anchored overlays keep a consistent containing block for their nested dropdowns in WebKit.
+const rise = "translateY(var(--studio-overlay-rise, 0px))";
 const raise = {
   in: { opacity: 1, transform: "translateY(0) scale(1)" },
-  out: {
-    opacity: 0,
-    transform:
-      "translateY(var(--studio-overlay-rise, 0px)) scale(var(--studio-overlay-scale, 0.98))",
-  },
+  out: { opacity: 0, transform: `${rise} scale(var(--studio-overlay-scale, 0.98))` },
   transitionProperty: "transform, opacity",
+};
+// A lasting identity matrix on a full-screen scroller with sticky children flickers on iOS.
+const dialogRaise = { ...raise, in: { ...raise.in, transform: "none" } };
+// A full-screen drawer rises a little like a full-screen dialog, rather than sliding its whole height
+// over a backdrop that doesn't fade (theme.module.css).
+export const fullScreenRise = {
+  in: { transform: "none" },
+  out: { transform: rise },
+  transitionProperty: "transform",
 };
 export type Rounding = Appearance["rounding"];
 
@@ -160,6 +166,7 @@ export function studioTheme({
   const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
   const transitionProps = motionTransition(motionDuration);
   const popupTransition = { ...transitionProps, transition: raise };
+  const dialogTransition = { ...transitionProps, transition: dialogRaise };
   return createTheme({
     primaryColor,
     // Match both schemes so contrast resolves against the displayed amber shade.
@@ -355,7 +362,7 @@ export function studioTheme({
           centered: true,
           closeButtonProps: { "aria-label": "Close" },
           overlayProps: { backgroundOpacity: 0.55 },
-          transitionProps: popupTransition,
+          transitionProps: dialogTransition,
           radius: "lg",
           size: "lg",
         },
@@ -371,7 +378,12 @@ export function studioTheme({
           ]
             .filter(Boolean)
             .join(" "),
-          ...(props.fullScreen && { overlay: classes.fullScreenOverlay }),
+          // The viewer draws its own see-through backdrop and fades in over the page.
+          ...(props.fullScreen &&
+            props.variant !== "viewer" && {
+              content: `${classes.dialogContent} ${classes.fullScreen}`,
+              overlay: classes.fullScreenOverlay,
+            }),
         }),
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
         // under the title, as they would with Mantine's sticky header over a scrolling content.
@@ -398,7 +410,7 @@ export function studioTheme({
         }),
       }),
       // Compound modals share the Modal styles and take their default props from their own Root.
-      ModalRoot: { defaultProps: { transitionProps: popupTransition } },
+      ModalRoot: { defaultProps: { transitionProps: dialogTransition } },
       NavLink: NavLink.extend({
         styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },
       }),
