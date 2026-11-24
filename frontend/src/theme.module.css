@@ -75,6 +75,12 @@
   backdrop-filter: none !important;
 }
 
+/* Neither fades as it rises in or out: fading would cross-fade the whole screen. */
+.fullScreen,
+.fullScreenOverlay {
+  opacity: 1 !important;
+}
+
 .dialogBody {
   min-height: 0;
 }

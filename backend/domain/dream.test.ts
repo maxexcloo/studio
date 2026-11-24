@@ -87,6 +87,8 @@ function fixture(t: TestContext, catalogue = profiles) {
       ]),
     ) as Record<string, DreamAccess | null>,
     onlineCalls: [] as { kind: string; backend: string }[],
+    /** Whether cloud work holds back near its usage limit. */
+    cloudHeld: false,
     online: { cloud: true, text: true, image: true, video: true } as Record<
       string,
       boolean | "parked"
@@ -237,6 +239,7 @@ function fixture(t: TestContext, catalogue = profiles) {
         media: reach(state.online[backend === "cloud" ? "cloud" : kind]),
       };
     },
+    cloudHeld: async () => state.cloudHeld,
     slots: () => state.slots,
     text: () => ({ side: "cloud", uncensored: false }),
     writer,
@@ -686,7 +689,8 @@ test("A verdict that leaves the deck low starts Dream's next work without waitin
   assert.equal((await request(`/${card.id}/keep`, {})).status, 200);
   for (let turn = 0; turn < 100 && !live("alice").length; turn++)
     await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(live("alice").length, 1);
+  const cards = new Set(live("alice").map((job) => job.dream?.pair?.id ?? job.id));
+  assert.equal(cards.size, 1);
 });
 
 test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or liked images", async (t) => {
@@ -1373,7 +1377,14 @@ async function serve(
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream, projects, inbox, listed: (items) => items });
+  registerDreamRoutes(app as never, {
+    dream,
+    projects,
+    inbox,
+    // dream-digest.test.ts serves This Week.
+    digest: () => Promise.reject(new Error("Not served here.")),
+    listed: (items) => items,
+  });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -3576,6 +3587,19 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   denied.state.access.alice = null;
   const request = await serve(t, denied);
   assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 403);
+});
+
+test("Near the cloud's usage limit Dream's Cloud runs locally, keeping the account's choice", async (t) => {
+  const cloud = { id: "custom:cloud-image", provider: "cliproxyapi", kind: "image" };
+  const fx = fixture(t, [...profiles, cloud]);
+  await fx.dream.save("alice", { enabled: true, imageBackend: "cloud" });
+  fx.state.cloudHeld = true;
+  const local = await fx.dreamOnce();
+  assert.notEqual(local?.input.profileId, cloud.id);
+  assert.equal(fx.dream.read("alice").settings.imageBackend, "cloud");
+  fx.state.cloudHeld = false;
+  fx.dream.keep("alice", String(fx.dream.unseen("alice")[0].id));
+  assert.equal((await fx.dreamOnce())?.input.profileId, cloud.id);
 });
 
 test("Dream sets aside a profile whose last three jobs failed until the failures age out", async (t) => {

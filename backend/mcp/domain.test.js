@@ -154,3 +154,36 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("Near Grok's usage limit a cloud default runs locally, and an asked-for cloud run still runs", async (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "studio-mcp-held-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  let held = true;
+  const media = new McpMedia({
+    dataDir: directory,
+    publicUrl: "http://localhost:1",
+    cloudHeld: async () => held,
+    async domainRequest() {
+      return {
+        status: 200,
+        payload: {
+          defaults: { imageModel: "grok-image" },
+          profiles: [
+            { id: "grok-image", kind: "image", label: "Grok Image", provider: "cliproxyapi" },
+            { id: "flux", kind: "image", label: "Flux" },
+          ],
+        },
+      };
+    },
+  });
+  const local = await media.choose("owner", { kind: "image" });
+  assert.equal(local.profile.id, "flux");
+  assert.match(local.note, /Grok is near its weekly usage limit, so this runs locally/);
+  const asked = await media.choose("owner", { kind: "image", cloud: true });
+  assert.equal(asked.profile.id, "grok-image");
+  assert.match(asked.note, /this still uses it as asked/);
+  held = false;
+  const usual = await media.choose("owner", { kind: "image" });
+  assert.equal(usual.profile.id, "grok-image");
+  assert.equal(usual.note, "");
+});

@@ -28,6 +28,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { useRemembered } from "../auth/useRemembered";
 import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
@@ -203,37 +204,30 @@ function ViewerVideo({
 
 /**
  * Decodes the display copies (a video's still) two either side of the current one, so navigation
- * lands on a picture.
+ * lands on a picture, and downloads the videos either side so they start at once.
  */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
-  const held = useRef(new Map<string, HTMLImageElement>());
-  const urls =
+  const neighbours =
     index < 0 || items.length < 2
       ? []
       : [1, -1, 2, -2]
           .map((offset) => items[index + offset])
-          .filter((item) => item?.url && item.status === "done")
-          .map((item) =>
-            item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
-          )
-          .filter((url) => url !== undefined);
-  const key = urls.join("\n");
-  useEffect(() => {
-    const keep = new Map<string, HTMLImageElement>();
-    for (const url of urls) {
-      let image = held.current.get(url);
-      if (!image) {
-        image = new window.Image();
-        image.decoding = "async";
-        image.fetchPriority = "low";
-        image.src = url;
-        void image.decode().catch(() => {});
-      }
-      keep.set(url, image);
-    }
-    for (const [url, image] of held.current) if (!keep.has(url)) image.src = "";
-    held.current = keep;
-  }, [key]);
+          .filter((item) => item?.url && item.status === "done");
+  usePrefetchImages(
+    neighbours
+      .map((item) =>
+        item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
+      )
+      .filter((url) => url !== undefined),
+    4,
+  );
+  usePrefetchVideos(
+    neighbours
+      .slice(0, 2)
+      .filter((item) => item.type === "video")
+      .map((item) => playbackUrl(mediaSource(item).url)),
+    3,
+  );
 }
 
 export function MediaViewer({
@@ -483,6 +477,7 @@ export function MediaViewer({
         returnFocus={false}
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
+        variant="viewer"
         classNames={{
           content: classes.content,
           body: classes.body,
@@ -826,7 +821,6 @@ export function MediaViewer({
                       </ActionBarSurface>
                     ) : (
                       <MediaViewerActions
-                        key={displayed.id}
                         item={displayed}
                         compare={compare}
                         iterate={iterate}

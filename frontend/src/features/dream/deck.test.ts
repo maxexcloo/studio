@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { MediaItem } from "../../types";
-import { deckCards } from "./deck.ts";
+import { deckCards, deckPrefetch } from "./deck.ts";
 import type { DreamItem } from "./queries";
 
 const items = (...ids: string[]) => ids.map((id) => ({ id, type: "image" }) as MediaItem);
@@ -106,4 +106,20 @@ test("Undo restores the exact comparison ahead of arrivals without repeating or 
   // An externally removed card and a previous media choice cannot pin the deck.
   assert.deepEqual(keys(deckCards(arrivals, { current })), ["new", "new-pair"]);
   assert.deepEqual(deckCards([...original, ...arrivals], { current, media: "video" }), []);
+});
+
+test("the deck loads the next cards' pictures ahead and the next two videos", () => {
+  const image = (id: string) =>
+    ({ id, type: "image", url: `/${id}.png`, thumbnailUrl: `/${id}.jpg` }) as DreamItem;
+  const video = (id: string) =>
+    ({ id, type: "video", url: `/${id}.mp4`, thumbnailUrl: `/${id}.jpg` }) as DreamItem;
+  const cards = [image("top"), video("v1"), image("b"), video("v2"), video("v3")].map((item) => ({
+    kind: "dream" as const,
+    key: item.id,
+    item,
+  }));
+  assert.deepEqual(deckPrefetch(cards), {
+    images: ["/v1.jpg", "/b.png", "/v2.jpg", "/v3.jpg"],
+    videos: ["/v1.mp4", "/v2.mp4"],
+  });
 });

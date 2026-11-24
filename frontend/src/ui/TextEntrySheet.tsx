@@ -1,6 +1,8 @@
 import { Drawer, type DrawerProps, FocusTrap, Group, VisuallyHidden } from "@mantine/core";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { fullScreenRise, motionTransition } from "../theme";
+import { useMotionDuration } from "./Appearance";
 import { closeWhenTop, layerAbove, popupLayer } from "./popupClicks";
 import { useKeyboard, useKeyboardDrop, useTypingIn } from "./useKeyboard";
 import { useSwipeClose } from "./useSwipeClose";
@@ -82,6 +84,7 @@ export function TextEntrySheet({
     onClose,
     props.opened && !hidden && !field && !keyboard.inset,
   );
+  const motion = motionTransition(useMotionDuration());
   return (
     <Drawer.Root
       {...props}
@@ -89,6 +92,7 @@ export function TextEntrySheet({
       onClose={closeWhenTop(sheetId, onClose)}
       position="bottom"
       size="100%"
+      transitionProps={{ ...motion, transition: fullScreenRise }}
       classNames={{
         content: classes.sheet,
         header: fieldTitle ? undefined : classes.header,

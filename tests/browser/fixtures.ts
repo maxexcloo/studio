@@ -1529,6 +1529,8 @@ export async function serveDream(
     proposals?: any[];
     /** When the visit before this one ended. */
     since?: string;
+    /** What Dream › This Week shows. */
+    week?: import("../../shared/dream").DreamDigest<any>;
   } = {},
 ) {
   const state = {
@@ -1663,6 +1665,7 @@ export async function serveDream(
       return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream") return route.fulfill({ json: show() });
+    if (path === "/api/dream/week") return route.fulfill({ json: options.week });
     if (path === "/api/dream/history")
       return route.fulfill({
         json: {

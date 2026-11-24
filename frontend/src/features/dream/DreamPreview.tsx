@@ -306,6 +306,7 @@ export function DreamPreview({
       opened
       onClose={closeIfTop}
       fullScreen
+      variant="viewer"
       withCloseButton={false}
       padding={0}
       title={<VisuallyHidden>Preview</VisuallyHidden>}

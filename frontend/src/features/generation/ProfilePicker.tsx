@@ -7,6 +7,7 @@ import { isCloudProfile } from "../../../../shared/profiles";
 import type { GenerationInput, Models, Profile } from "../../types";
 import { compareNames } from "../../ui/DataTable";
 import { useIsAdmin } from "../auth/AccountGate";
+import { servicesStatusQuery } from "../runtime/RuntimePanel";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect, type ChipSelectProps } from "./ChipSelect";
 import {
@@ -35,6 +36,19 @@ function profileReadiness(profile: Profile, workers: Models["workers"]) {
         workloads: assigned.flatMap((worker) => worker.workloads ?? []),
       }
     : { label: "Offline", color: "red" };
+}
+
+/**
+ * Each profile's readiness for this account; a cloud profile reads Near Limit while cloud work
+ * holds back near its usage limit, though choosing one still runs it.
+ */
+function useReadiness() {
+  const workers = useQuery(modelsQuery).data?.workers;
+  const cloudHeld = useQuery(servicesStatusQuery).data?.cloudHeld;
+  return (profile: Profile) =>
+    cloudHeld && isCloudProfile(profile) && profile.ready !== false
+      ? { label: "Near Limit", color: "yellow" }
+      : profileReadiness(profile, workers);
 }
 
 /** A profile's short facts for its option: model (else family), kind and where it runs. */
@@ -99,10 +113,10 @@ export function ProfileSelect({
     "field" | "clearable" | "disabled" | "swatch" | "title" | "target" | "label"
   >
 >) {
-  const workers = useQuery(modelsQuery).data?.workers;
+  const readinessOf = useReadiness();
   const selected = profiles.find((profile) => isProfile(profile, value ?? undefined));
   const selectedLabel = selected && profileLabel(selected, profiles);
-  const readiness = selected && profileReadiness(selected, workers);
+  const readiness = selected && readinessOf(selected);
   return (
     <ChipSelect
       name={name}
@@ -116,7 +130,7 @@ export function ProfileSelect({
       value={selected?.id ?? (value || (unset && !clearable ? "" : null))}
       renderOption={({ option, checked }) => {
         const profile = profiles.find((profile) => profile.id === option.value);
-        const status = profile && profileReadiness(profile, workers);
+        const status = profile && readinessOf(profile);
         return (
           <ChipOption
             label={option.label}
@@ -167,6 +181,7 @@ export function ProfilePicker({
   const client = useQueryClient();
   const admin = useIsAdmin();
   const runtime = useWorkloadStart(admin && startParked);
+  const readinessOf = useReadiness();
   const failure = runtime.starting?.error;
   useEffect(() => {
     if (!failure) return;
@@ -181,7 +196,7 @@ export function ProfilePicker({
     ? available.find((profile) => isProfile(profile, input.profileId))
     : defaultProfile(context.models.data, input.kind);
   const selectedLabel = selected && profileLabel(selected, available);
-  const readiness = selected && profileReadiness(selected, workers);
+  const readiness = selected && readinessOf(selected);
   // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the
   // profile's; only the composer's Backend chip shows it, where it is switched.
   const selectedBackend = selected?.backend && (input.profileBackend || selected.backend);
