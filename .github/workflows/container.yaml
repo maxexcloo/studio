@@ -341,7 +341,9 @@ jobs:
   deploy:
     name: Deploy
     needs: release
-    if: needs.release.outputs.version
+    # Release skips the image and browser jobs for an already verified tree; without !cancelled(),
+    # their skip would skip Deploy too.
+    if: ${{ !cancelled() && needs.release.outputs.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # A newer release replaces the pending deployment.
