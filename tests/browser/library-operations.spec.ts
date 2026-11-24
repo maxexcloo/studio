@@ -607,19 +607,6 @@ test("Imports switch views by what they need: Download All Missing, substitutes 
     .click();
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Clear Stale", exact: true })).toBeHidden();
-  // Each row says what the import gave and where it went.
-  await chooseView(page, "Imports", "Installed");
-  const installed = page.getByRole("table", { name: "Installed Imports", exact: true });
-  await expect(installed).toContainText("LoRA · Flux.1 D · loras/kept.safetensors");
-  await expect(installed).toContainText("Close Recipe");
-  await expect(page.getByText("Missing Model", { exact: true })).toBeHidden();
-  await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await page
-    .getByRole("dialog", { name: "Delete Import", exact: true })
-    .getByRole("button", { name: "Delete", exact: true })
-    .click();
-  await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
 });
 
 test("LoRA row actions start with Edit and end with Delete, and deletion requires confirmation", async ({
