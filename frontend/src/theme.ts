@@ -74,11 +74,14 @@ export const motionSpeeds = {
   standard: 160,
   relaxed: 260,
 } as const satisfies Record<MotionSpeed, number>;
-// Entrances ease out over the motion duration; exits are quicker and accelerate away. Neither
-// overshoots. CSS reads the same values as --studio-ease-enter/-exit and --studio-motion-exit.
+// Entrances ease out over the motion duration; exits are quicker and accelerate away. A released
+// drag carries on from the finger, starting at 1 / 0.58 times its average speed, and slows to a
+// stop. None overshoots. CSS reads enter and exit as --studio-ease-enter/-exit and
+// --studio-motion-exit.
 export const easing = {
   enter: "cubic-bezier(0.2, 0, 0, 1)",
   exit: "cubic-bezier(0.4, 0, 1, 1)",
+  release: "cubic-bezier(0, 0, 0.58, 1)",
 } as const;
 const exitDuration = (duration: number) => Math.round(duration * 0.7);
 export const motionTransition = (duration: number) => ({

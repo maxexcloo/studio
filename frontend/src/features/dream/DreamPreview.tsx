@@ -31,7 +31,7 @@ import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome, ViewerMetadata, ViewerTitle } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
-import { zoomImage } from "../gallery/zoomImage";
+import { ZoomImage } from "../gallery/zoomImage";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
 import type { DeckCard } from "./deck";
@@ -140,7 +140,6 @@ interface FaceProps {
 
 function PreviewImage({ item, swipe, onTap, bare }: FaceProps) {
   const source = mediaSource(item);
-  const [ZoomImage] = useState(zoomImage);
   return (
     <div className={classes.fit}>
       {/* The deck card's own picture, already loaded, so the fill is there from the first frame. */}

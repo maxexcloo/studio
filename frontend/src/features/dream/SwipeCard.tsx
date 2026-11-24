@@ -26,6 +26,8 @@ const flick = 0.6;
 const tapDistance = 6;
 // A still press this long (ms) is a hold.
 const holdTime = 500;
+// A released card leaves within these times (ms), at the finger's speed where they allow.
+const releaseTimes = { min: 80, max: 200 };
 
 /**
  * The top card follows a finger or pointer, tilting with the drag while motion is on, and flies
@@ -137,13 +139,25 @@ export function SwipeCard({
     const vertical = direction === "up" || direction === "down";
     const x = vertical ? (from?.dx ?? 0) : (direction === "right" ? 1 : -1) * window.innerWidth;
     const y = vertical ? (direction === "up" ? -1 : 1) * window.innerHeight : (from?.dy ?? 0) + 40;
-    element.style.transition = `transform ${duration}ms ${easing.exit}, opacity ${duration}ms ${easing.exit}`;
+    // A released drag carries on at the finger's speed and slows to a stop; buttons and keys
+    // accelerate the card away.
+    let time = duration;
+    let curve: string = easing.exit;
+    if (from) {
+      const remaining = vertical ? Math.abs(y - from.dy) : Math.abs(x - from.dx);
+      const speed = Math.abs(vertical ? from.vy : from.vx);
+      time = Math.round(
+        Math.min(releaseTimes.max, Math.max(releaseTimes.min, remaining / 0.58 / speed)),
+      );
+      curve = easing.release;
+    }
+    element.style.transition = `transform ${time}ms ${curve}, opacity ${time}ms ${curve}`;
     delete element.dataset.dragging;
     place(x, y);
     element.style.opacity = "0";
     return new Promise<void>((resolve) => {
       // transitionend may not fire if the card is hidden or the transition is skipped.
-      const timer = setTimeout(resolve, duration + 50);
+      const timer = setTimeout(resolve, time + 50);
       element.addEventListener(
         "transitionend",
         () => {
