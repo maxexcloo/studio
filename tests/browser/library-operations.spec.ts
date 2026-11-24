@@ -578,7 +578,8 @@ test("Imports switch views by what they need: Download All Missing, substitutes 
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  // Needs Action opens first, grouped by what each import needs.
+  // Installed opens first; Needs Action groups imports by what each needs.
+  await chooseView(page, "Imports", "Needs Action");
   await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
   const needs = page.getByRole("region", { name: "Missing Files · 1", exact: true });
   await expect(needs).toContainText("missing.safetensors: Not downloaded yet");

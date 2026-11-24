@@ -95,6 +95,8 @@ export function StudioSettings() {
   });
   return (
     <Stack gap="lg">
+      <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
+      {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
       <SettingGroup title="Defaults">
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
@@ -119,8 +121,6 @@ export function StudioSettings() {
           />
         </SettingRow>
       </SettingGroup>
-      <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
-      {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
       <SettingGroup danger>
         <DeleteFailedItems />
       </SettingGroup>

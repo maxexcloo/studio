@@ -6,19 +6,25 @@ import {
 } from "../../ui/WorkspaceSections";
 import { useAccount, useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Personal sections, then administration, each by how often it is used, with About last.
+// Personal sections, then administration, each by name, with About last.
 const settingSections = {
+  account: {
+    label: "Account",
+    description: "Manage how you sign in and connect MCP clients to your account.",
+    icon: icons.account,
+    group: "Personal",
+  },
+  dream: {
+    label: "Dream",
+    description: "Choose what Dream makes for you and how much it can make each day.",
+    icon: icons.dream,
+    group: "Personal",
+  },
   preferences: {
     label: "Preferences",
     description:
       "Choose how the gallery looks, which models are offered and whether to keep prompts.",
     icon: icons.settings,
-    group: "Personal",
-  },
-  "where-work-runs": {
-    label: "Where Work Runs",
-    description: "Choose where your work runs and the models and image sizes it starts with.",
-    icon: icons.routing,
     group: "Personal",
   },
   taste: {
@@ -28,22 +34,23 @@ const settingSections = {
     icon: icons.taste,
     group: "Personal",
   },
-  dream: {
+  "where-work-runs": {
+    label: "Where Work Runs",
+    description: "Choose where your work runs and the models and image sizes it starts with.",
+    icon: icons.routing,
+    group: "Personal",
+  },
+  "dream-policy": {
     label: "Dream",
-    description: "Choose what Dream makes for you and how much it can make each day.",
+    description: "Choose which Dream settings accounts can change and when Dream can start jobs.",
     icon: icons.dream,
-    group: "Personal",
+    admin: true,
+    group: "Administration",
   },
-  account: {
-    label: "Account",
-    description: "Manage how you sign in and connect MCP clients to your account.",
-    icon: icons.account,
-    group: "Personal",
-  },
-  workers: {
-    label: "Workers",
-    description: "Manage worker placement, service health and unfinished jobs.",
-    icon: icons.workers,
+  groups: {
+    label: "Groups",
+    description: "Choose the models and features each access group can use, and the default group.",
+    icon: icons.group,
     admin: true,
     group: "Administration",
   },
@@ -54,13 +61,6 @@ const settingSections = {
     admin: true,
     group: "Administration",
   },
-  "dream-policy": {
-    label: "Dream",
-    description: "Choose which Dream settings accounts can change and when Dream can start jobs.",
-    icon: icons.dream,
-    admin: true,
-    group: "Administration",
-  },
   users: {
     label: "Users",
     description: "Manage accounts and linked chat identities.",
@@ -68,10 +68,10 @@ const settingSections = {
     admin: true,
     group: "Administration",
   },
-  groups: {
-    label: "Groups",
-    description: "Choose the models and features each access group can use, and the default group.",
-    icon: icons.group,
+  workers: {
+    label: "Workers",
+    description: "Manage worker placement, service health and unfinished jobs.",
+    icon: icons.workers,
     admin: true,
     group: "Administration",
   },

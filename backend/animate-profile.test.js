@@ -196,3 +196,18 @@ test("Dream clips run 5 to 8 seconds within the profile's frame grid", () => {
   assert.equal(clip(192, 24, { min: 124, max: 345, step: 17, offset: 5 }), 192);
   assert.equal(dreamFrames({ defaults: { duration: 6 } }), undefined);
 });
+
+test("A chosen Dream clip length reaches the job and is clamped to the profile's frame grid", () => {
+  const profile = {
+    id: "video",
+    kind: "video",
+    defaults: { frames: 121, fps: 24 },
+    constraints: { frames: { min: 17, max: 161, step: 8, offset: 1 } },
+    inputs: { image: true },
+  };
+  assert.equal(dreamFrames(profile, 5), 121);
+  assert.equal(dreamFrames(profile, 8), 161);
+  assert.equal(dreamFrames(profile, 10), 161);
+  assert.equal(dreamFrames(profile, 0), 121);
+  assert.equal(dreamFrames({ defaults: { duration: 6 } }, 8), undefined);
+});

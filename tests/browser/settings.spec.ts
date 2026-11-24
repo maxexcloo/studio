@@ -29,18 +29,18 @@ test("Settings follow the settled section order and run maintenance and worker r
     if (new URL(request.url()).pathname === "/api/services/status") statusReads++;
   });
   await page.goto("/settings");
-  // Personal, then Administration, each by how often it is used, with About last.
+  // Personal, then Administration, each by name, with About last.
   const order = [
-    "Preferences",
-    "Where Work Runs",
-    "Taste",
-    "Dream",
     "Account",
-    "Workers",
-    "Studio",
     "Dream",
-    "Users",
+    "Preferences",
+    "Taste",
+    "Where Work Runs",
+    "Dream",
     "Groups",
+    "Studio",
+    "Users",
+    "Workers",
     "About",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -344,7 +344,7 @@ test("Where Work Runs saves each group’s processing and default models", async
   const workGroups = where.getByRole("region", { name: /^(Images|Videos|Text|Dream)$/ });
   await expect
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
-    .toEqual(["Images", "Videos", "Text", "Dream"]);
+    .toEqual(["Images", "Videos", "Dream", "Text"]);
   const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
   await expect(textCloud).toHaveText("Default (Studio)");
   await textCloud.click();
