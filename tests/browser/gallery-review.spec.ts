@@ -58,7 +58,7 @@ test("Returning to Gallery offers a jump only after an image arrives while away"
   await expect(deck.getByText("Old Bird", { exact: true })).toBeHidden();
 });
 
-test("Gallery review rates matching results with arrows and Undo and returns to the filter", async ({
+test("Gallery Review accepts without rating, supports Undo and keeps the gallery filter", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -75,14 +75,32 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await showGalleryView(page, "Review");
   const deck = page.getByRole("region", { name: "Review", exact: true });
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeVisible();
-  await page.keyboard.press("ArrowRight");
-  await expect.poll(() => state.gallery.find(({ id }) => id === "first")?.rating).toBe("liked");
-  await expect(deck.getByText("Bird at Sea", { exact: true })).toBeVisible();
+  const first = state.gallery[0];
+  const second = state.gallery[1];
+  const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
+  const box = (await card.boundingBox())!;
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(centre.x + box.width * 0.45, centre.y, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => first.libraryReviewedAt).toBeDefined();
+  expect(first.rating).toBeUndefined();
+  await deck.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => first.libraryReviewedAt).toBeUndefined();
+  await expect(card.getByText("Bird in Snow", { exact: true })).toBeVisible();
+  await deck.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect.poll(() => first.libraryReviewedAt).toBeDefined();
+  await expect(card.getByText("Bird at Sea", { exact: true })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect.poll(() => state.gallery.find(({ id }) => id === "second")?.rating).toBe("disliked");
+  await expect.poll(() => second.rating).toBe("disliked");
   await expect(deck.getByText("No Unrated Results")).toBeVisible();
   await deck.getByRole("button", { name: "Undo" }).click();
-  await expect(deck.getByText("Bird at Sea", { exact: true })).toBeVisible();
+  await expect.poll(() => second.rating).toBeUndefined();
+  await expect(card.getByText("Bird at Sea", { exact: true })).toBeVisible();
+  await deck.getByRole("button", { name: "Super Like", exact: true }).click();
+  await expect.poll(() => second.rating).toBe("liked");
+  await expect(deck.getByText("No Unrated Results")).toBeVisible();
   await deck.getByRole("button", { name: "Rating", exact: true }).click();
   await page.getByRole("menuitem", { name: "Liked", exact: true }).click();
   await deck.getByRole("button", { name: "Time", exact: true }).click();
@@ -95,16 +113,35 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await expect(search).toHaveValue("Bird");
 });
 
-test("Gallery Review offers suggestions for the current result", async ({ page }) => {
+test("Gallery Review loads the next five Suggestions across pages and reuses them", async ({
+  page,
+}) => {
   const state = await fixtures(page);
-  state.gallery.push({ ...result("bird", "Amber Bird"), jobId: "bird-job" });
+  const results = Array.from({ length: 7 }, (_, index) =>
+    result(`review-${index}`, `Review Result ${index}`),
+  );
+  state.gallery.push(...results);
+  await page.route(/\/api\/gallery\?/, (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("unrated") !== "1") return route.fallback();
+    const offset = Number(params.get("cursor") || 0);
+    const end = offset + 2;
+    return route.fulfill({
+      json: {
+        items: results.slice(offset, end),
+        hasMore: end < results.length,
+        nextCursor: String(end),
+        totalApprox: results.length,
+      },
+    });
+  });
   const asked: string[] = [];
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
     if (body.surface === "composer") return route.fallback();
     if (body.surface === "change")
       return route.fulfill({ json: { suggestions: [], reason: "No matching change" } });
-    asked.push(body.itemId);
+    asked.push(`${body.itemId}:${body.action || body.surface}`);
     return route.fulfill({
       json: {
         suggestions: [
@@ -120,6 +157,23 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   await page.goto("/images");
   await showGalleryView(page, "Review");
   const deck = page.getByRole("region", { name: "Review", exact: true });
+  const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card.getByText("Review Result 0", { exact: true })).toBeVisible();
+  const warmed = (count: number) =>
+    results
+      .slice(0, count)
+      .flatMap(({ id }) => ["viewer", "recreate", "edit", "animate"].map((mode) => `${id}:${mode}`))
+      .sort();
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(6));
+  expect(asked.slice(0, 4)).toEqual([
+    "review-0:viewer",
+    "review-0:recreate",
+    "review-0:edit",
+    "review-0:animate",
+  ]);
+  await deck.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(card.getByText("Review Result 1", { exact: true })).toBeVisible();
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(7));
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
   const chosen = page.waitForRequest(
@@ -128,10 +182,10 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   );
   await menu.getByRole("menuitem", { name: "Later Light", exact: true }).click();
   expect((await chosen).postDataJSON()).toMatchObject({
-    itemId: "bird",
+    itemId: "review-1",
     request: "change the light",
   });
-  expect(asked).toEqual(["bird"]);
+  expect([...asked].sort()).toEqual(warmed(7));
 });
 
 test("Video Review opened directly leaves for the video gallery", async ({ page }) => {

@@ -259,6 +259,12 @@ test("library Accept and gallery ratings undo through their own routes", async (
       studioAccount: { userId: media.ownerId },
       query: { seed: "review" },
     });
+  const gallery = (query = {}) =>
+    call(routes["/api/gallery"], {
+      studioAccount: { userId: media.ownerId },
+      query,
+    });
+  const reviewList = (query) => gallery({ ...query, unreviewed: "1" });
   const rate = (rating) =>
     call(handlers["/api/gallery/favorite"], {
       studioAccount: { userId: media.ownerId },
@@ -266,16 +272,27 @@ test("library Accept and gallery ratings undo through their own routes", async (
     });
   assert.ok((await review(true, "account-b")).error);
   assert.equal((await page()).remaining, 1);
+  assert.equal((await reviewList()).items[0].id, media.id);
   assert.equal((await review(true)).ok, true);
   assert.equal((await page()).remaining, 0);
+  assert.equal((await reviewList()).totalApprox, 0);
+  assert.equal((await gallery()).items[0].id, media.id);
   assert.equal(galleryStore.galleryItem(media.id).rating, undefined);
   assert.equal((await review(false)).ok, true);
   assert.equal((await page()).remaining, 1);
+  assert.equal((await reviewList()).items[0].id, media.id);
   assert.equal(ratings.length, 0);
   assert.equal((await rate("disliked")).ok, true);
   assert.equal((await page()).remaining, 0);
   assert.equal(galleryStore.visibleGallery({ ownerId: media.ownerId }).length, 0);
   assert.equal(galleryStore.galleryItem(media.id).rating, "disliked");
+  const disliked = { rating: "disliked" };
+  assert.equal((await reviewList(disliked)).items[0].id, media.id);
+  assert.equal((await review(true)).ok, true);
+  assert.equal((await reviewList(disliked)).totalApprox, 0);
+  assert.equal((await gallery(disliked)).items[0].rating, "disliked");
+  assert.equal((await review(false)).ok, true);
+  assert.equal((await reviewList(disliked)).items[0].rating, "disliked");
   assert.equal((await rate(null)).ok, true);
   assert.equal((await page()).remaining, 1);
   assert.deepEqual(

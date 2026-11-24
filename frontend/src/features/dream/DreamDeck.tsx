@@ -22,6 +22,7 @@ import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
+import { usePrefetchResultSuggestions } from "../gallery/usePrefetchResultSuggestions";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
@@ -229,7 +230,7 @@ export function DreamDeck({
   libraryWaiting: boolean;
   media: DreamMedia;
   empty: ReactNode;
-  /** Gallery's rating mode uses left for Dislike and right for Like. */
+  /** Gallery Review uses Dislike as its left verdict. */
   quickRating?: boolean;
   onSuggestionApplied?: () => void;
 }) {
@@ -286,6 +287,7 @@ export function DreamDeck({
     : deckCards(items, { depth: 6, media, current });
   const cards = coming.slice(0, 3);
   const [top] = cards;
+  usePrefetchResultSuggestions(top?.kind === "library" ? top.item : undefined, libraryItems);
   if (top !== current) setCurrent(top);
   const requestedSide =
     viewing?.key === top?.key
@@ -319,7 +321,7 @@ export function DreamDeck({
       setSetDraft(undefined);
     }
     decide(judgement.card);
-    if (!quickRating || judgement.verdict !== "keep") judge.mutate(judgement);
+    judge.mutate(judgement);
     setHistory((previous) => [...previous, judgement]);
   }
   /** Puts the last judged card back on top and takes its judgement back. */
@@ -333,7 +335,7 @@ export function DreamDeck({
     else if (card.kind === "pair" || card.kind === "set") returnItems(card.items);
     restore(card);
     restoreDraft(last);
-    if (!quickRating || last.verdict !== "keep") takeBack.mutate(last);
+    takeBack.mutate(last);
   }
   /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
   const isPass = (choice: Verdict | PairAnswer) =>
@@ -371,7 +373,7 @@ export function DreamDeck({
       if (!(choice in directions)) return;
       const likedId =
         top.kind === "set" && viewing && choice === "like" ? top.items[shown].id : undefined;
-      await out?.(quickRating && choice === "like" ? "right" : directions[choice]);
+      await out?.(directions[choice]);
       commit({
         card: top,
         verdict: choice as Verdict,
@@ -385,8 +387,6 @@ export function DreamDeck({
   }
   /** What a swipe or arrow key in a direction means for the top card. */
   const intent = (card: DeckCard, direction: Direction): Verdict | PairAnswer | null => {
-    if (quickRating)
-      return ({ left: "discard", right: "like", up: null, down: null } as const)[direction];
     if (card.kind !== "pair")
       return ({ left: "discard", right: "keep", up: "like", down: null } as const)[direction];
     if (card.items.length === 3 && (direction === "left" || direction === "right")) return null;
@@ -495,13 +495,11 @@ export function DreamDeck({
                 up: "Accept",
                 down: "Pass",
               }
-            : quickRating
-              ? { left: "Dislike", right: "Like" }
-              : {
-                  left: card.kind === "set" ? "Deny All" : "Pass",
-                  right: "Accept",
-                  up: "Super Like",
-                }
+            : {
+                left: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
+                right: "Accept",
+                up: "Super Like",
+              }
         }
         onTap={(target) => openPressed(card, target)}
         onHold={(target) => openPressed(card, target)}
@@ -581,6 +579,7 @@ export function DreamDeck({
               card={top}
               side={shown}
               onMore={() => void act("more")}
+              onKeep={() => void act("keep")}
               onApplied={onSuggestionApplied}
             />
           )
@@ -590,9 +589,7 @@ export function DreamDeck({
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
             ? `${top.items.length === 2 ? "← A · → B · " : ""}↑ Accept · ↓ Pass · U Undo`
-            : quickRating
-              ? "← Dislike · → Like · U Undo"
-              : `← ${top.kind === "set" ? "Deny All" : "Pass"} · → Accept · ↑ Super Like · U Undo`}
+            : `← ${quickRating ? "Dislike" : top.kind === "set" ? "Deny All" : "Pass"} · → Accept · ↑ Super Like · U Undo`}
         </Text>
       )}
       {viewing && (

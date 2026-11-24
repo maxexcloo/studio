@@ -12,6 +12,7 @@
  */
 import path from "node:path";
 
+import { imageChangeActions } from "../shared/suggestions.ts";
 import { customStyles, defaultPreset, seedStyles } from "./assistant-presets.js";
 import { currentDataDir } from "./data-dir.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
@@ -35,6 +36,15 @@ function cleanStyles(value) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(id) || id === "custom" || seen.has(`${kind}:${id}`))
       throw fail(`Style ${index + 1} needs its own lowercase ID.`);
     seen.add(`${kind}:${id}`);
+    const actions = entry.actions;
+    if (
+      kind === "change" &&
+      actions !== undefined &&
+      (!Array.isArray(actions) ||
+        !actions.length ||
+        actions.some((action) => !imageChangeActions.includes(action)))
+    )
+      throw fail(`Style ${index + 1} needs Edit or Recreate as its action.`);
     const style = {
       id,
       kind,
@@ -42,6 +52,7 @@ function cleanStyles(value) {
       description: text(entry.description, 120),
       instruction: text(entry.instruction, 2000),
       enabled: entry.enabled !== false,
+      ...(kind === "change" && actions && { actions: [...new Set(actions)] }),
       ...(entry.uncensored === true ? { uncensored: true } : {}),
       ...(entry.censored === true ? { censored: true } : {}),
     };

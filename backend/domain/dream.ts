@@ -18,6 +18,8 @@ import {
   type DreamPassReason,
   type DreamResultSet,
   type DreamSettings,
+  type KeepCount,
+  type KeepRates,
   type PairAnswer,
   dreamCardCounts,
   dreamDefaults,
@@ -62,6 +64,7 @@ import {
   cooledMotifs,
   direction,
   diversity,
+  explicitExclusions,
   fashionableLooks,
   forbiddenMotifs,
   freshConceptProblem,
@@ -221,7 +224,7 @@ export type DreamItem = QueueMedia & {
   rating?: string;
   createdAt?: string;
   settings?: Record<string, unknown>;
-  caption?: { text?: string };
+  caption?: { text?: string; tags?: unknown };
   resultSet?: DreamResultSet & { context?: ResultContext };
   /** The chat that asked for it. */
   chat?: { conversationId: string };
@@ -1110,7 +1113,7 @@ export function createDream(options: {
    * profile or LoRA starts at one half.
    */
   function judgement(ownerId: string) {
-    const judged = new Map<string, { kept: number; total: number }>();
+    const judged = new Map<string, KeepCount>();
     for (const item of options.gallery(ownerId, {
       dreamState: ["kept", "discarded"],
       type: "image",
@@ -1118,11 +1121,13 @@ export function createDream(options: {
     })) {
       if (item.dream?.passReason === "similar") continue;
       const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
-      for (const key of [
+      const tags = Array.isArray(item.caption?.tags) ? item.caption.tags : [];
+      for (const key of new Set([
         `profile:${item.settings?.profileId}`,
         ...(loras.length ? [`loras:${item.settings?.profileId}`] : []),
         ...loras.map((lora) => `lora:${(lora as { name?: string })?.name}`),
-      ]) {
+        ...tags.map((tag) => `tag:${String(tag).trim().toLowerCase()}`),
+      ])) {
         const entry = judged.get(key) ?? { kept: 0, total: 0 };
         entry.total++;
         if (item.dream?.state === "kept") entry.kept++;
@@ -1131,6 +1136,7 @@ export function createDream(options: {
     }
     const counts = (key: string) => judged.get(key) ?? { kept: 0, total: 0 };
     return {
+      judged,
       counts,
       keepRate(key: string) {
         const { kept, total } = counts(key);
@@ -1705,8 +1711,11 @@ export function createDream(options: {
   const pausedMotifs = (similar: DreamItem[]) =>
     similar.flatMap((item) => item.dream?.motifs ?? []);
   const seedMotifs = (ownerId: string, record: DreamRecord) => {
-    const { preferences, rules } = options.taste.read(ownerId);
-    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules, true);
+    const { preferences, rules, exclusions = [] } = options.taste.read(ownerId);
+    const forbidden = [
+      ...explicitExclusions(exclusions),
+      ...forbiddenMotifs(preferences.avoid ?? [], rules, true),
+    ];
     const paused = pausedMotifs(similarPasses(ownerId));
     return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden, paused)];
   };
@@ -2058,18 +2067,30 @@ export function createDream(options: {
       record.settings.uncensored &&
       access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
-    const { summary, rules, likes, styles, preferences, learnt } = options.taste.read(ownerId);
+    const {
+      summary,
+      rules,
+      likes,
+      styles,
+      preferences,
+      learnt,
+      exclusions = [],
+    } = options.taste.read(ownerId);
     // Their own avoids and those Studio learnt both steer the idea; only their own are enforced.
     const avoid = [...new Set([...(preferences.avoid ?? []), ...learnt.avoid])];
-    const forbidden = forbiddenMotifs(
-      [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
-      [...rules, project?.brief.rules ?? ""],
-      true,
-    );
+    const forbidden = [
+      ...explicitExclusions(exclusions),
+      ...forbiddenMotifs(
+        [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
+        [...rules, project?.brief.rules ?? ""],
+        true,
+      ),
+    ];
     const [fewest, most] = tasteDraw.likes;
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
     const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
+      ...(exclusions.length ? [`Exclude: ${exclusions.join(", ")}`] : []),
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
       ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
       ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),
@@ -3964,6 +3985,18 @@ export function createDream(options: {
       return record.visit.since || null;
     },
     unseen,
+    /** The account's keeps by profile, LoRA and caption tag, as Dream weighs them. */
+    keepRates(ownerId: string): KeepRates {
+      const rates: KeepRates = { profiles: {}, loras: {}, tags: {} };
+      const families = { profile: rates.profiles, lora: rates.loras, tag: rates.tags };
+      for (const [key, count] of judgement(ownerId).judged) {
+        const at = key.indexOf(":");
+        const name = key.slice(at + 1);
+        const family = families[key.slice(0, at) as keyof typeof families];
+        if (family && name && name !== "undefined") family[name] = count;
+      }
+      return rates;
+    },
     unseenCount(ownerId: string) {
       const record = read(ownerId);
       const { settings } = record;

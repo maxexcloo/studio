@@ -7,13 +7,27 @@ import type { Draft, Variant } from "../generation/GenerationProvider";
 import { referencePatch } from "../generation/payload.ts";
 
 export const directionLabels: Record<VariationDirection, string> = {
-  scene: "Scene",
+  light: "Light",
   outfit: "Outfit",
+  pose: "Pose",
+  scene: "Scene",
   style: "Style",
 };
 
-const directionGuides = { scene: "layout", outfit: "style", style: "style" };
-const cardKindsToVary = { scene: "scenes", outfit: "outfits", style: undefined };
+const directionGuides = {
+  light: "style",
+  outfit: "style",
+  pose: "layout",
+  scene: "layout",
+  style: "style",
+};
+const cardKindsToVary = {
+  light: undefined,
+  outfit: "outfits",
+  pose: undefined,
+  scene: "scenes",
+  style: undefined,
+};
 
 /** Retain the exact saved character wording and the compatible references for each direction. */
 export function variationVariants(

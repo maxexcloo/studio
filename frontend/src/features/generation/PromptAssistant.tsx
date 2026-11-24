@@ -4,6 +4,7 @@ import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { maxLoras } from "../../../../shared/profiles";
+import type { ImageChangeAction } from "../../../../shared/suggestions";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
@@ -17,14 +18,18 @@ export interface AssistantOption {
   id: string;
   label: string;
 }
+export interface AssistantChangeOption extends AssistantOption {
+  instruction: string;
+  actions?: ImageChangeAction[];
+}
 interface AssistantStatus {
   available: boolean;
   /** Improve Prompt's styles, then Custom. */
   presets: AssistantOption[];
   /** Animate's themes, then Custom. */
-  themes: AssistantOption[];
+  themes: (AssistantOption & { instruction?: string })[];
   /** Fixed AI edits, each run as its instruction. */
-  changes: (AssistantOption & { instruction: string })[];
+  changes: AssistantChangeOption[];
   defaultPreset?: string;
   vision?: boolean;
   loras?: boolean;

@@ -382,6 +382,21 @@ export function forbiddenMotifs(avoids: string[], rules: string[], unasked = fal
   ];
 }
 
+/** Literal user exclusions and their known equivalent motifs. */
+export function explicitExclusions(entries: string[]) {
+  const terms = entries.map(phraseWords).filter(Boolean);
+  return [
+    ...new Set([
+      ...terms,
+      ...terms.flatMap((term) => {
+        if (/^laundry(?: rooms?)?$/.test(term)) return ["laundry"];
+        if (/^(?:smoking|cigarettes?|tobacco smoking)$/.test(term)) return ["smoking"];
+        return [];
+      }),
+    ]),
+  ];
+}
+
 export function ideaMotifs(value: unknown, prompt = "") {
   const clauses = motifClauses(prompt);
   const shown = clauses.map((clause) => clause.shown);

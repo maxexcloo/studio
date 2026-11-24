@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import type { ImageChangeAction } from "../../../../shared/suggestions";
 import { api } from "../../api";
 import type { LibraryItem } from "./LibraryCatalogueTable";
 import type { ImportRecord, ImportVision } from "./LibraryImportReview";
@@ -79,6 +80,7 @@ export interface PromptStyle {
   id: string;
   /** The menu it belongs to: Improve Prompt, Animate or fixed AI edits. */
   kind: "improve" | "animate" | "change";
+  actions?: ImageChangeAction[];
   label: string;
   description: string;
   instruction: string;

@@ -8365,22 +8365,27 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   assert.equal(f.submitted.length, 0);
 });
 
-test("MCP generation follows supplied prompts independently of saved taste", async (t) => {
+test("MCP preserves supplied prompts and stops at explicit exclusions", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  // Saved taste never constrains generation.
   const taste = {
     avoid: ["buttons"],
     models: [imageProfile.id],
     loras: ["film"],
-    preferences: { avoid: ["smoking", "laundry"] },
+    exclusions: ["smoking", "laundry rooms"],
   };
   f.app.get("/api/taste", (_req, res) => res.json(taste));
-  await generate(client, { prompts: ["A coat with buttons"] });
+  await call(client, "models", { profile_id: imageProfile.id });
+  const first = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A coat with buttons"],
+  });
+  assert.match(texts(first), /user excludes[^:]*: smoking, laundry rooms/);
+  assert.equal(f.submitted.at(-1).prompt, "A coat with buttons");
   const beforeExclusions = f.submitted.length;
   for (const [prompt, expected] of [
-    ["A coat beside a washing machine", /your Taste Profile avoids/],
-    ["A coat beside an ashtray", /your Taste Profile avoids/],
+    ["A coat beside a washing machine", /"laundry rooms", which your Taste Profile excludes/],
+    ["A coat beside an ashtray", /"smoking", which your Taste Profile excludes/],
     ["Same as above, but switch to silk", /depends on an earlier prompt or image/],
   ]) {
     const refused = await call(client, "generate", { prompts: [prompt] });

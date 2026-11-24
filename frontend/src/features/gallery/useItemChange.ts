@@ -11,6 +11,9 @@ import { automaticEditProfile } from "./editProfile";
 import { useItemMutation } from "./useItemMutation";
 import type { Iteration } from "./useMediaAction";
 
+export const canSuggestChangeForItem = (item: MediaItem) =>
+  item.status === "done" && Boolean(item.url);
+
 /** Resolve the editor before writing, so the eventual edit runs with the same profile. */
 export async function askItemChange(
   client: QueryClient,
@@ -100,7 +103,7 @@ export function useItemChange<T extends string>(
     setChange(null);
   }
   return {
-    available: Boolean(assistant.data?.available) && item.status === "done" && Boolean(item.url),
+    available: Boolean(assistant.data?.available) && canSuggestChangeForItem(item),
     pending: ask.isPending,
     proposal: change?.proposal,
     typed: change?.typed,

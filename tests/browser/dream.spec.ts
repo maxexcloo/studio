@@ -239,10 +239,14 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
 }) => {
   await fixtures(page);
   const library = [
-    dreamItem("library-old", { dream: undefined, settings: undefined }),
-    dreamItem("library-video", { dream: undefined, type: "video" }),
-    dreamItem("library-image", { dream: undefined }),
-    dreamItem("library-third", { dream: undefined }),
+    dreamItem("library-old", {
+      dream: undefined,
+      settings: undefined,
+      title: "Older Library Image",
+    }),
+    dreamItem("library-video", { dream: undefined, title: "Library Video", type: "video" }),
+    dreamItem("library-image", { dream: undefined, title: "Library Image" }),
+    dreamItem("library-third", { dream: undefined, title: "Third Library Image" }),
   ];
   const dream = await serveDream(page, {
     unseen: [dreamItem("last-image"), dreamItem("last-video", { type: "video" })],
@@ -265,7 +269,7 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await showView(page, "Library");
   await expect(page).toHaveURL(/\/dream\/library$/);
   await expect(page.getByRole("radio", { name: "Videos (1)", exact: true })).toBeChecked();
-  await expect(video).toContainText("library-video");
+  await expect(video.getByText("Library Video", { exact: true })).toBeVisible();
   await expect(undo).toBeDisabled();
   await page.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(page.getByText("Library Review Complete")).toBeVisible();
@@ -273,14 +277,14 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
 
   await showMedia(page, "Images");
   await expect(page.getByRole("radio", { name: "Images (3)", exact: true })).toBeChecked();
-  await expect(image).toContainText("library-old");
+  await expect(image.getByText("Older Library Image", { exact: true })).toBeVisible();
   await expect(undo).toBeDisabled();
 
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(image).toContainText("library-image");
+  await expect(image.getByText("Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(true);
   await page.getByRole("button", { name: "Super Like", exact: true }).click();
-  await expect(image).toContainText("library-third");
+  await expect(image.getByText("Third Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[2].rating).toBe("liked");
   await page.getByRole("button", { name: "Pass", exact: true }).press("Shift+F10");
   await confirmPass(page);
@@ -288,17 +292,17 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await expect.poll(() => dream.library[3].rating).toBe("disliked");
 
   await undo.click();
-  await expect(image).toContainText("library-third");
+  await expect(image.getByText("Third Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[3].rating).toBeUndefined();
   await undo.click();
-  await expect(image).toContainText("library-image");
+  await expect(image.getByText("Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[2].rating).toBeUndefined();
   await undo.click();
-  await expect(image).toContainText("library-old");
+  await expect(image.getByText("Older Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(false);
   await showMedia(page, "Videos");
   await undo.click();
-  await expect(video).toContainText("library-video");
+  await expect(video.getByText("Library Video", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[1].rating).toBeUndefined();
 
   await showView(page, "Dream");
@@ -349,10 +353,60 @@ test("Suggest can queue a variation of a library import without a job or prompt"
     profileId: "image:test",
     prompt: "A tighter harbour view",
   });
-  expect(asked.map(({ surface, jobId, itemId }) => ({ surface, jobId, itemId }))).toEqual([
-    { surface: "viewer", jobId: undefined, itemId: "harbour" },
-    { surface: "change", jobId: undefined, itemId: "harbour" },
+  expect(asked).toContainEqual(
+    expect.objectContaining({ surface: "viewer", itemId: "harbour", fresh: false }),
+  );
+  expect(asked.filter(({ surface }) => surface === "change")).toEqual([
+    expect.objectContaining({ itemId: "harbour", request: "crop closer" }),
   ]);
+  expect(asked.every(({ itemId, jobId }) => itemId === "harbour" && jobId === undefined)).toBe(
+    true,
+  );
+});
+
+test("Keep & Vary accepts a Dream card and stages four variations of one thing to compare", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const dream = await serveDream(page, { unseen: [dreamItem("harbour"), dreamItem("next")] });
+  const poses = ["Seated Low", "Mid Stride", "Arms Crossed", "Looking Back"].map((label) => ({
+    action: "recreate",
+    request: "pose",
+    label,
+    prompt: `A harbour keeper, ${label.toLowerCase()}`,
+  }));
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "change") return route.fallback();
+    expect(body).toMatchObject({ itemId: "harbour", directions: ["pose"] });
+    return route.fulfill({ json: { suggestions: poses } });
+  });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Keep & Vary", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toContainText([
+    "Vary Light",
+    "Vary Outfit",
+    "Vary Pose",
+    "Vary Scene",
+    "Vary Style",
+    "Explore Three Directions",
+  ]);
+  await page.getByRole("menuitem", { name: "Vary Pose", exact: true }).click();
+  const review = page.getByRole("dialog", { name: "Vary Pose", exact: true });
+  await review.getByRole("button", { name: "Open Composer", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.map(({ path }) => path))
+    .toContain("/api/dream/harbour/keep");
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    poses[0].prompt,
+  );
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  expect(state.jobs.map((job) => job.input.prompt)).toEqual(poses.map(({ prompt }) => prompt));
 });
 
 test("Dream video Suggestions can stage an extension from the current clip", async ({ page }) => {
@@ -380,6 +434,60 @@ test("Dream video Suggestions can stage an extension from the current clip", asy
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   expect(state.jobs).toHaveLength(0);
   expect(dream.requests).toHaveLength(0);
+});
+
+test("Dream Library shows result details and preloads the next five Suggestions across pages", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const library = Array.from({ length: 7 }, (_, index) =>
+    dreamItem(`review-${index}`, {
+      dream: undefined,
+      title: `Library Result ${index}`,
+      settings: { profileName: "Archipelago", steps: 16 },
+    }),
+  );
+  await serveDream(page, { library });
+  const asked: string[] = [];
+  await page.route("**/api/suggestions", (route) => {
+    const { itemId, action, surface } = route.request().postDataJSON();
+    if (surface === "composer") return route.fallback();
+    asked.push(`${itemId}:${action || surface}`);
+    return route.fulfill({
+      json: { suggestions: [{ label: "Closer Crop", request: "crop closer" }] },
+    });
+  });
+  await page.goto("/dream/library");
+  const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card.getByText("Library Result 0", { exact: true })).toBeVisible();
+  await expect(card.getByText(/^Archipelago( · |$)/)).toBeVisible();
+  await expect(card.locator("time")).toHaveAttribute("datetime", stamp);
+  const warmed = (count: number) =>
+    library
+      .slice(0, count)
+      .flatMap(({ id }) => ["viewer", "recreate", "edit", "animate"].map((mode) => `${id}:${mode}`))
+      .sort();
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(6));
+  expect(asked.slice(0, 4)).toEqual([
+    "review-0:viewer",
+    "review-0:recreate",
+    "review-0:edit",
+    "review-0:animate",
+  ]);
+
+  await card.getByRole("button", { name: "View", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
+  await expect(header.getByText("Library Result 0", { exact: true })).toBeVisible();
+  await expect(header.getByText(/^Archipelago( · |$)/)).toBeVisible();
+  await expect(header.locator("time")).toHaveAttribute("datetime", stamp);
+  await preview.getByRole("button", { name: "Accept", exact: true }).click();
+
+  await expect(header.getByText("Library Result 1", { exact: true })).toBeVisible();
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(7));
+  await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
+  expect([...asked].sort()).toEqual(warmed(7));
 });
 
 test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => {
@@ -636,14 +744,13 @@ test("Library review stays available while Dream is off", async ({ page }) => {
   await serveDream(page, {
     enabled: false,
     unseen: [dreamItem("fox")],
-    library: [dreamItem("library-image", { dream: undefined })],
+    library: [dreamItem("library-image", { dream: undefined, title: "Library Image" })],
   });
   await page.goto("/dream");
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await showView(page, "Library");
-  await expect(page.getByRole("group", { name: "Current Gallery Image" })).toContainText(
-    "Dream prompt library-image",
-  );
+  const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card.getByText("Library Image", { exact: true })).toBeVisible();
 });
 
 test("Taste displays readable preferences and saves explicit edits separately", async ({
@@ -691,11 +798,17 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await history.getByRole("button", { name: "Show Less", exact: true }).click();
   await expect(historyRows).toHaveCount(4);
   const profile = page.getByRole("region", { name: "Taste Profile" });
-  await expect(profile.getByText(/foxes in snow/)).toBeVisible();
-  await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
-  await expect(profile.getByText("Detail Slider 0.8", { exact: true })).toBeVisible();
-  await expect(profile.getByText("Portrait 2:3; Landscape 16:9", { exact: true })).toBeVisible();
-  await expect(profile.getByText("fox; snow", { exact: true })).toBeVisible();
+  await expect(profile.getByText("foxes in snow", { exact: true })).toBeVisible();
+  const favourite = (table: string, row: string) =>
+    page
+      .getByRole("table", { name: table, exact: true })
+      .getByRole("row", { name: row, exact: true });
+  await expect(favourite("Models", "Image Quality")).toContainText("Favourite");
+  await expect(favourite("LoRAs", "Detail Slider 0.8")).toContainText("Favourite");
+  await expect(profile.getByText("Portrait 2:3", { exact: true })).toBeVisible();
+  await expect(profile.getByText("Landscape 16:9", { exact: true })).toBeVisible();
+  await expect(favourite("Tags", "fox")).toBeVisible();
+  await expect(favourite("Scenes", "snow")).toBeVisible();
   const editTaste = page
     .getByRole("group", { name: "Dream Toolbar", exact: true })
     .getByRole("button", { name: "Edit", exact: true });
@@ -715,6 +828,9 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   } else await summary.fill("Quiet coastal scenes with lighthouses.");
   await editor.getByRole("combobox", { name: "Dislikes", exact: true }).fill("clowns");
   await page.keyboard.press("Enter");
+  const exclusions = editor.getByRole("combobox", { name: "Exclusions", exact: true });
+  await exclusions.fill("laundry rooms");
+  await exclusions.press("Enter");
   await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   expect(dream.requests).not.toContainEqual(
     expect.objectContaining({ path: "/api/taste", method: "PUT" }),
@@ -726,12 +842,14 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       preferences: {
         likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets"],
         avoid: ["crowds", "clowns"],
+        exclusions: ["laundry rooms"],
         note: "Quiet coastal scenes with lighthouses.",
       },
     });
   await expect(editor).toBeHidden();
   await expect(profile.getByText("Summary · Your Edit", { exact: true })).toBeVisible();
-  await expect(profile.getByText("crowds; clowns", { exact: true })).toBeVisible();
+  await expect(profile.getByText("clowns", { exact: true })).toBeVisible();
+  await expect(profile.getByText("laundry rooms", { exact: true })).toBeVisible();
   await expect(
     profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
   ).toBeVisible();
@@ -748,6 +866,64 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(
     page.getByRole("dialog", { name: "Clear Taste Profile", exact: true }),
   ).toBeVisible();
+});
+
+test("Taste shows keep rates by model and tag kind, and pins or removes values in place", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    taste: {
+      likes: ["misty harbours", "foxes in snow"],
+      models: ["image:test"],
+      tags: ["red dress"],
+    },
+    keepRates: {
+      profiles: { "image:test": { kept: 19, total: 30 }, "image:fast": { kept: 9, total: 10 } },
+      loras: {},
+      tags: {
+        "red dress": { kept: 6, total: 10 },
+        "golden light": { kept: 8, total: 10 },
+        beach: { kept: 2, total: 12 },
+        fox: { kept: 1, total: 3 },
+      },
+    },
+  });
+  await page.goto("/dream");
+  await showView(page, "Taste");
+  const table = (name: string) => page.getByRole("table", { name, exact: true });
+  const row = (name: string, value: string) =>
+    table(name).getByRole("row", { name: value, exact: true });
+  await expect(row("Models", "Image Fast")).toContainText("90% of 10");
+  await expect(row("Models", "Image Quality")).toContainText("63% of 30");
+  await expect(row("Models", "Image Quality")).toContainText("Favourite");
+  await expect(row("Outfits", "red dress")).toContainText("60% of 10");
+  await expect(row("Colours", "golden light")).toContainText("80% of 10");
+  await expect(row("Scenes", "beach")).toContainText("17% of 12");
+  // Three verdicts are too few to say.
+  await expect(table("Tags")).toHaveCount(0);
+  await row("Colours", "golden light")
+    .getByRole("button", { name: "Actions for golden light", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({ preferences: { tags: ["red dress", "golden light"] } });
+  await expect(row("Colours", "golden light")).toContainText("Favourite");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await row("Models", "Image Quality")
+    .getByRole("button", { name: "Actions for Image Quality", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { models: [] } });
+  await expect(row("Models", "Image Quality")).not.toContainText("Favourite");
+  const profile = page.getByRole("region", { name: "Taste Profile" });
+  await profile.getByRole("button", { name: "Remove foxes in snow", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({ preferences: { likes: ["misty harbours"] } });
+  await expect(profile.getByText("Likes · Your Edit", { exact: true })).toBeVisible();
+  await expect(profile.getByText("foxes in snow", { exact: true })).toHaveCount(0);
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
@@ -1806,7 +1982,7 @@ test("Dream autoplays silently when sound is blocked and lets the viewer choose 
   const unmute = viewer.getByRole("button", { name: "Unmute", exact: true });
   const stage = (await player.boundingBox())!;
   const corner = (await unmute.boundingBox())!;
-  expect(corner.x + corner.width).toBeGreaterThan(stage.x + stage.width * 0.75);
+  expect(corner.x).toBeLessThan(stage.x + stage.width * 0.25);
   expect(corner.y + corner.height).toBeGreaterThan(stage.y + stage.height * 0.75);
   await unmute.click();
   await expect(player).toHaveJSProperty("muted", false);

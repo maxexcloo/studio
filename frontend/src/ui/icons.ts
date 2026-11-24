@@ -55,6 +55,7 @@ import {
   Pause,
   PenLine,
   Pencil,
+  Pin,
   Play,
   Plus,
   Puzzle,
@@ -195,6 +196,8 @@ export const icons = {
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: filled(Pause),
+  /** Pinning a value to the account's taste (Dream › Taste). */
+  pin: Pin,
   /** A saved preset: the Presets chip and Library › Presets. */
   preset: Bookmark,
   /** Seeing a choice full screen before choosing it. */

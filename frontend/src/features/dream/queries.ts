@@ -1,6 +1,12 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import type { ChatNote, DreamCounts, DreamDigest, DreamSettings } from "../../../../shared/dream";
+import type {
+  ChatNote,
+  DreamCounts,
+  DreamDigest,
+  DreamSettings,
+  KeepRates,
+} from "../../../../shared/dream";
 import type { Inbox } from "../../../../shared/inbox";
 import type { Project, ProjectStats } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
@@ -63,6 +69,12 @@ export const dreamCountQuery = queryOptions({
     api<{ unseen: number; images: number; videos: number; active: boolean }>("/api/dream/count"),
   refetchInterval: (query) => (query.state.data?.active ? 15_000 : false),
   refetchOnWindowFocus: "always",
+});
+/** The account's Dream keeps by profile, LoRA and caption tag; verdicts refresh it with Dream's. */
+export const keepRatesQuery = queryOptions({
+  queryKey: ["dream", "keep-rates"],
+  queryFn: () => api<KeepRates>("/api/dream/keep-rates"),
+  staleTime: 5 * 60_000,
 });
 export const discardedQuery = (media: DreamMedia) =>
   infiniteQueryOptions({

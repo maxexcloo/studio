@@ -1,12 +1,12 @@
 import { Alert, Button, Group, VisuallyHidden } from "@mantine/core";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
-import type { MediaItem } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { DreamDeck, type Judgement } from "../dream/DreamDeck";
 import { type GalleryListing, type GalleryReviewRating, galleryReviewQuery } from "./queries";
+import { reviewSuggestionCount } from "./usePrefetchResultSuggestions";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "../dream/DreamPage.module.css";
@@ -80,11 +80,19 @@ function GalleryReviewDeck({
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [history, setHistory] = useState<Judgement[]>([]);
   const review = useInfiniteQuery(galleryReviewQuery(listing, rating, since));
-  const items: MediaItem[] =
-    review.data?.pages.flatMap((page) => page.items.filter((item) => !decided.has(item.id))) ?? [];
+  const items = useMemo(
+    () =>
+      review.data?.pages.flatMap((page) => page.items.filter(({ id }) => !decided.has(id))) ?? [],
+    [decided, review.data],
+  );
   const { fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = review;
   useEffect(() => {
-    if (items.length < 3 && hasNextPage && !isFetchingNextPage && !isFetchNextPageError)
+    if (
+      items.length <= reviewSuggestionCount &&
+      hasNextPage &&
+      !isFetchingNextPage &&
+      !isFetchNextPageError
+    )
       void fetchNextPage();
   }, [items.length, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError]);
   return (

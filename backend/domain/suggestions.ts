@@ -11,12 +11,14 @@ import {
   type Suggestions,
   type VariationDirection,
   changeActions,
+  directionVariants,
   maxSuggestionReferences,
   maxSuggestions,
   variationDirections,
 } from "../../shared/suggestions.ts";
 import { shortTitle } from "../../shared/titles.ts";
 import { promptInstruction } from "./../prompt-instructions.js";
+import { explicitExclusions, namedMotif } from "./dream-concepts.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
 import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
@@ -34,6 +36,7 @@ import {
   writerGuide,
 } from "./writing-standard.ts";
 
+type ImageChange = Extract<ChangeAction, "edit" | "recreate">;
 type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
 // The viewer's next steps and Animate's motion ideas may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
@@ -94,8 +97,8 @@ interface Router {
 const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
-const suggestionRevision = { image: 3, video: 2 } as const;
-const motionRevision = 4;
+const suggestionRevision = { image: 4, video: 3 } as const;
+const motionRevision = 5;
 const savedRevision = (field: "nextSteps" | "motionIdeas", item?: SuggestionItem) =>
   field === "motionIdeas"
     ? motionRevision
@@ -104,10 +107,13 @@ const savedRevision = (field: "nextSteps" | "motionIdeas", item?: SuggestionItem
 const shownIdeas = maxSuggestions;
 const maxRequest = 500;
 const directionRequests: Record<VariationDirection, string> = {
+  light:
+    "Give the same scene distinct lighting: the time of day, light source, direction and color of the light. Keep the subject's identity, pose, outfit, setting and visual style.",
+  outfit:
+    "Give the same subject a distinct outfit suited to the original setting. Keep the subject's identity, pose, setting and visual style.",
+  pose: "Give the same subject a distinct pose, gesture or action suited to the setting. Keep the subject's identity, outfit, setting, lighting and visual style.",
   scene:
     "Give the same subject a distinct setting. Keep the subject's identity, outfit and visual style.",
-  outfit:
-    "Give the same subject a distinct outfit suited to the original setting. Keep the subject's identity, setting and visual style.",
   style:
     "Give the same subject a distinct visual treatment through lighting, color and camera or artistic medium. Keep the subject's identity, setting and outfit.",
 };
@@ -151,19 +157,32 @@ const draftGuides: Record<
   recreate: (kind) => `recreate: make a fresh ${kind} from the rewritten prompt.`,
   animate: () => "animate: the prompt describes the video's motion, camera, action and sound.",
 };
-// Areas to vary across the viewer's next steps.
-const stepAreas = [
-  "accessories",
-  "action",
-  "expression",
-  "interaction",
-  "lighting",
-  "outfit",
-  "pose",
-  "props",
-  "setting",
-  "style",
-] as const;
+const editAreas = [
+  "one subject's expression, gaze or small gesture",
+  "an existing prop, trim, garment or accessory",
+  "a particular material, surface or texture",
+  "targeted light, shadow, reflection or color",
+  "a distracting object, mark or background detail",
+  "a subtle weather or atmosphere effect",
+];
+const recreateAreas = [
+  "a different viewpoint, crop or foreground arrangement",
+  "a new pose or interaction tied to the scene",
+  "an earlier or later moment in the same scene",
+  "a credible change of location, season or time",
+  "a different visual medium or photographic process",
+  "a contrasting light or color treatment",
+];
+const openingFrameAngles = [
+  "a gesture that uses the opening pose",
+  "an interaction with a nearby subject or prop",
+  "motion of a visible object or its material",
+  "a change in the weather, water or light already present",
+  "a camera move that follows or reveals a specific detail",
+  "a contrast between motion and stillness across the frame",
+  "a near-to-far change in focus that shifts attention",
+  "an expression or eye-line change with a clear payoff",
+];
 const variety = () => promptInstruction("suggestion-variety");
 // Image change suggestions swap the source's own named parts; motion ideas have their own angles.
 const specifics = (kind: "image" | "video") =>
@@ -296,7 +315,12 @@ const changeChoices = (kind: "image" | "video", uncensored: boolean) =>
     .filter(Boolean)
     .join("\n");
 /** The viewer's next steps instruction, from the picture where the model reads it. */
-const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensored: boolean) =>
+const viewerInstruction = (
+  kind: "image" | "video",
+  pictured: boolean,
+  uncensored: boolean,
+  action?: ImageChange,
+) =>
   promptInstruction("suggest-viewer", {
     kind,
     availableImages: pictured ? "what the attached image shows, " : "",
@@ -308,8 +332,22 @@ const viewerInstruction = (kind: "image" | "video", pictured: boolean, uncensore
           })
         : promptInstruction("image-change-directions", {
             maxSuggestions,
-            areas: angles(stepAreas, stepAreas.length),
-            specifics: specifics(kind),
+            areas: [
+              action !== "recreate" && angles(editAreas, 4),
+              action !== "edit" && angles(recreateAreas, 4),
+            ]
+              .filter(Boolean)
+              .join("; "),
+            specifics: [
+              specifics(kind),
+              promptInstruction(
+                action === "edit"
+                  ? "image-edit-ideas"
+                  : action === "recreate"
+                    ? "image-recreate-ideas"
+                    : "image-mixed-ideas",
+              ),
+            ].join("\n"),
           }),
     contentRule: contentRule(uncensored),
     suggestionChoices: changeChoices(kind, uncensored),
@@ -369,7 +407,7 @@ export function createSuggestions({
   fixed = () => [],
   now = Date.now,
 }: {
-  taste: Pick<Taste, "read">;
+  taste: Pick<Taste, "read" | "exclusions">;
   /** Null where the account may not send prompts to the text model. */
   writer: (ownerId: string) => Writer | null;
   online: () => Promise<boolean>;
@@ -464,6 +502,8 @@ export function createSuggestions({
       hasReferences,
       uncensored = false,
       cardDraft,
+      action,
+      exclusions = [],
     }: {
       signal?: AbortSignal;
       images?: ModelImage[];
@@ -471,6 +511,8 @@ export function createSuggestions({
       hasReferences?: boolean;
       uncensored?: boolean;
       cardDraft?: string;
+      action?: ImageChange;
+      exclusions?: string[];
     } = {},
   ): Promise<Suggestions<PromptIdea | NextStep>> {
     const offered = surface === "composer" ? [] : fixed(fixedKinds[surface]);
@@ -528,12 +570,17 @@ export function createSuggestions({
             : "the source caption, then the source prompt",
           maxSuggestions,
           contentRule: contentRule(uncensored),
-          suggestionChoices: suggestionChoices("video", uncensored),
+          suggestionChoices: [
+            suggestionChoices("video", uncensored),
+            promptInstruction("opening-frame-idea-directions", {
+              angles: angles(openingFrameAngles, 6),
+            }),
+          ].join("\n"),
           americanEnglish,
           avoidFiller: avoidFiller(),
           data,
         }),
-      viewer: () => viewerInstruction(kind, images.length > 0, uncensored),
+      viewer: () => viewerInstruction(kind, images.length > 0, uncensored, action),
     }[surface]();
     let text: string;
     try {
@@ -575,6 +622,7 @@ export function createSuggestions({
           const title = sameLabel(label);
           const words = sameLabel(prompt);
           if (!title || !words || labels.has(title) || prompts.has(words)) return false;
+          if (namedMotif(`${label} ${prompt}`, exclusions)) return false;
           if (cardDraft !== undefined && cardDraft.length + 2 + prompt.length > maxPromptCharacters)
             return false;
           labels.add(title);
@@ -584,7 +632,9 @@ export function createSuggestions({
         .slice(0, maxSuggestions) as PromptIdea[];
       return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
-    const steps = readSteps(reply, offered, surface === "animate");
+    const steps = readSteps(reply, offered, surface === "animate").filter(
+      ({ label, request }) => !namedMotif(`${label} ${request}`, exclusions),
+    );
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
@@ -610,6 +660,7 @@ export function createSuggestions({
     const limits = [
       ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
       ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
+      ...(record.exclusions ?? []).map((motif) => `Exclude from new ideas: ${motif}`),
     ];
     return {
       known: Boolean(record.summary || liked.length),
@@ -633,7 +684,13 @@ export function createSuggestions({
     model: Writer,
     ownerId: string,
     source: SuggestionItem,
-    options: { signal?: AbortSignal; image?: ModelImage | null; save?: boolean } = {},
+    options: {
+      signal?: AbortSignal;
+      image?: ModelImage | null;
+      save?: boolean;
+      action?: ImageChange;
+      exclusions?: string[];
+    } = {},
   ): Promise<Suggestions<PromptIdea | NextStep>> {
     const kind = source.type === "video" ? "video" : "image";
     const uncensored = explicit(ownerId);
@@ -644,6 +701,7 @@ export function createSuggestions({
       source.jobId,
       source.prompt || source.suggestedPrompt,
       uncensored,
+      options.action,
     ]);
     const latest = shown.get(menu) ?? source.nextSteps?.steps.map(describeIdea) ?? [];
     const context = [
@@ -659,6 +717,8 @@ export function createSuggestions({
       images: options.image ? [options.image] : [],
       signal: options.signal,
       uncensored,
+      action: options.action,
+      exclusions: options.exclusions,
     });
     if (!answer.reason && !options.signal?.aborted) rememberShown(menu, answer.suggestions);
     if (!answer.reason && !options.signal?.aborted && options.save !== false)
@@ -713,6 +773,8 @@ export function createSuggestions({
     const loses = draft ? "" : editLoss(source, editWriting, profileId);
     const instruction = offered.includes("edit") && editing === "instruction";
     const onlyInstruction = instruction && offered.length === 1;
+    // One direction alone gets several variations of it, to compare.
+    const alone = directions?.length === 1 ? directions[0] : undefined;
     const system = promptInstruction("write-change", {
       sourceContext: draft
         ? promptInstruction("change-composer-prompt", { kind })
@@ -723,6 +785,11 @@ export function createSuggestions({
         ? [
             promptInstruction("write-distinct-variations"),
             ...directions.map((direction) => `${direction}: ${directionRequests[direction]}`),
+            ...(alone
+              ? [
+                  `Write ${directionVariants} ${alone} variations, each unlike the others, changing only the ${alone}.`,
+                ]
+              : []),
             promptInstruction("name-each-variation"),
           ]
         : [
@@ -757,11 +824,16 @@ export function createSuggestions({
       contentRule: contentRule(explicit(ownerId)),
       americanEnglish,
       avoidFiller: avoidFiller(),
-      replyFormat: directions
-        ? `Reply with JSON only, keyed by direction: {${directions
-            .map((direction) => `"${direction}": {"label": "<label>", "prompt": "<the prompt>"}`)
-            .join(", ")}}.`
-        : `Reply with JSON only: {"action": "<${offered.join("|")}>", "label": "<label>", "prompt": "<the prompt>"}.`,
+      replyFormat: alone
+        ? `Reply with JSON only: {"${alone}": [${Array.from(
+            { length: directionVariants },
+            () => `{"label": "<label>", "prompt": "<the prompt>"}`,
+          ).join(", ")}]}.`
+        : directions
+          ? `Reply with JSON only, keyed by direction: {${directions
+              .map((direction) => `"${direction}": {"label": "<label>", "prompt": "<the prompt>"}`)
+              .join(", ")}}.`
+          : `Reply with JSON only: {"action": "<${offered.join("|")}>", "label": "<label>", "prompt": "<the prompt>"}.`,
     });
     let text: string;
     try {
@@ -797,13 +869,19 @@ export function createSuggestions({
     const reply = json(text);
     if (directions) {
       const original = promptText(source.prompt);
-      const suggestions = directions.map((direction) => ({
+      const written = alone
+        ? (Array.isArray(reply?.[alone]) ? reply[alone] : [])
+            .slice(0, directionVariants)
+            .map((variation: unknown) => [alone, variation] as const)
+        : directions.map((direction) => [direction, reply?.[direction]] as const);
+      const suggestions = written.map(([direction, variation]) => ({
         action: "recreate" as const,
-        label: shortTitle(clean(reply?.[direction]?.label, 40), 4),
+        label: shortTitle(clean((variation as { label?: unknown })?.label, 40), 4),
         request: direction,
-        prompt: promptText(reply?.[direction]?.prompt),
+        prompt: promptText((variation as { prompt?: unknown })?.prompt),
       }));
       if (
+        suggestions.length !== (alone ? directionVariants : directions.length) ||
         suggestions.some(({ label, prompt }) => !label || !prompt || prompt === original) ||
         new Set(suggestions.map(({ prompt }) => prompt)).size !== suggestions.length
       ) {
@@ -835,6 +913,7 @@ export function createSuggestions({
       const ownerId = source.ownerId || "";
       const uncensored = explicit(ownerId);
       const offered = fixed(fixedKinds.viewer);
+      const exclusions = explicitExclusions(taste.exclusions(ownerId));
       return {
         instructions: viewerInstruction("image", true, uncensored),
         context: [
@@ -846,7 +925,9 @@ export function createSuggestions({
             : []),
         ].join("\n"),
         keep(reply: unknown) {
-          const steps = readSteps(reply as { steps?: unknown } | null, offered);
+          const steps = readSteps(reply as { steps?: unknown } | null, offered).filter(
+            ({ label, request }) => !namedMotif(`${label} ${request}`, exclusions),
+          );
           return steps.length ? savedSteps(suggestionRevision.image, steps, uncensored) : undefined;
         },
       };
@@ -938,6 +1019,7 @@ export function createSuggestions({
         request?: unknown;
         directions?: unknown;
         actions?: unknown;
+        action?: unknown;
         cardIds?: unknown;
       },
       {
@@ -979,13 +1061,20 @@ export function createSuggestions({
       const referenceIds = (references ?? []) as string[];
       if (surface === "change" || (surface === "draft" && body.request !== undefined)) {
         const request = clean(body.request, maxRequest);
+        // In the order asked for, which the variations keep.
         const directions =
           body.directions === undefined
             ? undefined
-            : variationDirections.filter(
-                (direction) =>
-                  Array.isArray(body.directions) && body.directions.includes(direction),
-              );
+            : variationDirections
+                .filter(
+                  (direction) =>
+                    Array.isArray(body.directions) && body.directions.includes(direction),
+                )
+                .sort(
+                  (a, b) =>
+                    (body.directions as unknown[]).indexOf(a) -
+                    (body.directions as unknown[]).indexOf(b),
+                );
         if (
           directions &&
           (surface !== "change" ||
@@ -993,7 +1082,7 @@ export function createSuggestions({
             !directions.length ||
             directions.length !== body.directions.length)
         ) {
-          throw failure("Choose distinct Scene, Outfit or Style directions.", 400);
+          throw failure("Choose distinct Light, Outfit, Pose, Scene or Style directions.", 400);
         }
         // A draft has nothing to upscale yet.
         const actions = changeActions.filter(
@@ -1071,7 +1160,14 @@ export function createSuggestions({
         body.prompt !== source?.settings?.typedPrompt &&
         body.prompt !== (source?.prompt || source?.suggestedPrompt || "");
       const field = surface === "animate" ? "motionIdeas" : "nextSteps";
-      const saved = edited ? undefined : source?.[field];
+      const action =
+        surface === "viewer" &&
+        source?.type === "image" &&
+        (body.action === "edit" || body.action === "recreate")
+          ? body.action
+          : undefined;
+      const saved = edited || action ? undefined : source?.[field];
+      const exclusions = explicitExclusions(taste.exclusions(ownerId));
       if (edited)
         source = { ...source!, prompt: body.prompt as string, suggestedPrompt: undefined };
       if (
@@ -1080,12 +1176,13 @@ export function createSuggestions({
         saved.revision === savedRevision(field, source) &&
         !fresh &&
         Boolean(saved.uncensored) === uncensored
-      )
-        return {
-          suggestions: saved.steps.filter(
-            unlike(fixed(surface === "animate" ? "animate" : "change")),
-          ),
-        };
+      ) {
+        const distinct = unlike(fixed(surface === "animate" ? "animate" : "change"));
+        const suggestions = saved.steps.filter(
+          (step) => distinct(step) && !namedMotif(`${step.label} ${step.request}`, exclusions),
+        );
+        if (suggestions.length) return { suggestions };
+      }
       const { known, lines, motionLines } = tasteContext(ownerId);
       const kind = drafted ? (body.kind as "image" | "video") : "image";
       const prompt = drafted || edited ? promptText(body.prompt) : "";
@@ -1127,6 +1224,8 @@ export function createSuggestions({
         source?.jobId ?? jobId ?? "",
         source?.id ?? itemId,
         uncensored,
+        action,
+        exclusions,
       ]);
       const cached = cache.get(key);
       if (cached && cached.until > now() && !fresh && !cached.signal?.aborted) {
@@ -1151,7 +1250,13 @@ export function createSuggestions({
         if (drafted && profileId && !writing) return empty("The selected model is unavailable.");
         if (signal?.aborted) return empty("Suggestion writing was interrupted.");
         if (source && surface === "viewer")
-          return stepsFor(model, ownerId, source, { image: picture, save: !edited, signal });
+          return stepsFor(model, ownerId, source, {
+            image: picture,
+            save: !edited && !action,
+            signal,
+            action,
+            exclusions,
+          });
         const context = source
           ? [
               ...motionLines,
@@ -1200,6 +1305,7 @@ export function createSuggestions({
             uncensored,
             cardDraft,
             signal,
+            exclusions,
           },
         );
         if (ideas.reason || signal?.aborted) return ideas;

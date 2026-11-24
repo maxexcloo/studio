@@ -6,6 +6,8 @@ import {
   type Change,
   type Suggestions,
   type VariationDirection,
+  directionVariants,
+  exploreDirections,
   variationDirections,
 } from "../../../../shared/suggestions";
 import { post } from "../../api";
@@ -109,7 +111,7 @@ export function VariationDialog({
         itemId: item.id,
         prompt,
         actions: ["recreate"],
-        directions: exploring ? variationDirections : [direction],
+        directions: exploring ? exploreDirections : [direction],
       });
       if (answer.reason) throw new Error(answer.reason);
       const runProfile = profileForBackend(
@@ -147,7 +149,7 @@ export function VariationDialog({
         <Text size="sm">
           {exploring
             ? "Review three prompts in the composer, each changing the scene, outfit or style."
-            : `Review a new ${direction} in the composer.`}{" "}
+            : `Compare ${directionVariants} prompts in the composer, each with a different ${directionLabels[direction].toLowerCase()} and nothing else changed.`}{" "}
           Studio carries over the character and identity references.
         </Text>
         {replace && <Text size="sm">This replaces your current image draft.</Text>}
