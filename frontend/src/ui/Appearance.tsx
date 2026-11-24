@@ -5,6 +5,7 @@ import {
   Popover,
   ScrollArea,
   SegmentedControl,
+  SimpleGrid,
   Stack,
   Text,
   Tooltip,
@@ -197,15 +198,8 @@ function AppearanceControls() {
           <Text size="sm" fw={500}>
             Colour
           </Text>
-          {/* Two even rows of five, spread across the popover's width. */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: phone ? "repeat(5, 1fr)" : "repeat(5, 30px)",
-              justifyContent: "space-between",
-              rowGap: "var(--mantine-spacing-xs)",
-            }}
-          >
+          {/* Two rows of five. */}
+          <SimpleGrid cols={5} spacing="xs" verticalSpacing="xs" w="fit-content">
             {appearanceChoices.colour.map((colour) => (
               <Tooltip key={colour} label={colour === "studio" ? "Amber" : titleCase(colour)}>
                 <ActionIcon
@@ -221,7 +215,7 @@ function AppearanceControls() {
                 </ActionIcon>
               </Tooltip>
             ))}
-          </div>
+          </SimpleGrid>
         </Stack>
         <Stack gap={6}>
           <Text size="sm" fw={500}>
