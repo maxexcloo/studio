@@ -120,9 +120,7 @@ export function GalleryToolbar({
     />
   );
   // An empty view says so itself.
-  const results = !count
-    ? undefined
-    : `${count.toLocaleString()} ${kind === "video" ? "Video" : "Image"}${count === 1 ? "" : "s"}`;
+  const results = !count ? undefined : plural(count, kind === "video" ? "Video" : "Image");
   // The open phone search keeps Select and the actions, so selecting doesn't close it.
   if (phone && searching)
     return (

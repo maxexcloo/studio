@@ -1,9 +1,11 @@
-import { Alert, Button, Text } from "@mantine/core";
+import { Alert, Button } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../api";
 import { formatDateTime } from "../../ui/dates";
+import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type RememberedChat, chatChoicesQuery } from "./queries";
@@ -31,11 +33,7 @@ export function ChatChoices() {
   return (
     <SettingGroup title="Chat Choices">
       {chats.isPending && <LoadingState label="Loading Chat Choices" />}
-      {chats.data && !chats.data.chats.length && (
-        <Text size="xs" c="dimmed">
-          Nothing remembered. The model, LoRA and count choices chats keep show here.
-        </Text>
-      )}
+      {chats.data && !chats.data.chats.length && <EmptyState fill>No Chat Choices</EmptyState>}
       {chats.data?.chats.map((choices) => (
         <SettingRow
           key={choices.chat}
@@ -50,7 +48,7 @@ export function ChatChoices() {
             choices.loras === false && "No LoRAs",
             choices.count && `${choices.count} each`,
             choices.references &&
-              `${choices.references.count} reference${choices.references.count === 1 ? "" : "s"} until ${formatDateTime(choices.references.until)}`,
+              `${plural(choices.references.count, "reference")} until ${formatDateTime(choices.references.until)}`,
             `Last used ${formatDateTime(choices.at)}`,
           ]
             .filter(Boolean)

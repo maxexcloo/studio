@@ -20,6 +20,7 @@ import {
 } from "react";
 
 import { loraName } from "../../../../shared/profiles";
+import { likeColour } from "../../theme";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
@@ -430,7 +431,12 @@ export function DreamPreview({
                 {card.kind === "set" &&
                   (
                     [
-                      { value: "like", label: "Like This Image", icon: icons.like, colour: "pink" },
+                      {
+                        value: "like",
+                        label: "Like This Image",
+                        icon: icons.like,
+                        colour: likeColour,
+                      },
                       {
                         value: "discard",
                         label: "Deny This Image",

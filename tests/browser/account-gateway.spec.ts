@@ -366,7 +366,7 @@ test("Administrators change roles, reset passwords and delete galleries, account
     "Reset Learnt Taste",
     /^Delete Gallery/,
     "Disable",
-    "Delete User",
+    "Delete",
   ]);
   await page.keyboard.press("Escape");
   await menu("Make Administrator");
@@ -400,7 +400,7 @@ test("Administrators change roles, reset passwords and delete galleries, account
   await expect(wipe).toBeHidden();
   expect(state.galleryOwners).toEqual({});
 
-  await menu("Delete User");
+  await menu("Delete");
   const confirm = page.getByRole("dialog", { name: "Delete User", exact: true });
   await expect(confirm).toContainText("stay on disk");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
@@ -454,14 +454,14 @@ test("Account menu names the account by its email and opens the account workspac
   await fixtures(page);
   await signIn(page, { id: "admin", role: "user", username: "admin@example.test" });
   await page.goto("/");
-  const more = page.getByRole("button", { name: "More Options", exact: true });
+  const more = page.getByRole("button", { name: "Actions", exact: true });
   if (!testInfo.project.use.isMobile) {
     await more.hover();
-    await expect(page.getByRole("tooltip", { name: "More Options", exact: true })).toBeVisible();
+    await expect(page.getByRole("tooltip", { name: "Actions", exact: true })).toBeVisible();
   }
   await more.click();
   await expect(more).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("tooltip", { name: "More Options", exact: true })).toBeHidden();
+  await expect(page.getByRole("tooltip", { name: "Actions", exact: true })).toBeHidden();
   await expect(page.getByRole("menuitem")).toHaveText([
     "Account",
     "Library",
@@ -486,7 +486,7 @@ test("The Studio header keeps its home link with modes and account controls on p
     header.getByRole("navigation", { name: "Creative Modes", exact: true }),
   ).toBeVisible();
   await expect(header.getByRole("button", { name: "Appearance", exact: true })).toBeVisible();
-  await expect(header.getByRole("button", { name: "More Options", exact: true })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Actions", exact: true })).toBeVisible();
   await home.click();
   await expect(page).toHaveURL(/\/images$/);
 });

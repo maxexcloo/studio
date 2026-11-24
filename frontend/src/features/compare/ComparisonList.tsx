@@ -19,10 +19,13 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ViewMenu } from "../../ui/ViewMenu";
+import { ratingChoices } from "../gallery/GalleryFilters";
 import { itemAction } from "../gallery/itemActions";
 import { mediaTitle } from "../gallery/mediaLabels";
 import { MediaTile } from "../gallery/MediaTile";
+import type { GalleryReviewRating } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { ComparisonRatingButtons, useRateComparison } from "./ComparisonRatingButtons";
 import { type Comparison, againItems, comparisonTitle, comparisonsQuery } from "./queries";
@@ -34,14 +37,11 @@ import galleryClasses from "../gallery/GalleryPage.module.css";
 import tileClasses from "../gallery/MediaTileActions.module.css";
 
 // Disliked comparisons stay out of the default view.
-const ratings = [
+type Rating = "kept" | GalleryReviewRating;
+const ratings: { value: Rating; label: string }[] = [
   { value: "kept", label: "Liked & Unrated" },
-  { value: "liked", label: "Liked" },
-  { value: "unrated", label: "Unrated" },
-  { value: "disliked", label: "Disliked" },
-  { value: "all", label: "All" },
-] as const;
-type Rating = (typeof ratings)[number]["value"];
+  ...ratingChoices,
+];
 
 /**
  * The gallery's Comparisons view: a card per comparison or kept Dream comparison, newest first,
@@ -211,16 +211,18 @@ function ComparisonActions({
         position="bottom-end"
         width={menuWidth}
       >
-        <Menu.Target>
-          <ActionIcon
-            className={`${tileClasses.control} ${tileClasses.more}`}
-            aria-label={`More Actions for ${title}`}
-            variant="default"
-            size={28}
-          >
-            <icons.more size={16} />
-          </ActionIcon>
-        </Menu.Target>
+        <PopupTooltip label="Actions">
+          <Menu.Target>
+            <ActionIcon
+              className={`${tileClasses.control} ${tileClasses.more}`}
+              aria-label={`Actions for ${title}`}
+              variant="default"
+              size={28}
+            >
+              <icons.more size={16} />
+            </ActionIcon>
+          </Menu.Target>
+        </PopupTooltip>
         <Menu.Dropdown>
           <ActionMenuItems
             groups={[

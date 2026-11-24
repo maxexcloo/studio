@@ -112,7 +112,10 @@ test("Dislike hides a tile, and can be cleared from the Disliked filter", async 
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
   // Disliked is one of the filters, shown as a removable chip while on.
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Disliked", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Rating", exact: true })
+    .getByText("Disliked", { exact: true })
+    .click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
@@ -160,7 +163,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(page.getByRole("menu")).toBeHidden();
   // The pointer leaves the tile, so hover opens no submenu under it.
   await page.mouse.move(0, 0);
-  const more = page.getByRole("button", { name: "More Actions for Copper Bird", exact: true });
+  const more = page.getByRole("button", { name: "Actions for Copper Bird", exact: true });
   await more.focus();
   await more.press("Enter");
   await expect(page.getByRole("menu")).toBeVisible();
@@ -193,7 +196,7 @@ test("Phones without captions hide More and open the tile menu by holding or the
   await galleryFixture(page);
   const tile = page.getByRole("button", { name: "Open image: Copper Bird", exact: true });
   await expect(
-    page.getByRole("button", { name: "More Actions for Copper Bird", exact: true }),
+    page.getByRole("button", { name: "Actions for Copper Bird", exact: true }),
   ).toBeHidden();
   const menu = page.getByRole("menu");
   await touch(tile, "touchstart");

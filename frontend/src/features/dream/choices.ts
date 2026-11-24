@@ -22,34 +22,50 @@ export interface Choice {
 }
 
 /**
- * The top card's choices, in groups: a comparison's Pass, sides and Accept; a single card's Edit
- * and Animate, Variations and More Like This, then its ratings. Dislike hides it, Like accepts it
- * and rates it Liked, and Accept keeps it unrated. Edit, Animate, Variations and More Like This
- * need a Dream image.
+ * A card's verdicts as every surface names them: Pass dislikes it (Deny All on a set, Dislike when
+ * rating the gallery), Accept keeps it unrated and Super Like accepts and rates it.
  */
-export function dreamChoices(card: DeckCard, singleImageComparison = false): Choice[][] {
+export function verdictLabels(card: DeckCard, quickRating = false) {
+  return {
+    discard: quickRating ? "Dislike" : card.kind === "set" ? "Deny All" : "Pass",
+    like: "Super Like",
+    keep: "Accept",
+  };
+}
+
+/**
+ * The top card's choices, in groups: a comparison's Pass, sides and Accept; a single card's Edit
+ * and Animate, Variations and More Like This, then its verdicts. Edit, Animate, Variations and
+ * More Like This need a Dream image.
+ */
+export function dreamChoices(
+  card: DeckCard,
+  singleImageComparison = false,
+  quickRating = false,
+): Choice[][] {
   if (card.kind === "pair" && !singleImageComparison)
     return [
       [
-        { choice: "neither", id: "neither", label: "Neither", icon: X },
+        { choice: "neither", id: "neither", label: "Pass", icon: X },
         ...comparisonVotes.slice(0, card.items.length).map((choice, index) => ({
           choice,
           id: choice,
           label: letter(index),
           icon: icons.winner,
         })),
-        { choice: "both", id: "both", label: "Both", icon: icons.keep },
+        { choice: "both", id: "both", label: "Accept", icon: icons.keep },
       ],
     ];
+  const labels = verdictLabels(card, quickRating);
   const ratings: Choice[] = [
-    { choice: "discard", id: "discard", label: "Dislike", icon: icons.dislike, main: true },
-    { choice: "like", id: "like", label: "Like", icon: icons.like, main: true },
-    { choice: "keep", id: "keep", label: "Accept", icon: icons.keep, main: true, primary: true },
+    { choice: "discard", id: "discard", label: labels.discard, icon: icons.dislike, main: true },
+    { choice: "like", id: "like", label: labels.like, icon: icons.superLike, main: true },
+    { choice: "keep", id: "keep", label: labels.keep, icon: icons.keep, main: true, primary: true },
   ];
-  if (card.kind === "pair")
-    return [[...ratings, { choice: "both", id: "both", label: "Both", icon: icons.compare }]];
-  if (card.kind === "set")
-    return [ratings.map((choice) => ({ ...choice, label: `${choice.label} Set` }))];
+  if (card.kind === "pair") {
+    const label = card.items.length > 2 ? "All" : "Both";
+    return [[...ratings, { choice: "both", id: "both", label, icon: icons.keep }]];
+  }
   if (card.kind !== "dream" || card.item.type !== "image") return [ratings];
   return [
     [
@@ -57,7 +73,7 @@ export function dreamChoices(card: DeckCard, singleImageComparison = false): Cho
       { choice: "animate", id: "animate", label: "Animate", icon: icons.animate },
     ],
     [
-      { choice: "variations", id: "variations", label: "Variations", icon: icons.assistant },
+      { choice: "variations", id: "variations", label: "Variations", icon: icons.recreate },
       { choice: "more", id: "more-like-this", label: "More Like This", icon: icons.moreLikeThis },
     ],
     ratings,

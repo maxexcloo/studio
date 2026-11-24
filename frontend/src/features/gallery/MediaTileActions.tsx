@@ -5,6 +5,7 @@ import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
 import { useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { ratingLabel } from "./itemActions";
 import { MediaActionMenu, useMediaDialogs } from "./MediaActions";
@@ -84,17 +85,19 @@ export function MediaTileActions({
           position="bottom-end"
           width={menuWidth}
         >
-          <Menu.Target>
-            <ActionIcon
-              className={`${classes.control} ${classes.more}`}
-              data-hidden={hideMore || undefined}
-              aria-label={`More Actions for ${name}`}
-              variant="default"
-              size={28}
-            >
-              <icons.more size={16} />
-            </ActionIcon>
-          </Menu.Target>
+          <PopupTooltip label="Actions">
+            <Menu.Target>
+              <ActionIcon
+                className={`${classes.control} ${classes.more}`}
+                data-hidden={hideMore || undefined}
+                aria-label={`Actions for ${name}`}
+                variant="default"
+                size={28}
+              >
+                <icons.more size={16} />
+              </ActionIcon>
+            </Menu.Target>
+          </PopupTooltip>
           <Menu.Dropdown>
             <MediaActionMenu
               item={item}

@@ -6,6 +6,7 @@ import { characterProfiles, keepsIdentity } from "../../../../shared/characters"
 import type { Models, Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
@@ -21,7 +22,7 @@ export function characterDetail(card: CharacterCard) {
   const count = card.references.length;
   return [
     count
-      ? `${count} ${count === 1 ? "image" : "images"}`
+      ? plural(count, "image")
       : card.portrait?.status === "making"
         ? "Making Portrait"
         : card.portrait

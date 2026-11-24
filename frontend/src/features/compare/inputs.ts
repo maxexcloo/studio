@@ -1,6 +1,7 @@
 import { letter } from "../../../../shared/compare.ts";
 import type { Resolution } from "../../../../shared/resolution.ts";
 import type { GenerationInput } from "../../types";
+import { plural } from "../../ui/plural.ts";
 import type { Draft, Variant } from "../generation/GenerationProvider";
 
 /** Compares candidates one at a time, keeping the rest of the stack and optionally its baseline. */
@@ -171,7 +172,7 @@ export function variantLabels(
   const settings: Facet[] = differs(profile)
     ? []
     : [
-        ({ input }) => `${input.steps} Step${Number(input.steps) === 1 ? "" : "s"}`,
+        ({ input }) => plural(Number(input.steps), "Step"),
         ({ input }) => `Guidance ${input.cfg}`,
         ({ input }) =>
           typeof input.resolution === "string" && input.resolution
@@ -190,7 +191,7 @@ export function variantLabels(
         .join(", "),
     ...settings,
     (_, index) => `Seed ${seeds[index]}`,
-    ({ references }) => `${references.length} Reference${references.length === 1 ? "" : "s"}`,
+    ({ references }) => plural(references.length, "Reference"),
   ];
   const differing = facets.filter(differs);
   return variants.map(

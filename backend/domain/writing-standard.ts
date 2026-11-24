@@ -17,6 +17,9 @@ export const plainWords =
 /** Generation models read and voice American English; other spellings read and sound wrong to them. */
 export const americanEnglish = `Use American English spelling for English prompt text (color, gray, center). Keep quoted text and any requested language exactly as given. ${plainWords}`;
 
+/** What people read (titles, reasons, taste notes) is in Australian English, as the rest of Studio. */
+export const australianEnglish = "Australian English (colour, centre)";
+
 /** What the writer may add: only what the input states or implies. */
 export const fidelity = () => promptInstruction("keep-requested-details");
 

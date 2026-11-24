@@ -322,7 +322,7 @@ function settingChips(
     input.seed !== undefined && input.seed !== "" ? `Seed ${input.seed}` : "",
     ...(loraName
       ? loras.map((lora) => `${loraName(lora.name)} ${Number(lora.strength ?? 1).toFixed(2)}`)
-      : [loras.length ? `${loras.length} ${loras.length === 1 ? "LoRA" : "LoRAs"}` : ""]),
+      : [loras.length ? plural(loras.length, "LoRA") : ""]),
     Number(input.count) > 1 ? `${input.count} Outputs` : "",
   ].filter(Boolean);
 }

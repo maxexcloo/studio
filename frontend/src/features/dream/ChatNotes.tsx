@@ -1,9 +1,10 @@
-import { Alert, Button, Text } from "@mantine/core";
+import { Alert, Button } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { ChatNote } from "../../../../shared/dream";
 import { api } from "../../api";
 import { formatDateTime } from "../../ui/dates";
+import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { ChatChoices } from "./ChatChoices";
@@ -30,11 +31,7 @@ export function ChatNotes() {
     <>
       <SettingGroup title="Chat Notes">
         {notes.isPending && <LoadingState label="Loading Chat Notes" />}
-        {notes.data && !notes.data.notes.length && (
-          <Text size="xs" c="dimmed">
-            Nothing yet. What chats tell Studio about your work shows here for Dream to draw on.
-          </Text>
-        )}
+        {notes.data && !notes.data.notes.length && <EmptyState fill>No Chat Notes</EmptyState>}
         {notes.data?.notes.map((note) => (
           <SettingRow
             key={note.id}

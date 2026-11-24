@@ -5,20 +5,13 @@ import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { EmptyState } from "../../ui/EmptyState";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { DreamDeck, type Judgement } from "../dream/DreamDeck";
+import { dateCutoff, galleryDates, ratingChoices } from "./GalleryFilters";
 import { type GalleryListing, type GalleryReviewRating, galleryReviewQuery } from "./queries";
 import { reviewSuggestionCount } from "./usePrefetchResultSuggestions";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "../dream/DreamPage.module.css";
 import filterClasses from "./GalleryFilters.module.css";
-
-const day = 24 * 60 * 60 * 1000;
-const ratings: { value: GalleryReviewRating; label: string }[] = [
-  { value: "all", label: "All Ratings" },
-  { value: "unrated", label: "Unrated" },
-  { value: "liked", label: "Liked" },
-  { value: "disliked", label: "Disliked" },
-];
 
 export function GalleryReview({
   listing,
@@ -33,15 +26,19 @@ export function GalleryReview({
   view: ReactNode;
 }) {
   const id = useId();
-  const [openedAt] = useState(Date.now);
-  const [cutoff, setCutoff] = useState("0");
+  const [time, setTime] = useState("all");
   const [rating, setRating] = useState<GalleryReviewRating>(listing.filters.rating || "unrated");
   const times = [
-    { value: "0", label: "All Time" },
-    { value: String(openedAt - day), label: "Last 24 Hours" },
-    { value: String(openedAt - 7 * day), label: "Last 7 Days" },
-    ...(leftAt ? [{ value: String(leftAt + 1), label: "New Since Last Visit" }] : []),
+    { value: "all", label: "All" },
+    ...galleryDates,
+    ...(leftAt ? [{ value: "visit", label: "New Since Last Visit" }] : []),
   ];
+  const since =
+    time === "all"
+      ? 0
+      : time === "visit"
+        ? leftAt + 1
+        : dateCutoff(time as Parameters<typeof dateCutoff>[0]).getTime();
   return (
     <section className={classes.page} aria-labelledby={id}>
       <VisuallyHidden id={id} component="h1">
@@ -51,15 +48,15 @@ export function GalleryReview({
         <Group gap="xs" mih={44} wrap="nowrap" className={filterClasses.mode}>
           {view}
           <div className={filterClasses.chips} />
-          <ViewMenu label="Time" value={cutoff} groups={[times]} onChange={setCutoff} />
-          <ViewMenu label="Rating" value={rating} groups={[ratings]} onChange={setRating} />
+          <ViewMenu label="Time" value={time} groups={[times]} onChange={setTime} />
+          <ViewMenu label="Rating" value={rating} groups={[ratingChoices]} onChange={setRating} />
         </Group>
       </div>
       <GalleryReviewDeck
-        key={`${rating}:${cutoff}`}
+        key={`${rating}:${time}`}
         listing={listing}
         rating={rating}
-        since={Number(cutoff)}
+        since={since}
         close={close}
       />
     </section>

@@ -1,15 +1,4 @@
-import {
-  ActionIcon,
-  Badge,
-  Button,
-  Chip,
-  Divider,
-  Group,
-  Input,
-  Menu,
-  Stack,
-  Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Badge, Button, Chip, Group, Input, Stack, Tooltip } from "@mantine/core";
 import { ChevronDown, type LucideIcon, Search } from "lucide-react";
 import {
   type AnimationEvent,
@@ -20,10 +9,8 @@ import {
   useState,
 } from "react";
 
-import { menuWidth } from "../theme";
 import { ChipPopup } from "./ChipPopup";
 import { icons } from "./icons";
-import { PopupTooltip } from "./PopupTooltip";
 import { ScrollingSegments } from "./ScrollingSegments";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
@@ -92,22 +79,6 @@ export function ToolbarAction({
   );
 }
 
-/** Separates a toolbar's groups of actions, as in the viewer and selection bars. */
-function ToolbarDivider() {
-  return <Divider orientation="vertical" className={classes.divider} />;
-}
-
-/** A section's secondary action, listed by name under its toolbar's More menu. */
-interface ToolbarMoreAction {
-  label: string;
-  icon: LucideIcon;
-  onClick?: () => void;
-  /** A download link instead of a click. */
-  href?: string;
-}
-
-const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
-
 /**
  * One filter's choices, inline in a toolbar's Filter popover: All, then each option; exactly one
  * is chosen, and All (`null`) filters nothing.
@@ -144,8 +115,8 @@ export function FilterChoices({
 /**
  * Library and Settings lists share one toolbar, on one line: segmented views (on phones a menu
  * named by the current view), then search (a field, or an icon when space is tight),
- * one filter popover, then behind a divider the section's own actions: `more`
- * by name under ⋯, then `actions`, ending with the create action (`ToolbarAction`). Escape leaves search, keeping the query, or closes the filters;
+ * one filter popover, then the section's own `actions`, ending with the create action
+ * (`ToolbarAction`). Escape leaves search, keeping the query, or closes the filters;
  * `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
  */
 export function SectionToolbar({
@@ -158,7 +129,6 @@ export function SectionToolbar({
   filters,
   filterCount = 0,
   onClearFilters,
-  more = [],
   actions,
 }: {
   label: string;
@@ -170,7 +140,6 @@ export function SectionToolbar({
   filters?: ReactNode;
   filterCount?: number;
   onClearFilters?: () => void;
-  more?: ToolbarMoreAction[];
   actions?: ReactNode;
 }) {
   const phone = usePhone();
@@ -309,30 +278,6 @@ export function SectionToolbar({
           >
             <Stack gap="sm">{filters}</Stack>
           </ChipPopup>
-        )}
-        {(onQueryChange || filters) && more.length > 0 && <ToolbarDivider />}
-        {more.length > 0 && (
-          <Menu position="bottom-end" width={menuWidth}>
-            <PopupTooltip label={`More ${label} Actions`}>
-              <Menu.Target>
-                <ActionIcon variant="subtle" color="gray" aria-label={`More ${label} Actions`}>
-                  <icons.more size={18} />
-                </ActionIcon>
-              </Menu.Target>
-            </PopupTooltip>
-            <Menu.Dropdown>
-              {more.map((action) => (
-                <Menu.Item
-                  key={action.label}
-                  leftSection={<action.icon size={16} />}
-                  onClick={action.onClick}
-                  {...link(action.href)}
-                >
-                  {action.label}
-                </Menu.Item>
-              ))}
-            </Menu.Dropdown>
-          </Menu>
         )}
         {actions && (
           <Group gap={phone ? 4 : "xs"} ml={phone ? 0 : "xs"} wrap="nowrap">

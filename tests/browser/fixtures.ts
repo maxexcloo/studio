@@ -1128,7 +1128,7 @@ export async function pressGenerate(page: Page, name = "Generate Image") {
 }
 export async function openNav(page: Page, label: string) {
   if (["Library", "Settings"].includes(label)) {
-    await page.getByRole("button", { name: "More Options", exact: true }).click();
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
     await page.getByRole("menuitem", { name: label, exact: true }).click();
     return;
   }
@@ -1364,16 +1364,17 @@ export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") 
   await showGalleryView(page, choice === "Uploads" ? "Uploads" : "Gallery");
   // Liked is a Filters choice, shown as a removable chip while on.
   const chip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
-  if ((await chip.count()) > 0 !== (choice === "Liked")) await toggleGalleryFilter(page, "Liked");
+  if ((await chip.count()) > 0 !== (choice === "Liked"))
+    await filterGalleryRating(page, choice === "Liked" ? "Liked" : "All");
   await expect(chip).toHaveCount(choice === "Liked" ? 1 : 0);
 }
 
-/** Turns one of the gallery's Show filters (Liked, Disliked) on or off in its Filters popup. */
-export async function toggleGalleryFilter(page: Page, name: "Liked" | "Disliked") {
+/** Chooses the gallery's Rating filter in its Filters popup. */
+export async function filterGalleryRating(page: Page, name: "All" | "Liked" | "Disliked") {
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page
-    .getByRole("group", { name: "Show", exact: true })
-    .getByRole("button", { name, exact: true })
+    .getByRole("radiogroup", { name: "Rating", exact: true })
+    .getByText(name, { exact: true })
     .click();
   await page.keyboard.press("Escape");
 }
@@ -1450,7 +1451,7 @@ export async function closeReferences(page: Page) {
  */
 export async function saveCurrent(page: Page, name: string, toggle: string[] = []) {
   if (toggle.length) {
-    await page.getByRole("button", { name: "Preset Actions", exact: true }).click();
+    await page.getByRole("button", { name: "Actions for Preset", exact: true }).click();
     for (const part of toggle)
       await page.getByRole("menuitem", { name: part, exact: true }).click();
     await page.keyboard.press("Escape");
@@ -1486,7 +1487,7 @@ export async function loadSaved(page: Page, name: string) {
 
 /** Renames the current preset from the open popup's menu. */
 export async function renamePreset(page: Page, name: string) {
-  await page.getByRole("button", { name: "Preset Actions", exact: true }).click();
+  await page.getByRole("button", { name: "Actions for Preset", exact: true }).click();
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   const field = page.getByRole("combobox", { name: "Preset Name", exact: true });
   await expect(field).toBeFocused();

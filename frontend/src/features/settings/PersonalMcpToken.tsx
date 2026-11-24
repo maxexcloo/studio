@@ -147,7 +147,7 @@ export function PersonalMcpToken() {
         </SettingRow>
       </SettingGroup>
       {status.data?.enabled && (
-        <SettingGroup title="Danger Zone" danger>
+        <SettingGroup danger>
           {/* The milder action first, as Delete comes last. */}
           <SettingRow
             label="Rotate Token"

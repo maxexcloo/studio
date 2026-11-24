@@ -21,10 +21,12 @@ import type { MediaKind, Profile, Rating } from "../../types";
 import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
+import { FilterChoices } from "../../ui/SectionToolbar";
 import { chipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
+import type { GalleryReviewRating } from "./queries";
 
 import classes from "./GalleryFilters.module.css";
 
@@ -54,8 +56,20 @@ const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 const facets = ["model", "lora", "size", "aspect", "tag", "origin"] as const;
 type Facet = (typeof facets)[number];
 type GalleryDate = "" | "day" | "week" | "month" | "year";
-const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
-  { value: "", label: "Any", chip: "", days: 0 },
+/** Every rating filter's choices, All first; the gallery's Filter offers Liked and Disliked. */
+export const ratingChoices: { value: GalleryReviewRating; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "liked", label: "Liked" },
+  { value: "unrated", label: "Unrated" },
+  { value: "disliked", label: "Disliked" },
+];
+/** The date filter's choices, and Review's times; each reaches back from the start of today. */
+export const galleryDates: {
+  value: Exclude<GalleryDate, "">;
+  label: string;
+  chip: string;
+  days: number;
+}[] = [
   { value: "day", label: "Today", chip: "Today", days: 0 },
   { value: "week", label: "Week", chip: "Past Week", days: 7 },
   { value: "month", label: "Month", chip: "Past Month", days: 30 },
@@ -94,14 +108,16 @@ export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFi
   if (filters.rating) params.set("rating", filters.rating);
   if (filters.offCharacter) params.set("drifted", "1");
   params.set("uploads", filters.uploads ? "1" : "0");
-  const date = dates.find((option) => option.value === filters.date);
-  if (date?.value) {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    since.setDate(since.getDate() - date.days);
-    params.set("since", since.toISOString());
-  }
+  if (filters.date) params.set("since", dateCutoff(filters.date).toISOString());
   return params;
+}
+
+/** When a date choice starts. */
+export function dateCutoff(date: Exclude<GalleryDate, "">) {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - galleryDates.find((option) => option.value === date)!.days);
+  return since;
 }
 
 export const galleryFacetsQuery = (kind?: MediaKind) =>
@@ -215,7 +231,7 @@ export function useActiveFilters(
   extra: FilterChip[] = [],
 ): FilterChip[] {
   const { options } = useFacetOptions(kind, value);
-  const date = dates.find((option) => option.value === value.date)?.chip;
+  const date = galleryDates.find((option) => option.value === value.date)?.chip;
   return [
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
     ...(value.rating
@@ -383,8 +399,8 @@ export function FilterToggle({
 }
 
 /**
- * The Show filters the gallery and reference picker share. Liked, Disliked and Off-Character turn
- * Uploads off; Off-Character shows images Face Check found off their character.
+ * The Show filters the gallery and reference picker share. Off-Character turns Uploads off and
+ * shows images Face Check found off their character.
  */
 export function ShowToggles({
   kind,
@@ -393,20 +409,9 @@ export function ShowToggles({
   originalsOnly = false,
   onOriginalsOnly,
 }: FilterProps & { originalsOnly?: boolean; onOriginalsOnly?: (on: boolean) => void }) {
-  const rate = (rating: Rating, label: string) => (
-    <FilterToggle
-      label={label}
-      on={value.rating === rating}
-      onToggle={() =>
-        onChange({ ...value, rating: value.rating === rating ? "" : rating, uploads: false })
-      }
-    />
-  );
   return (
     <Input.Wrapper label="Show">
       <Group gap={6} mt={4} role="group" aria-label="Show">
-        {rate("liked", "Liked")}
-        {rate("disliked", "Disliked")}
         {galleryOrigins.map(({ value: origin, label }) => (
           <FilterToggle
             key={origin}
@@ -444,7 +449,8 @@ export function ShowToggles({
 }
 
 /**
- * The gallery's Filter popup and the reference picker share the Show toggles, date and facets.
+ * The gallery's Filter popup and the reference picker share the Show toggles, rating, date and
+ * facets. Choosing a rating turns Uploads off.
  */
 export function GalleryFilterPanel({
   kind,
@@ -547,17 +553,22 @@ export function GalleryFilterPanel({
           <Divider />
         </>
       )}
-      <Input.Wrapper label="Date">
-        <SegmentedControl
-          aria-label="Date"
-          fullWidth
-          size="xs"
-          mt={4}
-          value={value.date}
-          onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
-          data={dates.map(({ value, label }) => ({ value, label }))}
-        />
-      </Input.Wrapper>
+      <FilterChoices
+        label="Rating"
+        data={ratingChoices.filter(
+          (choice) => choice.value === "liked" || choice.value === "disliked",
+        )}
+        value={value.rating || null}
+        onChange={(rating) =>
+          onChange({ ...value, rating: (rating ?? "") as Rating | "", uploads: false })
+        }
+      />
+      <FilterChoices
+        label="Date"
+        data={galleryDates}
+        value={value.date || null}
+        onChange={(date) => onChange({ ...value, date: (date ?? "") as GalleryDate })}
+      />
       {lists.tag.length > 0 && (
         <>
           <Divider />

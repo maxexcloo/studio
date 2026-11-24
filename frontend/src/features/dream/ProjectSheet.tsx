@@ -114,12 +114,7 @@ function Results({ projectId }: { projectId: string }) {
   if (results.isPending) return <LoadingState label="Loading Results" />;
   if (results.isError) return <Alert color="red">{results.error.message}</Alert>;
   const items = results.data.pages.flatMap((page) => page.items);
-  if (!items.length)
-    return (
-      <Text size="sm" c="dimmed">
-        No results yet.
-      </Text>
-    );
+  if (!items.length) return <EmptyState fill>No Results</EmptyState>;
   const current = viewing ? items.find((item) => item.id === viewing) : undefined;
   if (viewing && !current) setViewing(null);
   function act(item: DreamItem, verdict: Verdict) {
@@ -213,9 +208,7 @@ function Chats({ project }: { project: Project }) {
           </SettingRow>
         ))
       ) : (
-        <Text size="sm" c="dimmed">
-          No chats attached.
-        </Text>
+        <EmptyState fill>No Chats</EmptyState>
       )}
     </SettingGroup>
   );
@@ -321,12 +314,10 @@ function ProjectDetail({
             ))}
           </Stack>
         ) : (
-          <Text size="sm" c="dimmed">
-            No changes yet.
-          </Text>
+          <EmptyState fill>No Changes</EmptyState>
         )}
       </SettingGroup>
-      <SettingGroup title="Danger Zone" danger>
+      <SettingGroup danger>
         <SettingRow label="Delete Project" description="Chats using it keep going without it.">
           <Button size="compact-sm" color="red" variant="light" onClick={onDelete}>
             Delete

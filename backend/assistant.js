@@ -39,6 +39,7 @@ import { userContent } from "./domain/model-content.ts";
 import { reviewInstructions, reviewReply } from "./domain/review.ts";
 import {
   americanEnglish,
+  australianEnglish,
   avoidFiller,
   contentRule,
   fidelity,
@@ -68,6 +69,7 @@ const gatewayKeys = [
 // A gallery item's title, from its prompt.
 const titleInstructions = () =>
   promptInstruction("gallery-title", {
+    australianEnglish,
     plainWords,
     titleRule,
   });

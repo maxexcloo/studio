@@ -8,6 +8,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { CopyButton } from "../../ui/CopyButton";
 import { dateFormat } from "../../ui/dates";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { accountAdminQuery } from "../settings/AccountAdmin";
@@ -58,7 +59,7 @@ const podText = (pods: RuntimePodLog[]) =>
   pods
     .map((pod) =>
       [
-        `# ${pod.name} · ${pod.container} · ${pod.phase} · ${pod.restarts} ${pod.restarts === 1 ? "restart" : "restarts"}${pod.previous ? " · last run" : ""}`,
+        `# ${pod.name} · ${pod.container} · ${pod.phase} · ${plural(pod.restarts, "restart")}${pod.previous ? " · last run" : ""}`,
         ...(pod.lines.length ? pod.lines.map(podLine) : ["No log yet."]),
       ].join("\n"),
     )

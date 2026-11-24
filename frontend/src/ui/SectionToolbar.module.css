@@ -2,10 +2,6 @@
 .enter {
   animation: global(studio-enter) var(--studio-motion-duration) var(--studio-ease-enter);
 }
-.divider {
-  align-self: stretch;
-  margin: 4px 2px;
-}
 /* A phone's open search takes a full row under the heading. */
 .header {
   display: flex;

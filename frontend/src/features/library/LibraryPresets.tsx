@@ -6,8 +6,10 @@ import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SelectionBar } from "../../ui/SelectionBar";
+import { SelectToggle } from "../../ui/SelectToggle";
 import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import {
@@ -110,12 +112,8 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           query={query}
           onQueryChange={presets.records.length ? setQuery : undefined}
           actions={
-            <ToolbarAction
-              label="Select"
-              icon={icons.select}
-              iconOnly
-              variant="default"
-              aria-pressed={selection !== null}
+            <SelectToggle
+              selecting={selection !== null}
               disabled={(!selection && !presets.records.length) || bulkDelete.isPending}
               onClick={() => {
                 bulkDelete.reset();
@@ -309,7 +307,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
                 if (failed.length)
                   notifications.show({
                     color: "red",
-                    message: `Couldn't delete ${failed.length} ${failed.length === 1 ? "preset" : "presets"}.`,
+                    message: `Couldn't delete ${plural(failed.length, "preset")}.`,
                   });
               },
             });
@@ -321,7 +319,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
         onClose={() => setDeleting(null)}
       >
         {deleting === "selected"
-          ? `Delete ${selected.length} ${selected.length === 1 ? "preset" : "presets"}? Drafts made from them stay as they are.`
+          ? `Delete ${plural(selected.length, "preset")}? Drafts made from them stay as they are.`
           : `Delete ${deleting?.title}? Drafts made from it stay as they are.`}
       </ConfirmDialog>
     </Stack>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { plural } from "../../ui/plural";
 import { queueQuery } from "../generation/Queue";
 import { galleryKey } from "./queries";
 
@@ -70,7 +71,7 @@ export function DeleteMediaDialog({
       onConfirm={() => deletion.mutate(ids)}
       error={
         failure &&
-        `${failure.count} ${failure.count === 1 ? "item" : "items"} couldn't be deleted. ${failure.reason || "Try again."}`
+        `${plural(failure.count, "item")} couldn't be deleted. ${failure.reason || "Try again."}`
       }
     >
       Delete {ids.length} {ids.length === 1 ? "item and its file" : "items and their files"}?
