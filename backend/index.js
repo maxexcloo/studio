@@ -922,7 +922,7 @@ registerCardReferenceRoutes(app, {
   profiles: (account) => assistant.profiles({ studioAccount: account }),
   queue: comparisons.queue,
 });
-registerTasteRoutes(app, { taste });
+registerTasteRoutes(app, { taste, adminRefusal });
 const mcpRecords = mcpOwnership(runtimeDatabase(dataDir));
 // Recurring issues (domain/issues.ts) propose rules in Dream's Inbox.
 const issues = createIssues({
