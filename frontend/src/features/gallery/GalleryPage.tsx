@@ -784,8 +784,11 @@ function Gallery() {
     const items = new Set<string>();
     const jobs = new Set<string>();
     for (const { itemIds, jobIds } of comparisons ?? []) {
-      if (itemIds) for (const id of itemIds) items.add(id);
-      else for (const id of jobIds) jobs.add(id);
+      for (const [index, jobId] of jobIds.entries()) {
+        const itemId = itemIds?.[index];
+        if (itemId) items.add(itemId);
+        else jobs.add(jobId);
+      }
     }
     return { items, jobs };
   }, [comparisons]);
