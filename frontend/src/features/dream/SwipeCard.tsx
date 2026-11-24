@@ -89,7 +89,7 @@ export function SwipeCard({
   const [audioSide, setAudioSide] = useState("0");
   const playing = Boolean(video && !depth && !paused);
   const audioOptions = playing ? comparisonSize : undefined;
-  const { play, sound } = useDreamPlayback(
+  const { play, controls } = useDreamPlayback(
     card,
     playing,
     undefined,
@@ -307,7 +307,7 @@ export function SwipeCard({
               }))}
             />
           )}
-          {sound}
+          {controls}
         </Group>
       )}
       {play && <VideoPlayButton play={play} />}

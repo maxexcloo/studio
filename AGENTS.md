@@ -310,10 +310,14 @@ recur across features.
   Desktop controls float on the viewer backdrop, and phone controls use a
   separate bottom dock. A touch tap cycles through actions, actions with
   thumbnails and media alone. Hiding the chrome gives its space back to
-  the media. Swipe up opens Details. In Dream fullscreen a tap or C cycles
-  through its chrome, the chrome with the card's text over a scrim, and
-  media alone; swipe up opens Details. Both viewers fit media between the header
-  and bottom controls by default.
+  the media. Swipe up opens Details. In Dream fullscreen a tap or C shows or
+  hides all its chrome at once: the header, the card's text over its scrim
+  and the verdicts. With the chrome shown the media centres between the header
+  and the card's text, which may cover it where the text runs long; swipe up
+  opens Details. The gallery viewer fits media between the header and bottom
+  controls by default. A video's play/pause and sound are one pair
+  (`VideoControls`): in a corner over the media, or in Dream fullscreen at the
+  right end of the card's text.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping
   has one owner in `gallery/versions.ts`. Viewing and upscale
