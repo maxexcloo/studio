@@ -51,6 +51,7 @@ export function profileForBackend(
     ? {
         ...option.profile,
         imagePreference: profile.imagePreference,
+        videoPreference: profile.videoPreference,
         backendOptions: profile.backendOptions,
         failing: profile.failing,
         workerIds: profile.workerIds,

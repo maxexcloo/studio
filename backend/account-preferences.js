@@ -1,7 +1,13 @@
 import { appearanceChoices } from "../shared/appearance.ts";
 import { gallerySortLabels } from "../shared/gallery-sort.ts";
 import { defaultModelKeys } from "../shared/profiles.ts";
-import { imageAspects, maxImageCount, resolutions } from "../shared/resolution.ts";
+import {
+  grokVideoAspects,
+  imageAspects,
+  maxImageCount,
+  resolutions,
+  videoResolutions,
+} from "../shared/resolution.ts";
 import { dataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
@@ -18,7 +24,8 @@ import {
  * a gateway text model. Unsaved, a default is the deployment's (model/catalogue.js,
  * animate-profile.js, assistant.js). A side that can't run gives way to the other, saying so; a
  * model the person picks always wins. `imageAspect`, `imageCount` and `imageResolution` start new
- * image drafts and MCP runs that name none (model/catalogue.js). `galleryWork` is which unfinished
+ * image drafts and MCP runs that name none (model/catalogue.js). Video draft sizes use
+ * `videoAspect` and `videoResolution`. `galleryWork` is which unfinished
  * work the gallery shows: none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts). `galleryViews` are the gallery's saved views, each a name with
  * the search, filters and sort it restores (frontend gallery/savedViews.ts). Keys Studio no longer knows are dropped as the document is read.
@@ -35,15 +42,17 @@ const preferenceChoices = Object.freeze({
   text: ["cloud", "local"],
   videos: ["cloud", "local"],
 });
-const imageSizeChoices = Object.freeze({
+const sizeChoices = Object.freeze({
   imageAspect: imageAspects,
   imageResolution: resolutions,
+  videoAspect: grokVideoAspects,
+  videoResolution: videoResolutions,
 });
 const modelKeys = new Set(Object.values(defaultModelKeys).flatMap((sides) => Object.values(sides)));
 const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
-  Object.hasOwn(imageSizeChoices, key) ||
+  Object.hasOwn(sizeChoices, key) ||
   key === "imageCount" ||
   modelKeys.has(key) ||
   key === "appearance" ||
@@ -109,9 +118,9 @@ export function saveAccountPreferences(ownerId, patch) {
   const entries = Object.entries(patch || {});
   if (!entries.length) throw new Error("Choose a preference to change.");
   for (const [key, value] of entries) {
-    if (Object.hasOwn(imageSizeChoices, key)) {
-      if (value !== null && !imageSizeChoices[key].includes(value))
-        throw new Error(`Set ${key} to ${imageSizeChoices[key].join(", ")}.`);
+    if (Object.hasOwn(sizeChoices, key)) {
+      if (value !== null && !sizeChoices[key].includes(value))
+        throw new Error(`Set ${key} to ${sizeChoices[key].join(", ")}.`);
       continue;
     }
     if (key === "imageCount") {

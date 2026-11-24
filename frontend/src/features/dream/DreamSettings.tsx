@@ -1,4 +1,4 @@
-import { Alert, Switch, Text } from "@mantine/core";
+import { Alert, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../api";
@@ -44,7 +44,7 @@ export function DreamPreferences() {
   const toggle = (
     key: "enabled" | "images" | "uncensored" | "useLoadedProfile" | "videos",
     label: string,
-    description: string,
+    description = "",
   ) => (
     <SettingRow label={label} description={description + note(key)}>
       <Switch
@@ -74,8 +74,8 @@ export function DreamPreferences() {
     </SettingRow>
   );
   return (
-    <>
-      <SettingGroup>
+    <Stack gap="lg">
+      <SettingGroup title="General">
         {dream.data.reason && (
           <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
             {dream.data.reason}
@@ -89,7 +89,9 @@ export function DreamPreferences() {
         )}
         {dream.data.uncensoredAvailable &&
           toggle("uncensored", "Uncensored", "Allow explicit themes.")}
-        {toggle("images", "Images", "Make new images.")}
+      </SettingGroup>
+      <SettingGroup title="Images">
+        {toggle("images", "Generate Images")}
         {number(
           "dailyImages",
           "Daily Images",
@@ -97,7 +99,9 @@ export function DreamPreferences() {
           !settings.images,
           500,
         )}
-        {toggle("videos", "Videos", "Animate kept or liked images.")}
+      </SettingGroup>
+      <SettingGroup title="Videos">
+        {toggle("videos", "Generate Videos", "Animate kept or liked images.")}
         {number(
           "dailyVideos",
           "Daily Videos",
@@ -111,6 +115,6 @@ export function DreamPreferences() {
           {save.error.message}
         </Alert>
       )}
-    </>
+    </Stack>
   );
 }

@@ -55,7 +55,7 @@ export function useItemChange<T extends string>(
     proposal: Change;
     typed: T;
     profileId?: string;
-    preview: boolean;
+    freshSeed: boolean;
   } | null>(null);
   const ask = useItemMutation(item.id, "ask-change", {
     mutationFn: async ({
@@ -69,6 +69,7 @@ export function useItemChange<T extends string>(
       action?: ChangeAction;
       profileId?: string;
       preview: boolean;
+      freshSeed: boolean;
     }) => {
       const actions: ChangeAction[] = action
         ? [action]
@@ -77,15 +78,15 @@ export function useItemChange<T extends string>(
           : ["edit", "recreate", "animate"];
       return askItemChange(client, item, request, actions, typed, profileId);
     },
-    onSuccess: ({ answer, profileId }, { preview }) => {
+    onSuccess: ({ answer, profileId }, { preview, freshSeed }) => {
       if (answer.reason) notifications.show({ message: answer.reason });
       else if (!preview) {
         const proposal = answer.suggestions[0];
-        run(proposal.prompt, proposal, profileId);
+        run(proposal.prompt, proposal, profileId, freshSeed);
       }
     },
   });
-  function run(prompt: string, proposal: Change, profileId?: string, preview = false) {
+  function run(prompt: string, proposal: Change, profileId?: string, freshSeed = false) {
     const action = proposal.action;
     // An image's animation, as proposed, has Animate's writer word the request for the video
     // model; a prompt the person edited runs as they wrote it.
@@ -97,7 +98,7 @@ export function useItemChange<T extends string>(
         prompt: prompt.trim(),
         operation:
           action === "edit" ? "refine" : action === "animate" && !video ? "animate" : "image",
-        sameSeed: action === "recreate" && !preview,
+        sameSeed: action === "recreate" && !freshSeed,
         ...(action === "edit" && { profileId, profileBackend: proposal.profileBackend }),
       });
     setChange(null);
@@ -107,17 +108,23 @@ export function useItemChange<T extends string>(
     pending: ask.isPending,
     proposal: change?.proposal,
     typed: change?.typed,
-    previewing: change?.preview,
-    send(request: string, text: T, action?: ChangeAction, editProfileId?: string, preview = false) {
+    freshSeed: change?.freshSeed,
+    send(
+      request: string,
+      text: T,
+      action?: ChangeAction,
+      editProfileId?: string,
+      { freshSeed = false, preview = review } = {},
+    ) {
       const typed = change?.typed ?? text;
       const profileId = action === "edit" ? editProfileId : undefined;
       ask.mutate(
-        { request: request.trim(), typed, action, profileId, preview: review || preview },
+        { request: request.trim(), typed, action, profileId, preview, freshSeed },
         {
           onSuccess: ({ answer, profileId }) => {
-            if ((!review && !preview) || answer.reason) return;
+            if (!preview || answer.reason) return;
             const [proposal] = answer.suggestions;
-            setChange({ proposal, typed, profileId, preview });
+            setChange({ proposal, typed, profileId, freshSeed });
             show(proposal);
           },
         },
@@ -128,7 +135,7 @@ export function useItemChange<T extends string>(
       setChange(null);
     },
     run(prompt: string) {
-      if (change) run(prompt, change.proposal, change.profileId, change.preview);
+      if (change) run(prompt, change.proposal, change.profileId, change.freshSeed);
     },
   };
 }

@@ -10,6 +10,7 @@ import {
 
 import { isCloudProfile } from "../../../../shared/profiles";
 import type { StudioSession } from "../../../../shared/queue";
+import { profileStartingSize } from "../../../../shared/resolution";
 import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
@@ -56,7 +57,7 @@ const useAnimateLength = () => useRemembered<number | null>("animate-length", nu
 /** Animate's Review Prompt: templates write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
 /** A change's proposal fills the viewer's prompt before it runs when Review Prompt is on. */
-export const useMediaReview = () => useRemembered<boolean>("viewer-review-first", false);
+export const useMediaReview = () => useRemembered<boolean | null>("viewer-review-first", null);
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
@@ -286,6 +287,10 @@ export async function mediaDraft(
   const loras = loraInfo
     ? sourceLoras!.filter((lora) => compatibleLoras(loraRun, loraInfo).includes(lora.name))
     : [];
+  const resolution =
+    operation === "animate" && item.type === "image"
+      ? profileStartingSize(editProfile).resolution
+      : undefined;
   return {
     profile,
     choice,
@@ -311,6 +316,7 @@ export async function mediaDraft(
         ...(operation !== "image" && !takesDenoise && { denoise: undefined }),
         ...(operation === "refine" && { loras }),
         ...(timing ? { duration: timing.duration, frames: timing.frames, fps: timing.fps } : {}),
+        ...(resolution && { resolution }),
         kind: targetKind,
         profileId: profile.id,
         model: editProfile.model,

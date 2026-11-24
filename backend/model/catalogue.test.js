@@ -121,6 +121,16 @@ test("default profiles sit on the preferred side while it can run, otherwise the
   assert.equal(withPreferredDefaults(models, { imageLocal: "krea" }).defaults.imageModel, "krea");
   const cloud = withPreferredDefaults(models, { images: "cloud", imageLocal: "krea" });
   assert.deepEqual(cloud.defaults, { imageModel: "grok-image", videoModel: "grok-video" });
+  const videoDefaults = { videoAspect: "9:16", videoResolution: "720p" };
+  const sized = withPreferredDefaults(models, videoDefaults);
+  assert.deepEqual(
+    sized.profiles
+      .filter(({ kind }) => kind === "video")
+      .map(({ videoPreference }) => videoPreference),
+    [videoDefaults, videoDefaults],
+  );
+  assert.equal(sized.profiles[0].videoPreference, undefined);
+  assert.equal(models.profiles[3].videoPreference, undefined);
   // Without a cloud profile for the account, Cloud gives way to the deployment's local default.
   const noCloud = withPreferredDefaults(
     { ...models, profiles: models.profiles.filter((profile) => !profile.id.startsWith("grok")) },

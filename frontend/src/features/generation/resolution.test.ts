@@ -150,6 +150,66 @@ test("new image drafts select a supported preset for their profile and account d
   });
 });
 
+test("video drafts apply supported native choices or pixel sizes on the profile's grid", () => {
+  const video = {
+    kind: "video",
+    defaults: { width: 1280, height: 736 },
+    aspectPresets: [
+      { label: "16:9", w: 1280, h: 736 },
+      { label: "9:16", w: 736, h: 1280 },
+    ],
+    constraints: {
+      width: { min: 256, max: 1920, step: 32 },
+      height: { min: 256, max: 1920, step: 32 },
+    },
+  };
+  const preference = { videoAspect: "9:16", videoResolution: "1080p" } as const;
+  const ready = { ...video, videoPreference: preference };
+  assert.deepEqual(
+    profileStartingSize({
+      ...ready,
+      options: { resolutions: ["720p", "1080p"] },
+    }),
+    { width: 736, height: 1280, resolution: "1080p" },
+  );
+  assert.deepEqual(
+    profileStartingSize({
+      ...ready,
+      options: { resolutions: ["480p", "720p"] },
+    }),
+    { width: 736, height: 1280 },
+  );
+  assert.deepEqual(
+    profileStartingSize({
+      ...ready,
+      aspectPolicy: "fixed",
+    }),
+    video.defaults,
+  );
+  assert.deepEqual(
+    profileStartingSize({
+      ...ready,
+      constraints: {},
+    }),
+    video.defaults,
+  );
+  assert.deepEqual(
+    profileStartingSize({
+      ...ready,
+      videoSizeLimits: { maxPixels: 1344 * 768 },
+    }),
+    { width: 736, height: 1280 },
+  );
+  assert.deepEqual(
+    profileStartingSize({
+      ...ready,
+      videoPreference: { ...preference, videoResolution: "720p" },
+      videoSizeLimits: { maxPixels: 1920 * 1088, upscale: { abovePixels: 960 * 544, step: 64 } },
+    }),
+    { width: 704, height: 1280 },
+  );
+});
+
 const draft: GenerationInput = {
   ...input,
   kind: "image",

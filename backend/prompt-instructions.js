@@ -1,13 +1,11 @@
 import path from "node:path";
 
+import { promptVariable, promptVariables } from "../shared/prompt-variables.ts";
 import { currentDataDir } from "./data-dir.js";
 import { readJsonFile } from "./json-store.js";
 import { conflict, hashOf, versionsIn, writeVersion } from "./profile/store.js";
 import { promptInstructionDefaults } from "./prompt-instruction-defaults.js";
 
-const placeholder = /\{\{([a-zA-Z][a-zA-Z0-9]*)\}\}/g;
-const names = (text) =>
-  [...new Set([...text.matchAll(placeholder)].map((match) => match[1]))].sort();
 const failure = (message, status = 400) => Object.assign(new Error(message), { status });
 const maxInstructionLength = 24_000;
 
@@ -45,8 +43,8 @@ function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
       );
     if (typeof text !== "string" || !text.trim() || text.length > maxInstructionLength)
       throw failure(`Enter prompt text of up to ${maxInstructionLength} characters.`);
-    const required = names(saved.initial);
-    if (JSON.stringify(names(text)) !== JSON.stringify(required))
+    const required = promptVariables(saved.initial);
+    if (JSON.stringify(promptVariables(text)) !== JSON.stringify(required))
       throw failure(
         `Keep the placeholders from the default prompt: ${required.map((name) => `{{${name}}}`).join(", ") || "(none)"}.`,
       );
@@ -88,7 +86,7 @@ export function promptInstruction(id, values = {}) {
   return text
     .split("\n")
     .flatMap((line) => {
-      const expanded = line.replace(placeholder, (_match, name) => {
+      const expanded = line.replace(promptVariable, (_match, name) => {
         const value = Object.hasOwn(values, name) ? values[name] : undefined;
         return value == null || value === false ? "" : String(value);
       });

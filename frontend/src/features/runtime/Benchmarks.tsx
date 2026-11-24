@@ -222,12 +222,14 @@ export function BenchmarkResults() {
           {
             key: "decode",
             header: "Decode",
+            nowrap: true,
             sortValue: (run) => run.summary?.decode ?? undefined,
             cell: (run) => <Text size="sm">{rate(run.summary?.decode, 1)}</Text>,
           },
           {
             key: "ttft",
             header: "First Token",
+            nowrap: true,
             hideOnPhone: true,
             sortValue: (run) => run.summary?.ttftMs ?? undefined,
             cell: (run) => (
@@ -239,6 +241,7 @@ export function BenchmarkResults() {
           {
             key: "aggregate",
             header: "Concurrent",
+            nowrap: true,
             hideOnPhone: true,
             sortValue: (run) => run.summary?.aggregate?.tps,
             cell: (run) => (
@@ -255,6 +258,7 @@ export function BenchmarkResults() {
           {
             key: "prefill",
             header: "Prefill",
+            nowrap: true,
             hideOnPhone: true,
             sortValue: (run) => run.summary?.prefill?.tps ?? undefined,
             cell: (run) => (
@@ -271,7 +275,6 @@ export function BenchmarkResults() {
           {
             key: "result",
             header: "Result",
-            width: 120,
             cell: (run) => (
               <Badge
                 color={statusColour(run.status)}
