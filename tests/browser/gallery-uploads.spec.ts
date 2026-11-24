@@ -4,7 +4,16 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, selectionMenuItem, showOnly, signIn, stamp } from "./fixtures";
+import {
+  expandAssistantMenu,
+  fixtures,
+  image,
+  selectionMenuItem,
+  showOnly,
+  signIn,
+  stamp,
+  viewerChangeMenu,
+} from "./fixtures";
 
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: Buffer.from(name) });
 
@@ -112,6 +121,78 @@ test("Recreate › Run Suggested Prompts on several uploads queues each suggeste
     ["/api/sessions/session-a/generations", "A red barn at noon", "job-a", "a"],
     ["/api/sessions/session-b/generations", "A lighthouse at dusk", "job-b", "b"],
   ]);
+});
+
+test("A Recreate template on an upload queues a new version of the upload", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "imported-barn",
+    title: "Imported Barn",
+    uploaded: true,
+    type: "image",
+    status: "done",
+    prompt: "",
+    url: image,
+    thumbnailUrl: image,
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  });
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        presets: [],
+        themes: [],
+        changes: [
+          {
+            id: "night",
+            label: "After Dark",
+            instruction: "Show the same scene at night.",
+            actions: ["recreate"],
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "change") return route.fallback();
+    expect(body).toMatchObject({
+      itemId: "imported-barn",
+      actions: ["recreate"],
+      request: "Show the same scene at night.",
+    });
+    return route.fulfill({
+      json: {
+        suggestions: [
+          {
+            action: "recreate",
+            label: "After Dark",
+            request: body.request,
+            prompt: "A barn at night",
+          },
+        ],
+      },
+    });
+  });
+  await page.route("**/api/gallery/recreate", (route) =>
+    route.fulfill({ json: { sessionId: "import-session", jobId: "import-source" } }),
+  );
+
+  await page.goto("/images");
+  await showOnly(page, "Uploads");
+  await page.getByRole("button", { name: "Open image: Imported Barn", exact: true }).click();
+  await viewerChangeMenu(page, "Recreate");
+  await expandAssistantMenu(page, "Templates");
+  await page.getByRole("menuitem", { name: "After Dark", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0]).toMatchObject({
+    sessionId: "import-session",
+    input: { prompt: "A barn at night" },
+    parentJobId: "import-source",
+    parentItemId: "imported-barn",
+  });
 });
 
 test("An ordinary account imports a Reddit post From URL with retry and partial failure feedback", async ({

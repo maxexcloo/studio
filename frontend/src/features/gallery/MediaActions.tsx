@@ -494,7 +494,7 @@ export function useMediaActions(
     assistMenu({
       settings: [
         ...(mode === "edit" ? editProfiles : []),
-        ...(mode === "recreate" && countLimit > 1
+        ...(mode === "recreate" && !item.uploaded && countLimit > 1
           ? [
               {
                 id: "recreate-count",
@@ -536,8 +536,6 @@ export function useMediaActions(
       others,
       last,
     });
-  // The assistant and the animate offers decide every option, so they show together.
-  const optionsLoading = assistant.isPending || animation.isPending;
   // Discovery from this image, A–Z: More Like This, the gallery ranked by likeness to it
   // (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
@@ -581,7 +579,7 @@ export function useMediaActions(
         note: refusal,
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
-          loading: optionsLoading,
+          loading: assistant.isPending,
           settings: [length, ...animateProfiles, ...reviewItems],
           suggestions: motionsOffered ? motions : undefined,
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
@@ -648,11 +646,11 @@ export function useMediaActions(
       onClick: ready
         ? undefined
         : () => action.mutate({ operation: "image", prompt: changedPrompt }),
-      onOpen: ready && !item.uploaded ? openChanges("recreate") : undefined,
+      onOpen: ready ? openChanges("recreate") : undefined,
       menu: !ready
         ? undefined
         : item.uploaded
-          ? [[recreateAction]]
+          ? changeMenu("recreate", [], [recreateAction])
           : changeMenu(
               "recreate",
               [

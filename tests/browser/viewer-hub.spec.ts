@@ -1146,12 +1146,22 @@ test("A rerun whose backend the profile no longer has runs on its current one an
 test("An Animate theme queues a video in one click; the queue item writes its motion prompt", async ({
   page,
 }) => {
-  const { state, viewer } = await seed(page);
+  let release!: () => void;
+  const routePending = new Promise<void>((resolve) => (release = resolve));
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route(/\/api\/animate\/profile(?:\?.*)?$/, async (route) => {
+      await routePending;
+      await route.fallback();
+    }),
+  );
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Uncensored", exact: true })).toHaveCount(0);
   await expandAssistantMenu(page, "Templates");
-  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  const theme = page.getByRole("menuitem", { name: "Living Photo", exact: true });
+  await expect(theme).toBeDisabled();
+  release();
+  await theme.click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "animate",

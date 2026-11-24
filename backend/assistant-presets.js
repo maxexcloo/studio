@@ -237,7 +237,7 @@ export const seedStyles = Object.freeze([
     description: "Crop around the subject and preserve the existing viewpoint.",
     instruction:
       "Crop in from the existing viewpoint until the main subject occupies more of the frame. Keep the nearest point of contact or detail that explains the action inside the crop. Preserve the subject's identity, pose, lighting, perspective and all retained details.",
-    actions: ["edit", "recreate"],
+    actions: ["edit"],
   },
   {
     id: "wider",
@@ -267,7 +267,7 @@ export const seedStyles = Object.freeze([
     description: "Show the same place and action after dark.",
     instruction:
       "Set the same subject, location and action after dark. Light them with one source that belongs in this place and describe where that light reaches. Keep the composition, identities, wardrobe and essential props. Make the subject readable against the darker surroundings.",
-    actions: ["edit", "recreate"],
+    actions: ["recreate"],
   },
   {
     id: "simple-background",
@@ -317,7 +317,7 @@ export const seedStyles = Object.freeze([
     description: "Replace the outfit and keep the person, action and surroundings.",
     instruction:
       "Choose a coherent replacement outfit suited to the existing activity and place. Give it a different silhouette, layering or fabric, with specific colors. Fit the clothes to the current pose and keep the face, build, expression, action, framing and surroundings unchanged.",
-    actions: ["edit", "recreate"],
+    actions: ["edit"],
   },
   {
     id: "new-visual-treatment",
@@ -327,7 +327,7 @@ export const seedStyles = Object.freeze([
     description: "Keep the composition and render it in a distinct art medium.",
     instruction:
       "Render the scene in one clearly different art medium, such as ink and wash, relief print, cut paper or painted animation. Choose one that suits the subject and differs from the source. Describe identifying marks, edge treatment and palette. Keep the subject's identity, pose, outfit, action, objects, setting and composition.",
-    actions: ["edit", "recreate"],
+    actions: ["edit"],
   },
   {
     id: "photographic-realism",
@@ -337,7 +337,27 @@ export const seedStyles = Object.freeze([
     description: "Make the same scene read as a real photograph.",
     instruction:
       "Render this composition as a believable photograph. Keep the same people, identity, pose, outfit, objects, action, location and framing. Give the existing light a plausible source and direction, preserve natural proportions, and choose material textures, contact shadows and depth of field that make this shot believable.",
-    actions: ["edit", "recreate"],
+    actions: ["edit"],
+  },
+  {
+    id: "photographic-restage",
+    kind: "change",
+    enabled: true,
+    label: "Restage as a Photograph",
+    description: "Stage the same story in a new, realistic camera setup.",
+    instruction:
+      "Restage the moment as a real photograph. Keep the same subject, identity, action, location and essential props. Choose a new camera position and a setup that fits the place, giving the subject a plausible place to stand or move. Describe the practical light, tactile materials and what falls in or out of focus. Preserve what makes the moment recognizable.",
+    actions: ["recreate"],
+  },
+  {
+    id: "illustrated-reframe",
+    kind: "change",
+    enabled: true,
+    label: "Recompose as an Illustration",
+    description: "Build a new composition around the scene in a chosen illustration medium.",
+    instruction:
+      "Recompose this moment as a deliberate illustration. Keep the subject identifiable and retain the core action, place and objects involved. Use a different visual hierarchy and position the main shapes to suit the story. Choose an illustration medium that fits the scene and describe the marks or textures it gives the foreground and setting.",
+    actions: ["recreate"],
   },
   {
     id: "remove-distraction",

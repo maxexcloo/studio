@@ -78,8 +78,10 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
     "closer",
     "new-setting",
     "photographic-realism",
+    "illustrated-reframe",
     "remove-distraction",
     "repair-detail",
+    "photographic-restage",
     "simple-background",
     "new-visual-treatment",
     "wardrobe-swap",
@@ -96,11 +98,8 @@ test("change templates send a complete request for the actions they target", () 
   const allows = (action) =>
     styles.usable("change").filter((style) => style.actions.includes(action));
   assert.ok(allows("edit").some(({ id }) => id === "repair-detail"));
-  assert.ok(!allows("recreate").some(({ id }) => id === "repair-detail"));
   assert.ok(allows("recreate").some(({ id }) => id === "new-angle"));
-  assert.ok(!allows("edit").some(({ id }) => id === "new-angle"));
-  for (const id of ["photographic-realism", "new-visual-treatment", "wardrobe-swap"])
-    assert.deepEqual(styles.style("change", id).actions, ["edit", "recreate"]);
+  for (const style of styles.usable("change")) assert.equal(style.actions.length, 1);
   for (const { id, instruction } of styles.usable("change"))
     assert.ok(instruction.length <= 500, `${id} fits the change request without clipping`);
 });
