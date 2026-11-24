@@ -69,6 +69,7 @@ import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
+import { createChatNotes } from "./domain/chat-notes.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDreamDigest } from "./domain/dream-digest.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
@@ -974,6 +975,7 @@ registerSuggestionRoutes(app, {
 // Dream (domain/dream.ts): idle-time results from each account's taste and resolved settings.
 // It only queues work; it never places GPU workloads.
 const projects = createProjects({ cards: accountCards, dataDir });
+const chatNotes = createChatNotes({ dataDir });
 const dream = createDream({
   dataDir,
   idleMinutes: (kind) =>
@@ -983,6 +985,7 @@ const dream = createDream({
   taste,
   projects: (ownerId) => projects.list(ownerId),
   chats: (ownerId) => projects.chats(ownerId),
+  notes: (ownerId) => chatNotes.list(ownerId),
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
   // A group's Dream feature gates its routes and idle work alike.
   access: (ownerId) => {
@@ -1160,6 +1163,7 @@ registerDreamRoutes(app, {
     profiles: async () => (await mediaModels(false)).models.profiles || [],
     loraName: (name) => loraName(name, catalogueLoraInfo(name)),
   }),
+  notes: chatNotes,
   listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });
 // Dream yields to idle background work, so review and captions can run before it reaches its caps.

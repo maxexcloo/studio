@@ -127,6 +127,7 @@ test("GET /api/dream/week answers only the caller's own digest, and only with Dr
     projects: {} as never,
     inbox: {} as never,
     digest,
+    notes: {} as never,
     listed: (list) => list.map((item) => ({ ...item, listed: true })),
   });
   const server = app.listen(0, "127.0.0.1");

@@ -776,8 +776,22 @@ function Gallery() {
     if (routeView) leaveView();
   }
   const counts = useQuery({ ...galleryViewCountsQuery(kind), enabled: countsWanted }).data;
-  const comparisons = useQuery({ ...comparisonMembersQuery, enabled: countsWanted }).data
-    ?.comparisons.length;
+  const comparisons = useQuery({
+    ...comparisonMembersQuery,
+    enabled: countsWanted || (!routeView && !filters.uploads && loaded.length > 0),
+  }).data?.comparisons;
+  const comparisonMembers = useMemo(() => {
+    const items = new Set<string>();
+    const jobs = new Set<string>();
+    for (const { itemIds, jobIds } of comparisons ?? []) {
+      for (const [index, jobId] of jobIds.entries()) {
+        const itemId = itemIds?.[index];
+        if (itemId) items.add(itemId);
+        else jobs.add(jobId);
+      }
+    }
+    return { items, jobs };
+  }, [comparisons]);
   const view = (
     <ViewMenu<GalleryView>
       label="Gallery View"
@@ -793,7 +807,7 @@ function Gallery() {
           { value: "uploads", label: "Uploads", count: counts?.uploads },
         ],
         [
-          { value: "comparisons", label: "Comparisons", count: comparisons },
+          { value: "comparisons", label: "Comparisons", count: comparisons?.length },
           {
             value: "review",
             label: "Review",
@@ -1048,6 +1062,7 @@ function Gallery() {
           )}
           <MediaGrid
             items={loaded}
+            comparisonMembers={comparisonMembers}
             results={resultsKey}
             byDay={byDay}
             timeline={timeline.data?.days}

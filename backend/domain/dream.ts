@@ -13,6 +13,7 @@ import {
   suggestedCards,
 } from "../../shared/characters.ts";
 import {
+  type ChatNote,
   type DreamCounts,
   type DreamPassReason,
   type DreamResultSet,
@@ -187,6 +188,7 @@ type DreamQuery = {
   status?: string;
   conversationIds?: string[];
   ids?: string[];
+  jobIds?: string[];
   ownGeneration?: boolean;
   promptedProfiles?: string[];
   dreamDraft?: string;
@@ -799,6 +801,8 @@ export function createDream(options: {
   projects(ownerId: string): Project[];
   /** Each attached chat's project and latest request (domain/projects.ts). */
   chats(ownerId: string): Chats;
+  /** The context the account's chats gave, newest first (domain/chat-notes.ts). */
+  notes?(ownerId: string): ChatNote[];
   /** Whether the text model and the worker for a kind are reachable, or parked (stopped on purpose). */
   online(kind: Kind, backend: "local" | "cloud"): Promise<{ text: Reach; media: Reach }>;
   /** Whether cloud work holds back near its usage limit, so Dream's Cloud runs locally. */
@@ -1460,6 +1464,41 @@ export function createDream(options: {
       return null;
     return { character, outfit, scene };
   }
+  /**
+   * Up to two notes the account's chats gave (MCP) as soft hints for an idea: a project's own, or
+   * else standing notes and those that came with a liked result or a pinned card.
+   */
+  function chatNoteLines(
+    ownerId: string,
+    projectId: string | undefined,
+    project: ProjectContent | undefined,
+    pinned: NonNullable<ReturnType<typeof projectCards>>,
+  ) {
+    const notes = options.notes?.(ownerId) ?? [];
+    if (!notes.length || (project && !projectId)) return [];
+    const pins = Object.values(pinned).map((card) => card?.id);
+    const jobIds = notes.flatMap((note) => note.results ?? []);
+    const liked = new Set(
+      jobIds.length
+        ? options.gallery(ownerId, { jobIds, rating: "liked" }).map((item) => item.jobId)
+        : [],
+    );
+    const relevant = notes.filter((note) =>
+      projectId
+        ? note.project === projectId
+        : !note.project &&
+          ((!note.results && !note.card) ||
+            (note.card && pins.includes(note.card)) ||
+            note.results?.some((id) => liked.has(id))),
+    );
+    const drawn = shuffled(relevant).slice(0, 2);
+    return drawn.length
+      ? [
+          "Notes from their chats, as background only (never over their rules or the brief; use what fits, ignore the rest):",
+          ...drawn.map((note) => `- ${clean(note.text, 400)}`),
+        ]
+      : [];
+  }
   const characterSlot = (profile: DreamProfile) =>
     keepsIdentity(profile)
       ? identitySlot(profile) ||
@@ -2066,6 +2105,7 @@ export function createDream(options: {
             : []),
         ]
       : [];
+    const noteLines = chatNoteLines(ownerId, projectId, project, pinned);
     const collectCards = media === "image" && !reword;
     const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"`;
     const language = `Write "why" and "title" in Australian English (colour, centre); only "prompt" uses American English.`;
@@ -2155,6 +2195,7 @@ export function createDream(options: {
           content: [
             ...briefLines,
             ...ruleLines,
+            ...noteLines,
             `Seed prompt: ${seed}`,
             ...(loras.length ? [`It loads these LoRAs: ${loras.join(", ")}`] : []),
           ].join("\n"),
@@ -2268,6 +2309,7 @@ export function createDream(options: {
             ...(newConcept && contentTaste.length ? ["Taste profile:", ...contentTaste] : []),
             ...ruleLines,
             ...briefLines,
+            ...noteLines,
             ...(openCards.length ? ["Optional Library cards:", ...openCards] : []),
             "Liked prompts:",
             ...(liked.length ? liked.map((prompt) => `- ${prompt}`) : ["(none yet)"]),
