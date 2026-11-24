@@ -425,9 +425,7 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   expect(state.jobs).toHaveLength(0);
 });
 
-test("LoRAs show their Dream keep rate once enough verdicts back it", async ({
-  page,
-}) => {
+test("LoRAs show their Dream keep rate once enough verdicts back it", async ({ page }) => {
   await fixtures(page);
   await page.route("**/api/dream/keep-rates", (route) =>
     route.fulfill({
