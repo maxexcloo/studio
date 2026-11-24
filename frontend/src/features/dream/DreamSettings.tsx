@@ -113,7 +113,7 @@ export function DreamPreferences() {
           </>
         )}
       </SettingGroup>
-      <SettingGroup title="Image Mix">
+      <SettingGroup title="Mix">
         {mix("mixNew", "New Ideas", "Fresh concepts from your taste.")}
         {mix(
           "mixComparisons",
