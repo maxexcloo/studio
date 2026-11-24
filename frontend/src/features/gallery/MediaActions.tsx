@@ -650,7 +650,9 @@ export function useMediaActions(
       menu: !ready
         ? undefined
         : item.uploaded
-          ? changeMenu("recreate", [], [recreateAction])
+          ? image
+            ? changeMenu("recreate", [], [recreateAction])
+            : [[recreateAction]]
           : changeMenu(
               "recreate",
               [

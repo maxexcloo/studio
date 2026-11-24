@@ -353,10 +353,15 @@ test("Suggest can queue a variation of a library import without a job or prompt"
     profileId: "image:test",
     prompt: "A tighter harbour view",
   });
-  expect(asked.map(({ surface, jobId, itemId }) => ({ surface, jobId, itemId }))).toEqual([
-    { surface: "viewer", jobId: undefined, itemId: "harbour" },
-    { surface: "change", jobId: undefined, itemId: "harbour" },
+  expect(asked).toContainEqual(
+    expect.objectContaining({ surface: "viewer", itemId: "harbour", fresh: false }),
+  );
+  expect(asked.filter(({ surface }) => surface === "change")).toEqual([
+    expect.objectContaining({ itemId: "harbour", request: "crop closer" }),
   ]);
+  expect(asked.every(({ itemId, jobId }) => itemId === "harbour" && jobId === undefined)).toBe(
+    true,
+  );
 });
 
 test("Keep & Vary accepts a Dream card and stages four variations of one thing to compare", async ({
