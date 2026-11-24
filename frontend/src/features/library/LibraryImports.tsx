@@ -17,10 +17,12 @@ import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, filterTableRows } from "../../ui/DataTable";
+import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
+import { usePhone } from "../../ui/usePhone";
 import { inspirationQuery } from "../generation/inspiration";
 import {
   type ImportRecord,
@@ -135,6 +137,7 @@ export function LibraryImports({
   admin: boolean;
 }) {
   const client = useQueryClient();
+  const phone = usePhone();
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -303,8 +306,10 @@ export function LibraryImports({
       </Menu.Item>
     </>
   );
+  // Keyed by title, so each view starts from its own sort rather than the empty table's.
   const importTable = (title: string, rows: ImportRecord[]) => (
     <DataTable
+      key={title}
       label={`${title} Imports`}
       rows={rows}
       rowKey={(record) => record.id}
@@ -316,7 +321,7 @@ export function LibraryImports({
         importStatus(record).label,
         ...lacking(record),
       ]}
-      initialSort={{ key: "name", descending: false }}
+      initialSort={{ key: "added", descending: true }}
       empty="No Matches"
       compact
       columns={[
@@ -347,14 +352,37 @@ export function LibraryImports({
           ),
         },
         {
+          key: "added",
+          header: "Added",
+          sortValue: (record) => record.createdAt,
+          cell: (record) =>
+            record.createdAt && (
+              <Text
+                size={phone ? "xs" : "sm"}
+                c={phone ? "dimmed" : undefined}
+                title={formatDateTime(record.createdAt)}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {formatDate(record.createdAt)}
+              </Text>
+            ),
+        },
+        {
           key: "status",
           header: "Status",
           sortValue: (record) => importStatus(record).label,
-          cell: (record) => (
-            <Badge miw="max-content" color={importStatus(record).color}>
-              {importStatus(record).label}
-            </Badge>
-          ),
+          cell: (record) => {
+            const { label, color } = importStatus(record);
+            return color ? (
+              <Badge miw="max-content" color={color}>
+                {label}
+              </Badge>
+            ) : (
+              <Text size={phone ? "xs" : "sm"} c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                {label}
+              </Text>
+            );
+          },
         },
       ]}
       rowActions={importActions}

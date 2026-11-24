@@ -905,14 +905,14 @@ export function QueueActions() {
   return (
     // At the end of the heading it shares: beside the title, or beside the phone drawer's Close.
     <Group gap={4} wrap="nowrap" justify="flex-end">
-      {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
-        pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
-      )}
-      {failed.length > 0 && queueAction("Retry All", icons.retry, () => void retryAll(), retrying)}
       {failed.length > 0 &&
         queueAction(bulk["clear-failed"].label, bulk["clear-failed"].icon, () =>
           setConfirming("clear-failed"),
         )}
+      {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
+        pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
+      )}
+      {failed.length > 0 && queueAction("Retry All", icons.retry, () => void retryAll(), retrying)}
       {stopping > 0 && (
         <Tooltip label="Stop All">
           <ActionIcon

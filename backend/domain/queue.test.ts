@@ -1430,7 +1430,7 @@ test("narrow reads: unfinished jobs and jobs since a time", () => {
     };
     enqueue("alice", 1, "completed");
     const waiting = enqueue("alice", 2, "waiting");
-    enqueue("alice", 3, "failed");
+    const failed = enqueue("alice", 3, "failed");
     const cleared = enqueue("alice", 4, "failed", true);
     const running = enqueue("alice", 5, "running");
     const recent = enqueue("alice", 6, "cancelled");
@@ -1439,6 +1439,8 @@ test("narrow reads: unfinished jobs and jobs since a time", () => {
     const ids = (jobs: OwnedJob[]) => jobs.map((job) => job.id);
     assert.deepEqual(ids(store.openJobs()), [waiting, running, bobs]);
     assert.deepEqual(ids(store.openJobs("alice")), [waiting, running]);
+    // Older than a day: only the unfinished and uncleared failed jobs still list.
+    assert.deepEqual(ids(store.queueJobs("alice")), [waiting, failed, running]);
     assert.deepEqual(ids(store.jobsSince("alice", "2026-11-04T10:04:00.000Z")), [
       cleared,
       running,
@@ -2024,4 +2026,23 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
   assert.equal(store.hasOpenOwnWork(), false);
   // A finished job's provider journal goes with it.
   assert.equal(store.providerRecord("alice", own.id), undefined);
+});
+
+test("Only a refusal marked permanent fails a generation for good", async () => {
+  const answers = [
+    { status: 409, payload: { error: "Radiance isn't ready." } },
+    { status: 400, payload: { error: "Staging failed." } },
+    { status: 403, payload: { permanent: true, error: "LoRAs are off for this account." } },
+  ];
+  const adapter = createGenerationQueueAdapter({
+    submitGeneration: async () => answers.shift()!,
+    jobs: new Map(),
+    items: () => [],
+    accountForOwner: () => ({ authenticated: true }),
+    cancelPrompt: async () => undefined,
+  });
+  const job = { id: "j", ownerId: "alice" } as OwnedJob;
+  assert.equal((await adapter.submit(job)).permanent, undefined);
+  assert.equal((await adapter.submit(job)).permanent, undefined);
+  assert.equal((await adapter.submit(job)).permanent, true);
 });

@@ -183,7 +183,7 @@ recur across features.
 
 ### Layers, Focus & Phones
 
-- Suppress iOS edge history swipes once at the document, preserving native control touches and Back navigation. The installed app adds no browser history entries, so its back swipe has nothing to go back to; Studio's own Back still works (`singleEntry.ts`).
+- Suppress iOS edge history swipes once at the document, preserving native control touches and Back navigation. The installed iOS app adds no browser history entries, so its back swipe has nothing to go back to; Studio's own Back still works (`singleEntry.ts`).
 - The phone layout covers screens below Mantine's `sm` breakpoint and phones
   held sideways (short touch screens up to 1000 px wide); iPads in landscape
   keep the tablet layout. `ui/usePhone.ts` owns phone detection: components use
@@ -284,8 +284,9 @@ recur across features.
   Desktop controls float on the viewer backdrop, and phone controls use a
   separate bottom dock. A touch tap cycles through actions, actions with
   thumbnails and media alone. Hiding the chrome gives its space back to
-  the media. Swipe up opens Details. Dream fullscreen keeps its verdicts
-  and opens Details on swipe up. Both viewers fit media between the header
+  the media. Swipe up opens Details. In Dream fullscreen a tap or C cycles
+  through its chrome, the chrome with the card's text over a scrim, and
+  media alone; swipe up opens Details. Both viewers fit media between the header
   and bottom controls by default.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping

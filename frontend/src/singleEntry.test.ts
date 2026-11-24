@@ -27,3 +27,18 @@ test("a single-entry history replaces on push and goes back to the exact locatio
   assert.equal(history.index, 0);
   assert.equal(saved.get("studio-history"), "[]");
 });
+
+test("a single-entry history keeps the last 50 locations and survives full storage", () => {
+  const history = UNSAFE_createMemoryHistory({ initialEntries: ["/0"], v5Compat: true });
+  singleEntry(history, {
+    getItem: () => null,
+    setItem: () => {
+      throw new DOMException("Full", "QuotaExceededError");
+    },
+  });
+  for (let index = 1; index <= 60; index++) history.push(`/${index}`);
+  history.go(-50);
+  assert.equal(history.location.pathname, "/10");
+  history.go(-1);
+  assert.equal(history.location.pathname, "/10");
+});

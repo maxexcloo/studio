@@ -72,7 +72,7 @@ Prompting guide: {{guide}}`,
   "caption-gallery": {
     label: "Caption Gallery",
     area: "Gallery",
-    text: `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. This is an adult gallery: name nudity, sexual acts, fetish wear and body details plainly, in the everyday words people search with, never softened or left out. Tags are the specific, distinctive things someone would search this image for (the outfit, the act, the body type, the hair colour, the setting, the style), not generic words such as image, photo, person, indoor or colourful. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under {{captionCharacters}} characters", "tags": ["8 to {{captionTags}} short lowercase search tags"]}`,
+    text: `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. {{plainWords}} This is an adult gallery: name nudity, sexual acts, fetish wear and body details plainly, in the everyday words people search with, never softened or left out. Tags are the specific, distinctive things someone would search this image for (the outfit, the act, the body type, the hair colour, the setting, the style), not generic words such as image, photo, person, indoor or colourful. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under {{captionCharacters}} characters", "tags": ["8 to {{captionTags}} short lowercase search tags"]}`,
   },
   "card-description-ideas": {
     label: "Card Description Suggestions",
@@ -127,9 +127,9 @@ Reply with the prompt only, as plain text: no preamble, Markdown or notes.`,
     label: "Chat Media Instructions",
     area: "Chat",
     text: `Studio makes images and videos. Read the selected model's guide before writing finished generate prompts. Send the finished prompts as prompts and the user's original words as request. Studio runs the submitted prompts as written. Consult taste only if asked. Apply the user's explicit rules and save preferences only if asked. {{precedence}} {{keepDescriptions}} {{standalonePrompt}} {{americanEnglish}} {{subjectFirst}} {{proportionate}}
-Add a LoRA only when the user names one or clearly wants one. When the user requests multiple creative results, write one distinct prompt per result. "N sets of K" uses N distinct prompts with count K; use repeated seeds of one prompt only when the user asks for that kind of variation or supplies exact prompts. Keep requested identity, references and other fixed details. Vary two or more open dimensions: setting, outfit, action, framing within the shot, light or style. Across batches, continue from the number already queued and use directions the conversation hasn't used. Avoid stock motifs and defaulting to phone photos. Technical comparisons change one axis and hold the rest fixed.
+Add a LoRA only when the user names one or clearly wants one. When the user requests multiple creative results, write one distinct prompt per result. "N sets of K" uses N distinct prompts with count K; use repeated seeds of one prompt only when the user asks for that kind of variation or supplies exact prompts. Vary two or more open dimensions: setting, outfit, action, framing within the shot, light or style. Across batches, continue from the number already queued and use directions the conversation hasn't used. Avoid stock motifs and defaulting to phone photos. Technical comparisons change one axis and hold the rest fixed.
 Set kind. Omit settings unless requested. Tier: {{tierWords}}. Save the user's recurring theme or series in context.series using their wording and keep it across its batches. Title each distinct set for its own direction and put the short shared brief in context.notes when useful. Suggest with generate preview and wait. {{attachments}} Use upload only with the real image bytes. Use models for availability and queue for progress. For a follow-up, call reuse with its ref and your revised prompt, not a new generate.
-Reply briefly as each result says. When queued, share the links and end the turn: one round per turn; review finished results before rewriting. If the overall request exceeds the accepted batch, say how many were accepted and how many remain; don't imply later batches have been queued. Call result only when the user asks to see results, never in the background. Never poll, duplicate or invent results. Retry a connection failure once; if a tool is missing or fails, say so. Offline models queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images. Batch models, generate and review in one call per tool. Retain any set name the user explicitly supplied.`,
+Reply briefly as each result says. When queued, share the links and end the turn: one round per turn; review finished results before rewriting. If the overall request exceeds the accepted batch, say how many were accepted and how many remain; don't imply the rest are queued. Call result only when the user asks to see results, never in the background. Never poll, duplicate or invent results. Retry a connection failure once; if a tool is missing or fails, say so. Offline models queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images. Batch models, generate and review in one call per tool. Keep any set name the user gives.`,
   },
   "continue-project-brief": {
     label: "Continue Project Brief",
@@ -293,7 +293,11 @@ Prefer a single subject unless the brief or rules ask for a group.`,
   "dream-motion": {
     label: "Dream Motion",
     area: "Dream",
-    text: `One continuous shot of one simple, coherent action that this frame clearly sets up, carried through from start to finish, as if the picture kept rolling for a few seconds. The same subjects, faces, outfits, place and style throughout: no cuts, scene changes, transitions or new locations, and no people or objects appearing from nowhere or transforming. Use a stable frame or one continuous camera move that follows the action or reveals something specific to this scene. {{expressions}} {{extendedThemes}}`,
+    text: `One continuous shot that tells a small story with this frame's people and place: a setup already moving in the first second, one clear action with real body movement (standing, walking, turning, reaching, handing something over, changing pose) and a visible payoff or reaction that the last frame lands on. The same subjects, faces, outfits, place and style throughout: no cuts, scene changes, transitions or new locations, and no people or objects appearing from nowhere or transforming; someone may enter from out of frame where the scene suggests it.
+This clip's beat: {{beat}}
+Film it with intent: the camera technique above, timed to the action, rather than a slow push-in or zoom toward a still subject. Where the model makes sound, let a person say one short, natural line that fits the moment and the clip's length, with sound from the action and the place; where it is silent, carry the exchange through lips, eyes and gesture.
+{{expressions}} {{extendedThemes}}
+{{context}}`,
   },
   "dream-negative": {
     label: "Dream Negative",
@@ -358,7 +362,7 @@ Reply with only this JSON object, one key per task: {{shape}}`,
   "extended-themes-motion": {
     label: "Uncensored Motion",
     area: "Dream",
-    text: `Make it sensual, at a natural unhurried pace, building only on the people, pose and setting already in the frame.`,
+    text: `Make it sensual, with real movement and touch at a natural pace, building only on the people, pose and setting already in the frame.`,
   },
   "feature-dream-taste": {
     label: "Feature Dream Taste",
@@ -406,7 +410,7 @@ Output only the caption.`,
   "gallery-title": {
     label: "Result Title",
     area: "Gallery",
-    text: `Title what the text below describes: the prompt that made an image or video. Reply with only {{titleRule}}, without quotes or punctuation, in Australian English (colour, centre).`,
+    text: `Title what the text below describes: the prompt that made an image or video. Reply with only {{titleRule}}, without quotes or punctuation, in Australian English (colour, centre). {{plainWords}}`,
   },
   "group-issues": {
     label: "Identify Recurring Issues",
@@ -439,7 +443,7 @@ Reply with JSON only: {"issues": [{"issue": "...", "entries": [1, 4], "rule": ".
     label: "Image Change Directions",
     area: "Gallery",
     suggestions: true,
-    text: `Suggest {{maxSuggestions}} useful, distinct changes, each in a distinct area ({{areas}}). Keep the subject's identity. Include an everyday action or setting and a specific photographic or visual treatment when they fit. Name the actual visible change, including when it concerns framing or style.`,
+    text: `Suggest {{maxSuggestions}} useful, distinct changes from areas such as {{areas}}. Keep the subject's identity. {{specifics}} Name the actual visible change, including when it concerns framing or style.`,
   },
   "improve-card": {
     label: "Improve Card Description",
@@ -506,6 +510,11 @@ Return only JSON: {"issue":"one brief observation, or an empty string"}.`,
     label: "Motion without Sound",
     area: "Gallery",
     text: `This model makes no sound: describe only what is seen, with no quoted dialogue, sound or music; show anyone talking by their lips and gestures.`,
+  },
+  "name-clip": {
+    label: "Name Dream Clip",
+    area: "Dream",
+    text: `After the prompt, end with two lines for the clip's card, in Australian English: "Title: " and a two-to-five-word Title Case name for what happens, then "Why: " and one short phrase naming its action, camera and mood.`,
   },
   "name-each-variation": {
     label: "Name Each Variation",
@@ -691,7 +700,8 @@ Reply with JSON only: {"ideas": [{"label": "<title>", "prompt": "<prompt text>"}
     area: "Compose",
     suggestions: true,
     text: `You suggest changes to the draft prompt of {{media}} a person is about to make in a media studio, drawn from the prompt and their taste profile.
-Suggest {{maxSuggestions}} useful, distinct changes, each from a different angle ({{angles}}).
+Suggest {{maxSuggestions}} useful, distinct changes, some from these angles: {{angles}}.
+{{specifics}}
 {{guide}}
 {{referenceContext}}
 {{fidelity}}
@@ -764,7 +774,7 @@ Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}
     label: "Appearance Suggestion Scope",
     area: "Writing Standard",
     suggestions: true,
-    text: `For a clearly adult human subject, include a non-graphic body-shape, proportion or build alternative where it would be useful and visible, alongside distinct pose, framing, outfit, setting or other relevant choices. Infer a specific alternative from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.`,
+    text: `For a clearly adult human subject, include one or two non-graphic body alternatives (build, proportions or a specific body detail) where they would be visible, alongside outfit, pose, setting and other choices. Infer each from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. Where a trait is already extreme, offer at most one body change and never push it further; spend the rest on outfit pieces, pose, setting or props. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.`,
   },
   "suggestion-card": {
     label: "Card Suggestion Scope",
@@ -789,6 +799,12 @@ Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}
     area: "Writing Standard",
     suggestions: true,
     text: `When the source clearly depicts adults and a sensual direction fits the scene or request, make roughly a third to half of the choices sensual, spread from lightly suggestive to bold, and the rest non-sexual. Make the sensual ones differ in what changes as well as intensity, using specific expression, movement or interaction (and, for stills, wardrobe) that fits the scene. Otherwise keep every choice non-sexual.`,
+  },
+  "suggestion-specifics": {
+    label: "Specific Change Suggestions",
+    area: "Writing Standard",
+    suggestions: true,
+    text: `First pick out what is particular to this subject and scene: their pose and expression, each piece of their outfit and accessories, the props, the setting's details, the light and the style. Most changes swap one of those named parts for a specific alternative (the denim jacket for a cropped leather one, standing for sitting on the steps, the cafe for a night market), weighted toward the outfit and pose; at most two are purely photographic (framing, lens or light). Add a material or finish word (shiny, glossy, latex) only when the fabric itself is the change.`,
   },
   "suggestion-variety": {
     label: "Taste & Suggestion Variety",
@@ -896,6 +912,7 @@ Reply with JSON only: {"title": "{{titleRule}}", "prompt": "the finished prompt"
 {{standalonePrompt}}
 {{fidelity}}
 {{contentRule}}
+Carry out every part of the request (a narrower waist and a bigger bust both land), and keep everything it doesn't name exactly as the source has it.
 Preserve the source subject's identity and species. Never invent an adult age or change the age to justify a sexualised change; ambiguous ages and nonhuman subjects must not be sexualised.
 {{americanEnglish}}
 {{avoidFiller}}

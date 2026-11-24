@@ -470,8 +470,8 @@ const seriesShare = 2;
 const extendShare = 35;
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
-/** One video in this many runs on another video model than the account's default, so videos vary. */
-const videoExploreDraw = 2;
+/** The weight left to the video model Dream used last, so consecutive videos change model. */
+const lastVideoModelWeight = 0.25;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
@@ -623,14 +623,54 @@ const uncensoredTheme = () => promptInstruction("dream-extended");
 const naturalFaces = () => promptInstruction("dream-expressions");
 /** Added to a recommended negative prompt, where the profile uses one. */
 const faceNegative = () => promptInstruction("dream-negative");
+/** Camera techniques, actions and tones Dream's clips rotate through, so consecutive ones differ. */
+const motionTechniques = [
+  "a tracking shot that moves alongside the subject",
+  "a handheld follow that stays close to the action",
+  "a low-angle hold that lets the action rise into frame",
+  "a rack focus from the foreground to the subject as the action starts",
+  "an arc around the subject as they move",
+  "a quick pan to whatever they react to",
+  "a locked-off frame that the action crosses",
+  "a pull-back that reveals more of the place as the action lands",
+];
+const motionActions = [
+  "a full-body move: they stand, walk, turn or change position",
+  "handling a prop that is in the frame",
+  "an exchange with someone in the frame, or someone stepping in from out of frame",
+  "a playful or surprising moment that ends in a laugh or a reaction",
+  "a reveal: they show, open or uncover something in the scene",
+  "the weather, light or something in the place changes and they respond",
+];
+const motionTones = ["playful", "tender", "confident", "tense", "wistful"];
+/** The `turn`th clip's camera technique, action and tone; consecutive turns differ in each. */
+export function motionBeat(turn: number) {
+  const at = <T>(items: T[]) => items[turn % items.length];
+  return `${at(motionActions)}, filmed as ${at(motionTechniques)}, with a ${at(motionTones)} tone.`;
+}
+/** Dream's recent clip prompts shown to the writer, so a new clip doesn't repeat them. */
+const recentMotionPrompts = 5;
 /**
- * Animate's Custom instruction for Dream's clips (prompt-animate.js): one coherent shot that
- * matches its frame.
+ * Animate's Custom instruction for Dream's clips (prompt-animate.js): one shot that tells a small
+ * story in its `turn`'s beat, knowing what the still was made for and the clips Dream made lately.
  */
-const motionInstruction = (uncensored: boolean) =>
+const motionInstruction = (
+  uncensored: boolean,
+  turn: number,
+  { title = "", why = "", recent = [] as string[] } = {},
+) =>
   promptInstruction("dream-motion", {
+    beat: motionBeat(turn),
     expressions: naturalFaces(),
     extendedThemes: uncensored ? promptInstruction("extended-themes-motion") : "",
+    context: [
+      title && `The still is titled "${title}".`,
+      why && `Dream made it for: ${why}`,
+      recent.length &&
+        `Recent clips, whose action, camera and lines this one should not repeat:\n${recent.map((prompt) => `- ${prompt}`).join("\n")}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
   });
 
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
@@ -824,11 +864,12 @@ export function createDream(options: {
       backend: "local" | "cloud";
       allowUncensored: boolean;
       unavailable: ReadonlySet<string>;
-      alternate?: (profiles: DreamProfile[], chosen: DreamProfile) => DreamProfile | undefined;
+      choose?: (profiles: DreamProfile[]) => DreamProfile | undefined;
     },
   ): Promise<{
     profile: DreamProfile;
     size?: { width: number; height: number };
+    frames?: number;
   }>;
   /** The account's character, outfit and scene cards, or null where it may not use Characters. */
   cards(ownerId: string): Record<CardKind, Character[]> | null;
@@ -2284,8 +2325,14 @@ export function createDream(options: {
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
-    /** Why a reply can't be used, or "" when it can. */
-    const problem = (prompt: string, title: string, motifs: string[], cooling: string[]) => {
+    /** Why a reply can't be used, or "" when it can. A retry may miss the brief's subjects. */
+    const problem = (
+      prompt: string,
+      title: string,
+      motifs: string[],
+      cooling: string[],
+      retry: boolean,
+    ) => {
       if (!prompt) return "Your reply had no usable prompt.";
       const minor = options.minorAge(prompt);
       if (minor)
@@ -2301,7 +2348,7 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
-      if (project && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
+      if (project && !retry && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
         return `Your prompt shows none of the brief's subjects (${project.brief.subjects}).`;
       return freshProblem(prompt, title, motifs, cooling);
     };
@@ -2342,6 +2389,7 @@ export function createDream(options: {
               title,
               chosenMotifs,
               newConcept && latest ? cooledMotifs(latest, fixed, forbidden, paused) : [],
+              attempt > 0,
             );
       if (!wrong) {
         likeUses.used(ownerId, "prompt", likedUsed);
@@ -2476,8 +2524,7 @@ export function createDream(options: {
           continue;
         }
         videoMisses.delete(ownerId);
-        const alternate = random(videoExploreDraw) === 1;
-        const refused = await video(ownerId, record, access, key, alternate);
+        const refused = await video(ownerId, record, access, key);
         if (!refused) return { status: "generating" };
         reason = refused;
         continue;
@@ -3120,13 +3167,7 @@ export function createDream(options: {
    * Queues a video that animates the account's best still or extends one of its videos
    * (videoSources), on its selected backend; answers why it couldn't, or "".
    */
-  async function video(
-    ownerId: string,
-    record: DreamRecord,
-    access: DreamAccess,
-    key: string,
-    alternate: boolean,
-  ) {
+  async function video(ownerId: string, record: DreamRecord, access: DreamAccess, key: string) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
       try {
         return options.reference(access.account, String(item.id), extend ? "last" : undefined);
@@ -3142,7 +3183,7 @@ export function createDream(options: {
         markUsed(ownerId, source);
         continue;
       }
-      const refused = await animate(ownerId, record, access, source, reference, key, alternate);
+      const refused = await animate(ownerId, record, access, source, reference, key);
       if (refused && referenceOf(source)) {
         if (!source.extend) return refused;
         extensionRefusal = refused;
@@ -3157,6 +3198,33 @@ export function createDream(options: {
     return (
       extensionRefusal || "Dream videos animate a kept or liked image. Keep or like one first."
     );
+  }
+  /**
+   * How much each video profile weighs for the account's next Dream video: its keep rate among
+   * Dream's latest judged videos (Laplace's rule, so an untried one starts at one half), with
+   * `lastVideoModelWeight` left to the one its last video used.
+   */
+  function videoWeights(ownerId: string) {
+    const judged = new Map<string, { kept: number; total: number }>();
+    for (const item of options.gallery(ownerId, {
+      dreamState: ["kept", "discarded"],
+      type: "video",
+      limit: judgedRates,
+    })) {
+      const id = String(item.settings?.profileId || "");
+      const entry = judged.get(id) ?? { kept: 0, total: 0 };
+      entry.total++;
+      if (item.dream?.state === "kept") entry.kept++;
+      judged.set(id, entry);
+    }
+    const last = store
+      .dreamJobsSince(ownerId, new Date(now() - 7 * 86_400_000).toISOString())
+      .filter((job) => kindOf(job) === "video")
+      .at(-1)?.profileId;
+    return (profile: DreamProfile) => {
+      const { kept, total } = judged.get(profile.id) ?? { kept: 0, total: 0 };
+      return ((kept + 1) / (total + 2)) * (profile.id === last ? lastVideoModelWeight : 1);
+    };
   }
   /** Each account's last Dream video that found no model, and the video profiles it saw then. */
   const videoMisses = new Map<string, { reason: string; key: string; until: number }>();
@@ -3175,7 +3243,6 @@ export function createDream(options: {
     { item, extend }: DreamVideoSource,
     reference: { id: string; source?: string },
     key: string,
-    alternate: boolean,
   ) {
     const miss = (reason: string) => {
       if (!extend) videoMisses.set(ownerId, { reason, key, until: now() + videoRecheckMs });
@@ -3190,11 +3257,10 @@ export function createDream(options: {
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
         unavailable: failingProfiles(ownerId, 1),
-        ...(alternate &&
-          !extend && {
-            alternate: (profiles, chosen) =>
-              exploreProfile(ownerId, "video", profiles, chosen)?.profile,
-          }),
+        choose: (profiles) => {
+          const weigh = videoWeights(ownerId);
+          return drawn(profiles.map((profile) => [profile, weigh(profile)]));
+        },
       });
     } catch (error) {
       return miss((error as Error).message);
@@ -3207,12 +3273,22 @@ export function createDream(options: {
     const slot = dreamVideoSlot(profile);
     if (!slot) return miss("No video model is ready for this source frame.");
     const uncensored = uncensoredShare(record, access);
+    const recentClips = store
+      .jobsSince(ownerId, new Date(now() - 7 * 86_400_000).toISOString())
+      .filter((job) => job.dream && kindOf(job.input) === "video");
     // Written as the viewer's Animate writes it (prompt-animate.js): seeing the frame and knowing
     // the clip's length, sound and the profile's prompt format.
     const writing = {
       kind: "animate",
       theme: "custom",
-      instruction: motionInstruction(Boolean(uncensored)),
+      instruction: motionInstruction(Boolean(uncensored), recentClips.length, {
+        title: clean(item.title, 120),
+        why: clean(item.dream?.why, 240),
+        recent: recentClips
+          .slice(-recentMotionPrompts)
+          .map((job) => clean(job.input.prompt, 240))
+          .filter(Boolean),
+      }),
       source: clean(item.prompt || item.dream?.prompt, maxPromptCharacters),
       ...(extend ? { extend: true } : {}),
     };
@@ -3220,6 +3296,7 @@ export function createDream(options: {
       {
         ...profile.defaults,
         ...choice.size,
+        ...(choice.frames ? { frames: choice.frames } : {}),
         autoUpscale: null,
         kind: "video",
         profileId: profile.id,
@@ -3773,8 +3850,8 @@ export function createDream(options: {
     get started() {
       return Boolean(timer);
     },
-    /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
-    finished: wake,
+    /** Ticks now: a Dream job finished, freeing its worker, or the deck runs low (dream-routes.ts). */
+    wake,
     idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
     access: (ownerId: string) => options.access(ownerId),
     status(

@@ -23,6 +23,12 @@
   ],
   packageRules: [
     {
+      description: "Update worker extensions together weekly, so each commit doesn't run CI on its own",
+      groupName: "worker extensions",
+      matchFileNames: ["worker/sources.json"],
+      schedule: ["* 0-5 * * 1"],
+    },
+    {
       description: "Keep dated ROCm builds on the existing channel",
       matchDatasources: ["docker"],
       matchPackageNames: ["/(^|/)yanwk/comfyui-boot$/"],
