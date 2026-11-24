@@ -945,11 +945,8 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   await page.getByRole("button", { name: "None", exact: true }).click();
   await page.getByRole("button", { name: /^Select image: Live Study$/i }).click();
   await expect(status).toHaveText("1 Selected");
-  // A disabled action says why.
-  await expect(selectionAction(page, "Delete")).toHaveAttribute("aria-disabled", "true");
-  await expect(selectionAction(page, "Delete")).toHaveAccessibleDescription(
-    "Stop work in progress before deleting it.",
-  );
+  // Only what applies shows: running work offers Stop, not Delete.
+  await expect(selectionAction(page, "Delete")).toHaveCount(0);
   await selectionAction(page, "Stop").click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
   await expect(status).toHaveCount(0);
