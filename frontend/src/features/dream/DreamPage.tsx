@@ -302,7 +302,6 @@ export function DreamPage() {
           <Stack flex={1} gap="lg" pb="md">
             <DreamProjects
               creating={creatingProject}
-              onCreate={() => setCreatingProject(true)}
               onCloseCreate={() => setCreatingProject(false)}
             />
           </Stack>
