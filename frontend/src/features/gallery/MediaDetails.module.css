@@ -43,3 +43,94 @@
     inset: -12px -8px;
   }
 }
+
+/* Lineage: every step is a 48 px row centred on its marker, and draws its stretch of the rail
+   from there to the next step; branches tick off the rail to their thumbnails. */
+.flow {
+  --rail: 23px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow > li {
+  position: relative;
+}
+
+.flow > li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: var(--rail);
+  top: 0;
+  bottom: calc(-1 * var(--mantine-spacing-xs));
+  width: 2px;
+  background: var(--mantine-color-default-border);
+}
+
+.flow > li:first-child::before {
+  top: 24px;
+}
+
+.flow > li:last-child::before {
+  bottom: auto;
+  height: 24px;
+}
+
+.flow > li:only-child::before {
+  display: none;
+}
+
+.flow > li[data-gap] {
+  padding-inline-start: calc(48px + var(--mantine-spacing-xs));
+}
+
+.flow > li[data-gap]:has(> p)::before {
+  width: 0;
+  background: none;
+  border-inline-start: 2px dotted var(--mantine-color-default-border);
+}
+
+.flow > li[data-branch] {
+  padding-inline-start: calc(var(--rail) + var(--mantine-spacing-lg));
+}
+
+.flow > li[data-branch]::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: var(--rail);
+  top: 23px;
+  width: calc(var(--mantine-spacing-lg) + 2px);
+  height: 2px;
+  background: var(--mantine-color-default-border);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  min-height: 48px;
+}
+
+.marker {
+  position: relative;
+  flex: 0 0 48px;
+  align-self: stretch;
+  max-height: 48px;
+  background: var(--mantine-color-default);
+}
+
+/* This result is a dot on the rail. */
+.flow [data-current] .marker {
+  background: none;
+}
+
+.flow [data-current] .marker::after {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  background: var(--mantine-primary-color-filled);
+}
