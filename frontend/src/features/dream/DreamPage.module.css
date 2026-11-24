@@ -385,6 +385,12 @@
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--mantine-color-default-border);
 }
+/* Long comparison labels keep one line each and scroll sideways once they outgrow the row. */
+.previewChoices {
+  justify-content: safe center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
 .choice[data-selected] .side {
   outline: 1px solid var(--mantine-primary-color-filled);
 }
