@@ -51,10 +51,6 @@ test("Images and Videos tabs keep an expanding bottom composer", async ({ page }
   ).toBeVisible();
   await expandComposer(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
-  // Each profile option names its model, kind and backend in short facts.
-  await expect(page.getByRole("option", { name: /^Image Fast\b/ })).toContainText(
-    "Studio Image · Image · Local GPU",
-  );
   await page.getByRole("option", { name: /^Image Fast\b/ }).click();
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(2);

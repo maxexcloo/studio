@@ -440,9 +440,7 @@ test("Models and LoRAs show their Dream keep rate once enough verdicts back it",
   );
   await create(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
-  await expect(page.getByRole("option", { name: /^Image Quality\b/ })).toContainText(
-    "Studio Image · Image · Local GPU · Kept 63%",
-  );
+  await expect(page.getByRole("option", { name: /^Image Quality\b/ })).toContainText("Kept 63%");
   // Four verdicts are too few to say.
   await expect(page.getByRole("option", { name: /^Image Fast\b/ })).not.toContainText("Kept");
   await page.keyboard.press("Escape");

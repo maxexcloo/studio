@@ -53,14 +53,6 @@ function useReadiness() {
       : profileReadiness(profile, workers);
 }
 
-/** A profile's short facts for its option: model (else family), kind and where it runs. */
-const profileFacts = (profile: Profile) =>
-  [
-    profile.recipe?.modelLabel || modelFamilyLabel(profile.family, profile.familyName),
-    profile.kind === "video" ? "Video" : "Image",
-    isCloudProfile(profile) ? "Cloud" : "Local GPU",
-  ].join(" · ");
-
 /** A shared name gains the part of the profile ID that differs, such as "· fp8" or "· comfyui". */
 function profileLabel(profile: Profile, profiles: Profile[]) {
   const name = profileName(profile);
@@ -134,12 +126,18 @@ export function ProfileSelect({
       renderOption={({ option, checked }) => {
         const profile = profiles.find((profile) => profile.id === option.value);
         const status = profile && readinessOf(profile);
+        // Its name's first part titles it; the rest (speed, steps), Cloud and its keep rate follow.
+        const [title, ...rest] = option.label.split(" · ");
         return (
           <ChipOption
-            label={option.label}
+            label={title}
             description={
               profile &&
-              [profileFacts(profile), keptLabel(keepRates?.profiles[profile.id])]
+              [
+                ...rest,
+                isCloudProfile(profile) && "Cloud",
+                keptLabel(keepRates?.profiles[profile.id]),
+              ]
                 .filter(Boolean)
                 .join(" · ")
             }
