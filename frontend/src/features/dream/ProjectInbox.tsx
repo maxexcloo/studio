@@ -205,7 +205,7 @@ function ProposalEditor({
       {rule !== undefined && (
         <TextBox
           label="Rule"
-          description="A limit every prompt keeps in Dream and chats, never a look to aim for."
+          description="A rule that only bans (never X, no X) joins your Exclusions; any other joins My Preferences in Settings › Taste."
           autosize
           minRows={2}
           maxLength={maxTasteRule}

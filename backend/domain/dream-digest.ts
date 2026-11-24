@@ -1,7 +1,6 @@
 import type { DreamDigest, DreamDigestRow, DreamPassReason } from "../../shared/dream.ts";
 import type { Project } from "../../shared/projects.ts";
 import type { DreamItem } from "./dream.ts";
-import type { TasteRecord } from "./taste.ts";
 
 const weekMs = 7 * 86_400_000;
 const rows = 5;
@@ -23,7 +22,8 @@ export function createDreamDigest({
 }: {
   /** The owner's kept and passed Dream results decided since then, Dream's pool included. */
   decided(ownerId: string, since: string): DreamItem[];
-  taste(ownerId: string): Pick<TasteRecord, "models" | "loras" | "tags">;
+  /** What Dream leans to next: the account's Favourites, then what it learnt. */
+  taste(ownerId: string): { models: string[]; loras: string[]; tags: string[] };
   projects(ownerId: string): Project[];
   /** The share of Dream's ideas that explore, from 0 to 1. */
   exploring(ownerId: string): number;

@@ -17,7 +17,7 @@ export interface ProposalChange {
   /** Pausing a project or giving it more turns (`pacing`). */
   paused?: boolean;
   favoured?: boolean;
-  /** A rule for Taste › Rules (`rule`). */
+  /** A rule from a recurring issue (`rule`): a pure ban joins Taste Exclusions, any other My Preferences. */
   rule?: string;
   /** A character, outfit or scene card (`card`). */
   card?: { kind: CardKind; name: string; description: string };

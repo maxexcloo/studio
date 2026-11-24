@@ -1,44 +1,79 @@
-/** The longest taste profile summary Studio writes, in characters. */
-export const maxTasteSummary = 1000;
 /** The longest word or tag a taste field holds, in characters. */
 export const maxTastePhrase = 80;
-/** The longest rule, in characters. */
+/** The longest rule an issue suggests, in characters. */
 export const maxTasteRule = 160;
+/** The longest My Preferences text, in characters. */
+export const maxTastePrefer = 2000;
+/** The longest guidance one area of taste holds, in characters. */
+export const maxTasteGuidance = 300;
 
 /**
- * A taste profile's fields: words the summariser writes (likes, dislikes as `avoid`, styles and
- * the note) and favourites read from scores (model profile ids, LoRA names, shapes as
- * width-over-height ratios such as "0.67", caption tags). A field the person edits is theirs, and
- * Studio's learning leaves it alone until they hand it back. Rules are the person's alone: limits
- * every prompt written for them keeps ("never fat: always a clear waist"), never a look to aim for.
+ * What Studio learnt of a person's taste: words the summariser writes (likes, what it leans away
+ * from as `avoid`, styles and the note) and favourites read from scores (model profile ids, LoRA
+ * names, shapes as width-over-height ratios such as "0.67", caption tags). Only learning changes
+ * them; the person steers it with More Like This, Less Like This and Never.
  */
 export interface TasteFields {
   likes: string[];
   avoid: string[];
-  exclusions: string[];
   styles: string[];
   note: string;
-  rules: string[];
   models: string[];
   loras: string[];
   shapes: string[];
   tags: string[];
 }
 export type TasteWords = Pick<TasteFields, "likes" | "avoid" | "styles" | "note">;
+/** What More and Less Like This mark: learnt words (likes, styles) or a model, LoRA, shape or tag. */
+export const tasteMarkKinds = ["words", "models", "loras", "shapes", "tags"] as const;
+export type TasteMarkKind = (typeof tasteMarkKinds)[number];
+export type TasteMarks = Partial<Record<TasteMarkKind, string[]>>;
+/**
+ * The person's own taste: My Preferences (`prefer`, free text), Favourites (More Like This), Less Of
+ * (Less Like This, a soft down-weight) and Exclusions (Never: hard, everywhere).
+ */
+export interface TastePreferences {
+  prefer?: string;
+  favourites?: TasteMarks;
+  less?: TasteMarks;
+  exclusions?: string[];
+}
+export type TastePreferenceChanges = {
+  [Key in keyof TastePreferences]?: TastePreferences[Key] | null;
+};
 export const tasteLimits = {
   likes: 12,
-  avoid: 40,
+  avoid: 8,
   exclusions: 40,
   styles: 8,
   note: 400,
-  rules: 12,
+  words: 12,
   models: 8,
   loras: 8,
   shapes: 6,
   tags: 12,
 } as const;
-export type TastePreferences = Partial<TasteFields>;
-export type TastePreferenceChanges = { [Key in keyof TasteFields]?: TasteFields[Key] | null };
+
+/** Where taste applies (Settings › Taste), each area with its own switch and guidance. */
+export const tasteAreas = ["dream", "suggestions", "writing", "chats"] as const;
+export type TasteArea = (typeof tasteAreas)[number];
+/** Whether an area uses Learnt and My Preferences, and the guidance always sent with its work. */
+export interface TasteAreaSetting {
+  taste: boolean;
+  guidance: string;
+}
+export type TasteAreas = Record<TasteArea, TasteAreaSetting>;
+const tasteAreaDefaults: TasteAreas = {
+  dream: { taste: true, guidance: "" },
+  suggestions: { taste: true, guidance: "" },
+  writing: { taste: false, guidance: "" },
+  chats: { taste: false, guidance: "" },
+};
+/** An account's saved areas (the `tasteAreas` preference) over the defaults. */
+export const tasteAreasOf = (saved?: Partial<Record<TasteArea, Partial<TasteAreaSetting>>>) =>
+  Object.fromEntries(
+    tasteAreas.map((area) => [area, { ...tasteAreaDefaults[area], ...saved?.[area] }]),
+  ) as TasteAreas;
 
 const shapes: [number, number][] = [
   [1, 1],

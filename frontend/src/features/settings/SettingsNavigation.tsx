@@ -1,4 +1,4 @@
-import { Route, Server, Shield, SlidersVertical, UsersRound } from "lucide-react";
+import { Palette, Route, Server, Shield, SlidersVertical, UsersRound } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -27,6 +27,13 @@ const settingSections = {
     description:
       "Choose how the gallery looks, which models are offered and whether to keep prompts.",
     icon: icons.settings,
+    group: "Personal",
+  },
+  taste: {
+    label: "Taste",
+    description:
+      "Choose where your taste applies, your own preferences and exclusions, and steer what Studio learnt.",
+    icon: Palette,
     group: "Personal",
   },
   "where-work-runs": {

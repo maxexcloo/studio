@@ -81,7 +81,8 @@ export function DreamWhy({ item, question }: { item: DreamItem; question?: strin
         </Row>
       )}
       {inputs.notes && <Row label="Chat Notes">{inputs.notes.join(" · ")}</Row>}
-      {inputs.rules && <Row label="Rules">{inputs.rules.join(" · ")}</Row>}
+      {inputs.guidance && <Row label="Guidance">{inputs.guidance}</Row>}
+      {inputs.preferences && <Row label="My Preferences">{inputs.preferences}</Row>}
       {inputs.choice && <Row label="Model">{inputs.choice}</Row>}
       {inputs.seed && <Row label="Seed">{inputs.seed}</Row>}
     </Stack>

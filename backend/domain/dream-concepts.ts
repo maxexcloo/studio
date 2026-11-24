@@ -442,19 +442,31 @@ export function forbiddenMotifs(avoids: string[], rules: string[], unasked = fal
   ];
 }
 
-/** Literal user exclusions and their known equivalent motifs. */
-export function explicitExclusions(entries: string[]) {
-  const terms = entries.map(phraseWords).filter(Boolean);
-  return [
-    ...new Set([
-      ...terms,
-      ...terms.flatMap((term) => {
-        if (/^laundry(?: rooms?)?$/.test(term)) return ["laundry"];
-        if (/^(?:smoking|cigarettes?|tobacco smoking)$/.test(term)) return ["smoking"];
-        return [];
-      }),
-    ]),
-  ];
+/** Literal user exclusions as motifs. */
+export const explicitExclusions = (entries: string[]) => [
+  ...new Set(entries.map(phraseWords).filter(Boolean)),
+];
+
+/**
+ * A rule's bans where it does nothing but ban ("never CGI", "no smoking or tattoos"), else null:
+ * a rule that also asks for something, or makes an exception, is a preference.
+ */
+export function ruleBans(rule: string) {
+  const clauses = motifClauses(rule).filter(
+    ({ shown, excluded }) => phraseWords(shown) || phraseWords(excluded),
+  );
+  if (
+    !clauses.length ||
+    clauses.some(({ shown, excluded }) => phraseWords(shown) || conditionalMotif.test(excluded))
+  )
+    return null;
+  const bans = clauses.flatMap(({ excluded }) =>
+    excluded
+      .split(/[,;]+|\b(?:or|nor)\b/gi)
+      .map((part) => phraseWords(part).replace(/^(?:any|an?|the) /, ""))
+      .filter(Boolean),
+  );
+  return bans.length && bans.every((ban) => ban.split(" ").length <= 4) ? [...new Set(bans)] : null;
 }
 
 export function ideaMotifs(value: unknown, prompt = "") {

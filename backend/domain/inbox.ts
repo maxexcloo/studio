@@ -24,7 +24,7 @@ import {
   maxProjectBrief,
   maxProjectName,
 } from "../../shared/projects.ts";
-import { maxTasteRule, tasteLimits } from "../../shared/taste.ts";
+import { maxTasteRule } from "../../shared/taste.ts";
 import {
   readRuntimeDocument,
   runtimeTransaction,
@@ -392,7 +392,7 @@ function editsFrom(
 export function createInbox(options: {
   dataDir: string;
   projects: Projects;
-  taste: Pick<Taste, "read" | "edit">;
+  taste: Pick<Taste, "adopt" | "adopted" | "unadopt">;
   /** The account's recurring issues with a suggested rule. */
   issues(ownerId: string): Issue[];
   writer: InboxWriter | null;
@@ -456,9 +456,7 @@ export function createInbox(options: {
     if (proposal.kind === "brief" || proposal.kind === "pacing")
       return Boolean(projectOf(ownerId, proposal.projectId));
     if (proposal.kind === "rule")
-      return !options.taste
-        .read(ownerId)
-        .rules.some((rule) => lower(rule) === lower(proposal.change.rule || ""));
+      return !options.taste.adopted(ownerId, proposal.change.rule || "");
     if (proposal.kind === "card") return Boolean(options.cards(ownerId));
     return true;
   }
@@ -888,10 +886,7 @@ export function createInbox(options: {
     }
     if (proposal.kind === "rule") {
       const rule = change.rule!;
-      const { rules } = options.taste.read(ownerId);
-      if (rules.length >= tasteLimits.rules)
-        throw failure(`Rules are full at ${tasteLimits.rules}: remove one first.`, 400);
-      options.taste.edit(ownerId, { rules: [...rules, rule] });
+      options.taste.adopt(ownerId, rule);
       return { rule };
     }
     const { kind, name, description } = change.card!;
@@ -1108,10 +1103,7 @@ export function createInbox(options: {
             throw failure("Detach the project's chats before undoing it.", 409);
           options.dream.detachProject(ownerId, projectId);
           projects.remove(ownerId, projectId);
-        } else if (rule)
-          options.taste.edit(ownerId, {
-            rules: options.taste.read(ownerId).rules.filter((entry) => entry !== rule),
-          });
+        } else if (rule) options.taste.unadopt(ownerId, rule);
         else if (card) {
           const current = options.cards(ownerId)?.[card.kind].find((entry) => entry.id === card.id);
           if (!current || revisionOf(current) !== revision)

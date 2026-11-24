@@ -522,6 +522,7 @@ function rewriteInstructions({
   vision,
   stack,
   examples,
+  taste,
   negative,
 }) {
   const label = profile.label || profile.displayName || profile.id;
@@ -570,6 +571,7 @@ function rewriteInstructions({
           likedPrompts: examples.map((example) => JSON.stringify(one(example, 400))).join(" "),
         })
       : "",
+    taste: taste.length ? promptInstruction("use-writing-taste", { taste: taste.join("\n") }) : "",
     guide: writerGuide(guide) || "(none; write a clear, specific natural-language prompt)",
     style: override || preset.instruction,
     customInstruction: preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
@@ -903,6 +905,7 @@ export function createAssistant(
     references = [],
     stack = [],
     examples = [],
+    taste = [],
     negative = false,
     writer,
     signal,
@@ -949,6 +952,7 @@ export function createAssistant(
         vision,
         stack,
         examples: examples.slice(0, maxExamples),
+        taste,
         negative,
       });
     const base = {

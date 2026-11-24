@@ -3,6 +3,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import type { Appearance } from "../../../../shared/appearance";
 import { defaultModelKeys } from "../../../../shared/profiles";
 import type { ImagePreference, VideoPreference } from "../../../../shared/resolution";
+import type { TasteArea, TasteAreaSetting } from "../../../../shared/taste";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -33,6 +34,8 @@ interface PreferenceValues {
   appearance?: Partial<Appearance>;
   /** The gallery's saved views, in the order saved. */
   galleryViews?: SavedGalleryView[];
+  /** Where Taste Applies (Settings › Taste); unsaved areas take `tasteAreasOf`'s defaults. */
+  tasteAreas?: Partial<Record<TasteArea, Partial<TasteAreaSetting>>>;
 }
 /** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
 export type Preferences = PreferenceValues &
@@ -72,7 +75,8 @@ export function useSavePreferences(previousGalleryViews?: SavedGalleryView[]) {
         for (const queryKey of [accountQuery.queryKey, modelsQuery.queryKey])
           void client.invalidateQueries({ queryKey });
       // Uncensored Models decides whether suggestions may be worded explicitly.
-      if ("uncensoredModels" in patch) void client.invalidateQueries({ queryKey: ["suggestions"] });
+      if ("uncensoredModels" in patch || "tasteAreas" in patch)
+        void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.
       if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: galleryKey });
       // Default models follow where the account prefers each kind to run and its chosen defaults.

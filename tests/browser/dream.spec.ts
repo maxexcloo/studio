@@ -789,22 +789,19 @@ test("Library review stays available while Dream is off", async ({ page }) => {
   await expect(card.getByText("Library Image", { exact: true })).toBeVisible();
 });
 
-test("Taste displays readable preferences and saves explicit edits separately", async ({
+test("Settings › Taste shows what Studio learnt and saves the person's own taste separately", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
   const dream = await serveDream(page, {
     taste: {
-      likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets", "old boats"],
-      styles: ["film grain", "muted colour", "long exposure"],
+      likes: ["misty harbours", "foxes in snow"],
+      styles: ["film grain"],
       avoid: ["crowds"],
       note: "Quiet coastal scenes in soft, misty light.",
-      models: ["image:test", "gone"],
-      loras: ["detail.safetensors"],
-      loraScores: [{ name: "detail.safetensors", strength: 0.8, score: 2 }],
-      shapes: ["0.67", "1.78"],
-      tags: ["fox", "snow"],
+      shapes: ["0.67"],
       signals: 40,
+      preferences: { favourites: { models: ["image:test"] } },
     },
   });
   const sameness = { recent: null, earlier: null, converging: false, examples: [] };
@@ -824,78 +821,49 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       },
     }),
   );
-  await page.goto("/dream");
-  await showView(page, "Taste");
+  await page.goto("/settings#taste");
   const history = page.getByRole("region", { name: "History", exact: true });
   const historyRows = history.getByRole("table", { name: "History", exact: true }).getByRole("row");
   await expect(historyRows).toHaveCount(4);
-  await history.getByRole("button", { name: "Show All", exact: true }).click();
-  await expect(historyRows).toHaveCount(5);
-  await history.getByRole("button", { name: "Show Less", exact: true }).click();
-  await expect(historyRows).toHaveCount(4);
-  const profile = page.getByRole("region", { name: "Taste Profile" });
-  await expect(profile.getByText("foxes in snow", { exact: true })).toBeVisible();
-  const favourite = (table: string, row: string) =>
-    page
-      .getByRole("table", { name: table, exact: true })
-      .getByRole("row", { name: row, exact: true });
-  await expect(favourite("Models", "Image Quality")).toContainText("Favourite");
-  await expect(favourite("LoRAs", "Detail Slider 0.8")).toContainText("Favourite");
-  await expect(profile.getByText("Portrait 2:3", { exact: true })).toBeVisible();
-  await expect(profile.getByText("Landscape 16:9", { exact: true })).toBeVisible();
-  await expect(favourite("Tags", "fox")).toBeVisible();
-  await expect(favourite("Scenes", "snow")).toBeVisible();
-  const editTaste = page
-    .getByRole("group", { name: "Dream Toolbar", exact: true })
-    .getByRole("button", { name: "Edit", exact: true });
-  await editTaste.click();
-  const editor = page.getByRole("dialog", { name: "Edit Taste", exact: true });
-  await editor.getByRole("combobox", { name: "Likes", exact: true }).press("Backspace");
-  const summary = editor.getByRole("textbox", { name: "Summary", exact: true });
-  if (testInfo.project.use.isMobile) {
-    await summary.click();
-    const textEditor = page.getByRole("dialog", { name: "Summary", exact: true });
-    await textEditor
-      .getByRole("textbox", { name: "Summary", exact: true })
-      .fill("Quiet coastal scenes with lighthouses.");
-    await page.keyboard.press("Escape");
-    await expect(textEditor).toBeHidden();
-    await expect(editor).toBeVisible();
-  } else await summary.fill("Quiet coastal scenes with lighthouses.");
-  await editor.getByRole("combobox", { name: "Dislikes", exact: true }).fill("clowns");
-  await page.keyboard.press("Enter");
-  const exclusions = editor.getByRole("combobox", { name: "Exclusions", exact: true });
-  await exclusions.fill("laundry rooms");
-  await exclusions.press("Enter");
-  await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
-  expect(dream.requests).not.toContainEqual(
-    expect.objectContaining({ path: "/api/taste", method: "PUT" }),
-  );
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  const learnt = page.getByRole("region", { name: "Learnt From Your Ratings", exact: true });
+  await expect(learnt.getByText("Quiet coastal scenes in soft, misty light.")).toBeVisible();
+  await expect(learnt.getByRole("button", { name: "Portrait 2:3", exact: true })).toBeVisible();
+  const mine = page.getByRole("region", { name: "My Preferences", exact: true });
+  await expect(mine.getByText("Model: Image Quality", { exact: true })).toBeVisible();
+
+  // Learnt words are steered from their menus: Less Like This waits under Less Of with Undo.
+  await learnt.getByRole("button", { name: "foxes in snow", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Less Like This", exact: true }).click();
   await expect
     .poll(() => dream.requests.at(-1)?.body)
     .toEqual({
       preferences: {
-        likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets"],
-        avoid: ["crowds", "clowns"],
-        exclusions: ["laundry rooms"],
-        note: "Quiet coastal scenes with lighthouses.",
+        favourites: { models: ["image:test"], words: [] },
+        less: { words: ["foxes in snow"] },
       },
     });
-  await expect(editor).toBeHidden();
-  await expect(profile.getByText("Summary · Your Edit", { exact: true })).toBeVisible();
-  await expect(profile.getByText("clowns", { exact: true })).toBeVisible();
-  await expect(profile.getByText("laundry rooms", { exact: true })).toBeVisible();
+  const lessOf = page.getByRole("region", { name: "Less Of", exact: true });
+  await lessOf.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(() => dream.requests.at(-1)?.body?.preferences.less).toEqual({ words: [] });
+  await learnt.getByRole("button", { name: "crowds", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Never", exact: true }).click();
+  await expect.poll(() => dream.requests.at(-1)?.body?.preferences.exclusions).toEqual(["crowds"]);
   await expect(
-    profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
+    page
+      .getByRole("region", { name: "Exclusions", exact: true })
+      .getByText("crowds", { exact: true }),
   ).toBeVisible();
-  await editTaste.click();
-  await editor.getByRole("button", { name: "Use Learnt Summary", exact: true }).click();
+
+  // My Preferences are free text, saved from their dialog.
+  await mine.getByRole("button", { name: "Edit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "My Preferences", exact: true });
+  const text = "Photographic, natural light.";
+  await fillBox(editor, "Preferences", text, Boolean(testInfo.project.use.isMobile));
   await editor.getByRole("button", { name: "Save", exact: true }).click();
-  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { note: null } });
-  await expect(
-    profile.getByText("Quiet coastal scenes in soft, misty light.", { exact: true }),
-  ).toBeVisible();
+  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { prefer: text } });
+  await expect(editor).toBeHidden();
+  await expect(mine.getByText(text, { exact: true })).toBeVisible();
+
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("button", { name: "Clear", exact: true }).scrollIntoViewIfNeeded();
   await danger.getByRole("button", { name: "Clear", exact: true }).click();
@@ -904,13 +872,33 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   ).toBeVisible();
 });
 
-test("Taste shows keep rates by model and tag kind, and pins or removes values in place", async ({
+test("Where Taste Applies switches an area at once and says what it receives", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page);
+  await page.goto("/settings#taste");
+  const areas = page.getByRole("region", { name: "Where Taste Applies", exact: true });
+  const writing = areas.getByRole("switch", { name: "Use My Taste in Prompt Writing" });
+  await expect(writing).not.toBeChecked();
+  await expect(areas.getByRole("switch", { name: "Use My Taste in Dream" })).toBeChecked();
+  await expect(areas.getByText(/^Receives: Exclusions\. Improve Prompt/)).toBeVisible();
+  const saved = page.waitForRequest(
+    (request) => request.url().endsWith("/api/preferences") && request.method() === "PATCH",
+  );
+  await writing.dispatchEvent("click");
+  expect((await saved).postDataJSON().tasteAreas.writing).toEqual({ taste: true, guidance: "" });
+  await expect(writing).toBeChecked();
+  await expect(
+    areas.getByText(/^Receives: Learnt · Liked Examples · My Preferences · Exclusions\./),
+  ).toBeVisible();
+});
+
+test("Taste shows keep rates by model and tag kind, and marks values from their rows", async ({
   page,
 }) => {
   await fixtures(page);
   const dream = await serveDream(page, {
     taste: {
-      likes: ["misty harbours", "foxes in snow"],
+      likes: ["misty harbours"],
       models: ["image:test"],
       tags: ["red dress"],
     },
@@ -925,14 +913,12 @@ test("Taste shows keep rates by model and tag kind, and pins or removes values i
       },
     },
   });
-  await page.goto("/dream");
-  await showView(page, "Taste");
+  await page.goto("/settings#taste");
   const table = (name: string) => page.getByRole("table", { name, exact: true });
   const row = (name: string, value: string) =>
     table(name).getByRole("row", { name: value, exact: true });
   await expect(row("Models", "Image Fast")).toContainText("90% of 10");
   await expect(row("Models", "Image Quality")).toContainText("63% of 30");
-  await expect(row("Models", "Image Quality")).toContainText("Favourite");
   await expect(row("Outfits", "red dress")).toContainText("60% of 10");
   await expect(row("Colours", "golden light")).toContainText("80% of 10");
   await expect(row("Scenes", "beach")).toContainText("17% of 12");
@@ -941,25 +927,23 @@ test("Taste shows keep rates by model and tag kind, and pins or removes values i
   await row("Colours", "golden light")
     .getByRole("button", { name: "Actions for golden light", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+  await page.getByRole("menuitem", { name: "More Like This", exact: true }).click();
   await expect
     .poll(() => dream.requests.at(-1)?.body)
-    .toEqual({ preferences: { tags: ["red dress", "golden light"] } });
-  await expect(row("Colours", "golden light")).toContainText("Favourite");
-  await expect(page.getByRole("menu")).toBeHidden();
+    .toEqual({
+      preferences: { favourites: { tags: ["golden light"] }, less: { tags: [] } },
+    });
+  await expect(row("Colours", "golden light")).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("region", { name: "My Preferences", exact: true })
+      .getByText("Tag: golden light", { exact: true }),
+  ).toBeVisible();
+  // Never is for words and tags; a model can only be liked more or less.
   await row("Models", "Image Quality")
     .getByRole("button", { name: "Actions for Image Quality", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
-  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { models: [] } });
-  await expect(row("Models", "Image Quality")).not.toContainText("Favourite");
-  const profile = page.getByRole("region", { name: "Taste Profile" });
-  await profile.getByRole("button", { name: "Remove foxes in snow", exact: true }).click();
-  await expect
-    .poll(() => dream.requests.at(-1)?.body)
-    .toEqual({ preferences: { likes: ["misty harbours"] } });
-  await expect(profile.getByText("Likes · Your Edit", { exact: true })).toBeVisible();
-  await expect(profile.getByText("foxes in snow", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Never", exact: true })).toHaveCount(0);
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
@@ -989,7 +973,6 @@ test("Dream navigation orders its views and History shows retained activity and 
     "Dream",
     "Library",
     "Projects",
-    "Taste",
     "Discards",
     "History",
     "This Week",
@@ -1841,7 +1824,7 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
   await page.goto("/dream/projects");
   await expect(page.getByRole("region", { name: "Inbox (5)", exact: true })).toBeVisible();
 
-  // A rule goes to Taste › Rules, with Undo.
+  // A rule joins Settings › Taste, with Undo.
   const rule = page.getByRole("article", { name: "Add a Rule", exact: true });
   await rule.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(rule).toBeHidden();

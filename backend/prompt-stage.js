@@ -51,8 +51,9 @@ export function writingIssue(writing, { engine, account }) {
  * The stage's writer. `account(ownerId)` is the owner's access (undefined in single-user mode, null
  * once gone), `profiles(account)` the generation profiles it may use, `guide(profile)` a profile's
  * prompting guide, `dream()` Dream, `frame(account, assetId)` a reference image as the text model
- * reads it, `caption(account, assetId)` what it shows in words and `setPrompts(job)` the selected
- * source and the prompts the job's result set holds so far.
+ * reads it, `caption(account, assetId)` what it shows in words, `setPrompts(job)` the selected
+ * source and the prompts the job's result set holds so far and `taste(ownerId)` what Prompt Writing
+ * receives of the owner's taste, as lines.
  */
 export function createPromptStage({
   engine,
@@ -63,6 +64,7 @@ export function createPromptStage({
   frame,
   caption = () => "",
   setPrompts,
+  taste = () => [],
 }) {
   return async (job, stream) => {
     const { signal, onThinking, onDelta } = stream;
@@ -125,6 +127,8 @@ export function createPromptStage({
         ? Boolean(job.dream.uncensored) && dream().allowsUncensored(job.ownerId)
         : !access || mayUseFeature(access, "uncensoredModels"),
       story,
+      // Dream's clips follow Dream's own taste; the person's follow Prompt Writing's.
+      taste: job.dream ? [] : taste(job.ownerId || ""),
       writer,
       frame: () => frame(access, start),
       caption: () => caption(access, start),
