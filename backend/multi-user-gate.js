@@ -78,6 +78,10 @@ const ordinaryRoutes = [
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
+  // Chat notes and what each chat remembers are the requester's own (mcp/project.js).
+  ["GET", /^\/api\/(chat-choices|dream\/notes)$/],
+  ["POST", /^\/api\/dream\/notes$/],
+  ["DELETE", /^\/api\/(chat-choices|dream\/notes)\/[^/]+$/],
   // Dream projects are the requester's own (domain/projects.ts).
   ["GET", /^\/api\/dream\/projects(\/[\w-]+\/results)?$/],
   ["POST", /^\/api\/dream\/projects(\/(attach|activity)|\/[\w-]+\/undo)?$/],
