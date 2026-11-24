@@ -174,69 +174,101 @@ export function ComparePage() {
     item.width && item.height ? [item.width / item.height] : [],
   );
   const aspect = aspects.length ? Math.min(...aspects) : 1;
-  return (
-    <Stack gap="md" className={classes.page} {...hold.handlers}>
-      <div className={classes.header}>
-        <Group gap="xs" wrap="nowrap" miw={0}>
-          <Tooltip label={backLabel}>
+  const backButton = (
+    <Tooltip label={backLabel}>
+      <ActionIcon
+        component={Link}
+        to={
+          gallerySet
+            ? "/images"
+            : `${galleryViewPath("image", "comparisons")}${comparisonSearch || ""}`
+        }
+        state={gallerySet ? ({ set: gallerySet } satisfies GalleryState) : undefined}
+        variant="subtle"
+        color="gray"
+        aria-label={backLabel}
+      >
+        <ArrowLeft size={18} />
+      </ActionIcon>
+    </Tooltip>
+  );
+  // Sized like the Gallery's view menu beside its toolbar, not a page heading.
+  const heading = (
+    <Title order={1} fz={phone ? "sm" : "md"} fw={600} lh={1.2}>
+      {comparisonTitle({ axis, dream })}
+    </Title>
+  );
+  const layoutSwitch = (
+    <SegmentedControl
+      aria-label="Compare Layout"
+      size="xs"
+      fullWidth={phone}
+      value={layout}
+      onChange={(value) => setLayout(value as Layout)}
+      data={[
+        { value: "side", label: "Side by Side" },
+        { value: "scroll", label: "Scroll" },
+        ...(canSplit ? [{ value: "split", label: "Split" }] : []),
+      ]}
+    />
+  );
+  const summary = [plural(variants.length, "Variant"), seed && `Seed ${seed}`]
+    .filter(Boolean)
+    .join(" · ");
+  const actions = (
+    <Group gap="xs" justify="flex-end" wrap="nowrap">
+      <ComparisonRatingButtons comparison={comparison.data} />
+      {again.length > 1 &&
+        (phone ? (
+          <Tooltip label="Compare Again">
             <ActionIcon
-              component={Link}
-              to={
-                gallerySet
-                  ? "/images"
-                  : `${galleryViewPath("image", "comparisons")}${comparisonSearch || ""}`
-              }
-              state={gallerySet ? ({ set: gallerySet } satisfies GalleryState) : undefined}
-              variant="subtle"
-              color="gray"
-              aria-label={backLabel}
+              variant="filled"
+              aria-label="Compare Again"
+              loading={compareAgain.isPending}
+              onClick={() => compareAgain.mutate()}
             >
-              <ArrowLeft size={18} />
+              <icons.compare size={18} />
             </ActionIcon>
           </Tooltip>
-          <Title order={1} size="h3">
-            {comparisonTitle({ axis, dream })}
-          </Title>
-          <SegmentedControl
-            aria-label="Compare Layout"
-            size="xs"
-            value={layout}
-            onChange={(value) => setLayout(value as Layout)}
-            data={[
-              { value: "side", label: "Side by Side" },
-              { value: "scroll", label: "Scroll" },
-              ...(canSplit ? [{ value: "split", label: "Split" }] : []),
-            ]}
-          />
-        </Group>
-        <Text size="sm" c="dimmed" ta="center">
-          {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
-        </Text>
-        <Group gap="xs" justify="flex-end" wrap="nowrap">
-          <ComparisonRatingButtons comparison={comparison.data} />
-          {again.length > 1 &&
-            (phone ? (
-              <Tooltip label="Compare Again">
-                <ActionIcon
-                  variant="filled"
-                  aria-label="Compare Again"
-                  loading={compareAgain.isPending}
-                  onClick={() => compareAgain.mutate()}
-                >
-                  <icons.compare size={18} />
-                </ActionIcon>
-              </Tooltip>
-            ) : (
-              <Button
-                size="xs"
-                loading={compareAgain.isPending}
-                onClick={() => compareAgain.mutate()}
-              >
-                Compare Again
-              </Button>
-            ))}
-        </Group>
-      </div>
+        ) : (
+          <Button size="xs" loading={compareAgain.isPending} onClick={() => compareAgain.mutate()}>
+            Compare Again
+          </Button>
+        ))}
+    </Group>
+  );
+  return (
+    <Stack gap="md" className={classes.page} {...hold.handlers}>
+      {phone ? (
+        // Phones: back, title and summary beside the actions, then the layout switch full width.
+        <Stack gap="xs">
+          <Group justify="space-between" wrap="nowrap" gap="xs">
+            <Group gap="xs" wrap="nowrap" miw={0}>
+              {backButton}
+              <Stack gap={0} miw={0}>
+                {heading}
+                <Text size="xs" c="dimmed" truncate>
+                  {summary}
+                </Text>
+              </Stack>
+            </Group>
+            {actions}
+          </Group>
+          {layoutSwitch}
+        </Stack>
+      ) : (
+        <div className={classes.header}>
+          <Group gap="xs" wrap="nowrap" miw={0}>
+            {backButton}
+            {heading}
+            {layoutSwitch}
+          </Group>
+          <Text size="sm" c="dimmed" ta="center">
+            {summary}
+          </Text>
+          {actions}
+        </div>
+      )}
       {card && (
         <Text size="sm" c="dimmed">
           {`The winner joins ${card.name}'s images in Library.`}
