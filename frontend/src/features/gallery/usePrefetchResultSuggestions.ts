@@ -41,7 +41,8 @@ export function usePrefetchResultSuggestions(current?: MediaItem, reviewItems?: 
         await pending.current;
         if (cancelled) return;
         const key = JSON.stringify(query.queryKey);
-        if (attempted.current.has(key) && client.getQueryState(query.queryKey)) continue;
+        const state = client.getQueryState(query.queryKey);
+        if (attempted.current.has(key) && (state?.dataUpdatedAt || state?.errorUpdatedAt)) continue;
         attempted.current.add(key);
         pending.current = client.prefetchQuery(query);
       }
