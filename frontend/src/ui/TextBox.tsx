@@ -84,7 +84,10 @@ export function TextBox({
   hideTools?: boolean;
   /** Content under the box, such as assistant suggestions, that the phone editor shows too. */
   below?: ReactNode;
-  /** Edits in place on phones, for a surface that is itself full screen (the Generate sheet). */
+  /**
+   * Keeps an AI tool inside the box, and edits in place on phones within its form's tools bar or
+   * with its own sends (the Generate sheet).
+   */
   inline?: boolean;
   /** Rests on one line, ending in an ellipsis, and shows its whole text while focused. */
   oneLine?: boolean;
@@ -101,7 +104,22 @@ export function TextBox({
   }[];
 }) {
   const mobile = usePhone();
-  const phone = mobile && !inline;
+  const bar = useContext(TextToolsBar);
+  // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar. Such a
+  // box shows its tools there while typing. Its surface is known once it has mounted, before paint.
+  const [barred, setBarred] = useState(() => mobile && inline && bar !== null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    setBarred(
+      mobile &&
+        inline &&
+        bar !== null &&
+        bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]'),
+    );
+  }, [mobile, inline, bar]);
+  // A phone box edits in place only in its form's bar or beside its own sends; others open the editor.
+  const inPlace = mobile && inline && (barred || Boolean(submit));
+  const phone = mobile && !inPlace;
   const [editing, setEditing] = useState(false);
   const ai = tools?.some((tool) => tool.id === "assistant" || tool.icon === icons.assistant);
   const focusTool = (event: MouseEvent) => {
@@ -169,20 +187,7 @@ export function TextBox({
     </Button>
   );
   const editButtons = edits.map(editButton);
-  const bar = useContext(TextToolsBar);
   const [active, setActive] = useState(false);
-  const field = useRef<HTMLTextAreaElement>(null);
-  // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar. Such a
-  // box shows its tools there while typing. Its surface is known once it has mounted, before paint.
-  const [barred, setBarred] = useState(false);
-  useLayoutEffect(() => {
-    setBarred(
-      mobile &&
-        inline &&
-        bar !== null &&
-        bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]'),
-    );
-  }, [mobile, inline, bar]);
   const inBar = barred && active ? bar : null;
   const restingTools = barred && !active && !hideTools && Boolean(tools?.length || send);
   const spins =
@@ -262,7 +267,7 @@ export function TextBox({
   const toolsMenu = tools && tools.length > 0 && (
     <Menu
       // In place at rest, the button stands at the text's top, so the menu drops from it.
-      position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
+      position={inPlace && !inBar ? "bottom-end" : "top-end"}
       width={menuWidth}
       {...bounds}
       // Compact rows, as on desktop, keep the list short on a phone.
@@ -405,7 +410,7 @@ export function TextBox({
       {send}
     </div>
   );
-  const inlineAI = inline && ai && (!mobile || Boolean(submit));
+  const inlineAI = inline && ai && !barred;
   const inside = Boolean(!send && !hideTools && (inlineAI || (!mobile && props.label && tools)));
   const boxTools = (
     <div className={classes.tools}>
@@ -436,7 +441,7 @@ export function TextBox({
       {...props}
       ref={ref}
       description={description}
-      variant={mobile && inline ? "unstyled" : props.variant}
+      variant={inPlace ? "unstyled" : props.variant}
       // While the phone editor is open, it alone is the box.
       aria-hidden={editing || undefined}
       value={value}
@@ -503,7 +508,7 @@ export function TextBox({
       {(tools || send || submit || rightSection) && (
         <div className={`${classes.toolbar} ${classes.footerSurface}`} onMouseDown={keepFocus}>
           <div className={classes.editActions} role="group" aria-label={`${title} Tools`}>
-            {!inside && menu}
+            {(phone || !inside) && menu}
             {edits.filter((action) => action.id !== "clear").map(barEdit)}
             {!tools && !send && rightSection}
           </div>
@@ -556,9 +561,9 @@ export function TextBox({
     <>
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* AI tools remain available beside the summary before its phone editor opens. */}
-      {mobile && inline && submit ? (
+      {inPlace && submit ? (
         editor(textarea)
-      ) : mobile && inline ? (
+      ) : inPlace ? (
         // In place, the text fills the surface with its tools as icons in its corner, or only while
         // it has focus in its form's action bar.
         <div
@@ -603,7 +608,7 @@ export function TextBox({
       ) : (
         textarea
       )}
-      {!editing && !(mobile && inline) && below}
+      {!editing && !inPlace && below}
       {phone && (
         <Modal.Root
           opened={editing}

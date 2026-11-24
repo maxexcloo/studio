@@ -7,8 +7,22 @@ import { promptInstruction } from "../prompt-instructions.js";
  */
 export const diversity = { results: 20, floor: 0.2, alike: 0.9 };
 export const motifWindow = 12;
-export const recentPromptCharacters = 400;
+export const recentPromptCharacters = 1000;
 const motifFrequency = 2;
+/** A word shared by this many recent ideas' motif labels recurs, as a whole label does at two. */
+const motifWordFrequency = 3;
+/** Words too general to cool on their own, though labels holding them still count whole. */
+const generalMotifWords = new Set(
+  "background clothing color colors colour light lighting outfit palette photo photograph portrait scene shot style tone tones wear".split(
+    " ",
+  ),
+);
+/**
+ * Look terms over Dream's latest `window` prompts: one in at least `share` of them (and `least`
+ * times) is in fashion, and an idea reusing more than `reuse` of those repeats the look. Words in
+ * at least `boilerplate` of the recent prompts are a fixed style clause, not the idea.
+ */
+export const looks = { window: 30, share: 0.25, least: 3, reuse: 2, boilerplate: 0.5 };
 
 /** An idea sharing more than this share of its content words with a recent one is a repeat. */
 const repeatOverlap = 0.6;
@@ -143,6 +157,18 @@ const axes: Record<string, string[]> = {
     "chaotic",
     "lonely",
   ],
+  capture: [
+    "a candid phone snapshot",
+    "direct on-camera flash",
+    "35mm color film",
+    "black-and-white film",
+    "medium-format film",
+    "a disposable camera",
+    "soft window light",
+    "a long-lens street candid",
+    "an instant photo",
+    "a crisp digital editorial shot",
+  ],
   "camera or composition": [
     "extreme close-up",
     "wide establishing shot",
@@ -156,6 +182,78 @@ const axes: Record<string, string[]> = {
     "Dutch angle",
   ],
 };
+/**
+ * The looks Dream drifts towards: colors, garments, light and expressions. Plain black, white,
+ * grey and brown describe hair and everyday things too often to tell a look.
+ */
+const lookTerms: Record<string, string[]> = {
+  color:
+    "amber apricot beige blush burgundy camel caramel charcoal chocolate cobalt coral cream crimson emerald espresso fuchsia gold ivory khaki lavender lilac magenta maroon mauve mint mocha mustard navy ochre olive orange peach pink plum purple red rust saffron sage scarlet silver tan taupe teal terracotta turquoise violet wine yellow".split(
+      " ",
+    ),
+  garment: [
+    ..."blazer bodysuit bomber boots bralette bustier camisole cardigan corduroy corset denim fishnet halter heels hoodie jeans knit lace latex leather leggings linen lingerie mesh miniskirt overalls puffer ribbed satin sequin sheer silk stockings sundress sweater sweatshirt turtleneck velvet".split(
+      " ",
+    ),
+    "cargo pants",
+    "crop top",
+    "pleated skirt",
+    "slip dress",
+    "tank top",
+    "trench coat",
+    "tube top",
+    "zip-front",
+  ],
+  light: [
+    ..."backlit candlelight dappled dusk fluorescent halogen lamplight moonlight neon overcast sodium spotlight strobe sunset tungsten twilight".split(
+      " ",
+    ),
+    "blue hour",
+    "fairy lights",
+    "golden hour",
+    "on-camera flash",
+    "ring light",
+    "string lights",
+    "window light",
+  ],
+  expression: [
+    ..."bored calm coy deadpan dreamy grin laughing mischievous pensive playful pout serene sly smirk sultry wistful wry".split(
+      " ",
+    ),
+    "closed-lip smile",
+    "knowing look",
+    "soft smile",
+  ],
+};
+const lookPatterns = Object.values(lookTerms)
+  .flat()
+  .map((term) => [term, ` ${phraseWords(term)} `, ` ${phraseWords(term)}s `] as const);
+/** The look terms a prompt uses. */
+export function lookTermsIn(prompt: string) {
+  const words = ` ${phraseWords(prompt)} `;
+  return lookPatterns
+    .filter(([, one, more]) => words.includes(one) || words.includes(more))
+    .map(([term]) => term);
+}
+/**
+ * The look terms in fashion over the latest prompts, most used first, leaving out those the fixed
+ * brief or rules use.
+ */
+export function fashionableLooks(prompts: string[], fixed = "") {
+  const latest = prompts.slice(0, looks.window);
+  const required = new Set(lookTermsIn(fixed));
+  const counts = new Map<string, number>();
+  for (const prompt of latest)
+    for (const term of lookTermsIn(prompt)) counts.set(term, (counts.get(term) || 0) + 1);
+  return [...counts]
+    .filter(
+      ([term, count]) =>
+        !required.has(term) && count >= looks.least && count / latest.length >= looks.share,
+    )
+    .sort((a, b) => b[1] - a[1])
+    .map(([term]) => term);
+}
+
 const stopWords = new Set(
   "a an and are as at be by for from in into is it its of on or over the their there these this to under while with without".split(
     " ",
@@ -165,6 +263,32 @@ const contentWords = (text: string) =>
   new Set(
     (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter((word) => !stopWords.has(word)),
   );
+/** Words in at least `looks.boilerplate` of several recent prompts: a fixed clause, not the idea. */
+export function boilerplate(prompts: string[]) {
+  if (prompts.length < 4) return new Set<string>();
+  const counts = new Map<string, number>();
+  for (const prompt of prompts)
+    for (const word of contentWords(prompt)) counts.set(word, (counts.get(word) || 0) + 1);
+  return new Set(
+    [...counts]
+      .filter(([, count]) => count / prompts.length >= looks.boilerplate)
+      .map(([word]) => word),
+  );
+}
+/**
+ * A prompt without its opening sentences that are mostly `common` words, such as a style clause
+ * every prompt repeats; its last sentence always stays.
+ */
+export function promptBody(prompt: string, common: Set<string>) {
+  const sentences = prompt.split(/(?<=[.!?])\s+/);
+  let start = 0;
+  while (start < sentences.length - 1) {
+    const words = [...contentWords(sentences[start])];
+    if (words.length && words.filter((word) => common.has(word)).length / words.length < 0.7) break;
+    start++;
+  }
+  return sentences.slice(start).join(" ");
+}
 /** Jaccard overlap of two word sets. */
 function overlap(a: Set<string>, b: Set<string>) {
   let shared = 0;
@@ -276,11 +400,23 @@ export function ideaMotifs(value: unknown, prompt = "") {
   return [...new Set([...shownMotifs(shown), ...labels])].slice(0, 5);
 }
 
+/** Labels in at least two ideas, and their words in at least three (as "amber" in "amber glow"). */
 function recurringMotifs(history: string[][]) {
   const counts = new Map<string, number>();
-  for (const idea of history)
-    for (const motif of ideaMotifs(idea)) counts.set(motif, (counts.get(motif) || 0) + 1);
-  return [...counts].filter(([, count]) => count >= motifFrequency).map(([motif]) => motif);
+  const words = new Map<string, number>();
+  for (const idea of history) {
+    const motifs = ideaMotifs(idea);
+    for (const motif of motifs) counts.set(motif, (counts.get(motif) || 0) + 1);
+    for (const word of new Set(motifs.flatMap((motif) => [...contentWords(motif)])))
+      if (word.length > 2 && !generalMotifWords.has(word))
+        words.set(word, (words.get(word) || 0) + 1);
+  }
+  return [
+    ...new Set([
+      ...[...counts].filter(([, count]) => count >= motifFrequency).map(([motif]) => motif),
+      ...[...words].filter(([, count]) => count >= motifWordFrequency).map(([word]) => word),
+    ]),
+  ];
 }
 
 /**
@@ -313,10 +449,21 @@ export function repeatedMotif(prompt: string, cooling: string[], motifs: string[
   );
 }
 
+/** What an idea changes first, in turn, so successive ideas differ along different lines. */
+const varied = [
+  "palette: the colors and tones",
+  "garments: what people wear and its fabrics",
+  "light: the light source, its direction and color",
+  "expression: faces and mood",
+  "setting: where it happens",
+  "framing: the camera's distance, angle and lens",
+];
+
 /**
- * Draw away from recently used anchors as well as asking for a different concept. A project's
- * idea (`briefed`) keeps the brief's subjects and styles, so it varies only what the brief leaves
- * open.
+ * Draw away from recently used anchors as well as asking for a different concept, never towards
+ * what is excluded (`forbidden`). With a taste profile, the photographic capture stands in for
+ * subject and medium, and `vary` is the dimension the idea changes first. A project's idea
+ * (`briefed`) keeps the brief's subjects and styles, so it varies only what the brief leaves open.
  */
 export function direction(
   { explore, feature }: { explore?: boolean; feature?: string },
@@ -325,12 +472,20 @@ export function direction(
   hasTaste: boolean,
   random: (size: number) => number,
   briefed = false,
+  forbidden: string[] = [],
 ) {
   const words = recent.slice(0, diversity.results).map(contentWords);
-  const available = Object.entries(axes).filter(
-    ([axis]) => !(hasTaste || briefed) || (axis !== "subject" && axis !== "medium or style"),
+  const available = Object.entries({ ...axes, ...(briefed ? {} : { vary: varied }) }).filter(
+    ([axis]) =>
+      briefed
+        ? !["capture", "medium or style", "subject"].includes(axis)
+        : hasTaste
+          ? axis !== "subject" && axis !== "medium or style"
+          : axis !== "capture",
   );
-  const drawn = available.map(([axis, values]) => {
+  const draws = available.flatMap(([axis, all]) => {
+    const values = all.filter((value) => !forbidden.some((motif) => mentionsMotif(value, motif)));
+    if (!values.length) return [];
     const unused = values.filter((value) => !used.includes(`${axis}: ${value}`));
     const candidates = unused.length
       ? unused
@@ -342,10 +497,13 @@ export function direction(
     );
     const least = Math.min(...scores);
     const best = candidates.filter((_, index) => scores[index] === least);
-    return `${axis}: ${best[random(best.length)]}`;
+    return [`${axis}: ${best[random(best.length)]}`];
   });
+  const drawn = draws.filter((anchor) => !anchor.startsWith("vary: "));
+  const vary = draws.find((anchor) => anchor.startsWith("vary: "));
   return {
-    anchors: drawn,
+    anchors: vary ? [...drawn, vary] : drawn,
+    vary: vary?.slice("vary: ".length),
     text: briefed
       ? promptInstruction("project-diversity", { startingPoints: drawn.join("; ") })
       : promptInstruction("dream-diversity", {
@@ -374,8 +532,9 @@ export function freshConceptProblem(
   noveltyPrompts: string[],
   subjects: string[],
   fixed = "",
+  fashionable: string[] = [],
 ) {
-  const shared = contentWords(fixed);
+  const shared = new Set([...contentWords(fixed), ...boilerplate(recent)]);
   const varying = (text: string) =>
     new Set([...contentWords(text)].filter((word) => !shared.has(word)));
   const recentWords = noveltyPrompts.map(varying);
@@ -383,6 +542,9 @@ export function freshConceptProblem(
   return (prompt: string, title: string, motifs: string[], cooling: string[]) => {
     const repeat = repeatedMotif(prompt, cooling, motifs);
     if (repeat) return `The optional motif "${repeat}" has appeared in several recent ideas.`;
+    const reused = lookTermsIn(prompt).filter((term) => fashionable.includes(term));
+    if (reused.length > looks.reuse)
+      return `It reuses ${reused.join(", ")}, as many recent ideas do; choose other colors, garments, light and expressions.`;
     // Compared as remembered: shortened, as each recent prompt is.
     const head = clean(prompt, recentPromptCharacters);
     const words = varying(head);

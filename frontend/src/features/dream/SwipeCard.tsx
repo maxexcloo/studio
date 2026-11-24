@@ -9,6 +9,12 @@ import { useDreamPlayback } from "./DeckMedia";
 
 import classes from "./DreamPage.module.css";
 
+const solid = {
+  background: "var(--mantine-color-body)",
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
+};
+
 export type Direction = "left" | "right" | "up" | "down";
 /** Flies the card out in a direction; resolves once it has left. */
 export type Fly = (direction: Direction) => Promise<void>;
@@ -168,6 +174,8 @@ export function SwipeCard({
       ref={card}
       withBorder={!full}
       radius={full ? 0 : "lg"}
+      // Full screen is solid: glass under a fading modal shows its blur late in WebKit.
+      styles={full ? { root: solid } : undefined}
       className={classes.card}
       data-depth={depth}
       data-pair={Boolean(comparisonSize) || undefined}

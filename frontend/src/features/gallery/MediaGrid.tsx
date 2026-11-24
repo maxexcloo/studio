@@ -122,14 +122,14 @@ const layOut = (
   );
 
 /**
- * The part of the grid within a screen of the viewport, or of the `root` it scrolls in, in grid
- * coordinates, in steps so scrolling renders only as tiles come and go. Tiles have known sizes, so
- * nothing is measured.
+ * The part of the grid within `overscan` screens of the viewport, in grid coordinates.
+ * Round to steps so scrolling renders only as tiles come and go.
  */
 export function useWindowSpan(
   host: RefObject<HTMLDivElement | null>,
   height: number,
   root: HTMLElement | null = null,
+  overscan = 1,
 ) {
   const [span, setSpan] = useState({ top: 0, bottom: 0 });
   const measured = useRef(span);
@@ -143,8 +143,8 @@ export function useWindowSpan(
       const view = root ? root.clientHeight : window.innerHeight;
       const offset =
         (root?.getBoundingClientRect().top ?? 0) - host.current.getBoundingClientRect().top;
-      const top = Math.floor((offset - view) / step) * step;
-      const bottom = Math.ceil((offset + 2 * view) / step) * step;
+      const top = Math.floor((offset - overscan * view) / step) * step;
+      const bottom = Math.ceil((offset + (1 + overscan) * view) / step) * step;
       if (measured.current.top === top && measured.current.bottom === bottom) return;
       measured.current = { top, bottom };
       setSpan(measured.current);
@@ -160,7 +160,7 @@ export function useWindowSpan(
       scroller.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
-  }, [host, height, root]);
+  }, [host, height, root, overscan]);
   return span;
 }
 
@@ -210,7 +210,8 @@ export function MediaGrid({
     () => (width ? layOut(items, columns, cell, gap, byDay) : null),
     [items, columns, cell, gap, byDay, width],
   );
-  const span = useWindowSpan(host, layout?.height || 0);
+  const overscan = 2;
+  const span = useWindowSpan(host, layout?.height || 0, null, overscan);
   const places = useMemo(
     () =>
       layout && new Map(layout.tiles.map((tile, index) => [mediaIdentity(items[index]), tile.top])),
@@ -276,9 +277,8 @@ export function MediaGrid({
   const firstTile = layout ? firstAt(layout.tiles, span.top - layout.tallest) : 0;
   const lastTile = layout ? firstAt(layout.tiles, span.bottom) : 0;
   const within = (top: number, height: number) => top < span.bottom && top + height > span.top;
-  // The span reserves one viewport on either side. Give the visible tiles a head start.
-  const visibleTop = span.top + window.innerHeight;
-  const visibleBottom = span.bottom - window.innerHeight;
+  const visibleTop = span.top + overscan * window.innerHeight;
+  const visibleBottom = span.bottom - overscan * window.innerHeight;
   return (
     <>
       <div
