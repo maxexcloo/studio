@@ -251,7 +251,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
   // The story an MCP chat gave its set reaches the writer, then Prompt Writing's taste.
   assert.match(
     calls[0].messages[1].content,
-    /Story context.*series Aviary; notes: The bird was rescued from a storm\.[\s\S]*Their guidance: Keep the camera calm\.\nNever include: smoking/,
+    /Story context.*series Aviary; notes: The bird was rescued from a storm\.[\s\S]*Their guidance: Keep the camera calm\.\nNever include these or anything equivalent: smoking/,
   );
   // Dream's own clips keep only the Exclusions, which apply everywhere.
   await stage(
@@ -265,7 +265,10 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     },
     { signal: new AbortController().signal, onThinking() {}, onDelta() {} },
   );
-  assert.match(calls.at(-1).messages[1].content, /\nNever include: smoking$/);
+  assert.match(
+    calls.at(-1).messages[1].content,
+    /\nNever include these or anything equivalent: smoking$/,
+  );
   assert.doesNotMatch(calls.at(-1).messages[1].content, /Their guidance/);
   const uncensored = await writeAnimatePrompt({
     engine,

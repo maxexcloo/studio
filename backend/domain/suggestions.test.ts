@@ -274,7 +274,10 @@ test("updated account exclusions discard matching composer ideas", async () => {
     (await suggestions.suggest("alice", ask)).suggestions.map(({ label }) => label),
     ["Misty Jetty"],
   );
-  assert.match(calls.at(-1)![1].content, /Never include: laundry room/);
+  assert.match(
+    calls.at(-1)![1].content,
+    /Never include these or anything equivalent: laundry room/,
+  );
   assert.equal((await suggestions.suggest("bob", ask)).suggestions.length, 2);
 });
 

@@ -7781,15 +7781,19 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
       signals: 3,
     }),
   );
-  f.app.put(
-    "/api/taste",
-    record("taste", (req) => ({ preferences: req.body.preferences, signals: 3 })),
-  );
   f.app.post(
     "/api/loras/library/ops",
     record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "liked" } } }),
   );
   assert.deepEqual(data(await call(mine, "taste")), { exclusions: ["clowns"] });
+  f.app.post(
+    "/api/taste/reset",
+    record("taste-reset", { preferences: { exclusions: ["clowns"] } }),
+  );
+  assert.deepEqual(data(await call(mine, "taste", { action: "reset" })), {
+    exclusions: ["clowns"],
+  });
+  assert.equal(seen.at(-1).name, "taste-reset");
   assert.deepEqual(
     data(
       await call(mine, "taste", {
@@ -8448,10 +8452,10 @@ test("MCP preserves supplied prompts and removes what explicit exclusions name",
   });
   assert.match(texts(first), /user excludes[^:]*: smoking, laundry rooms/);
   assert.equal(f.submitted.at(-1).prompt, "A coat with buttons");
-  const cleaned = await call(client, "generate", { prompts: ["A red coat with an ashtray"] });
-  assert.match(texts(cleaned), /Removed for the user's Taste exclusions: "ashtray" \(smoking\)/);
+  const cleaned = await call(client, "generate", { prompts: ["A red coat, no smoking"] });
+  assert.match(texts(cleaned), /Removed for the user's Taste exclusions: "smoking"\./);
   assert.equal(f.submitted.at(-1).prompt, "A red coat");
-  assert.deepEqual(f.submitted.at(-1).excluded, ["ashtray"]);
+  assert.deepEqual(f.submitted.at(-1).excluded, ["smoking"]);
   const beforeRefusals = f.submitted.length;
   for (const [prompt, expected] of [
     ["Laundry rooms", /"Laundry rooms", which your Taste Profile excludes/],
