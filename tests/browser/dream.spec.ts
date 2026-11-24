@@ -1854,11 +1854,12 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
     return route.fulfill({ json: { text: "Soft morning light by the harbour." } });
   });
   await page.goto("/dream/projects");
-  // The empty view explains projects and offers New Project, as the toolbar does.
+  // The empty view explains projects; New Project stays in the toolbar.
   await expect(
     page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "New Project", exact: true }).last().click();
+  await expect(page.getByRole("button", { name: "New Project", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
   if (isMobile) await name.click();
