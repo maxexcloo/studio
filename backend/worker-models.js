@@ -103,7 +103,7 @@ export async function workerRadiance(body) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     },
-    modelLibraryWorker()?.url || "",
+    modelLibraryUrl(),
   );
 }
 
