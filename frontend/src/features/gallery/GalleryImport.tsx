@@ -246,7 +246,7 @@ export function GalleryImport({ upload }: { upload: ReturnType<typeof useGallery
               Administrators can also import Civitai and Hugging Face links into the Library.
             </Text>
             <TextInput
-              label="Link"
+              aria-label="Link"
               placeholder="https://…"
               type="url"
               required

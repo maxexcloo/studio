@@ -426,7 +426,7 @@ export function LibraryImports({
         >
           <Stack>
             <TextInput
-              label="Link"
+              aria-label="Link"
               description="A Civitai or Hugging Face model or file, or upload a recipe image instead."
               placeholder="https://civitai.com/models/…"
               data-autofocus

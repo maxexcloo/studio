@@ -516,7 +516,7 @@ function ResetPassword({
           yourself.
         </Text>
         <TextInput
-          label="Generated Password"
+          aria-label="Generated Password"
           value={generated}
           readOnly
           autoComplete="off"
@@ -541,7 +541,7 @@ function ResetPassword({
           tell them the new one yourself.
         </Text>
         <PasswordInput
-          label="New Password"
+          aria-label="New Password"
           autoComplete="new-password"
           minLength={8}
           required
