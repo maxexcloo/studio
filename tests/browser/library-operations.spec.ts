@@ -20,13 +20,16 @@ async function updates(page: Page, action: "Check" | "Update All") {
   await page.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
-test("The Library opens on Presets and groups Personal, Models and Prompting", async ({ page }) => {
+test("The Library opens on Presets and groups Personal, Models, Prompting and Templates", async ({
+  page,
+}) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
     Personal: ["Presets", "Characters", "Outfits", "Scenes"],
     Models: ["Files", "Imports", "LoRAs", "Profiles"],
-    Prompting: ["Guides", "Prompt Instructions", "Prompt Styles", "Suggestion Instructions"],
+    Prompting: ["Guides", "Instructions"],
+    Templates: ["Animate", "Edit & Recreate", "Improve Prompt"],
   };
   const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {

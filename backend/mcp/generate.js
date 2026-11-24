@@ -91,7 +91,7 @@ const stableJson = (value) =>
         )
       : item,
   );
-// The animation themes reuse takes (Library › Prompt Styles' enabled Animate records), checked at
+// The animation themes reuse takes (Library › Templates' enabled Animate records), checked at
 // call time like tier.
 const themeIds = () =>
   promptStyleStore()

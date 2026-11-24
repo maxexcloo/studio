@@ -249,7 +249,7 @@ const empty = <T = PromptIdea>(reason: string): Suggestions<T> => ({
   reason,
 });
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
-// The Library › Prompt Styles kind whose fixed options share a menu with each surface's steps.
+// The Library › Templates kind whose fixed options share a menu with each surface's steps.
 const fixedKinds = { viewer: "change", animate: "animate", draft: "improve" } as const;
 const sameLabel = (label: string) => label.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 /** Keeps the steps whose label none of `labels`, a menu's fixed options, already has. */
@@ -440,7 +440,7 @@ export function createSuggestions({
   draftReferences?: (ownerId: string, ids: string[]) => Promise<DraftReference[]>;
   /** The owner's text writer (account-policy.js `promptWriter`). */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
-  /** The labels of a Prompt Styles kind's fixed options, which suggestions never repeat. */
+  /** The labels of a Templates kind's fixed options, which suggestions never repeat. */
   fixed?: (kind: (typeof fixedKinds)[keyof typeof fixedKinds]) => string[];
   now?: () => number;
 }) {

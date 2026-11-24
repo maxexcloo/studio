@@ -76,7 +76,7 @@ export const profileStatsQuery = queryOptions({
   queryFn: () => api<{ profiles: Record<string, ProfileStats> }>("/api/stats/profiles"),
 });
 
-/** One of the assistant's fixed options, as Library › Prompt Styles edits it. */
+/** One of the assistant's fixed options, as Library › Templates edits it. */
 export interface PromptStyle {
   id: string;
   /** The menu it belongs to: Improve Prompt, Animate or fixed AI edits. */

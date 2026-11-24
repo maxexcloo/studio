@@ -479,7 +479,7 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   }
 });
 
-test("Prompt Styles sort by enabled, type and name, and can be filtered and edited", async ({
+test("Each Templates page lists its menu's templates by enabled and name, and edits them", async ({
   page,
 }) => {
   await fixtures(page);
@@ -512,17 +512,10 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Prompt Styles");
-  const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
+  await section(page, "Library", "Improve Prompt");
+  const table = page.getByRole("table", { name: "Improve Prompt Templates", exact: true });
   const names = table.getByRole("button", { name: /^Edit / });
-  await expect(names).toHaveText(["Cinematic Camera", "Bold Uncensored", "Candid"]);
-  await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
-  await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
-  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  const type = page.getByRole("radiogroup", { name: "Type", exact: true });
-  await type.getByText("Improve Prompt", { exact: true }).click();
-  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  await expect(table.getByText("Bold line.")).toBeVisible();
+  await expect(names).toHaveText(["Bold Uncensored", "Candid"]);
   await expect(table.getByText("Cinematic Camera", { exact: true })).toBeHidden();
   // A switch applies at once, over the list's hash. Its track takes the pointer, as it has no
   // visible label, so the click goes to the switch directly.
@@ -532,21 +525,19 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
   expect(saves[0].styles[0]).toMatchObject({ id: "candid", enabled: false });
   await expect(table.getByRole("switch", { name: "Enable Candid", exact: true })).not.toBeChecked();
 
-  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  await type.getByText("Animate", { exact: true }).click();
-  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  await page.getByRole("button", { name: "New Style", exact: true }).click();
-  const creating = page.getByRole("dialog", { name: "New Prompt Style", exact: true });
-  await expect(creating.getByRole("radio", { name: "Animate", exact: true })).toBeChecked();
+  await section(page, "Library", "Animate");
+  const animate = page.getByRole("table", { name: "Animate Templates", exact: true });
+  await page.getByRole("button", { name: "New Template", exact: true }).click();
+  const creating = page.getByRole("dialog", { name: "New Template", exact: true });
   await creating.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(page.getByRole("button", { name: "New Style", exact: true })).toBeFocused();
-  // Editing keeps the style's ID and kind and saves in a dialog.
-  await table.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
+  await expect(page.getByRole("button", { name: "New Template", exact: true })).toBeFocused();
+  // Editing keeps the template's ID and kind and saves in a dialog.
+  await animate.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
   await page
     .getByRole("menu", { name: "Actions for Cinematic Camera", exact: true })
     .getByRole("menuitem", { name: "Edit", exact: true })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Edit Prompt Style", exact: true });
+  const dialog = page.getByRole("dialog", { name: "Edit Template", exact: true });
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
   await dialog
     .getByRole("radiogroup", { name: "Offered To", exact: true })
@@ -560,7 +551,7 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
     description: "A moving camera.",
     uncensored: true,
   });
-  await expect(table.getByText("A moving camera.")).toBeVisible();
+  await expect(animate.getByText("A moving camera.")).toBeVisible();
 });
 
 test("Library edits a background prompt and reads the saved version back", async ({ page }) => {
@@ -598,8 +589,8 @@ test("Library edits a background prompt and reads the saved version back", async
   );
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Prompt Instructions");
-  const table = page.getByRole("table", { name: "Prompt Instructions", exact: true });
+  await section(page, "Library", "Instructions");
+  const table = page.getByRole("table", { name: "Instructions", exact: true });
   const open = async () => {
     await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();

@@ -18,12 +18,7 @@ import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import {
-  FilterChoices,
-  SectionHeader,
-  SectionToolbar,
-  ToolbarAction,
-} from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useReturnFocus } from "../../ui/useReturnFocus";
@@ -73,13 +68,6 @@ function newId(label: string, taken: string[]) {
 type Kind = PromptStyle["kind"];
 /** A style's ID is unique within its menu; a refetch replaces the objects an open dialog holds. */
 const same = (a: PromptStyle, b: PromptStyle) => a.id === b.id && a.kind === b.kind;
-/** Each kind's menu, in the order the section lists them. */
-const kinds: { value: Kind; label: string }[] = [
-  { value: "animate", label: "Animate" },
-  { value: "change", label: "Edit & Recreate" },
-  { value: "improve", label: "Improve Prompt" },
-];
-const kindLabel = (kind: Kind) => kinds.find((entry) => entry.value === kind)!.label;
 
 function StyleEditor({
   style,
@@ -125,7 +113,7 @@ function StyleEditor({
     <Modal
       opened
       onClose={close}
-      title={style ? "Edit Prompt Style" : "New Prompt Style"}
+      title={style ? "Edit Template" : "New Template"}
       fullScreen={phone}
     >
       <form
@@ -136,15 +124,6 @@ function StyleEditor({
       >
         <Stack>
           {mutation.error && <Alert color="red">{mutation.error.message}</Alert>}
-          {!style && (
-            <SegmentedControl
-              aria-label="Menu"
-              fullWidth
-              data={kinds.map(({ value, label }) => ({ value, label }))}
-              value={draft.kind}
-              onChange={(value) => change({ kind: value as Kind })}
-            />
-          )}
           {draft.kind === "change" && (
             <Input.Wrapper label="Show In">
               <SegmentedControl
@@ -215,13 +194,20 @@ function StyleEditor({
   );
 }
 
-/** Library › Prompt Styles: the assistant's fixed options, by name, with a Type filter. */
-export function PromptStyles({ heading }: { heading: ReactNode }) {
+/** Library › Templates: one menu's templates (Animate, Edit & Recreate or Improve Prompt), by name. */
+export function PromptTemplates({
+  kind,
+  label,
+  heading,
+}: {
+  kind: Kind;
+  label: string;
+  heading: ReactNode;
+}) {
   const client = useQueryClient();
   const list = useQuery(promptStylesQuery);
   const [query, setQuery] = useState("");
-  const [kind, setKind] = useState<Kind | null>(null);
-  const [editing, setEditing] = useState<{ style: PromptStyle | null; kind: Kind } | null>(null);
+  const [editing, setEditing] = useState<PromptStyle | null | undefined>();
   const [deleting, setDeleting] = useState<PromptStyle | null>(null);
   const { save, refresh } = useSaveStyles();
   const styles = list.data?.styles || [];
@@ -249,32 +235,18 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
     <Stack gap="md">
       <SectionHeader heading={heading}>
         <SectionToolbar
-          label="Prompt Styles"
+          label={label}
           query={query}
           onQueryChange={setQuery}
-          filters={
-            <FilterChoices
-              label="Type"
-              data={kinds}
-              value={kind}
-              onChange={(value) => setKind(value as Kind | null)}
-            />
-          }
-          filterCount={Number(!!kind)}
-          onClearFilters={() => setKind(null)}
           actions={
-            <ToolbarAction
-              label="New Style"
-              icon={icons.add}
-              onClick={() => setEditing({ style: null, kind: kind ?? "improve" })}
-            />
+            <ToolbarAction label="New Template" icon={icons.add} onClick={() => setEditing(null)} />
           }
         />
       </SectionHeader>
       {list.data?.meta?.aiDrafted && (
         <Alert color="orange" title="AI Draft">
           <Stack gap="xs" align="start">
-            <Text size="sm">These styles were drafted in chat. Review them, then approve.</Text>
+            <Text size="sm">These templates were drafted in chat. Review them, then approve.</Text>
             <Button size="compact-sm" loading={approve.isPending} onClick={() => approve.mutate()}>
               Approve
             </Button>
@@ -285,21 +257,17 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
         <Alert color="red">{list.error.message}</Alert>
       ) : (
         <DataTable
-          label="Prompt Styles"
-          // Sorted by type and name first, so the stable Enabled sort keeps that order within it.
+          label={label}
+          // Sorted by name first, so the stable Enabled sort keeps that order within it.
           rows={styles
-            .filter((style) => !kind || style.kind === kind)
-            .sort(
-              (a, b) =>
-                compareNames(kindLabel(a.kind), kindLabel(b.kind)) ||
-                compareNames(a.label, b.label),
-            )}
+            .filter((style) => style.kind === kind)
+            .sort((a, b) => compareNames(a.label, b.label))}
           rowKey={(style) => `${style.kind}:${style.id}`}
           rowName={(style) => style.label}
-          loading={list.isPending && "Loading Prompt Styles"}
+          loading={list.isPending && "Loading Templates"}
           query={query}
           searchText={(style) => [style.label, style.description, style.instruction]}
-          empty="No Prompt Styles"
+          empty="No Templates"
           initialSort={{ key: "enabled", descending: false }}
           columns={[
             {
@@ -326,16 +294,6 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
               ),
             },
             {
-              key: "kind",
-              header: "Type",
-              sortValue: (style) => kindLabel(style.kind),
-              cell: (style) => (
-                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
-                  {kindLabel(style.kind)}
-                </Text>
-              ),
-            },
-            {
               key: "name",
               header: "Name",
               sortValue: (style) => style.label,
@@ -359,17 +317,14 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                   }
                   detail={style.description}
                   openLabel={`Edit ${style.label}`}
-                  onOpen={() => setEditing({ style, kind: style.kind })}
+                  onOpen={() => setEditing(style)}
                 />
               ),
             },
           ]}
           rowActions={(style) => (
             <>
-              <Menu.Item
-                leftSection={<icons.edit size={16} />}
-                onClick={() => setEditing({ style, kind: style.kind })}
-              >
+              <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => setEditing(style)}>
                 Edit
               </Menu.Item>
               <Menu.Divider />
@@ -384,17 +339,17 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
           )}
         />
       )}
-      {editing && (
+      {editing !== undefined && (
         <StyleEditor
-          style={editing.style}
-          kind={editing.kind}
+          style={editing}
+          kind={kind}
           styles={styles}
-          close={() => setEditing(null)}
+          close={() => setEditing(undefined)}
         />
       )}
       <ConfirmDialog
         opened={!!deleting}
-        title="Delete Style"
+        title="Delete Template"
         action="Delete"
         pending={remove.isPending}
         error={remove.error?.message}

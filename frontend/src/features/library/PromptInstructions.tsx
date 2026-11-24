@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Box,
   Button,
   Code,
@@ -212,24 +213,20 @@ function InstructionEditor({
   );
 }
 
-export function PromptInstructions({
-  section,
-  heading,
-}: {
-  section: "promptInstructions" | "suggestionInstructions";
-  heading: ReactNode;
-}) {
-  const { label } = librarySections[section];
+/** Library › Instructions: every writer's instruction, suggestion ones flagged, by type and name. */
+export function PromptInstructions({ heading }: { heading: ReactNode }) {
+  const { label } = librarySections.instructions;
   const list = useQuery(promptInstructionsQuery);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState<string | null>(null);
+  const [suggests, setSuggests] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     instruction: PromptInstruction;
     restored?: string;
   } | null>(null);
   const [versions, setVersions] = useState<PromptInstruction | null>(null);
   const instructions = (list.data?.instructions ?? []).filter(
-    ({ suggestions }) => Boolean(suggestions) === (section === "suggestionInstructions"),
+    ({ suggestions }) => !suggests || Boolean(suggestions) === (suggests === "suggestions"),
   );
   const areas = [...new Set(instructions.map(({ area }) => area))].sort();
   const phone = usePhone();
@@ -241,15 +238,29 @@ export function PromptInstructions({
           query={query}
           onQueryChange={setQuery}
           filters={
-            <FilterChoices
-              label="Type"
-              data={areas.map((value) => ({ value, label: value }))}
-              value={area}
-              onChange={setArea}
-            />
+            <>
+              <FilterChoices
+                label="Type"
+                data={areas.map((value) => ({ value, label: value }))}
+                value={area}
+                onChange={setArea}
+              />
+              <FilterChoices
+                label="Writes"
+                data={[
+                  { value: "prompts", label: "Prompts & Text" },
+                  { value: "suggestions", label: "Suggestions" },
+                ]}
+                value={suggests}
+                onChange={setSuggests}
+              />
+            </>
           }
-          filterCount={Number(area !== null)}
-          onClearFilters={() => setArea(null)}
+          filterCount={Number(area !== null) + Number(suggests !== null)}
+          onClearFilters={() => {
+            setArea(null);
+            setSuggests(null);
+          }}
         />
       </SectionHeader>
       {list.error ? (
@@ -286,7 +297,16 @@ export function PromptInstructions({
               sortValue: ({ label }) => label,
               cell: (instruction) => (
                 <TableRecord
-                  name={instruction.label}
+                  name={
+                    <>
+                      {instruction.label}{" "}
+                      {instruction.suggestions && (
+                        <Badge component="span" size="sm" color="gray">
+                          Suggestions
+                        </Badge>
+                      )}
+                    </>
+                  }
                   openLabel={`Edit ${instruction.label}`}
                   onOpen={() => setEditing({ instruction })}
                 />

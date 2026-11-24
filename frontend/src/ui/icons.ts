@@ -247,7 +247,7 @@ export const icons = {
   project: FolderOpen,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
-  /** The assistant's styles and templates (Library › Prompt Styles). */
+  /** The assistant's styles and templates (Library › Templates). */
   promptStyles: SwatchBook,
   queue: List,
   /** Running an item again (Recreate). */
@@ -302,7 +302,7 @@ export const icons = {
   stop: filled(Square),
   /** Studio-wide settings an administrator sets (Settings › Studio). */
   studio: SlidersVertical,
-  /** The instructions behind Suggestions (Library › Suggestion Instructions). */
+  /** The instructions behind Suggestions (Library › Instructions). */
   suggestionInstructions: Lightbulb,
   /** Super Like: accepting a Dream result and rating it Liked. */
   superLike: Heart,
