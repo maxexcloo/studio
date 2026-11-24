@@ -80,12 +80,13 @@
 /* Hovering or keyboard focus reveals a tile's overlays, as it does its actions
    (MediaTileActions.module.css): they fade in at the motion speed and out at the exit speed. */
 .caption,
-.metadata,
+.sourceBadge,
+.timestamp,
 .videoPreview {
   transition: opacity var(--studio-motion-exit) var(--studio-ease-exit);
 }
 
-.tile:is(:hover, :has(:focus-visible)) :is(.caption, .metadata, .videoPreview) {
+.tile:is(:hover, :has(:focus-visible)) :is(.caption, .sourceBadge, .timestamp, .videoPreview) {
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
@@ -244,7 +245,9 @@
 }
 
 @media (hover: hover) {
-  :where(:root:not([data-phone])) .tile:not(:hover, :has(:focus-visible)) .metadata {
+  :where(:root:not([data-phone]))
+    .tile:not(:hover, :has(:focus-visible))
+    :is(.sourceBadge, .timestamp) {
     opacity: 0;
   }
 }
