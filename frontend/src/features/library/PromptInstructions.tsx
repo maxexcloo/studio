@@ -1,6 +1,5 @@
 import {
   Alert,
-  Badge,
   Box,
   Button,
   Code,
@@ -231,10 +230,14 @@ export function PromptInstructions({
     restored?: string;
   } | null>(null);
   const [versions, setVersions] = useState<PromptInstruction | null>(null);
-  const instructions = (list.data?.instructions ?? []).filter(
+  const inArea = (list.data?.instructions ?? []).filter((instruction) => instruction.area === area);
+  // Writes is a filter and a column only where the page holds both kinds.
+  const mixed = new Set(inArea.map(({ suggestions }) => Boolean(suggestions))).size > 1;
+  const writes = ({ suggestions }: PromptInstruction) =>
+    suggestions ? "Suggestions" : "Prompts & Text";
+  const instructions = inArea.filter(
     (instruction) =>
-      instruction.area === area &&
-      (!suggests || Boolean(instruction.suggestions) === (suggests === "suggestions")),
+      !mixed || !suggests || Boolean(instruction.suggestions) === (suggests === "suggestions"),
   );
   const phone = usePhone();
   return (
@@ -244,19 +247,21 @@ export function PromptInstructions({
           label={label}
           query={query}
           onQueryChange={setQuery}
-          filters={
-            <FilterChoices
-              label="Writes"
-              data={[
-                { value: "prompts", label: "Prompts & Text" },
-                { value: "suggestions", label: "Suggestions" },
-              ]}
-              value={suggests}
-              onChange={setSuggests}
-            />
-          }
-          filterCount={Number(suggests !== null)}
-          onClearFilters={() => setSuggests(null)}
+          {...(mixed && {
+            filters: (
+              <FilterChoices
+                label="Writes"
+                data={[
+                  { value: "prompts", label: "Prompts & Text" },
+                  { value: "suggestions", label: "Suggestions" },
+                ]}
+                value={suggests}
+                onChange={setSuggests}
+              />
+            ),
+            filterCount: Number(suggests !== null),
+            onClearFilters: () => setSuggests(null),
+          })}
         />
       </SectionHeader>
       {list.error ? (
@@ -281,18 +286,25 @@ export function PromptInstructions({
               cell: (instruction) => (
                 <TableRecord
                   name={instruction.label}
-                  flags={
-                    instruction.suggestions && (
-                      <Badge size="sm" color="gray">
-                        Suggestions
-                      </Badge>
-                    )
-                  }
                   openLabel={`Edit ${instruction.label}`}
                   onOpen={() => setEditing({ instruction })}
                 />
               ),
             },
+            ...(mixed
+              ? [
+                  {
+                    key: "writes",
+                    header: "Writes",
+                    sortValue: writes,
+                    cell: (instruction: PromptInstruction) => (
+                      <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                        {writes(instruction)}
+                      </Text>
+                    ),
+                  },
+                ]
+              : []),
             {
               key: "version",
               header: "Version",
