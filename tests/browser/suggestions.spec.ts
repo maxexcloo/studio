@@ -183,7 +183,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   const held = [0, 1].map(() => new Promise<void>((resolve) => release.push(resolve)));
   await page.route("**/api/suggestions", async (route) => {
     const body = route.request().postDataJSON();
-    if (body.surface === "composer") return route.fallback();
+    if (body.surface !== "viewer" || body.action !== "edit") return route.fallback();
     asked.push(body);
     await held[body.fresh ? 1 : 0];
     return route.fulfill({ json: { suggestions: body.fresh ? others : steps } });
@@ -218,7 +218,6 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
       action: "edit",
       jobId: "job-hub",
       fresh: false,
-      prompt: "An amber bird",
       itemId: "hub",
     },
   ]);
@@ -232,7 +231,6 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
     action: "edit",
     jobId: "job-hub",
     fresh: true,
-    prompt: "An amber bird",
     itemId: "hub",
   });
   // Custom… asks for the change in a box of its own, leaving the prompt as it was.
@@ -298,7 +296,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   const instruction = "Warm the light on the bird, keeping everything else unchanged.";
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
-    if (body.surface === "composer") return route.fallback();
+    if (body.surface !== "viewer" && body.surface !== "change") return route.fallback();
     if (body.surface === "viewer") {
       suggestionActions.push(body.action);
       return route.fulfill({ json: { suggestions: steps } });
@@ -326,6 +324,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
     await viewer.getByRole("button", { name: "AI", exact: true }).click();
     return page.getByRole("menu").first();
   };
+  await expect.poll(() => suggestionActions).toEqual(["recreate", "edit"]);
   let menu = await openAI();
   await expect(menu.getByRole("radio", { name: "Recreate", exact: true })).toBeChecked();
   await expandAssistantMenu(menu, "Templates");
@@ -334,7 +333,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   await backToActionMenu(menu);
   await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
-  expect(suggestionActions).toEqual(["recreate"]);
+  expect(suggestionActions).toEqual(["recreate", "edit"]);
   await expect(prompt).toHaveValue(steps[0].prompt);
   expect(asked).toEqual([
     expect.objectContaining({
@@ -367,7 +366,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   await backToActionMenu(menu);
   await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
-  expect(suggestionActions.at(-1)).toBe("edit");
+  expect(suggestionActions).toEqual(["recreate", "edit", "recreate", "edit"]);
   await expect(prompt).toHaveValue(instruction);
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
   expect(asked.at(-1)).toMatchObject({
@@ -494,9 +493,9 @@ test("Animate offers motions written for the image, then its templates and Custo
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  // Motions are asked for only once the menu opens.
   await expect(viewer.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
-  expect(asked).toEqual([]);
+  const warmed = { surface: "animate", jobId: "job-hub", fresh: false, itemId: "hub" };
+  await expect.poll(() => asked).toEqual([warmed]);
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu").first();
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
@@ -515,6 +514,7 @@ test("Animate offers motions written for the image, then its templates and Custo
   await expect(templateRows).toBeHidden();
   const ideaRows = menu.getByRole("group", { name: "Suggestions", exact: true });
   await expect(ideaRows.getByRole("menuitem")).toHaveText(motion.map((idea) => idea.label).sort());
+  expect(asked).toEqual([warmed]);
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.writing).toMatchObject({

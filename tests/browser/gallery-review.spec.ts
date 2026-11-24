@@ -141,7 +141,7 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
     if (body.surface === "composer") return route.fallback();
     if (body.surface === "change")
       return route.fulfill({ json: { suggestions: [], reason: "No matching change" } });
-    asked.push(body.itemId);
+    asked.push(`${body.itemId}:${body.action || body.surface}`);
     return route.fulfill({
       json: {
         suggestions: [
@@ -159,10 +159,21 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
   const deck = page.getByRole("region", { name: "Review", exact: true });
   const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card.getByText("Review Result 0", { exact: true })).toBeVisible();
-  await expect.poll(() => asked).toEqual(results.slice(1, 6).map(({ id }) => id));
+  const warmed = (count: number) =>
+    results
+      .slice(0, count)
+      .flatMap(({ id }) => ["viewer", "recreate", "edit", "animate"].map((mode) => `${id}:${mode}`))
+      .sort();
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(6));
+  expect(asked.slice(0, 4)).toEqual([
+    "review-0:viewer",
+    "review-0:recreate",
+    "review-0:edit",
+    "review-0:animate",
+  ]);
   await deck.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(card.getByText("Review Result 1", { exact: true })).toBeVisible();
-  await expect.poll(() => asked).toEqual(results.slice(1).map(({ id }) => id));
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(7));
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
   const chosen = page.waitForRequest(
@@ -174,7 +185,7 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
     itemId: "review-1",
     request: "change the light",
   });
-  expect(asked).toEqual(results.slice(1).map(({ id }) => id));
+  expect([...asked].sort()).toEqual(warmed(7));
 });
 
 test("Video Review opened directly leaves for the video gallery", async ({ page }) => {

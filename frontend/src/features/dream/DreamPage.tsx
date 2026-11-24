@@ -23,6 +23,7 @@ import { plural } from "../../ui/plural";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
+import { reviewSuggestionCount } from "../gallery/usePrefetchResultSuggestions";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamAllocation } from "./DreamAllocation";
@@ -30,7 +31,6 @@ import { DreamDeck, type Judgement } from "./DreamDeck";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
-import { reviewSuggestionCount } from "./DreamSuggestions";
 import { DreamWeek } from "./DreamWeek";
 import {
   type Dream,

@@ -38,7 +38,7 @@ export type ViewerAsk = {
 export interface ViewerDraftActions {
   /** The current prompt, when changed, and the prompt to base suggestions on. */
   changedPrompt?: string;
-  suggestionPrompt: string;
+  suggestionPrompt?: string;
   pending: boolean;
   pick: (action: ViewerChange, request: string, profileId?: string) => void;
   custom: (action: ViewerChange, profileId?: string) => void;
@@ -91,9 +91,10 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
       }
     />
   );
+  const base = ask.typed ?? prompt;
   const draft: ViewerDraftActions = {
     changedPrompt: prompt.trim() !== original.trim() ? prompt.trim() : undefined,
-    suggestionPrompt: ask.typed ?? prompt,
+    suggestionPrompt: base === original ? undefined : base,
     pending: ask.pending,
     pick,
     custom: openCustom,
@@ -113,7 +114,7 @@ export function ViewerPrompt({
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
 }) {
-  const { item, original, prompt, setPrompt, field, ask, custom, openCustom } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom, draft, openCustom } = state;
   const assistant = useQuery(assistantQuery).data;
   const change = ask.proposal;
   const [mode, setMode] = useRemembered<ViewerChange>("viewer-prompt-change", "recreate");
@@ -182,8 +183,7 @@ export function ViewerPrompt({
             }),
           ],
           onOpen: () => {
-            const typed = ask.typed ?? prompt;
-            setRequested({ itemId: item.id, prompt: typed !== original ? typed : undefined });
+            setRequested({ itemId: item.id, prompt: draft.suggestionPrompt });
           },
         },
       ]

@@ -22,6 +22,7 @@ import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
+import { usePrefetchResultSuggestions } from "../gallery/usePrefetchResultSuggestions";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
@@ -30,7 +31,7 @@ import { type DeckCard, type PairDeckCard, cardIds, deckCards, deckPrefetch } fr
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
 import { CardText, DreamPreview } from "./DreamPreview";
-import { DreamSuggestions, usePrefetchReviewSuggestions } from "./DreamSuggestions";
+import { DreamSuggestions } from "./DreamSuggestions";
 import { PairContent } from "./PairCard";
 import {
   type DreamItem,
@@ -286,7 +287,7 @@ export function DreamDeck({
     : deckCards(items, { depth: 6, media, current });
   const cards = coming.slice(0, 3);
   const [top] = cards;
-  usePrefetchReviewSuggestions(libraryItems, top?.key);
+  usePrefetchResultSuggestions(top?.kind === "library" ? top.item : undefined, libraryItems);
   if (top !== current) setCurrent(top);
   const requestedSide =
     viewing?.key === top?.key

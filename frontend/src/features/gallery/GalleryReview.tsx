@@ -5,8 +5,8 @@ import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { EmptyState } from "../../ui/EmptyState";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { DreamDeck, type Judgement } from "../dream/DreamDeck";
-import { reviewSuggestionCount } from "../dream/DreamSuggestions";
 import { type GalleryListing, type GalleryReviewRating, galleryReviewQuery } from "./queries";
+import { reviewSuggestionCount } from "./usePrefetchResultSuggestions";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
 import classes from "../dream/DreamPage.module.css";

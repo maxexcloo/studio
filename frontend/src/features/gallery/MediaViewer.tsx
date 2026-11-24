@@ -41,6 +41,7 @@ import { setMembers, setPosition } from "./resultSets";
 import type { SwipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
+import { usePrefetchResultSuggestions } from "./usePrefetchResultSuggestions";
 import { useVideoSound } from "./useVideoSound";
 import { playVideo } from "./videoPlayback";
 import { VideoPlayButton } from "./VideoPlayButton";
@@ -282,6 +283,7 @@ export function MediaViewer({
   const canNavigate = !!navigate && currentIndex >= 0 && viewable.length > 1;
   const showTogether = together && sideBySide && canNavigate && !phone;
   useNeighbourPrefetch(viewable, currentIndex);
+  usePrefetchResultSuggestions(!bare && !actions ? item : undefined);
   const gestureClick = useRef(false);
   const [compare, setCompare] = useState(false);
   const [localDetails, setLocalDetails] = useState(false);
