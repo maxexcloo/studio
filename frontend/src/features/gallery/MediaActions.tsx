@@ -592,9 +592,9 @@ export function useMediaActions(
           loading: assistant.isPending,
           settings: [
             length,
+            ...(modifiers.offered.length ? [modifiers.settingsAction()] : []),
             ...animateProfiles,
             ...reviewItems,
-            ...(modifiers.offered.length ? [modifiers.settingsAction()] : []),
           ],
           suggestions: motionsOffered ? motions : undefined,
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
