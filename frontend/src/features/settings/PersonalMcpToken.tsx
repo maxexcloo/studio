@@ -1,6 +1,6 @@
 import { Alert, Badge, Button, Group, Text } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
@@ -24,7 +24,8 @@ export interface McpTokenStatus {
  * row actions, then Rotate and Revoke in the Danger Zone. The token loads while the section shows,
  * hidden until Show, so Copy works within the tap.
  */
-export function PersonalMcpToken() {
+/** The MCP group, then `children` (a sibling group sorted after it), then its Danger Zone. */
+export function PersonalMcpToken({ children }: { children?: ReactNode }) {
   const client = useQueryClient();
   const visible = useSettingsSection() === "account";
   const visit = useRef(0);
@@ -146,6 +147,7 @@ export function PersonalMcpToken() {
           <CopyButton size="compact-sm" text={withToken} aria-label="Copy URL with Token" />
         </SettingRow>
       </SettingGroup>
+      {children}
       {status.data?.enabled && (
         <SettingGroup danger>
           {/* The milder action first, as Delete comes last. */}

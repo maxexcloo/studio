@@ -182,7 +182,7 @@ export function DataTable<T>({
   const shown = columns.filter(
     (column) => !folded.includes(column) && !(phone && column.hideOnPhone),
   );
-  if (loading) return <LoadingState label={loading} />;
+  if (loading) return <LoadingState fill={compact} view={!compact} label={loading} />;
   const matching = filterTableRows(rows, query, searchText);
   if (!matching.length) {
     const line = rows.length ? "No Matches" : empty;

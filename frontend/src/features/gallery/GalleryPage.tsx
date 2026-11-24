@@ -34,6 +34,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { lazyLoaded } from "../../ui/lazyLoaded";
 import { LoadingState } from "../../ui/LoadingState";
 import { SelectToggle } from "../../ui/SelectToggle";
+import { useFailureBanner } from "../../ui/useFailureBanner";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
@@ -46,7 +47,12 @@ import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { preferencesQuery } from "../settings/accountPreferences";
 import { ChatSetPicker } from "./ChatSetPicker";
-import { ShowToggles, emptyGalleryFilters } from "./GalleryFilters";
+import {
+  type GalleryFilterValues,
+  ShowToggles,
+  emptyGalleryFilters,
+  ratingChoices,
+} from "./GalleryFilters";
 import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
@@ -138,9 +144,7 @@ export function GalleryPage() {
   const location = useLocation();
   const comparisonRating =
     galleryRouteView(location.pathname) === "comparisons" &&
-    ["?rating=liked", "?rating=unrated", "?rating=disliked", "?rating=all"].includes(
-      location.search,
-    );
+    ["?rating=liked", "?rating=unrated", "?rating=disliked"].includes(location.search);
   if ((location.search && !comparisonRating) || location.pathname === "/video") {
     const { pathname, state } = cleanLocation(location);
     return <Navigate to={pathname} state={state} replace />;
@@ -397,6 +401,7 @@ function Gallery() {
       return first;
     },
   });
+  useFailureBanner(refresh.error);
   const { refetch: readFirst } = refresh;
   const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
@@ -853,6 +858,19 @@ function Gallery() {
         ...(saved.choices.length ? [saved.choices] : []),
       ]}
       actions={routeView ? [] : saved.actions}
+      rating={
+        routeView
+          ? undefined
+          : {
+              value: filters.rating || "all",
+              choices: ratingChoices,
+              onChange: (rating) =>
+                setFilters({
+                  ...filters,
+                  rating: rating === "all" ? "" : (rating as GalleryFilterValues["rating"]),
+                }),
+            }
+      }
       onChange={showView}
     />
   );
@@ -1015,17 +1033,19 @@ function Gallery() {
               : []),
           ]}
           toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
-          select={
-            // Select stays in place, pressed while selecting; pressing it again ends selection.
-            <SelectToggle
-              {...(phone ? iconChipProps : chipProps)}
-              ref={selectionButton}
-              selecting={selection.selecting}
-              disabled={!loaded.length && !selection.selecting}
-              onClick={selection.selecting ? doneSelecting : selection.start}
-            />
+          actions={
+            <>
+              <GalleryImport upload={upload} />
+              {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
+              <SelectToggle
+                {...(phone ? iconChipProps : chipProps)}
+                ref={selectionButton}
+                selecting={selection.selecting}
+                disabled={!loaded.length && !selection.selecting}
+                onClick={selection.selecting ? doneSelecting : selection.start}
+              />
+            </>
           }
-          actions={<GalleryImport upload={upload} />}
         />
         {selectionBar}
       </div>
@@ -1045,7 +1065,12 @@ function Gallery() {
         <Alert color="red" title="Couldn't Load the Gallery">
           <Stack gap="sm" align="flex-start">
             {gallery.error.message}
-            <Button size="compact-sm" variant="default" onClick={() => void gallery.refetch()}>
+            <Button
+              size="compact-sm"
+              variant="default"
+              disabled={gallery.isFetching}
+              onClick={() => void gallery.refetch()}
+            >
               Retry
             </Button>
           </Stack>
@@ -1123,21 +1148,6 @@ function Gallery() {
                   ? "No Videos"
                   : "No Images"}
         </EmptyState>
-      )}
-      {refresh.isError && (
-        <Alert color="red" title="Couldn't Update the Gallery">
-          <Stack gap="sm" align="flex-start">
-            {refresh.error.message}
-            <Button
-              size="compact-sm"
-              variant="default"
-              loading={refresh.isFetching}
-              onClick={refreshFirst}
-            >
-              Retry
-            </Button>
-          </Stack>
-        </Alert>
       )}
       <MorePages listing={gallery} results={listingScope} paused={!!itemId || !!review} />
       {!selection.selecting && (

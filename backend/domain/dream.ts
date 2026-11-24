@@ -919,6 +919,8 @@ export function createDream(options: {
       height: number;
       extend?: string;
       backend: "local" | "cloud";
+      /** Seconds per clip; 0 is Auto. */
+      seconds: number;
       allowUncensored: boolean;
       unavailable: ReadonlySet<string>;
       choose?: (profiles: DreamProfile[]) => DreamProfile | undefined;
@@ -3431,6 +3433,7 @@ export function createDream(options: {
     try {
       choice = await options.videoProfile(ownerId, access.account, {
         backend: record.settings.videoBackend,
+        seconds: record.settings.videoSeconds,
         allowUncensored: record.settings.uncensored && access.uncensored,
         width: Number(item.width) || 0,
         height: Number(item.height) || 0,
@@ -3577,6 +3580,7 @@ export function createDream(options: {
     try {
       choice = await options.videoProfile(ownerId, access.account, {
         backend: record.settings.videoBackend,
+        seconds: record.settings.videoSeconds,
         allowUncensored,
         ...size,
         unavailable: failing,

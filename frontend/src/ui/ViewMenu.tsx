@@ -13,6 +13,7 @@ export function ViewMenu<T extends string>({
   value,
   groups,
   actions = [],
+  rating,
   onChange,
   onOpen,
   describedBy,
@@ -27,6 +28,12 @@ export function ViewMenu<T extends string>({
     /** How many items the view holds, once known. */
     count?: number;
   }[])[];
+  /** A setting for the views, checked like them, in its own section after the first group. */
+  rating?: {
+    value: string;
+    choices: readonly { value: string; label: string }[];
+    onChange: (value: string) => void;
+  };
   /** Actions on the views, after a divider: saving the one shown, say. */
   actions?: { label: string; disabled?: boolean; onClick: () => void }[];
   onChange: (value: T) => void;
@@ -62,6 +69,26 @@ export function ViewMenu<T extends string>({
       <Menu.Dropdown>
         {groups.map((choices, index) => (
           <Fragment key={index}>
+            {index === 1 && rating && (
+              <>
+                <Menu.Divider />
+                {rating.choices.map((choice) => (
+                  <Menu.Item
+                    key={choice.value}
+                    aria-label={choice.label}
+                    rightSection={
+                      <Check
+                        size={14}
+                        visibility={choice.value === rating.value ? undefined : "hidden"}
+                      />
+                    }
+                    onClick={() => rating.onChange(choice.value)}
+                  >
+                    {choice.label}
+                  </Menu.Item>
+                ))}
+              </>
+            )}
             {index > 0 && <Menu.Divider />}
             {choices.map((choice) => (
               <Menu.Item

@@ -754,9 +754,7 @@ export async function fixtures(page: Page) {
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
           (rating
             ? i.rating === rating
-            : url.searchParams.get("includeDisliked") === "1" ||
-              (!similar && sort === "disliked") ||
-              i.rating !== "disliked") &&
+            : (!similar && sort === "disliked") || i.rating !== "disliked") &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (url.searchParams.get("drifted") !== "1" || i.identity?.drifted) &&
@@ -1362,21 +1360,20 @@ export async function showGalleryView(
 /** Shows Liked, Uploads or the unfiltered Gallery. */
 export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") {
   await showGalleryView(page, choice === "Uploads" ? "Uploads" : "Gallery");
-  // Liked is a Filters choice, shown as a removable chip while on.
+  // Liked is a view menu rating, shown as a removable chip while on.
   const chip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
   if ((await chip.count()) > 0 !== (choice === "Liked"))
     await filterGalleryRating(page, choice === "Liked" ? "Liked" : "All");
   await expect(chip).toHaveCount(choice === "Liked" ? 1 : 0);
 }
 
-/** Chooses the gallery's Rating filter in its Filters popup. */
-export async function filterGalleryRating(page: Page, name: "All" | "Liked" | "Disliked") {
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page
-    .getByRole("radiogroup", { name: "Rating", exact: true })
-    .getByText(name, { exact: true })
-    .click();
-  await page.keyboard.press("Escape");
+/** Chooses the gallery's rating in its view menu. */
+export async function filterGalleryRating(
+  page: Page,
+  name: "All" | "Disliked" | "Liked" | "Unrated",
+) {
+  await page.getByRole("button", { name: "Gallery View", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
 }
 
 /** Shows the reference picker's Uploads tab, which lists uploaded images. */

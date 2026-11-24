@@ -9,6 +9,7 @@ import {
   resolutions,
   videoResolutions,
 } from "../../../../shared/resolution";
+import { LoadFailed } from "../../ui/LoadFailed";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
@@ -26,22 +27,23 @@ import {
   useSavePreferences,
 } from "./accountPreferences";
 
-/** The model a side uses until the account picks one. */
-const studioDefault = "Studio Default";
+/** The choice of no preference, listed first and shown selected. */
+const studioDefault = "Default (Studio)";
+const profileDefault = { value: "", label: "Default (Profile)" };
+const runs = { images: "images run", text: "writing runs", videos: "videos run" } as const;
 const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
 const kinds: { kind: WorkKind | "dream"; label: string; description?: string }[] = [
-  { kind: "images", label: "Images" },
+  { kind: "images", label: "Images", description: "Applies to image generation and edits." },
   { kind: "videos", label: "Videos", description: "Applies to video generation and Animate." },
+  { kind: "dream", label: "Dream" },
   {
     kind: "text",
     label: "Text",
-    description:
-      "Applies to writing and captions, including Dream. Local shares a GPU with images.",
+    description: "Applies to writing and captions. Local shares a GPU with images.",
   },
-  { kind: "dream", label: "Dream" },
 ];
 
 function DreamProcessing({ label }: { label: string }) {
@@ -51,7 +53,7 @@ function DreamProcessing({ label }: { label: string }) {
     <SettingGroup title={label}>
       {!data ? (
         error ? (
-          <Alert color="red">{error.message}</Alert>
+          <LoadFailed error={error}>Couldn't Load Dream</LoadFailed>
         ) : (
           <LoadingState label="Loading Dream" fill />
         )
@@ -102,7 +104,7 @@ export function WhereWorkRuns() {
   const save = useSavePreferences();
   if (!status)
     return error ? (
-      <Alert color="red">{error.message}</Alert>
+      <LoadFailed error={error}>Couldn't Load Where Work Runs</LoadFailed>
     ) : (
       <LoadingState fill label="Loading Where Work Runs" />
     );
@@ -117,13 +119,17 @@ export function WhereWorkRuns() {
       (model) => model.startsWith("local/") === (side === "local"),
     );
     return (
-      <SettingRow key={key} wide label={name}>
+      <SettingRow
+        key={key}
+        wide
+        label={name}
+        description={`Used when ${runs[kind]} ${side === "cloud" ? "in the cloud" : "on this machine"}.`}
+      >
         {kind === "text" ? (
           <TextModelSelect
             name={name}
             models={text}
             unset={studioDefault}
-            clearable
             value={value}
             onChange={choose}
           />
@@ -132,7 +138,6 @@ export function WhereWorkRuns() {
             field
             name={name}
             unset={studioDefault}
-            clearable
             profiles={(profiles || []).filter(
               (profile) =>
                 profile.kind === (kind === "images" ? "image" : "video") &&
@@ -175,19 +180,20 @@ export function WhereWorkRuns() {
                   label="Default Aspect"
                   description={
                     kind === "images"
-                      ? "The starting shape for image drafts when the model supports it."
-                      : "The starting shape for new video drafts. A start frame can set the shape."
+                      ? "The starting shape for image drafts, where supported."
+                      : "The starting shape for video drafts. A start frame can override it."
                   }
                 >
                   <Select
                     aria-label="Default Aspect"
-                    placeholder="Profile Default"
-                    data={[...(kind === "images" ? imageAspects : grokVideoAspects)]}
+                    data={[
+                      profileDefault,
+                      ...(kind === "images" ? imageAspects : grokVideoAspects),
+                    ]}
                     value={
-                      (kind === "images" ? preferences.imageAspect : preferences.videoAspect) ??
-                      null
+                      (kind === "images" ? preferences.imageAspect : preferences.videoAspect) ?? ""
                     }
-                    clearable
+                    allowDeselect={false}
                     onChange={(choice) =>
                       save.mutate(
                         kind === "images"
@@ -204,17 +210,19 @@ export function WhereWorkRuns() {
                   <SettingRow
                     wide
                     label="Default Count"
-                    description="How many images new image drafts make when the model can make several."
+                    description="How many images new drafts make, where the model can."
                   >
                     <Select
                       aria-label="Default Count"
-                      data={Array.from({ length: maxImageCount }, (_, index) => ({
-                        value: String(index + 1),
-                        label: plural(index + 1, "Image"),
-                      }))}
-                      placeholder="Profile Default"
-                      value={preferences.imageCount ? String(preferences.imageCount) : null}
-                      clearable
+                      data={[
+                        profileDefault,
+                        ...Array.from({ length: maxImageCount }, (_, index) => ({
+                          value: String(index + 1),
+                          label: plural(index + 1, "Image"),
+                        })),
+                      ]}
+                      value={preferences.imageCount ? String(preferences.imageCount) : ""}
+                      allowDeselect={false}
                       onChange={(choice) =>
                         save.mutate({ imageCount: choice ? Number(choice) : null })
                       }
@@ -226,20 +234,19 @@ export function WhereWorkRuns() {
                   label="Default Resolution"
                   description={
                     kind === "images"
-                      ? "The starting resolution for image drafts when the model supports it."
-                      : "The starting resolution for new video drafts. Animate uses it when the model offers a resolution setting."
+                      ? "The starting resolution for image drafts, where supported."
+                      : "The starting resolution for video drafts and Animate."
                   }
                 >
                   <Select
                     aria-label="Default Resolution"
-                    placeholder="Profile Default"
-                    data={[...(kind === "images" ? resolutions : videoResolutions)]}
+                    data={[profileDefault, ...(kind === "images" ? resolutions : videoResolutions)]}
                     value={
                       (kind === "images"
                         ? preferences.imageResolution
-                        : preferences.videoResolution) ?? null
+                        : preferences.videoResolution) ?? ""
                     }
-                    clearable
+                    allowDeselect={false}
                     onChange={(choice) =>
                       save.mutate(
                         kind === "images"

@@ -552,15 +552,17 @@ export function DreamDeck({
         ) : (
           empty
         )}
-        <Box
-          ref={stage}
-          role="group"
-          aria-label={quickRating ? "Rating Actions" : "Dream Actions"}
-          className={classes.buttons}
-          mt="auto"
-        >
-          {undoButton}
-        </Box>
+        {history.length > 0 && (
+          <Box
+            ref={stage}
+            role="group"
+            aria-label={quickRating ? "Rating Actions" : "Dream Actions"}
+            className={classes.buttons}
+            mt="auto"
+          >
+            {undoButton}
+          </Box>
+        )}
       </>
     );
   const labels = verdictLabels(top, quickRating);

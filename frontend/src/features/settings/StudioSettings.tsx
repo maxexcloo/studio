@@ -63,7 +63,7 @@ export function StudioSettings() {
         <ProfileSelect
           field
           name={label}
-          unset="First Ready Profile"
+          unset="Default (First Ready)"
           profiles={profiles.filter((profile) => offered.some((item) => item.id === profile.id))}
           value={setting.configured || null}
           onChange={(profile) => save.mutate({ key: setting.key, value: profile?.id ?? "" })}
@@ -95,6 +95,8 @@ export function StudioSettings() {
   });
   return (
     <Stack gap="lg">
+      <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
+      {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
       <SettingGroup title="Defaults">
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
@@ -110,7 +112,7 @@ export function StudioSettings() {
           <TextModelSelect
             name="Text Profile"
             models={defaults.textModels}
-            unset="Gateway Default"
+            unset="Default (Gateway)"
             value={defaults.text.configured || null}
             onChange={(model) => save.mutate({ key: defaults.text.key, value: model ?? "" })}
             disabled={
@@ -119,8 +121,6 @@ export function StudioSettings() {
           />
         </SettingRow>
       </SettingGroup>
-      <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
-      {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
       <SettingGroup danger>
         <DeleteFailedItems />
       </SettingGroup>

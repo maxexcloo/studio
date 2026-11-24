@@ -578,7 +578,8 @@ test("Imports switch views by what they need: Download All Missing, substitutes 
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  // Needs Action opens first, grouped by what each import needs.
+  // Installed opens first; Needs Action groups imports by what each needs.
+  await chooseView(page, "Imports", "Needs Action");
   await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
   const needs = page.getByRole("region", { name: "Missing Files · 1", exact: true });
   await expect(needs).toContainText("missing.safetensors: Not downloaded yet");
@@ -715,6 +716,7 @@ test("Bulk accepting visible substitutes keeps the failed choice selected for re
     return route.fulfill({ json: { import: record } });
   });
   await page.goto("/library#imports");
+  await chooseView(page, "Imports", "Needs Action");
   const search = await toolbarSearch(page, "Imports");
   await search.fill("Close Recipe");
   const table = page.getByRole("table", { name: "Substitutes", exact: true });
@@ -879,6 +881,7 @@ test("Library shows import grades and what each imported image is missing", asyn
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An unsaved owl");
   await page.goto("/library#imports");
+  await chooseView(page, "Imports", "Needs Action");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(
     page.getByText("watercolour.safetensors: Not downloaded yet", { exact: true }),

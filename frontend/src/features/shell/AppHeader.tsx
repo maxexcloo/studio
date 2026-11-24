@@ -148,7 +148,21 @@ export function AppHeader({ mode }: { mode: string }) {
     >
       <FinishedAway />
       <Group gap={phone ? 4 : "sm"} wrap="nowrap">
-        <Link to="/images" replace={mode === "/images"} className={classes.home}>
+        <Link
+          to="/images"
+          replace={mode === "/images"}
+          className={classes.home}
+          onClick={(event) => {
+            // Already on the gallery: the logo returns to its top rather than navigating.
+            if (location.pathname !== "/images") return;
+            event.preventDefault();
+            const smooth =
+              getComputedStyle(document.documentElement).getPropertyValue(
+                "--studio-scroll-behavior",
+              ) === "smooth" && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+            window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "instant" });
+          }}
+        >
           <StudioLogo order={2} />
         </Link>
         <StatusAction />

@@ -63,6 +63,7 @@ export function ComparePage() {
   const client = useQueryClient();
   const stage = useStageComparison();
   const phone = usePhone();
+  const [savedLayout, setLayout] = useRemembered<Layout | null>("compare-layout", null);
   const [open, setOpen] = useState<MediaItem | null>(null);
   const items = (comparison.data?.variants || []).flatMap((variant) =>
     variant.item ? [variant.item] : [],
@@ -137,7 +138,12 @@ export function ComparePage() {
       <Alert color="red" title="Couldn't Load the Comparison">
         <Stack gap="sm" align="flex-start">
           {comparison.error.message}
-          <Button variant="subtle" onClick={() => void comparison.refetch()}>
+          <Button
+            size="compact-sm"
+            variant="default"
+            disabled={comparison.isFetching}
+            onClick={() => void comparison.refetch()}
+          >
             Retry
           </Button>
         </Stack>
@@ -159,6 +165,9 @@ export function ComparePage() {
       },
     ];
   });
+  const canSplit = splitImages.length >= 2;
+  const layout: Layout =
+    savedLayout && (savedLayout !== "split" || canSplit) ? savedLayout : phone ? "scroll" : "side";
   const again = againItems(comparison.data);
   // The tallest variant sets the shared width in Side by Side.
   const aspects = items.flatMap((item) =>
@@ -167,7 +176,7 @@ export function ComparePage() {
   const aspect = aspects.length ? Math.min(...aspects) : 1;
   return (
     <Stack gap="md" className={classes.page} {...hold.handlers}>
-      <Group justify="space-between" wrap="nowrap" gap="sm">
+      <Group justify="space-between" wrap={phone ? "wrap" : "nowrap"} gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
           <Tooltip label={backLabel}>
             <ActionIcon
@@ -190,6 +199,17 @@ export function ComparePage() {
           </Title>
         </Group>
         <Group gap="xs" justify="flex-end" wrap="nowrap">
+          <SegmentedControl
+            aria-label="Compare Layout"
+            size="xs"
+            value={layout}
+            onChange={(value) => setLayout(value as Layout)}
+            data={[
+              { value: "side", label: "Side by Side" },
+              { value: "scroll", label: "Scroll" },
+              ...(canSplit ? [{ value: "split", label: "Split" }] : []),
+            ]}
+          />
           <Text size="sm" c="dimmed" ta="right">
             {[plural(variants.length, "Variant"), seed && `Seed ${seed}`]
               .filter(Boolean)
@@ -227,8 +247,8 @@ export function ComparePage() {
       {(prompt || negative) && (
         <Stack gap={4}>
           {prompt && (
-            <Text size="sm" lineClamp={3}>
-              Prompt: {prompt}
+            <Text size="sm" c="dimmed" lineClamp={3}>
+              {prompt}
             </Text>
           )}
           {negative && (
@@ -238,7 +258,13 @@ export function ComparePage() {
           )}
         </Stack>
       )}
-      <Variants count={variants.length} aspect={aspect} splitImages={splitImages}>
+      <Variants
+        key={layout}
+        layout={layout}
+        count={variants.length}
+        aspect={aspect}
+        splitImages={splitImages}
+      >
         {variants.map(({ jobId, label, item }) => {
           const won = comparison.data.winnerItemId === item?.id;
           return (
@@ -318,7 +344,7 @@ export function ComparePage() {
               )}
               {!prompt && item?.prompt && (
                 <Text size="xs" c="dimmed" lineClamp={3}>
-                  Prompt: {item.prompt}
+                  {item.prompt}
                 </Text>
               )}
               {negative === undefined && item?.negative && (
@@ -382,6 +408,7 @@ function SplitVariants({ images }: { images: SplitImage[] }) {
             first={first}
             second={second}
             inPage
+            captions={images.length <= 2}
             width={second.width}
             height={second.height}
           />
@@ -395,21 +422,19 @@ function SplitVariants({ images }: { images: SplitImage[] }) {
  * The variants side by side, one at a time in a swiped row, or two finished images under one split.
  */
 function Variants({
+  layout,
   count,
   aspect,
   splitImages,
   children,
 }: {
+  layout: Layout;
   count: number;
   aspect: number;
   splitImages: SplitImage[];
   children: ReactNode;
 }) {
-  const phone = usePhone();
   const { columns: gallery } = useGalleryColumns();
-  const [saved, setLayout] = useRemembered<Layout | null>("compare-layout", null);
-  const canSplit = splitImages.length >= 2;
-  const layout = saved && (saved !== "split" || canSplit) ? saved : phone ? "scroll" : "side";
   const track = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(0);
   const columns = Math.min(count, gallery);
@@ -421,49 +446,33 @@ function Variants({
   };
   return (
     <Stack gap="xs">
-      <Group justify="space-between" wrap="nowrap">
-        <SegmentedControl
-          aria-label="Compare Layout"
-          size="xs"
-          value={layout}
-          onChange={(value) => {
-            setShown(0);
-            setLayout(value as Layout);
-          }}
-          data={[
-            { value: "side", label: "Side by Side" },
-            { value: "scroll", label: "Scroll" },
-            ...(canSplit ? [{ value: "split", label: "Split" }] : []),
-          ]}
-        />
-        {layout === "scroll" && (
-          <Group gap="xs" wrap="nowrap">
-            <Tooltip label="Previous Variant">
-              <ActionIcon
-                variant="default"
-                aria-label="Previous Variant"
-                disabled={shown === 0}
-                onClick={() => move(-1)}
-              >
-                <icons.previous size={20} />
-              </ActionIcon>
-            </Tooltip>
-            <Text size="sm" c="dimmed" aria-live="polite">
-              {shown + 1} of {count}
-            </Text>
-            <Tooltip label="Next Variant">
-              <ActionIcon
-                variant="default"
-                aria-label="Next Variant"
-                disabled={shown === count - 1}
-                onClick={() => move(1)}
-              >
-                <icons.next size={20} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        )}
-      </Group>
+      {layout === "scroll" && (
+        <Group justify="flex-end" gap="xs" wrap="nowrap">
+          <Tooltip label="Previous Variant">
+            <ActionIcon
+              variant="default"
+              aria-label="Previous Variant"
+              disabled={shown === 0}
+              onClick={() => move(-1)}
+            >
+              <icons.previous size={20} />
+            </ActionIcon>
+          </Tooltip>
+          <Text size="sm" c="dimmed" aria-live="polite">
+            {shown + 1} of {count}
+          </Text>
+          <Tooltip label="Next Variant">
+            <ActionIcon
+              variant="default"
+              aria-label="Next Variant"
+              disabled={shown === count - 1}
+              onClick={() => move(1)}
+            >
+              <icons.next size={20} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      )}
       {layout === "split" ? (
         <SplitVariants images={splitImages} />
       ) : layout === "side" ? (

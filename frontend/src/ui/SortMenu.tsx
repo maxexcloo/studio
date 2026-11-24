@@ -1,6 +1,6 @@
 import { ActionIcon, Menu } from "@mantine/core";
 import { Check } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, type ReactElement } from "react";
 
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
@@ -17,12 +17,15 @@ export function SortMenu<Sort extends string>({
   value,
   onChange,
   withinPortal = false,
+  trigger,
 }: {
   label: string;
   groups: readonly Partial<Record<Sort, string>>[];
   value: Sort;
   onChange: (sort: Sort) => void;
   withinPortal?: boolean;
+  /** Replaces the subtle icon button, for a toolbar of bordered chips. */
+  trigger?: ReactElement;
 }) {
   const selected = groups.find((group) => group[value])?.[value];
   return (
@@ -34,9 +37,11 @@ export function SortMenu<Sort extends string>({
     >
       <PopupTooltip label={selected || label}>
         <Menu.Target>
-          <ActionIcon aria-label={label} variant="subtle" color="gray">
-            <icons.sort size={18} />
-          </ActionIcon>
+          {trigger ?? (
+            <ActionIcon aria-label={label} variant="subtle" color="gray">
+              <icons.sort size={18} />
+            </ActionIcon>
+          )}
         </Menu.Target>
       </PopupTooltip>
       <Menu.Dropdown aria-label={label}>

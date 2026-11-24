@@ -15,6 +15,8 @@ import { useAppearancePreference } from "./features/settings/accountPreferences"
 import { singleEntry } from "./singleEntry";
 import { AppearanceProvider } from "./ui/Appearance";
 import "./ui/popupClicks";
+import { reloadOnce } from "./ui/reloadOnce";
+import { RootErrorBoundary } from "./ui/RootErrorBoundary";
 import { usePhone } from "./ui/usePhone";
 
 declare module "@tanstack/react-query" {
@@ -96,6 +98,8 @@ function AppNotifications() {
     />
   );
 }
+// A deploy replaces the chunk files an open tab still points at.
+window.addEventListener("vite:preloadError", reloadOnce);
 // Keep iOS history gestures from taking over Studio's swipes.
 document.addEventListener(
   "touchstart",
@@ -161,14 +165,16 @@ const fontReady = Promise.race([
 ]).catch(() => {});
 void fontReady.then(() =>
   createRoot(document.getElementById("root")!).render(
-    <QueryClientProvider client={client}>
-      <AccountAppearance>
-        {/* Stream updates must not keep declarative route changes in a pending transition. */}
-        <HistoryRouter history={routerHistory} useTransitions={false}>
-          <App />
-        </HistoryRouter>
-        <AppNotifications />
-      </AccountAppearance>
-    </QueryClientProvider>,
+    <RootErrorBoundary>
+      <QueryClientProvider client={client}>
+        <AccountAppearance>
+          {/* Stream updates must not keep declarative route changes in a pending transition. */}
+          <HistoryRouter history={routerHistory} useTransitions={false}>
+            <App />
+          </HistoryRouter>
+          <AppNotifications />
+        </AccountAppearance>
+      </QueryClientProvider>
+    </RootErrorBoundary>,
   ),
 );

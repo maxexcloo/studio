@@ -35,11 +35,11 @@ import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
 type Resource = NonNullable<ImportRecord["resources"]>[number];
 
-/** The toolbar's views, attention first; Needs Action keeps a group per audit. */
+/** The toolbar's views: Installed opens, then the rest by name; Needs Action keeps a group per audit. */
 const views = [
-  { value: "action", label: "Needs Action" },
-  { value: "busy", label: "In Progress" },
   { value: "ready", label: "Installed" },
+  { value: "busy", label: "In Progress" },
+  { value: "action", label: "Needs Action" },
 ];
 const actionGroups: { audit: ImportRecord["audit"]; title: string }[] = [
   { audit: "needs-files", title: "Missing Files" },
@@ -261,12 +261,7 @@ export function LibraryImports({
   });
   const records = imports.data?.imports || [];
   const stale = records.filter((record) => record.stale).length;
-  // The first view with imports opens and stays put as they move between views.
-  const view =
-    chosenView ??
-    views.find(({ value }) => records.some((record) => viewOf(record) === value))?.value ??
-    "ready";
-  if (!chosenView && imports.data) setView(view);
+  const view = chosenView ?? "ready";
   const inView = records.filter((record) => viewOf(record) === view);
   const failed = importing.error || uploading.error;
   const offered = records

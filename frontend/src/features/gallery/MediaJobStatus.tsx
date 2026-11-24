@@ -70,7 +70,7 @@ export function MediaJobStatus({
             <Button
               size="sm"
               leftSection={<icons.refresh size={16} />}
-              loading={queue.isFetching}
+              disabled={queue.isFetching}
               onClick={() => void queue.refetch()}
             >
               Refresh
@@ -122,7 +122,7 @@ export function MediaJobStatus({
               variant="subtle"
               size="compact-sm"
               leftSection={<icons.refresh size={16} />}
-              loading={queue.isFetching}
+              disabled={queue.isFetching}
               onClick={() => void queue.refetch()}
             >
               Refresh

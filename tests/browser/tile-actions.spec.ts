@@ -110,13 +110,9 @@ test("Dislike hides a tile, and can be cleared from the Disliked filter", async 
   await expect.poll(() => state.gallery[0].rating).toBe("disliked");
   // Undo is offered while the dislike's notification shows.
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
-  // Disliked is one of the filters, shown as a removable chip while on.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page
-    .getByRole("radiogroup", { name: "Rating", exact: true })
-    .getByText("Disliked", { exact: true })
-    .click();
-  await page.keyboard.press("Escape");
+  // Disliked is a rating in the view menu, shown as a removable chip while on.
+  await page.getByRole("button", { name: "Gallery View", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Disliked", exact: true }).click();
   await expect(tile).toBeVisible();
   await select();
   await selectionAction(page, "Dislike").click();
