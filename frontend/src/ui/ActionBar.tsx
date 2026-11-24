@@ -12,7 +12,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import {
   type ComponentProps,
   Fragment,
@@ -26,6 +26,7 @@ import {
 
 import { menuWidth, popupMiddlewares } from "../theme";
 import { icons } from "./icons";
+import { ChosenMark } from "./NameWithFlags";
 import { PopupTooltip } from "./PopupTooltip";
 import { useVisibleRect } from "./useKeyboard";
 import { usePhone, useTouch } from "./usePhone";
@@ -385,7 +386,7 @@ function MenuRows({
                   className={classes.switch}
                 />
               ) : checked || selected ? (
-                <Check size={14} />
+                <ChosenMark chosen />
               ) : (
                 action.marker && <action.marker size={14} aria-hidden />
               )

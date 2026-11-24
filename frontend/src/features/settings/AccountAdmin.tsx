@@ -29,6 +29,7 @@ import { CopyButton } from "../../ui/CopyButton";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { NameWithFlags } from "../../ui/NameWithFlags";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
@@ -44,7 +45,7 @@ const featureLabels: Record<string, { label: string; description: string }> = {
     label: "Characters",
     description: "Character cards that add their images and description to a prompt",
   },
-  cloudModels: { label: "Cloud Models", description: "Every cloud-provider profile" },
+  cloudModels: { label: "Cloud Models", description: "Every cloud-provider model" },
   dream: { label: "Dream", description: "The Dream deck of drawn ideas" },
   loras: { label: "LoRAs", description: "Style and subject adapters for compatible models" },
   promptAssistant: {
@@ -53,7 +54,7 @@ const featureLabels: Record<string, { label: string; description: string }> = {
   },
   uncensoredModels: {
     label: "Uncensored Models",
-    description: "Profiles marked uncensored and uncensored prompt styles and Dream themes",
+    description: "Models marked uncensored, and uncensored templates and Dream themes",
   },
 };
 const features = Object.entries(featureLabels);
@@ -323,24 +324,28 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
             sortValue: (group) => group.name,
             cell: (group) => (
               <>
-                <Group gap="xs" wrap="nowrap">
-                  <Anchor
-                    component="button"
-                    type="button"
-                    size="sm"
-                    fw={500}
-                    ta="start"
-                    aria-label={`Edit ${group.name}`}
-                    onClick={() => setEditing(group)}
-                  >
-                    {group.name}
-                  </Anchor>
-                  {group.id === data.defaultAccessProfileId && (
-                    <Badge miw="max-content" color="gray">
-                      Default
-                    </Badge>
-                  )}
-                </Group>
+                <NameWithFlags
+                  name={
+                    <Anchor
+                      component="button"
+                      type="button"
+                      size="sm"
+                      fw={500}
+                      ta="start"
+                      aria-label={`Edit ${group.name}`}
+                      onClick={() => setEditing(group)}
+                    >
+                      {group.name}
+                    </Anchor>
+                  }
+                  flags={
+                    group.id === data.defaultAccessProfileId && (
+                      <Badge miw="max-content" color="gray">
+                        Default
+                      </Badge>
+                    )
+                  }
+                />
                 <Text size="xs" c="dimmed">
                   {group.allModels
                     ? "All local models"
@@ -688,26 +693,37 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               <>
                 {/* Its badges follow the name; phones keep the group on the same line. */}
                 <Group gap="xs" wrap="nowrap" justify="space-between">
-                  <Group gap={4} wrap="nowrap" miw={0}>
-                    <Text size="sm" fw={500} truncate miw={0}>
-                      {account.username}
-                    </Text>
-                    {(account.disabled || account.role === "administrator") && (
-                      <Badge miw="max-content" color={account.disabled ? "red" : "gray"}>
-                        {account.disabled ? "Disabled" : "Administrator"}
-                      </Badge>
-                    )}
-                    {account.signInLinked && (
-                      <Badge miw="max-content" color="gray">
-                        Single Sign-On
-                      </Badge>
-                    )}
-                    {identitiesOf(account).length > 0 && (
-                      <Badge miw="max-content" color="gray">
-                        Chat Gateway
-                      </Badge>
-                    )}
-                  </Group>
+                  <NameWithFlags
+                    name={
+                      <Text size="sm" fw={500} truncate miw={0}>
+                        {account.username}
+                      </Text>
+                    }
+                    flags={
+                      (account.disabled ||
+                        account.role === "administrator" ||
+                        account.signInLinked ||
+                        identitiesOf(account).length > 0) && (
+                        <>
+                          {(account.disabled || account.role === "administrator") && (
+                            <Badge miw="max-content" color={account.disabled ? "red" : "gray"}>
+                              {account.disabled ? "Disabled" : "Administrator"}
+                            </Badge>
+                          )}
+                          {account.signInLinked && (
+                            <Badge miw="max-content" color="gray">
+                              Single Sign-On
+                            </Badge>
+                          )}
+                          {identitiesOf(account).length > 0 && (
+                            <Badge miw="max-content" color="gray">
+                              Chat Gateway
+                            </Badge>
+                          )}
+                        </>
+                      )
+                    }
+                  />
                   {phone && groupCell(account)}
                 </Group>
               </>

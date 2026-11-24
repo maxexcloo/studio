@@ -39,7 +39,7 @@ export function useActionProfile(kind: MediaKind) {
     ? [
         {
           id: `${kind}-action-profile`,
-          label: "Profile",
+          label: "Model",
           description: current?.label || "Automatic",
           menu: [
             [

@@ -300,7 +300,7 @@ async function runRadiance(
       const node = Object.values(graph).find((item) =>
         [radianceImageNode, radianceVideoNode].includes(item?.class_type),
       );
-      if (!node) throw new Error("This profile's Radiance backend has no Radiance node.");
+      if (!node) throw new Error("This model's Radiance backend has no Radiance node.");
       record = {
         body,
         video: node.class_type === radianceVideoNode,

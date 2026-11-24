@@ -123,7 +123,7 @@ test("A parked profile reads as parked, and an administrator choosing it starts 
     route.fulfill({ json: { id: "next", status: "running", progress: "Starting P." } }),
   );
   await create(page);
-  const picker = page.getByRole("combobox", { name: "Profile", exact: true });
+  const picker = page.getByRole("combobox", { name: "Model", exact: true });
   await picker.click();
   const option = page.getByRole("option", { name: /Parked Image/ });
   await expect(option).toContainText("Stopped");
@@ -458,7 +458,7 @@ test("Clear restores profile defaults and random seed; masked inputs load as Pai
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expandComposer(page);
   // Clear also returns to the account's default profile, and Undo to the one picked.
-  const profile = page.getByRole("combobox", { name: "Profile", exact: true });
+  const profile = page.getByRole("combobox", { name: "Model", exact: true });
   await profile.click();
   await page.getByRole("option", { name: /^Image Fast\b/ }).click();
   await expect(profile).toHaveText("Image Fast");
@@ -641,7 +641,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   // Edit opens the composer on the staged draft.
   await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
   await page
     .getByRole("group", { name: "Generation Actions", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
@@ -687,7 +687,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
     .filter({ hasText: "Video" })
     .click();
   await expect(page).toHaveURL(/\/videos/);
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toHaveText(
     "Motion Quality",
   );
   await expect(page.getByRole("combobox", { name: "Count", exact: true })).toHaveCount(0);
@@ -831,7 +831,7 @@ test("Generation controls preserve the draft and return keyboard focus with redu
     "Keep this direction, in soft daylight",
   );
   await controls.press("Enter");
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Keep this direction, in soft daylight",
   );
@@ -1343,7 +1343,7 @@ test("Composer popups on a tablet open with the keyboard down", async ({ page },
   await expect(search).toBeVisible();
   await expect(search).not.toBeFocused();
   await page.keyboard.press("Escape");
-  await generate.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await generate.getByRole("combobox", { name: "Model", exact: true }).click();
   await expect(page.getByRole("listbox")).toBeVisible();
   await expect(page.locator("[data-popup] input[type=text]:focus")).toHaveCount(0);
 });
@@ -1356,13 +1356,13 @@ test("Profile search waits for a touch and preserves typing and selection", asyn
   await create(page);
   await page.evaluate(() => {
     document.addEventListener("focusin", (event) => {
-      if ((event.target as Element).matches("[aria-label='Search Profile']"))
+      if ((event.target as Element).matches("[aria-label='Search Model']"))
         document.documentElement.dataset.profileSearchFocused = "true";
     });
   });
-  const picker = page.getByRole("combobox", { name: "Profile", exact: true });
+  const picker = page.getByRole("combobox", { name: "Model", exact: true });
   await picker.tap();
-  const search = page.getByRole("textbox", { name: "Search Profile", exact: true });
+  const search = page.getByRole("textbox", { name: "Search Model", exact: true });
   await expect(search).toBeVisible();
   await expect(page.locator("html")).not.toHaveAttribute("data-profile-search-focused");
   await search.tap();

@@ -208,7 +208,7 @@ export function useStageComparison() {
         );
       const preferred = defaultProfile(models, "image");
       const profile = suits(preferred) ? preferred : profiles.find(suits);
-      if (!profile) throw new Error("No ready image profile can run this LoRA.");
+      if (!profile) throw new Error("No ready image model can run this LoRA.");
       // Without the LoRA, then its default and the strengths beside it.
       open({
         sessionId: "",

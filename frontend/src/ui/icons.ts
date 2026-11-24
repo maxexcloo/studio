@@ -48,7 +48,6 @@ import {
   Layers,
   LayoutDashboard,
   Library,
-  Lightbulb,
   Link,
   List,
   ListChecks,
@@ -97,6 +96,7 @@ import {
   SlidersHorizontal,
   SlidersVertical,
   Snail,
+  SpellCheck,
   Square,
   SquareCheck,
   SwatchBook,
@@ -302,8 +302,6 @@ export const icons = {
   stop: filled(Square),
   /** Studio-wide settings an administrator sets (Settings › Studio). */
   studio: SlidersVertical,
-  /** The instructions behind Suggestions (Library › Instructions). */
-  suggestionInstructions: Lightbulb,
   /** Super Like: accepting a Dream result and rating it Liked. */
   superLike: Heart,
   /** Taste: what Studio learnt of an account's preferences, and their own. */
@@ -328,6 +326,8 @@ export const icons = {
   winner: Trophy,
   /** GPU workers and services (Settings › Workers). */
   workers: Server,
+  /** The writing rules every writer follows (Library › Writing Standard). */
+  writing: SpellCheck,
   /** Zooming in, or larger gallery tiles. */
   zoomIn: Plus,
   /** Zooming out, or smaller gallery tiles. */

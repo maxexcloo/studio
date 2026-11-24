@@ -60,7 +60,7 @@ export function listEditableProfiles() {
 
 export function readEditableProfile(id) {
   if (!validId(id) || !fs.existsSync(fileFor(id)))
-    throw Object.assign(new Error("That profile was not found."), { status: 404 });
+    throw Object.assign(new Error("That model was not found."), { status: 404 });
   const text = fs.readFileSync(fileFor(id), "utf8");
   return {
     id,
@@ -89,11 +89,11 @@ export function createEditableProfile(
 ) {
   if (!validId(id))
     throw Object.assign(
-      new Error("Choose a profile id: lowercase letters, digits, dots, dashes or underscores."),
+      new Error("Choose a model ID: lowercase letters, digits, dots, dashes or underscores."),
       { status: 400 },
     );
   if (profileIdTaken(id))
-    throw Object.assign(new Error("That profile id is already in use or was used before."), {
+    throw Object.assign(new Error("That model ID is already in use or was used before."), {
       status: 409,
     });
   const checked = validateProfileText(id, text, { info });
@@ -234,7 +234,7 @@ export function saveEditableProfile(
   const current = readEditableProfile(id);
   if (baseHash && baseHash !== current.hash)
     throw Object.assign(
-      new Error("This profile changed since you opened it. Reload it, then make your edit again."),
+      new Error("This model changed since you opened it. Reload it, then make your edit again."),
       { status: 409 },
     );
   const checked = validateProfileText(id, text, { info });

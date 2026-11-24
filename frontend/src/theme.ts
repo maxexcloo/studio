@@ -308,7 +308,11 @@ export function studioTheme({
       // Option rows are touch targets on touch screens: Recent Prompts here, the chips' lists
       // (ComboboxPopover) next, and Select and MultiSelect below.
       Combobox: Combobox.extend({ classNames: option, styles: { option: target } }),
-      ComboboxPopover: ComboboxPopover.extend({ classNames: option, styles: { option: target } }),
+      ComboboxPopover: ComboboxPopover.extend({
+        classNames: option,
+        defaultProps: { withCheckIcon: true, checkIconPosition: "right" },
+        styles: { option: target },
+      }),
       // A drawer's content is its scroller; a full-height one is a full-screen surface.
       Divider: Divider.extend({ classNames: { root: classes.hairline } }),
       Drawer: Drawer.extend({
@@ -504,16 +508,22 @@ export function studioTheme({
         },
       }),
       // Every control that opens a picker shows ▾, as the chips do (AGENTS.md › UI Patterns).
+      // A chosen option shows a check after its name in every list (AGENTS.md › Actions & Menus).
       MultiSelect: MultiSelect.extend({
         classNames: option,
-        defaultProps: { rightSection: chevron },
+        defaultProps: { withCheckIcon: true, checkIconPosition: "right", rightSection: chevron },
         styles: { option: target },
       }),
       // A Select without search is a button in effect: its read-only text takes no selection, so a
       // tap on a phone doesn't raise the selection or autofill bar.
       Select: Select.extend({
         classNames: option,
-        defaultProps: { checkIconPosition: "right", rightSection: chevron, autoComplete: "off" },
+        defaultProps: {
+          withCheckIcon: true,
+          checkIconPosition: "right",
+          rightSection: chevron,
+          autoComplete: "off",
+        },
         styles: (_theme, props) => ({
           option: target,
           input: props.searchable

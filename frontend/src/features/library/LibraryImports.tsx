@@ -46,7 +46,7 @@ const views = [
 ];
 const actionGroups: { audit: ImportRecord["audit"] | "profile"; title: string }[] = [
   { audit: "needs-files", title: "Missing Files" },
-  { audit: "profile", title: "Needs a Profile" },
+  { audit: "profile", title: "Needs a Model" },
   { audit: "substitute", title: "Substitutes" },
   { audit: "failed", title: "Failed" },
 ];

@@ -449,7 +449,7 @@ test("Dream video Suggestions can stage an extension from the current clip", asy
   await expect
     .poll(() => state.referenceRequests.at(-1))
     .toEqual({ galleryItemId: "dream-clip", frame: "last" });
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
   expect(state.jobs).toHaveLength(0);
   expect(dream.requests).toHaveLength(0);
 });
@@ -667,7 +667,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
 
   await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
-  const reuse = settings.getByRole("switch", { name: "Run on Loaded Profile", exact: true });
+  const reuse = settings.getByRole("switch", { name: "Run on Loaded Model", exact: true });
   await expect(reuse).toBeChecked();
   await reuse.click({ force: true });
   await expect.poll(() => dream.settings.useLoadedProfile).toBe(false);

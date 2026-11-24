@@ -21,6 +21,7 @@ import { formatDateTime } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { NameWithFlags } from "../../ui/NameWithFlags";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
@@ -363,13 +364,17 @@ export function ProjectSheet({
         shown === "missing" || !shown ? (
           "Project"
         ) : (
-          <Group gap="xs" wrap="nowrap" component="span">
-            {shown.name}
-            {/* The dialog keeps the project's name; its Status group states the same flags. */}
-            <span aria-hidden>
-              <ProjectFlags project={shown} />
-            </span>
-          </Group>
+          <NameWithFlags
+            name={shown.name}
+            flags={
+              // The dialog keeps the project's name; its Status group states the same flags.
+              (shown.paused || shown.favoured) && (
+                <span aria-hidden>
+                  <ProjectFlags project={shown} />
+                </span>
+              )
+            }
+          />
         )
       }
       size="lg"

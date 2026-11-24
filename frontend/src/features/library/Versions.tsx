@@ -7,6 +7,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
+import { NameWithFlags } from "../../ui/NameWithFlags";
 import { closeWhenTop } from "../../ui/popupClicks";
 
 /** One saved version as a Versions list shows it; the server names who saved it (`savedBy`). */
@@ -92,19 +93,29 @@ export function VersionsDialog({
             header: "Version",
             sortValue: ({ version }) => version,
             cell: ({ version, aiDrafted }) => (
-              <Text size="sm" span>
-                v{version}{" "}
-                {version === current && (
-                  <Badge component="span" size="sm" color="gray">
-                    Current
-                  </Badge>
-                )}{" "}
-                {aiDrafted && (
-                  <Badge component="span" size="sm" color="orange">
-                    AI
-                  </Badge>
-                )}
-              </Text>
+              <NameWithFlags
+                name={
+                  <Text size="sm" span>
+                    v{version}
+                  </Text>
+                }
+                flags={
+                  (version === current || aiDrafted) && (
+                    <>
+                      {version === current && (
+                        <Badge size="sm" color="gray">
+                          Current
+                        </Badge>
+                      )}
+                      {aiDrafted && (
+                        <Badge size="sm" color="orange">
+                          AI
+                        </Badge>
+                      )}
+                    </>
+                  )
+                }
+              />
             ),
           },
           {

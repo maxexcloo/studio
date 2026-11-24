@@ -174,7 +174,7 @@ test("The compact composer expands on interaction and keeps picked or dragged re
     .fill("Preserve the working direction");
   await finishTyping(page);
   if (!testInfo.project.use.isMobile) await expandComposer(page);
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toBeVisible();
   await (
     await openReferenceChoices(page)
   )

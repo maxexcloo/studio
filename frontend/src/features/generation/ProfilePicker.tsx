@@ -189,7 +189,7 @@ export function ProfileSelect({
       onChange={(id) => onChange(profiles.find((profile) => profile.id === id) ?? null)}
       swatch={readiness?.color}
       title={selectedLabel && [selectedLabel, readiness?.label].filter(Boolean).join(" · ")}
-      label={selectedLabel || value || unset || "Choose a Profile"}
+      label={selectedLabel || value || unset || "Choose a Model"}
       {...trigger}
     />
   );
@@ -231,7 +231,7 @@ export function ProfilePicker({
   return (
     <>
       <ProfileSelect
-        name="Profile"
+        name="Model"
         target={{ "data-profile-picker": true }}
         profiles={available}
         value={selected?.id ?? null}
@@ -263,7 +263,7 @@ export function ProfilePicker({
             .filter(Boolean)
             .join(" · ")
         }
-        label={selectedLabel || "Choose a Profile"}
+        label={selectedLabel || "Choose a Model"}
       />
       {runtime.dialog}
     </>

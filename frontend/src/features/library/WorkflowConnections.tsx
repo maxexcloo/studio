@@ -202,8 +202,8 @@ export function WorkflowConnections({
   return (
     <Stack gap="md">
       <Text size="sm" c="dimmed">
-        Connect the profile's controls and reference inputs to workflow nodes. Other inputs keep
-        their saved values.
+        Connect the model's controls and reference inputs to workflow nodes. Other inputs keep their
+        saved values.
       </Text>
       {preview.isPending && <LoadingState label="Reading Workflow Connections" />}
       {preview.error && (
