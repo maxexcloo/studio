@@ -8,10 +8,9 @@ import {
   SegmentedControl,
   Stack,
   Text,
-  Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { ChevronDown, type LucideIcon, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { galleryOrigins } from "../../../../shared/gallery-origin";
@@ -22,8 +21,7 @@ import type { MediaKind, Profile, Rating } from "../../types";
 import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { usePhone } from "../../ui/usePhone";
-import { chipProps, iconChipProps } from "../generation/chip";
+import { chipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
@@ -209,8 +207,8 @@ interface FilterProps {
 }
 
 /**
- * The active filters as removable chips, one per value, plus any `extra` view choices. Liked and
- * Uploads have none: their own toggle or view shows them.
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Uploads has
+ * none: its own view shows it.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
@@ -220,8 +218,14 @@ export function useActiveFilters(
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
-    ...(value.rating === "disliked"
-      ? [{ key: "disliked", label: "Disliked", remove: () => onChange({ ...value, rating: "" }) }]
+    ...(value.rating
+      ? [
+          {
+            key: value.rating,
+            label: value.rating === "liked" ? "Liked" : "Disliked",
+            remove: () => onChange({ ...value, rating: "" }),
+          },
+        ]
       : []),
     ...(value.offCharacter
       ? [
@@ -353,41 +357,28 @@ function ChoiceChip({
   );
 }
 
-/**
- * A filter chip that turns on and off with one tap, pressed while on. With an `icon`, phones show the
- * icon alone, named by `label` and its tooltip.
- */
+/** A filter chip that turns on and off with one tap, pressed while on. */
 export function FilterToggle({
   label,
   on,
   onToggle,
-  icon: Icon,
   title,
-  children = label,
 }: {
   label: string;
   on: boolean;
   onToggle: () => void;
-  icon?: LucideIcon;
   title?: string;
-  children?: ReactNode;
 }) {
-  const iconOnly = usePhone() && Icon !== undefined;
   return (
-    <Tooltip label={label} disabled={!Icon}>
-      <Button
-        {...(iconOnly ? iconChipProps : chipProps)}
-        aria-label={Icon ? label : undefined}
-        data-icon-toggle={Icon && !iconOnly ? true : undefined}
-        aria-pressed={on}
-        title={title}
-        variant={on ? "light" : "default"}
-        leftSection={Icon && !iconOnly ? <Icon size={15} /> : undefined}
-        onClick={onToggle}
-      >
-        {Icon && iconOnly ? <Icon size={16} /> : children}
-      </Button>
-    </Tooltip>
+    <Button
+      {...chipProps}
+      aria-pressed={on}
+      title={title}
+      variant={on ? "light" : "default"}
+      onClick={onToggle}
+    >
+      {label}
+    </Button>
   );
 }
 
@@ -530,9 +521,7 @@ export function GalleryFilterPanel({
                     : [...value[key], option.value],
                 })
               }
-            >
-              {option.label}
-            </FilterToggle>
+            />
           );
         })}
       </Group>

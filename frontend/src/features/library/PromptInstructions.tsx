@@ -194,8 +194,14 @@ export function PromptInstructions({
               key: "version",
               header: "Version",
               sortValue: ({ version }) => version ?? 0,
+              // An edited instruction stands out from the defaults.
               cell: ({ version }) => (
-                <Text size="sm">{version === null ? "Default" : `v${version}`}</Text>
+                <Text
+                  size={phone ? "xs" : "sm"}
+                  c={version === null || phone ? "dimmed" : undefined}
+                >
+                  {version === null ? "Default" : `v${version}`}
+                </Text>
               ),
             },
           ]}

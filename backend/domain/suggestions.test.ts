@@ -433,7 +433,7 @@ test("Animate saves its own image-grounded motion instructions", async () => {
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
-  assert.match(calls[1][0].content, /each in a distinct area/);
+  assert.match(calls[1][0].content, /changes from areas such as/);
 });
 
 test("viewer next steps vary across relevant areas, specific, and uncensored only where the account may", async () => {
@@ -459,13 +459,14 @@ test("viewer next steps vary across relevant areas, specific, and uncensored onl
     "Neon Rim Light",
   ]);
   // The areas come in a different order each time.
-  for (const area of ["interaction", "color palette", "framing"])
-    assert.match(calls[0][0].content, new RegExp(`distinct area \\([^)]*${area}`));
+  for (const area of ["interaction", "outfit", "pose"])
+    assert.match(calls[0][0].content, new RegExp(`areas such as [^.]*${area}`));
+  assert.match(calls[0][0].content, /pick out what is particular to this subject and scene/);
   assert.match(calls[0][0].content, /Name the actual visible change/);
   assert.match(calls[0][0].content, /Keep the subject's identity/);
-  assert.doesNotMatch(calls[0][0].content, /body-shape, proportion or build alternative/);
+  assert.doesNotMatch(calls[0][0].content, /non-graphic body alternatives/);
   await labels("bob", "job-b");
-  assert.match(calls[1][0].content, /clearly adult human subject.*body-shape, proportion or build/);
+  assert.match(calls[1][0].content, /clearly adult human subject.*non-graphic body alternatives/);
 });
 
 test("suggestions never repeat a fixed option in the same menu, and the writer is told them", async () => {
@@ -509,9 +510,9 @@ test("all creative suggestion surfaces share context and variety while motion ke
       assert.match(context.content, /35-year-old woman with a broad build/);
       if (surface === "animate" || kind === "video") {
         assert.match(system.content, /Vary motion, subject action/);
-        assert.doesNotMatch(system.content, /include a non-graphic body-shape/);
+        assert.doesNotMatch(system.content, /include one or two non-graphic body alternatives/);
       } else {
-        assert.match(system.content, /include a non-graphic body-shape/);
+        assert.match(system.content, /include one or two non-graphic body alternatives/);
       }
     }
   }

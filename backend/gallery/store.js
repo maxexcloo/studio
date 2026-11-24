@@ -130,7 +130,7 @@ const list = (values) => JSON.stringify([...values].map(String));
  * single-user owner); `unlisted` keeps (or leaves out) what the gallery doesn't list: disliked items
  * and Dream's pool; `rating` is "liked" or "disliked"; `status`, `notStatus` and `dreamState` take
  * one or several; `dreamArm` keeps Dream results whose arm starts with one of its prefixes,
- * `notDreamArm` leaves out one arm and `dreamPair` keeps (or leaves out) comparison sides; `liked` keeps
+ * `notDreamArm` leaves out one arm, `notDream` every Dream result, and `dreamPair` keeps (or leaves out) comparison sides; `liked` keeps
  * the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
  * items and `turnId` one turn of a chat; `ids` match items' ids, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
@@ -188,6 +188,7 @@ function where(query = {}) {
     );
   }
   if (query.notDreamArm !== undefined) add(`${dreamArm} IS NOT ?`, query.notDreamArm);
+  if (query.notDream) add("json_type(value, '$.dream') IS NOT 'object'");
   if (query.dreamPair !== undefined) add(`${dreamPair} IS ${query.dreamPair ? "NOT " : ""}NULL`);
   // Liked and kept rows are each read through their own index.
   if (query.liked)
@@ -328,25 +329,7 @@ function* galleryRows(query = {}, after = null, columns = keyColumns) {
   if (query.includeDisliked && query.unlisted === undefined) {
     const listed = galleryRows({ ...query, unlisted: false }, after, columns);
     const disliked = galleryRows({ ...query, unlisted: true }, after, columns);
-    let a = listed.next();
-    let b = disliked.next();
-    while (!a.done && !b.done) {
-      if (compareGalleryKeys(rowKey(a.value), rowKey(b.value)) <= 0) {
-        yield a.value;
-        a = listed.next();
-      } else {
-        yield b.value;
-        b = disliked.next();
-      }
-    }
-    if (!a.done) {
-      yield a.value;
-      yield* listed;
-    }
-    if (!b.done) {
-      yield b.value;
-      yield* disliked;
-    }
+    yield* interleaved([listed, disliked]);
     return;
   }
   const base = where(query);
@@ -367,31 +350,52 @@ function* galleryRows(query = {}, after = null, columns = keyColumns) {
   }
 }
 
+/** Walks in gallery order merged into one, each read as it goes. */
+function* interleaved(walks) {
+  const heads = walks.map((walk) => ({ walk, next: walk.next() }));
+  for (;;) {
+    let first;
+    for (const head of heads)
+      if (
+        !head.next.done &&
+        (!first || compareGalleryKeys(rowKey(head.next.value), rowKey(first.next.value)) < 0)
+      )
+        first = head;
+    if (!first) return;
+    yield first.next.value;
+    first.next = first.walk.next();
+  }
+}
+
 /**
- * The query's items, read a batch at a time: in gallery order within the gallery, then what it
- * doesn't list, then uploads. The order index leads with those, so each batch seeks; across them
- * every batch would sort the whole table. With `after` (a gallery key), only those after its
- * record, or all of them once it is gone.
+ * The query's items in gallery order, read a batch at a time; with `unlistedFirst`, all that the
+ * gallery doesn't list comes first. The order index leads with uploads and listing, so each of
+ * those partitions seeks on its own and the walk merges them. With `after` (a gallery key), only
+ * those after its record, or all of them once it is gone.
  */
 export function* eachGalleryItem(query = {}, after) {
-  const unlisted = query.unlistedFirst ? [true, false] : [false, true];
   const from =
     after &&
-    statement(
-      `SELECT ${positionColumns}, uploaded, unlisted FROM studio_gallery WHERE key = ?`,
-    ).get(after);
-  const placeOf = (uploaded, hidden) => Number(uploaded) * 2 + unlisted.indexOf(Boolean(hidden));
-  const fromPlace = from ? placeOf(from.uploaded, from.unlisted) : -1;
-  for (const uploaded of query.uploaded === undefined ? [false, true] : [query.uploaded])
-    for (const hidden of query.unlisted === undefined ? unlisted : [query.unlisted]) {
-      const place = placeOf(uploaded, hidden);
-      if (place < fromPlace) continue;
-      const rows = galleryRows(
-        { ...query, uploaded, unlisted: hidden },
-        place === fromPlace ? rowKey(from) : null,
-      );
-      for (const row of rows) yield parse(row);
-    }
+    statement(`SELECT ${positionColumns}, unlisted FROM studio_gallery WHERE key = ?`).get(after);
+  const walk = (unlisted, start) =>
+    interleaved(
+      (query.uploaded === undefined ? [false, true] : [query.uploaded]).map((uploaded) =>
+        galleryRows({ ...query, uploaded, unlisted }, start),
+      ),
+    );
+  const partitions = query.unlisted === undefined ? [false, true] : [query.unlisted];
+  if (!query.unlistedFirst) {
+    const start = from ? rowKey(from) : null;
+    for (const row of interleaved(partitions.map((unlisted) => walk(unlisted, start))))
+      yield parse(row);
+    return;
+  }
+  for (const unlisted of partitions.toReversed()) {
+    const resumes = from && Boolean(from.unlisted) === unlisted;
+    // A walk resuming among listed records has passed every unlisted one.
+    if (from && !resumes && unlisted) continue;
+    for (const row of walk(unlisted, resumes ? rowKey(from) : null)) yield parse(row);
+  }
 }
 
 /**

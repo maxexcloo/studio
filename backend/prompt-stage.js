@@ -115,7 +115,7 @@ export function createPromptStage({
     const start = (
       startSlot ? references.find((item) => item.slot === startSlot.id) : references[0]
     )?.assetId;
-    return writeAnimatePrompt({
+    const written = await writeAnimatePrompt({
       engine,
       profile: video,
       guide: guide(video),
@@ -128,9 +128,14 @@ export function createPromptStage({
       writer,
       frame: () => frame(access, start),
       caption: () => caption(access, start),
+      named: Boolean(job.dream),
       signal,
       onThinking,
       onDelta,
     });
+    if (!job.dream) return written;
+    // Dream's card heads a clip with how it was made, as its ideas head theirs with a direction.
+    const made = `${writing.extend ? "Extended" : "Animated"} with ${String(profile.label || profile.id).split(" · ")[0]}`;
+    return { ...written, why: [made, written.why].filter(Boolean).join(" · ") };
   };
 }

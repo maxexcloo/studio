@@ -300,16 +300,21 @@ test("profile health reads recent finished and failed runs from the runs index, 
   );
 });
 
-test("a walk resumes after any record, across the gallery, Dream's pool and uploads", () => {
-  const item = (id, fields) => ({ ...output(id), url: undefined, ...fields });
+test("a walk goes newest first and resumes after any record, across the gallery, Dream's pool and uploads", () => {
+  const item = (id, minute, fields) => ({
+    ...output(id),
+    url: undefined,
+    createdAt: `2026-01-01T00:0${minute}:00.000Z`,
+    ...fields,
+  });
   setGallery([
-    item("one"),
-    item("two"),
-    item("pooled", { dream: { state: "unseen" } }),
-    item("upload", { uploaded: true }),
+    item("one", 1),
+    item("two", 3),
+    item("pooled", 2, { dream: { state: "unseen" } }),
+    item("upload", 4, { uploaded: true }),
   ]);
   const walk = [...eachGalleryItem()].map((item) => item.id);
-  assert.deepEqual(new Set(walk), new Set(["one", "two", "pooled", "upload"]));
+  assert.deepEqual(walk, ["upload", "two", "pooled", "one"]);
   for (const [index, id] of walk.entries())
     assert.deepEqual(
       [...eachGalleryItem({}, galleryKey({ id }))].map((item) => item.id),
