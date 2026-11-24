@@ -155,7 +155,8 @@ export function usePromptHistory({
     ...optimistic<HistoryEdit>(client, [kind], editHistory),
   });
   const like = (text: string, liked: boolean) => edit.mutate({ action: "like", text, liked });
-  const title = kind === "negative" ? "Recent Negative Prompts" : "Recent Prompts";
+  // The box it opens from already says which prompt.
+  const title = "Recent";
   const filtered = (history.data?.prompts || [])
     .filter((entry) => entry.text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort(
