@@ -106,9 +106,3 @@
   align-items: center;
   gap: var(--mantine-spacing-sm);
 }
-
-:root[data-phone] .header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-}
