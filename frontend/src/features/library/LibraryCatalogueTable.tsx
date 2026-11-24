@@ -1,4 +1,4 @@
-import { Alert, Badge, Menu, Stack, Text, Tooltip } from "@mantine/core";
+import { Alert, Badge, Menu, Stack, Text, type TextProps, Tooltip } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -524,9 +524,13 @@ export function LibraryCatalogueTable({
 }
 
 /** A catalogued file's name with its extension, and its hashes on hover where its source recorded them. */
-function FileName({ file, sha256 }: { file: string; sha256?: string }) {
+export function FileName({
+  file,
+  sha256,
+  ...props
+}: TextProps & { file: string; sha256?: string }) {
   const name = (
-    <Text size="xs" c="dimmed" truncate>
+    <Text size="xs" c="dimmed" truncate {...props}>
       {file}
     </Text>
   );
