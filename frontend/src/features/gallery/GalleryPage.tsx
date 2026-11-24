@@ -1017,17 +1017,19 @@ function Gallery() {
               : []),
           ]}
           toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
-          select={
-            // Select stays in place, pressed while selecting; pressing it again ends selection.
-            <SelectToggle
-              {...(phone ? iconChipProps : chipProps)}
-              ref={selectionButton}
-              selecting={selection.selecting}
-              disabled={!loaded.length && !selection.selecting}
-              onClick={selection.selecting ? doneSelecting : selection.start}
-            />
+          actions={
+            <>
+              <GalleryImport upload={upload} />
+              {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
+              <SelectToggle
+                {...(phone ? iconChipProps : chipProps)}
+                ref={selectionButton}
+                selecting={selection.selecting}
+                disabled={!loaded.length && !selection.selecting}
+                onClick={selection.selecting ? doneSelecting : selection.start}
+              />
+            </>
           }
-          actions={<GalleryImport upload={upload} />}
         />
         {selectionBar}
       </div>
