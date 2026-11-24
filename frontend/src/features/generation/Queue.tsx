@@ -914,10 +914,11 @@ export function QueueActions() {
         queueAction(bulk["clear-failed"].label, bulk["clear-failed"].icon, () =>
           setConfirming("clear-failed"),
         )}
+      {failed.length > 0 &&
+        queueAction("Retry Failed", icons.retry, () => void retryAll(), retrying)}
       {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
         pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
       )}
-      {failed.length > 0 && queueAction("Retry All", icons.retry, () => void retryAll(), retrying)}
       {stopping > 0 && (
         <Tooltip label="Stop All">
           <ActionIcon
@@ -969,7 +970,7 @@ function pauseControl(paused: QueuePause, everyone: boolean) {
         (key): key is QueueAction["action"] => Boolean(key),
       )
     : [everyone ? "pause-all" : "pause"];
-  return { held, label: held ? "Resume Queue" : "Pause Queue", actions };
+  return { held, label: held ? "Resume" : "Pause", actions };
 }
 /** The account's work, then an administrator's model downloads (`useModelDownloads`). */
 export function Queue({ downloads }: { downloads: ModelDownload[] }) {
