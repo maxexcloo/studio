@@ -65,6 +65,7 @@ export function ComparePage() {
   const comparison = useQuery(comparisonQuery(id));
   const client = useQueryClient();
   const stage = useStageComparison();
+  const phone = usePhone();
   const [open, setOpen] = useState<MediaItem | null>(null);
   const items = (comparison.data?.variants || []).flatMap((variant) =>
     variant.item ? [variant.item] : [],
@@ -192,6 +193,27 @@ export function ComparePage() {
               .join(" · ")}
           </Text>
           <ComparisonRatingButtons comparison={comparison.data} />
+          {again.length > 1 &&
+            (phone ? (
+              <Tooltip label="Compare Again">
+                <ActionIcon
+                  variant="filled"
+                  aria-label="Compare Again"
+                  loading={compareAgain.isPending}
+                  onClick={() => compareAgain.mutate()}
+                >
+                  <icons.compare size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <Button
+                size="xs"
+                loading={compareAgain.isPending}
+                onClick={() => compareAgain.mutate()}
+              >
+                Compare Again
+              </Button>
+            ))}
         </Group>
       </Group>
       {card && (
@@ -292,13 +314,6 @@ export function ComparePage() {
           );
         })}
       </Variants>
-      {again.length > 1 && (
-        <Group justify="center" className={classes.applied}>
-          <Button loading={compareAgain.isPending} onClick={() => compareAgain.mutate()}>
-            Compare Again
-          </Button>
-        </Group>
-      )}
       {open && (
         <MediaViewer
           item={items.find((candidate) => candidate.id === open.id) || open}
@@ -320,9 +335,13 @@ function SplitVariants({ images }: { images: SplitImage[] }) {
   const others = images.filter(({ value }) => value !== first.value);
   const second = others.find(({ value }) => value === secondId) ?? others[0];
   return (
-    <Stack gap="xs">
+    <Stack
+      gap="xs"
+      className={classes.splitColumn}
+      style={{ "--split-aspect": (second.width || 1) / (second.height || 1) } as CSSProperties}
+    >
       {images.length > 2 && (
-        <SimpleGrid cols={2} spacing="xs" className={classes.splitChoices}>
+        <SimpleGrid cols={2} spacing="xs">
           <Select
             label="First Variant"
             data={images}
