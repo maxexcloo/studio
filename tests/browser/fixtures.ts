@@ -757,7 +757,6 @@ export async function fixtures(page: Page) {
             : (!similar && sort === "disliked") || i.rating !== "disliked") &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
-          (url.searchParams.get("drifted") !== "1" || i.identity?.drifted) &&
           (!url.searchParams.has("character") ||
             i.identity?.characterId === url.searchParams.get("character")) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&

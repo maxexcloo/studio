@@ -344,10 +344,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
             ...(chat && { conversationIds: [chat] }),
             ...(turn && { turnId: turn }),
             ...(["liked", "disliked"].includes(query.rating) && { rating: query.rating }),
-            // `character` keeps the results Face Check compared with that card, `drifted` those
-            // it found off-character.
+            // `character` keeps the results Face Check compared with that card.
             ...(query.character && { characterId: one(query.character) }),
-            ...(query.drifted === "1" && { drifted: true }),
             ...(work === "none" && { notStatus: "pending" }),
             ...(finished && { status: "done" }),
             ...(unrated && { unrated }),
@@ -390,8 +388,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
       cursor ||
       similarTo ||
       query.uploads === "1" ||
-      query.character ||
-      query.drifted === "1"
+      query.character
         ? []
         : untiledJobs(account?.userId || "")
             .reverse()
