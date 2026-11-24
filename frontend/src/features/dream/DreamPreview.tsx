@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Box,
   Group,
   Modal,
   SegmentedControl,
@@ -7,10 +8,13 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { useMergedRef } from "@mantine/hooks";
+import { useElementSize, useMergedRef } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import {
+  type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
+  type Ref,
   type RefObject,
   Suspense,
   useId,
@@ -114,18 +118,35 @@ export function CardText({
   dreamt,
   title,
   full = false,
+  controls,
+  ref,
 }: {
   item: MediaItem;
   dreamt: boolean;
   title?: string;
   full?: boolean;
+  /** A video's play/pause and sound, at the text's right end. */
+  controls?: ReactNode;
+  ref?: Ref<HTMLDivElement>;
 }) {
+  const caption = dreamt ? (
+    <Caption item={item as DreamItem} full={full} title={title} />
+  ) : (
+    <LibraryCaption item={item} full={full} />
+  );
   return (
-    <div className={classes.overlay}>
-      {dreamt ? (
-        <Caption item={item as DreamItem} full={full} title={title} />
+    <div ref={ref} className={classes.overlay}>
+      {controls ? (
+        <Group wrap="nowrap" align="flex-end" gap={0}>
+          <Box flex={1} miw={0}>
+            {caption}
+          </Box>
+          <Box pr="md" pb="sm">
+            {controls}
+          </Box>
+        </Group>
       ) : (
-        <LibraryCaption item={item} full={full} />
+        caption
       )}
     </div>
   );
@@ -134,7 +155,7 @@ export function CardText({
 interface FaceProps {
   item: MediaItem;
   swipe: SwipeGesture;
-  /** A tap or click on the media, which cycles the chrome. */
+  /** A tap or click on the media, which shows or hides all the chrome. */
   onTap: () => void;
   bare: boolean;
 }
@@ -259,22 +280,23 @@ export function DreamPreview({
   const closeIfTop = closeWhenTop(id, close);
   const phone = usePhone();
   const [details, setDetails] = useState(false);
-  // Taps cycle the chrome, then the chrome with the card's text, then the media alone.
-  const [chrome, setChrome] = useState<"standard" | "text" | "bare">("standard");
-  const bare = chrome === "bare";
+  // A tap shows or hides all the chrome at once: the top bar, the card's text and the verdicts.
+  const [bare, setBare] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const cycleChrome = () => {
     // Hiding the chrome removes any focused control in it; the stage keeps the shortcuts working.
-    if (chrome === "text") stage.current?.focus({ preventScroll: true });
-    setChrome(chrome === "standard" ? "text" : chrome === "text" ? "bare" : "standard");
+    if (!bare) stage.current?.focus({ preventScroll: true });
+    setBare(!bare);
   };
+  // The media centres above the card's text, which may still cover it where the text runs long.
+  const overlay = useElementSize();
   const [playbackRoot, setPlaybackRoot] = useState<HTMLDivElement | null>(null);
   const stageRef = useMergedRef(stage, setPlaybackRoot);
   const items = card.kind === "pair" || card.kind === "set" ? card.items : undefined;
   const item = (
     card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item
   ) as DreamItem;
-  const { play, cornerSound } = useDreamPlayback(
+  const { play, controls } = useDreamPlayback(
     stage,
     !!playbackRoot && item.type === "video",
     item.id,
@@ -338,6 +360,9 @@ export function DreamPreview({
             ref={stageRef}
             tabIndex={-1}
             className={`${classes.previewStage} ${viewerClasses.viewerStage}`}
+            style={
+              bare ? undefined : ({ "--overlay-space": `${overlay.height}px` } as CSSProperties)
+            }
             onClick={(event) => {
               if (
                 event.detail &&
@@ -364,8 +389,10 @@ export function DreamPreview({
                 <Neighbour item={next} side="next" />
               </div>
             </SwipeCard>
-            {chrome === "text" && (
+            {!bare && (
               <CardText
+                ref={overlay.ref}
+                controls={controls}
                 item={item}
                 dreamt={card.kind !== "library"}
                 title={
@@ -378,7 +405,6 @@ export function DreamPreview({
               />
             )}
             {play && <VideoPlayButton play={play} />}
-            {!bare && cornerSound}
           </div>
           <ViewerChrome
             item={item}

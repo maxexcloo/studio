@@ -45,7 +45,7 @@ import { useMediaRating } from "./useMediaRating";
 import { usePrefetchResultSuggestions } from "./usePrefetchResultSuggestions";
 import { useVideoSound } from "./useVideoSound";
 import { playVideo, videoLifecycle } from "./videoPlayback";
-import { VideoPlayButton, VideoSoundButton } from "./VideoPlayButton";
+import { VideoControls, VideoPlayButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
@@ -128,6 +128,7 @@ function ViewerVideo({
   const [refused, setRefused] = useState(false);
   const [silent, setSilent] = useState(false);
   const silentFallback = useRef(false);
+  const [paused, setPaused] = useState(false);
   const stopPlayback = useRef<() => void>(undefined);
   const preferredMute = useRef(muted);
   preferredMute.current = muted;
@@ -188,6 +189,8 @@ function ViewerVideo({
           onVolumeChange(event);
         }}
         onPlaying={() => setRefused(false)}
+        onPlay={() => setPaused(false)}
+        onPause={() => setPaused(true)}
         data-media-id={id}
         src={src}
         poster={poster}
@@ -216,9 +219,15 @@ function ViewerVideo({
       />
       {refused && <VideoPlayButton {...swipe} play={play} />}
       {!hideControls && (
-        <VideoSoundButton
+        <VideoControls
+          paused={paused}
+          onPlayPause={() => {
+            const media = player.current;
+            if (media?.paused) play();
+            else media?.pause();
+          }}
           muted={muted || silent}
-          toggle={() => {
+          onSound={() => {
             const soundOff = !(muted || silent);
             setMuted(soundOff);
             if (!soundOff) play(false);

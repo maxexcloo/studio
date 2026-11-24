@@ -373,6 +373,8 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
+  /* Centred above the card's text while the chrome shows; a long text still covers its foot. */
+  padding-bottom: min(var(--overlay-space, 0px), 25dvh);
 }
 .previewContent .previewMain {
   grid-template-rows: auto minmax(0, 1fr) auto;
