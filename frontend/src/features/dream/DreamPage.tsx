@@ -18,8 +18,10 @@ import { dreamCardCounts } from "../../../../shared/dream";
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
+import { LoadFailed } from "../../ui/LoadFailed";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
+import { useFailureBanner } from "../../ui/useFailureBanner";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
@@ -48,6 +50,7 @@ import classes from "./DreamPage.module.css";
 /** The Dream deck once every card is judged or while Dream is off. */
 function Empty({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
+  useFailureBanner(save.error);
   if (!dream.settings.enabled)
     return (
       <EmptyState
@@ -64,11 +67,6 @@ function Empty({ dream }: { dream: Dream }) {
               >
                 Turn On
               </Button>
-              {save.error && (
-                <Alert color="red" title="Couldn't Turn On Dream">
-                  {save.error.message}
-                </Alert>
-              )}
             </Stack>
           )
         }
@@ -76,23 +74,7 @@ function Empty({ dream }: { dream: Dream }) {
         Dream Is Off
       </EmptyState>
     );
-  if (dream.status === "paused")
-    return (
-      <EmptyState
-        fill
-        action={
-          <Button
-            leftSection={<icons.resume size={16} />}
-            loading={save.isPending}
-            onClick={() => save.mutate({ paused: false })}
-          >
-            Resume
-          </Button>
-        }
-      >
-        Dream Is Paused
-      </EmptyState>
-    );
+  if (dream.status === "paused") return <EmptyState fill>Dream Is Paused</EmptyState>;
   const quota = dreamQuota(dream);
   return (
     <EmptyState
@@ -309,9 +291,7 @@ export function DreamPage() {
       ) : !reviewing && dream.isPending ? (
         <LoadingState fill label="Loading Dream" />
       ) : !reviewing && dream.isError ? (
-        <Alert color="red" title="Couldn't Load Dream">
-          {dream.error.message}
-        </Alert>
+        <LoadFailed error={dream.error}>Couldn't Load Dream</LoadFailed>
       ) : (
         <DreamDeck
           key={deckKey}

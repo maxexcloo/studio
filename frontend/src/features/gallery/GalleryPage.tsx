@@ -34,6 +34,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { lazyLoaded } from "../../ui/lazyLoaded";
 import { LoadingState } from "../../ui/LoadingState";
 import { SelectToggle } from "../../ui/SelectToggle";
+import { useFailureBanner } from "../../ui/useFailureBanner";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
@@ -397,6 +398,7 @@ function Gallery() {
       return first;
     },
   });
+  useFailureBanner(refresh.error);
   const { refetch: readFirst } = refresh;
   const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
@@ -1045,7 +1047,12 @@ function Gallery() {
         <Alert color="red" title="Couldn't Load the Gallery">
           <Stack gap="sm" align="flex-start">
             {gallery.error.message}
-            <Button size="compact-sm" variant="default" onClick={() => void gallery.refetch()}>
+            <Button
+              size="compact-sm"
+              variant="default"
+              disabled={gallery.isFetching}
+              onClick={() => void gallery.refetch()}
+            >
               Retry
             </Button>
           </Stack>
@@ -1123,21 +1130,6 @@ function Gallery() {
                   ? "No Videos"
                   : "No Images"}
         </EmptyState>
-      )}
-      {refresh.isError && (
-        <Alert color="red" title="Couldn't Update the Gallery">
-          <Stack gap="sm" align="flex-start">
-            {refresh.error.message}
-            <Button
-              size="compact-sm"
-              variant="default"
-              loading={refresh.isFetching}
-              onClick={refreshFirst}
-            >
-              Retry
-            </Button>
-          </Stack>
-        </Alert>
       )}
       <MorePages listing={gallery} results={listingScope} paused={!!itemId || !!review} />
       {!selection.selecting && (

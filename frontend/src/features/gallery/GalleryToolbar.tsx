@@ -195,6 +195,13 @@ export function GalleryToolbar({
         value={sort}
         onChange={onSortChange}
         withinPortal
+        trigger={
+          phone ? (
+            <Button {...iconChipProps} aria-label="Sort Gallery">
+              <icons.sort size={16} />
+            </Button>
+          ) : undefined
+        }
       />
       {!phone && <ZoomSlider />}
       {actions}

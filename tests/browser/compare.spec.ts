@@ -492,7 +492,7 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   expect(state.comparisons[0].itemIds).toEqual(["batch-0", "batch-1"]);
-  await expect(page.getByText("Prompt: A tin owl", { exact: true })).toBeVisible();
+  await expect(page.getByText("A tin owl", { exact: true })).toBeVisible();
   await page.keyboard.press("2");
   await expect(
     page.getByRole("button", { name: "Clear Winner Variant B", exact: true }),

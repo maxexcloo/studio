@@ -26,12 +26,15 @@ export function MediaComparison({
   width,
   height,
   inPage = false,
+  captions = true,
 }: {
   first: ComparisonImage;
   second: ComparisonImage;
   width?: number;
   height?: number;
   inPage?: boolean;
+  /** Names each side; off where pickers already name them. */
+  captions?: boolean;
 }) {
   // Phones reveal the first image from the bottom, while desktop reveals it from the left.
   const vertical = usePhone();
@@ -69,14 +72,15 @@ export function MediaComparison({
 
   return (
     <div className={classes.layout} data-vertical={vertical || undefined}>
-      {vertical ? (
-        name(second.label)
-      ) : (
-        <Group justify="space-between">
-          {name(first.label)}
-          {name(second.label)}
-        </Group>
-      )}
+      {captions &&
+        (vertical ? (
+          name(second.label)
+        ) : (
+          <Group justify="space-between">
+            {name(first.label)}
+            {name(second.label)}
+          </Group>
+        ))}
       <div
         ref={zoom.viewport}
         className={classes.viewport}
@@ -223,7 +227,7 @@ export function MediaComparison({
         </TransformWrapper>
         <MediaZoomControls zoom={zoom} />
       </div>
-      {vertical && name(first.label)}
+      {captions && vertical && name(first.label)}
     </div>
   );
 }

@@ -19,8 +19,6 @@ const backends = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
-const backendNote =
-  "Uses ready models allowed for the account; waits if this backend is unavailable. Cloud needs access to a ready cloud model.";
 
 export function DreamAdministration() {
   const deployment = useQuery(deploymentQuery);
@@ -79,8 +77,18 @@ export function DreamAdministration() {
           "Allow explicit themes, only for accounts with Uncensored Models access.",
           onOff,
         )}
-        {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
-        {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
+        {row(
+          "imageBackend",
+          "Images",
+          "Where Dream's images run; waits if it is unavailable.",
+          backends,
+        )}
+        {row(
+          "videoBackend",
+          "Videos",
+          "Where Dream's videos run; waits if it is unavailable.",
+          backends,
+        )}
       </SettingGroup>
       <SettingGroup title="Delays">
         {delay(

@@ -17,6 +17,7 @@ import { ClearButton } from "../../ui/ClearButton";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextToolsBar } from "../../ui/TextBox";
+import { useFailureBanner } from "../../ui/useFailureBanner";
 import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useDraft, useGeneration } from "./GenerationProvider";
@@ -223,6 +224,7 @@ export function GenerationEditor({
     [listedProfile, input.profileBackend, anyReferences],
   );
   const { models, profiles } = useGeneration();
+  useFailureBanner(models.error);
   // The chips take the draft as typing leaves it, so they keep still while the prompt changes.
   const settled = useDraft().input;
   const [maskOpen, setMaskOpen] = useState(false);
@@ -353,7 +355,6 @@ export function GenerationEditor({
                 : "No models are available. Check the workers."}
             </Alert>
           )}
-          {models.error && <Alert color="red">{models.error.message}</Alert>}
           <TextToolsBar.Provider value={fill ? toolsBar : null}>
             <PromptFields
               textareaRef={prompt}

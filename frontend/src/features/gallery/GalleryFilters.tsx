@@ -541,7 +541,7 @@ export function GalleryFilterPanel({
           color="red"
           variant="light"
           leftSection={<icons.retry size={15} />}
-          loading={facets.isFetching}
+          disabled={facets.isFetching}
           onClick={() => void facets.refetch()}
         >
           Couldn't Load Filters

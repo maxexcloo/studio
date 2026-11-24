@@ -74,14 +74,8 @@ export function DreamPreferences() {
       />
     </SettingRow>
   );
-  const mixTotal = settings.mixNew + settings.mixComparisons + settings.mixExisting;
   const mix = (key: "mixNew" | "mixComparisons" | "mixExisting", label: string, what: string) =>
-    number(
-      key,
-      label,
-      `${what} Relative to the others${mixTotal ? `: ${Math.round((settings[key] / mixTotal) * 100)}% of cards` : ""}.`,
-      !settings.images,
-    );
+    number(key, label, what, !settings.images);
   return (
     <Stack gap="lg">
       <SettingGroup title="General">
@@ -99,12 +93,13 @@ export function DreamPreferences() {
         {dream.data.uncensoredAvailable && (
           <>
             {toggle("uncensored", "Uncensored", "Allow explicit themes.")}
-            {number(
-              "uncensoredShare",
-              "Uncensored Share",
-              "Percent of ideas with explicit themes.",
-              !settings.uncensored,
-            )}
+            {settings.uncensored &&
+              number(
+                "uncensoredShare",
+                "Uncensored Share",
+                "Percent of ideas with explicit themes.",
+                false,
+              )}
           </>
         )}
       </SettingGroup>

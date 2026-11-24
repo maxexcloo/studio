@@ -346,7 +346,7 @@ test("Where Work Runs saves each group’s processing and default models", async
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
     .toEqual(["Images", "Videos", "Text", "Dream"]);
   const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
-  await expect(textCloud).toHaveText("Studio Default");
+  await expect(textCloud).toHaveText("Default (Studio)");
   await textCloud.click();
   const options = page
     .getByRole("listbox")
@@ -358,9 +358,10 @@ test("Where Work Runs saves each group’s processing and default models", async
   await options.last().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
   await expect(textCloud).toHaveText("Cloud · Uncensored");
-  await group("Text").getByRole("button", { name: "Clear Cloud Model", exact: true }).click();
+  await textCloud.click();
+  await page.getByRole("option", { name: "Default (Studio)", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
-  await expect(textCloud).toHaveText("Studio Default");
+  await expect(textCloud).toHaveText("Default (Studio)");
   const area = (kind: string) =>
     group(kind).getByRole("radiogroup", { name: `${kind} Run On`, exact: true });
   const choose = (name: string, choice: string) =>
@@ -1068,7 +1069,7 @@ test("Settings › Studio saves and clears the default Text Profile", async ({ p
   await signIn(page, { id: "admin", role: "administrator" });
   await page.goto("/settings#studio");
   const text = page.getByRole("combobox", { name: "Text Profile", exact: true });
-  await expect(text).toHaveText("Gateway Default");
+  await expect(text).toHaveText("Default (Gateway)");
   await text.click();
   const saved = page.waitForResponse(
     (response) =>
@@ -1084,6 +1085,6 @@ test("Settings › Studio saves and clears the default Text Profile", async ({ p
   await page.reload();
   await expect(text).toHaveText("Local · Auto");
   await text.click();
-  await page.getByRole("option", { name: "Gateway Default", exact: true }).click();
-  await expect(text).toHaveText("Gateway Default");
+  await page.getByRole("option", { name: "Default (Gateway)", exact: true }).click();
+  await expect(text).toHaveText("Default (Gateway)");
 });
