@@ -22,10 +22,6 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
 export const sideControl = { variant: "default", size: "lg", radius: "xl" } as const;
 export const sideIconSize = 20;
 
-/** Undo and Suggestions, the smaller bordered controls either side of the verdicts. */
-export const sideControl = { variant: "default", size: "lg", radius: "xl" } as const;
-export const sideIconSize = 20;
-
 export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
     <Tooltip label="Undo">
