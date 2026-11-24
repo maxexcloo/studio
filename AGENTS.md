@@ -167,9 +167,10 @@ recur across features.
   existing results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
   gestures, top chrome, media controls and Details surface. Verdicts in
-  fullscreen use the buttons. Passing moves on without a rating. Holding Pass
-  opens the reason picker.
-  Not My Taste records a dislike. Comparisons in the deck and fullscreen video
+  fullscreen use the buttons. Passing a Dream result dislikes it and keeps it in
+  Discards for reference. Holding Pass
+  opens the reason picker: Too Similar and Glitch pass without a rating.
+  Comparisons in the deck and fullscreen video
   offer Pass, the lettered choices and Accept. Fullscreen image comparisons
   offer the single-image verdicts. Accept keeps the image shown and Super Like
   also rates it.
