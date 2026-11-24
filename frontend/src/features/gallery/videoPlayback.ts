@@ -18,7 +18,6 @@ export function playVideo(
   refused: () => void,
   silent: (value: boolean) => void,
 ) {
-  const release = videoLifecycle(media);
   let closed = false;
   void media.play().catch(async (error: unknown) => {
     if (closed) return;
@@ -40,6 +39,5 @@ export function playVideo(
   });
   return () => {
     closed = true;
-    release();
   };
 }

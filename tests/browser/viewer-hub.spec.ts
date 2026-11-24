@@ -2291,13 +2291,21 @@ test("Work still generating and videos take the same swipes as a picture", async
     "Touch input is dispatched through Chromium's protocol.",
   );
   await page.addInitScript(() => {
-    const played: string[] = [];
+    const played: { source: string; muted: boolean }[] = [];
     Object.assign(window, { played });
+    let allowed = false;
+    document.addEventListener(
+      "click",
+      (event) => {
+        if ((event.target as Element).closest('button[aria-label="Unmute"]')) allowed = true;
+      },
+      true,
+    );
     HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
       const source = this.getAttribute("src");
-      if (source === "/test-media/clip-2.mp4" && !this.muted)
+      if (!allowed && source === "/test-media/clip-2.mp4" && !this.muted)
         return Promise.reject(new DOMException("Audio needs a tap", "NotAllowedError"));
-      if (source) played.push(source);
+      if (source) played.push({ source, muted: this.muted });
       return Promise.resolve();
     };
   });
@@ -2355,12 +2363,22 @@ test("Work still generating and videos take the same swipes as a picture", async
   await swipeLeft(status);
   const video = viewer.locator("video");
   await expect(video).toHaveAttribute("src", "/test-media/clip.mp4");
+  await video.evaluate((media) => {
+    media.dataset.currentPlayer = "true";
+  });
   await swipeLeft(video);
   await expect(video).toHaveAttribute("src", "/test-media/clip-2.mp4");
+  await expect(video).toHaveAttribute("data-current-player", "true");
+  await expect(video).toHaveJSProperty("muted", true);
+  await viewer.getByRole("button", { name: "Unmute", exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
-    .toEqual(["/test-media/clip.mp4", "/test-media/clip-2.mp4"]);
-  await expect(video).toHaveJSProperty("muted", true);
+    .toEqual([
+      { source: "/test-media/clip.mp4", muted: false },
+      { source: "/test-media/clip-2.mp4", muted: true },
+      { source: "/test-media/clip-2.mp4", muted: false },
+    ]);
+  await expect(video).toHaveJSProperty("muted", false);
 });
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({
