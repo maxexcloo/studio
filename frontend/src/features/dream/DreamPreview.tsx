@@ -395,21 +395,14 @@ export function DreamPreview({
             inert={phone && details}
           >
             {items && (
-              <Group justify="center" gap="xs" wrap="nowrap" mb="xs">
+              <Group gap="xs" wrap="nowrap" mb="xs" className={classes.previewChoices}>
                 <SegmentedControl
                   aria-label={card.kind === "pair" ? "Comparison Results" : "Set Results"}
                   mih={card.kind === "pair" ? "2.5rem" : undefined}
-                  miw={0}
+                  flex="none"
                   styles={
                     card.kind === "pair"
-                      ? {
-                          control: { minWidth: 0 },
-                          label: {
-                            paddingInline: "var(--mantine-spacing-xs)",
-                            whiteSpace: "normal",
-                          },
-                          innerLabel: { minWidth: 0, overflowWrap: "anywhere" },
-                        }
+                      ? { label: { paddingInline: "var(--mantine-spacing-xs)" } }
                       : undefined
                   }
                   value={String(side)}
@@ -419,7 +412,7 @@ export function DreamPreview({
                     return {
                       value: String(index),
                       label: label ? (
-                        <Text span size="sm" lh={1.1} lineClamp={2} title={label}>
+                        <Text span size="sm">
                           {label}
                         </Text>
                       ) : (
