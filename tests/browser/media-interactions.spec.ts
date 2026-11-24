@@ -2,6 +2,7 @@ import { type Page, expect, test } from "@playwright/test";
 import sharp from "sharp";
 
 import {
+  expandComposer,
   finishTyping,
   fixtures,
   image,
@@ -42,6 +43,7 @@ test("Prompt paste attaches an owned reference before submission", async ({ page
   });
   try {
     await page.goto("/images");
+    await expandComposer(page);
     await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Use this pasted image");
     const files = await page.evaluateHandle(() => {
       const transfer = new DataTransfer();
@@ -66,7 +68,10 @@ test("Prompt paste attaches an owned reference before submission", async ({ page
     await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
     await pressGenerate(page);
     await expect.poll(() => state.jobs.length).toBe(1);
-    expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "upload-1", slot: "image" }]);
+    expect(state.jobs[0].input).toMatchObject({
+      prompt: "Use this pasted image",
+      referenceAssets: [{ assetId: "upload-1", slot: "image" }],
+    });
   } finally {
     release();
   }
