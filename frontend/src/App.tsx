@@ -1,5 +1,5 @@
 import { AppShell, FocusTrap, Modal } from "@mantine/core";
-import { type ComponentType, type ReactNode, Suspense, lazy, useEffect, useState } from "react";
+import { type ReactNode, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 
 import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
@@ -10,35 +10,22 @@ import { LibraryTitle } from "./features/library/LibraryNavigation";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
 import { AppHeader } from "./features/shell/AppHeader";
 import { useAppearance } from "./ui/Appearance";
+import { lazyLoaded } from "./ui/lazyLoaded";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { DialogKeyboard } from "./ui/useKeyboard";
 import { useLastWhileClosing } from "./ui/useLastWhileClosing";
 import { usePhone } from "./ui/usePhone";
-/**
- * A page loaded on demand. Once `load` has run it renders at once, where `lazy` alone would still
- * suspend on its first render, showing its loader for a moment after preloading.
- */
-function lazyPage(load: () => Promise<ComponentType>) {
-  let loaded: ComponentType | undefined;
-  const preload = () => load().then((page) => (loaded = page));
-  const Lazy = lazy(() => preload().then((page) => ({ default: page })));
-  function Page() {
-    const [Shown] = useState(() => loaded || Lazy);
-    return <Shown />;
-  }
-  return [Page, preload] as const;
-}
-const [ComparePage, loadCompare] = lazyPage(() =>
+const [ComparePage, loadCompare] = lazyLoaded(() =>
   import("./features/compare/ComparePage").then((module) => module.ComparePage),
 );
-const [DreamPage, loadDream] = lazyPage(() =>
+const [DreamPage, loadDream] = lazyLoaded(() =>
   import("./features/dream/DreamPage").then((module) => module.DreamPage),
 );
-const [LibraryPage, loadLibrary] = lazyPage(() =>
+const [LibraryPage, loadLibrary] = lazyLoaded(() =>
   import("./features/library/LibraryPage").then((module) => module.LibraryPage),
 );
-const [SettingsPage, loadSettings] = lazyPage(() =>
+const [SettingsPage, loadSettings] = lazyLoaded(() =>
   import("./features/settings/SettingsPage").then((module) => module.SettingsPage),
 );
 const noSections: Partial<Record<"library" | "settings", string>> = {};

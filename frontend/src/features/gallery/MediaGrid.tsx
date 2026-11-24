@@ -261,6 +261,36 @@ export function MediaGrid({
     if (pendingFocus.current && focusTile(host.current, pendingFocus.current))
       pendingFocus.current = null;
   });
+  // A tile that leaves while focused (a dislike hides it) passes focus to the one taking its place,
+  // which hands it back if the tile returns (Undo) before focus moves on in the grid.
+  const focused = useRef<string | null>(null);
+  const displaced = useRef<{ id: string; to: string } | null>(null);
+  const shownItems = useRef(items);
+  useLayoutEffect(() => {
+    const was = focused.current;
+    const back = displaced.current;
+    const before = shownItems.current;
+    shownItems.current = items;
+    const active = document.activeElement;
+    const refocus = (id: string) => {
+      pendingFocus.current = id;
+      if (focusTile(host.current, id)) pendingFocus.current = null;
+    };
+    if (
+      back &&
+      items.some((item) => item.id === back.id) &&
+      (active === document.body || (active as HTMLElement | null)?.dataset.mediaId === back.to)
+    ) {
+      displaced.current = null;
+      return refocus(back.id);
+    }
+    if (!was || active !== document.body || items.some((item) => item.id === was)) return;
+    const index = before.findIndex((item) => item.id === was);
+    const next = index < 0 ? undefined : items[Math.min(index, items.length - 1)];
+    if (!next) return;
+    displaced.current = { id: was, to: next.id };
+    refocus(next.id);
+  }, [items]);
   // The tile the viewer closed on comes into view once, not again whenever the layout changes
   // (new work, a refresh), which would pull the page back to it.
   const shownFocus = useRef<string | null>(null);
@@ -288,6 +318,19 @@ export function MediaGrid({
         data-by-day={byDay || undefined}
         className={classes.grid}
         {...hold.handlers}
+        onFocus={(event) => {
+          const tile = [...event.currentTarget.children].find((child) =>
+            child.contains(event.target),
+          );
+          const id = tile?.querySelector<HTMLElement>("[data-media-id]")?.dataset.mediaId;
+          if (!id) return;
+          focused.current = id;
+          if (displaced.current?.to !== id) displaced.current = null;
+        }}
+        onBlur={(event) => {
+          if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget))
+            focused.current = null;
+        }}
         style={{ height: layout?.height, position: "relative", touchAction: "pan-x pan-y" }}
       >
         {layout?.sections

@@ -11,7 +11,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   Suspense,
-  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -21,10 +20,12 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 
-import { glass } from "../../theme";
+import { easing, glass } from "../../theme";
 import type { MediaItem, QueueJob } from "../../types";
 import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "../../ui/ActionBar";
+import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
+import { lazyLoaded } from "../../ui/lazyLoaded";
 import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -48,12 +49,14 @@ import { VideoPlayButton, VideoSoundButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
-import { zoomImage } from "./zoomImage";
+import { ZoomImage } from "./zoomImage";
 
 import classes from "./MediaViewer.module.css";
-const MediaComparison = lazy(() =>
-  import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
+export const [MediaComparison, loadMediaComparison] = lazyLoaded(() =>
+  import("./MediaComparison").then((module) => module.MediaComparison),
 );
+// Comparing loads once the page is idle, so its first use shows at once.
+(window.requestIdleCallback || setTimeout)(() => void loadMediaComparison());
 
 // Versions don't depend on progress, so the viewer skips the queue's progress polls; the strips
 // read progress themselves.
@@ -323,12 +326,15 @@ export function MediaViewer({
   const thumbnailsOpen = !cycling || chrome === "full";
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
+  // The dialog mounts its content after the viewer, so effects on the stage wait for it.
+  const [stageNode, setStageNode] = useState<HTMLDivElement | null>(null);
   function cycleChrome() {
     stage.current?.focus({ preventScroll: true });
     setChrome((shown) => (shown === "standard" ? "full" : shown === "full" ? "image" : "standard"));
   }
   const containStage = useCallback((view: HTMLDivElement | null) => {
     stage.current = view;
+    setStageNode(view);
     // Keys reach the viewer from the start, before the dialog's own focus lands on its control.
     view?.focus({ preventScroll: true });
   }, []);
@@ -366,7 +372,6 @@ export function MediaViewer({
     }
     shownId.current = item.id;
   }, [item.id]);
-  const [ZoomImage] = useState(zoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join their source's strip.
@@ -476,6 +481,30 @@ export function MediaViewer({
   const next = canNavigate ? viewable[currentIndex + 1] : undefined;
   const strip = useStrip({ previous: Boolean(previous), next: Boolean(next) }, swipe);
   useLayoutEffect(() => strip.arrived(), [item.id]);
+  // When the stage changes size (the phone chrome cycling, Details opening or closing), the media
+  // glides from where it showed to its new place instead of jumping there.
+  const motion = useMotionDuration();
+  useEffect(() => {
+    const view = stageNode;
+    if (!view || !motion) return;
+    // Offsets ignore transforms, such as the dialog's own while it opens.
+    const centre = () => [
+      view.offsetLeft + view.offsetWidth / 2,
+      view.offsetTop + view.offsetHeight / 2,
+    ];
+    let [x, y] = centre();
+    const observer = new ResizeObserver(() => {
+      const [nextX, nextY] = centre();
+      if (nextX !== x || nextY !== y)
+        strip.ref.current?.animate(
+          [{ transform: `translate(${x - nextX}px, ${y - nextY}px)` }, { transform: "none" }],
+          { duration: motion, easing: easing.enter, composite: "add" },
+        );
+      [x, y] = [nextX, nextY];
+    });
+    observer.observe(view);
+    return () => observer.disconnect();
+  }, [stageNode, motion, strip.ref]);
   const onRetried = (job: string) => {
     if (shownId.current === item.id && !strip.settling.current)
       setReplacement({ from: item.id, job });

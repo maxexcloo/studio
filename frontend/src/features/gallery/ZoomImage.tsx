@@ -9,6 +9,10 @@ import { type SwipeGesture, dragAxis, swipeDirection } from "./swipe";
 
 import classes from "./ZoomImage.module.css";
 
+// A second tap this soon (ms, from the first's release to its press) makes a double tap, so a
+// single tap waits as long before it acts.
+const doubleTap = 250;
+
 export function ZoomImage({
   mediaId,
   src,
@@ -228,7 +232,7 @@ export function ZoomImage({
     lastTap.current = { at: event.timeStamp, x: event.clientX, y: event.clientY };
     if (
       previous &&
-      start.at - previous.at < 300 &&
+      start.at - previous.at < doubleTap &&
       Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 32
     ) {
       lastTap.current = null;
@@ -237,7 +241,7 @@ export function ZoomImage({
       pendingTap.current = window.setTimeout(() => zoom.toggleAt(clientX, clientY), 0);
     } else if (onTap && event.timeStamp - start.at < 500 && !closingPopup())
       // A long press is not a tap, and a press that closes a popup only closes it.
-      pendingTap.current = window.setTimeout(onTap, 300);
+      pendingTap.current = window.setTimeout(onTap, doubleTap);
   }
   return (
     <div
@@ -322,7 +326,7 @@ export function ZoomImage({
               if (event.detail === 0 || (!touched.current && !onTap && !doubleClickZoom))
                 zoom.cycle();
               else if (!touched.current && onTap && event.detail === 1 && !closingPopup())
-                pendingTap.current = window.setTimeout(onTap, 300);
+                pendingTap.current = window.setTimeout(onTap, doubleTap);
             }}
             onDoubleClick={(event) => {
               if ((!onTap && !doubleClickZoom) || touched.current || closingPopup()) return;
