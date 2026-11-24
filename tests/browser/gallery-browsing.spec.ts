@@ -1767,6 +1767,31 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     .toEqual(["", "liked", false, false]);
 });
 
+test("Returning to Gallery resets filters while closing an image keeps them", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push({ ...results(1)[0], rating: "liked" });
+  await page.goto("/images");
+  await toggleGalleryFilter(page, "Liked");
+  const liked = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
+  await expect(liked).toBeVisible();
+  await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
+  await page.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(liked).toBeVisible();
+
+  await showGalleryView(page, "Comparisons");
+  await showGalleryView(page, "Gallery");
+  await expect(liked).toHaveCount(0);
+
+  await toggleGalleryFilter(page, "Liked");
+  const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
+  await modes.getByRole("link", { name: "Videos", exact: true }).click();
+  await modes.getByRole("link", { name: "Images", exact: true }).click();
+  await expect(liked).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+});
+
 test("Incoming results wait behind New Results while scrolled, keeping loaded pages, the scroll anchor and selection", async ({
   page,
 }) => {

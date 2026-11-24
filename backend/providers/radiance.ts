@@ -47,7 +47,11 @@ const fps = 24;
  */
 export function radianceVideoLimits(model: string) {
   return isLtx(model)
-    ? { maxPixels: 1920 * 1088, frames: { min: 17, max: 161, step: 8, offset: 1 } }
+    ? {
+        maxPixels: 1920 * 1088,
+        frames: { min: 17, max: 161, step: 8, offset: 1 },
+        ...(isDistilledLtx(model) ? { upscale: { abovePixels: 960 * 544, step: 64 } } : {}),
+      }
     : { maxPixels: 1344 * 768, frames: { min: 124, max: 345, step: 17, offset: 5 } };
 }
 const maxVideoReferences = 9;
@@ -276,9 +280,10 @@ export function videoRequest(values: Values, images: RadianceReference[] = []) {
   let latentUpscale = Number(values.latent_upscale) || 1;
   // Distilled LTX-2.5 draws 960 × 544 itself and reaches larger sizes (to 1920 × 1088) through its
   // latent upsampler, whose sides are multiples of 64.
-  if (isDistilledLtx(model) && width * height > 960 * 544) {
+  const upscale = limits.upscale;
+  if (upscale && width * height > upscale.abovePixels) {
     latentUpscale = 2;
-    [width, height] = [width, height].map((side) => Math.floor(side / 64) * 64);
+    [width, height] = [width, height].map((side) => Math.floor(side / upscale.step) * upscale.step);
   }
   const refineSteps = Number(values.upscale_refine_steps) || 0;
   const { min, max, step, offset } = limits.frames;

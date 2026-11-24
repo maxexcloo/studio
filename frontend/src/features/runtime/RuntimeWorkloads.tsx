@@ -517,7 +517,6 @@ export function RuntimeWorkloads({
           {
             key: "state",
             header: "State",
-            width: 110,
             sortValue: (item) => phaseLabel(item.phase),
             cell: (item) => {
               const { pending } = changePhase(item.id, item.phase, operation);
@@ -778,7 +777,6 @@ export function RuntimeHistory() {
           {
             key: "result",
             header: "Result",
-            width: 120,
             cell: (entry) => (
               <Badge color={operationColour(entry.status)} miw="max-content">
                 {operationLabel(entry.status)}

@@ -446,14 +446,16 @@ export function withPreferredDefaults(models, preferences) {
         ? `No cloud ${kind} model is available, so this runs locally.`
         : `No local ${kind} model is running, so this runs in the cloud.`;
   }
-  const { imageAspect, imageCount, imageResolution } = preferences;
+  const { imageAspect, imageCount, imageResolution, videoAspect, videoResolution } = preferences;
   const profiles =
-    imageAspect || imageCount || imageResolution
-      ? models.profiles?.map((profile) =>
-          profile.kind === "image"
-            ? { ...profile, imagePreference: { imageAspect, imageCount, imageResolution } }
-            : profile,
-        )
+    imageAspect || imageCount || imageResolution || videoAspect || videoResolution
+      ? models.profiles?.map((profile) => {
+          if (profile.kind === "image" && (imageAspect || imageCount || imageResolution))
+            return { ...profile, imagePreference: { imageAspect, imageCount, imageResolution } };
+          if (profile.kind === "video" && (videoAspect || videoResolution))
+            return { ...profile, videoPreference: { videoAspect, videoResolution } };
+          return profile;
+        })
       : models.profiles;
   return { ...models, ...(profiles && { profiles }), defaults, defaultNotes };
 }

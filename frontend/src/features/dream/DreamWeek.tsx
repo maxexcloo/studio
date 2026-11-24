@@ -97,7 +97,7 @@ export function DreamWeek() {
               ),
             },
             { key: "kind", header: "Kind", cell: (row) => row.kind },
-            { key: "kept", header: "Kept", cell: kept },
+            { key: "kept", header: "Kept", nowrap: true, cell: kept },
           ]}
         />
       </SettingGroup>

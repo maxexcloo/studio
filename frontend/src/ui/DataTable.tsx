@@ -35,6 +35,8 @@ interface DataColumn<T> {
    * other secondary columns (those without it) into the main cell themselves.
    */
   hideOnPhone?: boolean;
+  /** Sizes the column to keep short values such as counts and dates on one line. */
+  nowrap?: boolean;
   width?: number;
   /** The column that takes the free width and lets its text truncate. */
   main?: boolean;
@@ -200,7 +202,7 @@ export function DataTable<T>({
       <Table.Thead>
         <Table.Tr>
           {selection && (
-            <Table.Th>
+            <Table.Th w={1}>
               <Checkbox
                 size="sm"
                 aria-label={`Select All ${label}`}
@@ -218,8 +220,7 @@ export function DataTable<T>({
               <Table.Th
                 key={column.key}
                 w={column.width}
-                // A header stays on one line; the main column gives up the width instead.
-                style={{ whiteSpace: "nowrap" }}
+                className={classes.nowrap}
                 aria-sort={
                   column.sortValue
                     ? active
@@ -277,6 +278,7 @@ export function DataTable<T>({
               {shown.map((column) => (
                 <Table.Td
                   key={column.key}
+                  className={column.nowrap ? classes.nowrap : undefined}
                   maw={column.main ? 0 : undefined}
                   w={column.main ? "100%" : undefined}
                 >

@@ -565,7 +565,7 @@ test("Prompt Styles sort by enabled, type and name, and can be filtered and edit
 
 test("Library edits a background prompt and reads the saved version back", async ({ page }) => {
   await fixtures(page);
-  const initial = "Summarise the recurring subjects.";
+  const initial = "Summarise the recurring subjects in {{request}}.";
   let instruction = {
     id: "summarise-taste",
     label: "Summarise Taste",
@@ -581,11 +581,18 @@ test("Library edits a background prompt and reads the saved version back", async
   await page.route("**/api/profiles/prompt-instructions/summarise-taste", (route) => {
     const { text, baseHash } = route.request().postDataJSON();
     expect(baseHash).toBe(instruction.hash);
-    instruction = { ...instruction, text, version: 1, hash: "version-1" };
+    instruction = { ...instruction, text, version: 2, hash: "version-2" };
     return route.fulfill({ json: instruction });
   });
   await page.route("**/api/profiles/prompt-instructions/summarise-taste/history", (route) =>
-    route.fulfill({ json: { versions: [{ version: 1, text: instruction.text }] } }),
+    route.fulfill({
+      json: {
+        versions: [
+          { version: 2, text: instruction.text },
+          { version: 1, text: initial },
+        ],
+      },
+    }),
   );
   await page.goto("/images");
   await openNav(page, "Library");
@@ -599,11 +606,26 @@ test("Library edits a background prompt and reads the saved version back", async
   const editor = await open();
   const text = editor.getByRole("textbox", { name: "Instruction", exact: true });
   await expect(text).toHaveValue(initial);
-  const changed = "Summarise recurring subjects and lighting.";
+  const changed = "Summarise recurring subjects and lighting in {{request}}.";
+  const legend = editor.getByRole("region", { name: "Prompt Variables", exact: true });
+  await expect(legend.getByText("{{request}}", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Missing", { exact: true })).toBeHidden();
   await text.fill(changed);
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   await open();
   await expect(text).toHaveValue(changed);
-  await expect(editor.getByRole("combobox", { name: "Load Version", exact: true })).toBeVisible();
+  const version = editor.getByRole("combobox", { name: "Load Version", exact: true });
+  await expect(version).toHaveValue("v2");
+  await version.click();
+  await editor.getByRole("option", { name: "v1", exact: true }).click();
+  await expect(version).toHaveValue("v1");
+  await expect(text).toHaveValue(initial);
+  await editor.getByRole("tab", { name: "Preview", exact: true }).click();
+  await expect(editor.getByLabel("Highlighted Instruction").locator("code")).toHaveText(
+    "{{request}}",
+  );
+  await editor.getByRole("tab", { name: "Edit", exact: true }).click();
+  await expect(text).toHaveValue(initial);
+  await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
 });

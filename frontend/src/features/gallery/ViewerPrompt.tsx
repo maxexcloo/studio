@@ -48,27 +48,31 @@ export interface ViewerDraftActions {
  * The viewer's prompt and its assistance. The field holds the item's prompt: editing it and
  * pressing Enter or Generate runs it with the item's settings as a new version. Its assistance
  * asks for a suggestion, template or Custom… change through `useItemChange`; tile choices use the
- * same request path. Review Prompt is off until chosen: when on, a proposal fills the field
- * until Run runs it or Undo restores what was typed; otherwise, the proposal runs at once.
+ * same request path. Review Prompt fills the field with a proposal until it is run or undone.
  */
 export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration) => void) {
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
-  const [review] = useMediaReview();
+  const [reviewChoice, setReview] = useMediaReview();
+  const review = reviewChoice ?? false;
+  const reviewPrompt = reviewChoice ?? true;
   const ask = useItemChange<string>(item, {
     iterate,
     review,
     show: (proposal) => setPrompt(proposalText(proposal)),
     restore: setPrompt,
   });
-  const pick = (action: ViewerChange, request: string, profileId?: string, preview?: boolean) =>
-    ask.send(request, prompt, item.type === "video" ? "animate" : action, profileId, preview);
+  const pick = (action: ViewerChange, request: string, profileId?: string, fromPrompt = false) =>
+    ask.send(request, prompt, item.type === "video" ? "animate" : action, profileId, {
+      freshSeed: fromPrompt,
+      preview: fromPrompt ? reviewPrompt : review,
+    });
   const [customAction, setCustomAction] = useState<
-    (Pick<ViewerAsk, "action" | "profileId"> & { preview?: boolean }) | null
+    (Pick<ViewerAsk, "action" | "profileId"> & { fromPrompt: boolean }) | null
   >(null);
-  const openCustom = (action: ViewerChange, profileId?: string, preview?: boolean) =>
-    setCustomAction({ action, profileId, preview });
+  const openCustom = (action: ViewerChange, profileId?: string, fromPrompt = false) =>
+    setCustomAction({ action, profileId, fromPrompt });
   // A tile's menu opened the viewer with its choice, asked once the assistant is ready.
   const location = useLocation();
   const navigate = useNavigate();
@@ -84,10 +88,10 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
       opened={Boolean(customAction)}
       onClose={() => setCustomAction(null)}
       title="Custom Change"
-      action={review || customAction?.preview ? "Ask" : "Run"}
+      action={(customAction?.fromPrompt ? reviewPrompt : review) ? "Ask" : "Run"}
       onSend={(request) =>
         customAction &&
-        pick(customAction.action, request, customAction.profileId, customAction.preview)
+        pick(customAction.action, request, customAction.profileId, customAction.fromPrompt)
       }
     />
   );
@@ -99,7 +103,20 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     pick,
     custom: openCustom,
   };
-  return { item, original, prompt, setPrompt, field, ask, custom, draft, openCustom, pick };
+  return {
+    item,
+    original,
+    prompt,
+    setPrompt,
+    field,
+    ask,
+    custom,
+    draft,
+    openCustom,
+    pick,
+    reviewPrompt,
+    setReview,
+  };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
@@ -114,13 +131,25 @@ export function ViewerPrompt({
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
 }) {
-  const { item, original, prompt, setPrompt, field, ask, custom, draft, openCustom } = state;
+  const {
+    item,
+    original,
+    prompt,
+    setPrompt,
+    field,
+    ask,
+    custom,
+    draft,
+    openCustom,
+    reviewPrompt,
+    setReview,
+  } = state;
   const assistant = useQuery(assistantQuery).data;
   const change = ask.proposal;
   const [mode, setMode] = useRemembered<ViewerChange>("viewer-prompt-change", "recreate");
   const { menu: editProfiles, profileId: selectedEdit } = useActionProfile("image");
   const editProfileId = mode === "edit" ? selectedEdit : undefined;
-  const generate = ask.previewing && change?.action !== "edit";
+  const generate = ask.freshSeed && change?.action !== "edit";
   const running = pending?.kind === "prompt";
   const [requested, setRequested] = useState<{ itemId: string; prompt?: string }>();
   const queried = requested?.itemId === item.id && requested;
@@ -151,26 +180,36 @@ export function ViewerPrompt({
           menu: [
             ...proposalUndo(change && ask.undo),
             ...assistMenu({
-              settings:
-                item.type === "image"
+              settings: [
+                ...(imageAction
                   ? [
                       {
                         id: "viewer-prompt-change",
-                        label: "Apply As",
+                        label: "Suggestion Action",
                         disabled: ask.pending,
                         choice: {
-                          showLabel: true,
                           value: mode,
                           options: [
                             { value: "edit", label: "Edit" },
                             { value: "recreate", label: "Recreate" },
                           ],
-                          onChange: (value) => setMode(value === "edit" ? "edit" : "recreate"),
+                          onChange: (value: string) =>
+                            setMode(value === "edit" ? "edit" : "recreate"),
                         },
                       },
-                      ...(mode === "edit" ? editProfiles : []),
                     ]
-                  : [],
+                  : []),
+                {
+                  id: "review",
+                  label: "Review Prompt",
+                  icon: icons.review,
+                  checked: reviewPrompt,
+                  keepOpen: true,
+                  disabled: ask.pending,
+                  onClick: () => setReview(!reviewPrompt),
+                },
+                ...(imageAction === "edit" ? editProfiles : []),
+              ],
               suggestions,
               ...changeTemplates(
                 templates,

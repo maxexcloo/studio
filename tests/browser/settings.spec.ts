@@ -374,6 +374,12 @@ test("Where Work Runs saves each group’s processing and default models", async
   await group("Images").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
   await page.getByRole("option", { name: "16:9", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.imageAspect).toBe("16:9");
+  await group("Videos").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
+  await page.getByRole("option", { name: "9:16", exact: true }).click();
+  await expect.poll(() => state.preferences.preferences.videoAspect).toBe("9:16");
+  await group("Videos").getByRole("combobox", { name: "Default Resolution", exact: true }).click();
+  await page.getByRole("option", { name: "720p", exact: true }).click();
+  await expect.poll(() => state.preferences.preferences.videoResolution).toBe("720p");
   const dreamImages = group("Dream").getByRole("radiogroup", { name: "Dream Images" });
   await dreamImages.getByText("Cloud", { exact: true }).click();
   await expect.poll(() => dream.settings.imageBackend).toBe("cloud");

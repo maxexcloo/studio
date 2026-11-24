@@ -67,7 +67,6 @@ export interface Action {
   menu?: ActionGroups;
   /** A setting between a few values (Cloud or Local), a segmented control in menus. */
   choice?: {
-    showLabel?: boolean;
     value: string;
     options: { value: string; label: string }[];
     onChange: (value: string) => void;
@@ -273,20 +272,17 @@ function MenuRows({
         if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
         if (action.choice)
           return (
-            <Fragment key={id}>
-              {action.choice.showLabel && <Menu.Label>{label}</Menu.Label>}
-              <div className={classes.choice}>
-                <SegmentedControl
-                  size="xs"
-                  fullWidth
-                  aria-label={label}
-                  disabled={disabled}
-                  value={action.choice.value}
-                  onChange={action.choice.onChange}
-                  data={action.choice.options}
-                />
-              </div>
-            </Fragment>
+            <div key={id} className={classes.choice}>
+              <SegmentedControl
+                size="xs"
+                fullWidth
+                aria-label={label}
+                disabled={disabled}
+                value={action.choice.value}
+                onChange={action.choice.onChange}
+                data={action.choice.options}
+              />
+            </div>
           );
         if (action.menu && !action.loading) {
           const open = expanded === id;

@@ -263,8 +263,8 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   ]);
 });
 
-test("Viewer prompt suggestions use the selected operation and wait for review", async ({
-  page,
+test("Viewer prompt suggestions use the selected operation and wait for review", async ({ page }, {
+  project,
 }) => {
   const state = await openViewer(page);
   state.gallery[0].title = "Original Amber Bird";
@@ -311,22 +311,29 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
       },
     });
   });
-  const showSource = async () => {
-    await page.goto("/images");
-    await page
-      .getByRole("button", { name: "Open image: Original Amber Bird", exact: true })
-      .click();
-  };
-  await showSource();
+  const openSource = () =>
+    page.getByRole("button", { name: "Open image: Original Amber Bird", exact: true }).click();
+  await page.goto("/images");
+  await openSource();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const reopenSource = async () => {
+    if (!project.use.isMobile)
+      await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+    await expect(viewer).toBeHidden();
+    await openSource();
+  };
   const openAI = async () => {
     await viewer.getByRole("button", { name: "AI", exact: true }).click();
     return page.getByRole("menu").first();
   };
   await expect.poll(() => suggestionActions).toEqual(["recreate", "edit"]);
   let menu = await openAI();
+  await expect(menu.getByText("Apply As", { exact: true })).toHaveCount(0);
   await expect(menu.getByRole("radio", { name: "Recreate", exact: true })).toBeChecked();
+  const review = () => menu.getByRole("menuitem", { name: "Review Prompt", exact: true });
+  await expect(menu.getByRole("menuitem").first()).toHaveText("Review Prompt");
+  await expect(review()).toHaveAttribute("aria-checked", "true");
   await expandAssistantMenu(menu, "Templates");
   await expect(menu.getByRole("menuitem", { name: "New Viewpoint", exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Repair Detail", exact: true })).toHaveCount(0);
@@ -356,7 +363,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
     },
   });
 
-  await showSource();
+  await reopenSource();
   menu = await openAI();
   await menu.getByText("Edit", { exact: true }).click();
   await expect(menu.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
@@ -366,7 +373,7 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
   await backToActionMenu(menu);
   await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
-  expect(suggestionActions).toEqual(["recreate", "edit", "recreate", "edit"]);
+  expect(suggestionActions).toEqual(["recreate", "edit"]);
   await expect(prompt).toHaveValue(instruction);
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
   expect(asked.at(-1)).toMatchObject({
@@ -387,6 +394,19 @@ test("Viewer prompt suggestions use the selected operation and wait for review",
       profileId: "image:test",
       referenceAssets: [{ assetId: "asset-hub", slot: "image" }],
     },
+  });
+
+  await reopenSource();
+  menu = await openAI();
+  await menu.getByText("Recreate", { exact: true }).click();
+  await review().click();
+  await expect(review()).toHaveAttribute("aria-checked", "false");
+  await expandAssistantMenu(menu, "Suggestions");
+  await menu.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  expect(state.jobs[3]).toMatchObject({
+    parentItemId: "hub",
+    input: { prompt: steps[0].prompt, seed: "" },
   });
 });
 

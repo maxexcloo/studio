@@ -2,7 +2,13 @@ import { Alert, SegmentedControl, Select, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
-import { imageAspects, maxImageCount, resolutions } from "../../../../shared/resolution";
+import {
+  grokVideoAspects,
+  imageAspects,
+  maxImageCount,
+  resolutions,
+  videoResolutions,
+} from "../../../../shared/resolution";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
@@ -86,7 +92,7 @@ function DreamProcessing({ label }: { label: string }) {
   );
 }
 
-/** Personal processing, model and image defaults. */
+/** Personal processing, model and output defaults. */
 export function WhereWorkRuns() {
   const dream = useGroupFeature("dream");
   const cloud = useGroupFeature("cloudModels");
@@ -162,60 +168,90 @@ export function WhereWorkRuns() {
             )}
             {cloud && defaultRow(kind, "cloud")}
             {defaultRow(kind, "local")}
-            {kind === "images" && (
+            {(kind === "images" || kind === "videos") && (
               <>
                 <SettingRow
                   wide
                   label="Default Aspect"
-                  description="The starting shape for image drafts when the model supports it."
+                  description={
+                    kind === "images"
+                      ? "The starting shape for image drafts when the model supports it."
+                      : "The starting shape for new video drafts. A start frame can set the shape."
+                  }
                 >
                   <Select
                     aria-label="Default Aspect"
                     placeholder="Profile Default"
-                    data={[...imageAspects]}
-                    value={preferences.imageAspect ?? null}
+                    data={[...(kind === "images" ? imageAspects : grokVideoAspects)]}
+                    value={
+                      (kind === "images" ? preferences.imageAspect : preferences.videoAspect) ??
+                      null
+                    }
                     clearable
                     onChange={(choice) =>
-                      save.mutate({
-                        imageAspect: imageAspects.find((value) => value === choice) ?? null,
-                      })
+                      save.mutate(
+                        kind === "images"
+                          ? { imageAspect: imageAspects.find((value) => value === choice) ?? null }
+                          : {
+                              videoAspect:
+                                grokVideoAspects.find((value) => value === choice) ?? null,
+                            },
+                      )
                     }
                   />
                 </SettingRow>
-                <SettingRow
-                  wide
-                  label="Default Count"
-                  description="How many images new image drafts make when the model can make several."
-                >
-                  <Select
-                    aria-label="Default Count"
-                    data={Array.from({ length: maxImageCount }, (_, index) => ({
-                      value: String(index + 1),
-                      label: plural(index + 1, "Image"),
-                    }))}
-                    placeholder="Profile Default"
-                    value={preferences.imageCount ? String(preferences.imageCount) : null}
-                    clearable
-                    onChange={(choice) =>
-                      save.mutate({ imageCount: choice ? Number(choice) : null })
-                    }
-                  />
-                </SettingRow>
+                {kind === "images" && (
+                  <SettingRow
+                    wide
+                    label="Default Count"
+                    description="How many images new image drafts make when the model can make several."
+                  >
+                    <Select
+                      aria-label="Default Count"
+                      data={Array.from({ length: maxImageCount }, (_, index) => ({
+                        value: String(index + 1),
+                        label: plural(index + 1, "Image"),
+                      }))}
+                      placeholder="Profile Default"
+                      value={preferences.imageCount ? String(preferences.imageCount) : null}
+                      clearable
+                      onChange={(choice) =>
+                        save.mutate({ imageCount: choice ? Number(choice) : null })
+                      }
+                    />
+                  </SettingRow>
+                )}
                 <SettingRow
                   wide
                   label="Default Resolution"
-                  description="The starting resolution for image drafts when the model supports it."
+                  description={
+                    kind === "images"
+                      ? "The starting resolution for image drafts when the model supports it."
+                      : "The starting resolution for new video drafts. Animate uses it when the model offers a resolution setting."
+                  }
                 >
                   <Select
                     aria-label="Default Resolution"
                     placeholder="Profile Default"
-                    data={[...resolutions]}
-                    value={preferences.imageResolution ?? null}
+                    data={[...(kind === "images" ? resolutions : videoResolutions)]}
+                    value={
+                      (kind === "images"
+                        ? preferences.imageResolution
+                        : preferences.videoResolution) ?? null
+                    }
                     clearable
                     onChange={(choice) =>
-                      save.mutate({
-                        imageResolution: resolutions.find((value) => value === choice) ?? null,
-                      })
+                      save.mutate(
+                        kind === "images"
+                          ? {
+                              imageResolution:
+                                resolutions.find((value) => value === choice) ?? null,
+                            }
+                          : {
+                              videoResolution:
+                                videoResolutions.find((value) => value === choice) ?? null,
+                            },
+                      )
                     }
                   />
                 </SettingRow>

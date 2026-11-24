@@ -362,12 +362,18 @@ export function LibraryImportReview({
                   </>
                 )}
                 {!!Object.keys(preset.settings).length && (
-                  <Table aria-label="Imported Settings">
+                  <Table aria-label="Imported Settings" layout="fixed">
                     <Table.Tbody>
                       {Object.entries(preset.settings).map(([name, value]) => (
                         <Table.Tr key={name}>
-                          <Table.Th>{name}</Table.Th>
-                          <Table.Td>
+                          <Table.Th
+                            scope="row"
+                            w="min(35%, 10rem)"
+                            style={{ overflowWrap: "anywhere" }}
+                          >
+                            {name}
+                          </Table.Th>
+                          <Table.Td style={{ overflowWrap: "anywhere" }}>
                             {typeof value === "object" ? JSON.stringify(value) : String(value)}
                           </Table.Td>
                         </Table.Tr>

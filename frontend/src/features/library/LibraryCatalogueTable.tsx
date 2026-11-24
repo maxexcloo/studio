@@ -316,7 +316,6 @@ export function LibraryCatalogueTable({
                   key: "type",
                   header: "Type",
                   hideOnPhone: true,
-                  width: 150,
                   sortValue: (item: LibraryItem) =>
                     typeLabel(item) === "Unclassified" ? undefined : typeLabel(item),
                   cell: (item: LibraryItem) => (
@@ -412,7 +411,6 @@ export function LibraryCatalogueTable({
           {
             key: "status",
             header: "Status",
-            width: 160,
             sortValue: (item) => statusOf(item).label,
             cell: (item) => {
               const { label, color } = statusOf(item);

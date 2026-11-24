@@ -37,6 +37,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
+import { ComparisonList } from "../compare/ComparisonList";
 import { comparisonMembersQuery } from "../compare/queries";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -96,7 +97,7 @@ import classes from "./GalleryPage.module.css";
 type PageState = GalleryState &
   OpenComposerState & {
     compose?: boolean;
-    /** Arrived from another mode: the gallery opens on its home view, not Uploads. */
+    /** Arrived from another mode and opened the unfiltered gallery. */
     home?: boolean;
     reviewQuery?: string;
     viewer?: boolean;
@@ -105,18 +106,11 @@ type PageState = GalleryState &
 /** A built-in view, or a saved one (`saved:` and its ID). */
 type GalleryView = "gallery" | "uploads" | "comparisons" | "review" | `saved:${string}`;
 const loadReview = () => import("./GalleryReview");
-const loadComparisons = () => import("../compare/ComparisonList");
 const GalleryReview = lazy(() =>
   loadReview().then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
-const ComparisonList = lazy(() =>
-  loadComparisons().then(({ ComparisonList }) => ({ default: ComparisonList })),
-);
-// Review and Comparisons load once the page is idle, so opening them doesn't wait for their code.
-(window.requestIdleCallback || setTimeout)(() => {
-  void loadReview();
-  void loadComparisons();
-});
+// Review loads once the page is idle, so opening it doesn't wait for its code.
+(window.requestIdleCallback || setTimeout)(() => void loadReview());
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -193,8 +187,11 @@ function Gallery() {
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
   const home = state?.home;
-  useEffect(() => {
-    if (home) setFilters((current) => (current.uploads ? { ...current, uploads: false } : current));
+  const homeEntry = useRef<string>(null);
+  useLayoutEffect(() => {
+    if (!home || homeEntry.current === location.key) return;
+    homeEntry.current = location.key;
+    setFilters(emptyGalleryFilters);
   }, [home, location.key, setFilters]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
@@ -697,7 +694,7 @@ function Gallery() {
   const toolbar = useRef<HTMLDivElement>(null);
   const viewButton = useRef<HTMLButtonElement>(null);
   const [countsWanted, setCountsWanted] = useState(false);
-  const viewScroll = useRef<{ key: string; top: number } | null>(null);
+  const viewScroll = useRef<{ key: string; top: number; keepFilters?: boolean } | null>(null);
   useLayoutEffect(() => {
     const host = page.current;
     const controls = toolbar.current;
@@ -717,19 +714,24 @@ function Gallery() {
     const previous = viewScroll.current;
     if (previous?.key !== location.key) return;
     viewScroll.current = null;
+    if (!previous.keepFilters) setFilters(emptyGalleryFilters);
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: previous.top, behavior: "instant" });
       viewButton.current?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
-  }, [location.key, routeView]);
-  const leaveView = () => {
+  }, [location.key, routeView, setFilters]);
+  const leaveView = (keepFilters = false) => {
+    if (viewScroll.current) viewScroll.current.keepFilters = keepFilters;
     const entry = window.history.state?.key;
     // An action that stages work in the composer can navigate while leaving Review.
     setTimeout(() => {
       if (window.history.state?.key !== entry) return;
       if (state?.viewFrom) void routerNavigate(-1);
-      else void routerNavigate(base, { replace: true });
+      else {
+        if (!keepFilters) setFilters(emptyGalleryFilters);
+        void routerNavigate(base, { replace: true });
+      }
     });
   };
   const saved = useSavedViews(kind, { search: query, filters, sort }, countsWanted);
@@ -744,7 +746,7 @@ function Gallery() {
       setFilters({ ...emptyGalleryFilters, ...view.filters });
       setSort(view.sort);
       if (similar) removeSimilar();
-      if (routeView) leaveView();
+      if (routeView) leaveView(true);
       return;
     }
     if (next === "review" || next === "comparisons") {
@@ -772,8 +774,13 @@ function Gallery() {
       setQuery("");
       setFilters({ ...emptyGalleryFilters, uploads });
       setSort("newest");
-    } else if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
-    if (routeView) leaveView();
+    } else if (uploads) {
+      if (!filters.uploads) setFilters({ ...filters, uploads: true, rating: "" });
+    } else {
+      setFilters(emptyGalleryFilters);
+      if (similar && !routeView) removeSimilar();
+    }
+    if (routeView) leaveView(uploads);
   }
   const counts = useQuery({ ...galleryViewCountsQuery(kind), enabled: countsWanted }).data;
   const comparisons = useQuery({
@@ -839,19 +846,13 @@ function Gallery() {
           key={kind}
           listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
           leftAt={leftAt}
-          close={leaveView}
+          close={() => leaveView()}
           view={view}
         />
       </Suspense>
     );
   }
-  if (routeView === "comparisons") {
-    return (
-      <Suspense fallback={loadingView("Loading Comparisons")}>
-        <ComparisonList view={view} />
-      </Suspense>
-    );
-  }
+  if (routeView === "comparisons") return <ComparisonList view={view} />;
   return (
     <Stack
       ref={page}
