@@ -263,7 +263,7 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
   assert.equal(body.stream, true);
   assert.match(
     body.messages[0].content,
-    /Fixture Image[\s\S]*Lead with the light\.[\s\S]*Style: Portrait: make the person the clear focus/,
+    /Fixture Image[\s\S]*Lead with the light\.[\s\S]*Style: Portrait\. Direct attention to the subject's established face/,
   );
   assert.doesNotMatch(body.messages[0].content, /x\.invalid/, "no guide sources");
   // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.

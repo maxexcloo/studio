@@ -57,33 +57,52 @@ test("each kind sorts enabled labels before Custom, and the default falls back t
   ]);
   assert.deepEqual(ids("animate"), [
     "action",
-    "atmosphere",
-    "changing-light",
-    "cinematic",
-    "dialogue",
     "living",
     "locked-camera",
-    "playful",
+    "focus-pull",
+    "changing-light",
+    "cinematic",
+    "atmosphere",
     "reaction",
+    "playful",
     "reveal",
+    "loop",
+    "dialogue",
     "uncensored",
     "custom",
   ]);
   assert.deepEqual(ids("change"), [
-    "closer",
+    "night",
     "new-action",
     "new-angle",
+    "closer",
     "new-setting",
-    "new-visual-treatment",
-    "night",
+    "photographic-realism",
+    "remove-distraction",
+    "repair-detail",
     "simple-background",
+    "new-visual-treatment",
     "wardrobe-swap",
     "warmer",
     "wider",
   ]);
-  // An ID may repeat across kinds: Cinematic is a style and a theme.
-  assert.equal(styles.style("animate", "cinematic").label, "Cinematic Camera");
+  // An ID may repeat across kinds: cinematic identifies both a rewrite style and a motion theme.
+  assert.equal(styles.style("animate", "cinematic").label, "Motivated Camera Move");
   assert.equal(styles.defaultId(), rest[0].id);
+});
+
+test("change templates send a complete request for the actions they target", () => {
+  const styles = store();
+  const allows = (action) =>
+    styles.usable("change").filter((style) => style.actions.includes(action));
+  assert.ok(allows("edit").some(({ id }) => id === "repair-detail"));
+  assert.ok(!allows("recreate").some(({ id }) => id === "repair-detail"));
+  assert.ok(allows("recreate").some(({ id }) => id === "new-angle"));
+  assert.ok(!allows("edit").some(({ id }) => id === "new-angle"));
+  for (const id of ["photographic-realism", "new-visual-treatment", "wardrobe-swap"])
+    assert.deepEqual(styles.style("change", id).actions, ["edit", "recreate"]);
+  for (const { id, instruction } of styles.usable("change"))
+    assert.ok(instruction.length <= 500, `${id} fits the change request without clipping`);
 });
 
 test("a chat draft stays AI-Drafted until approved", () => {
