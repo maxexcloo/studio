@@ -209,8 +209,8 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
     options: {
       model: byName(keys("model"), (key) => modelNames.get(key) || modelKeyName(key)),
       lora: byName(keys("lora"), (key) => loraName(key, loraInfo.data?.loras[key])),
-      size: [...(facets.data?.sizes || [])].sort((a, b) => compareNames(a.label, b.label)),
-      aspect: [...(facets.data?.aspects || [])].sort((a, b) => compareNames(a.label, b.label)),
+      size: facets.data?.sizes || [],
+      aspect: facets.data?.aspects || [],
       tag: facets.data?.tags || [],
       origin: galleryOrigins as GalleryFilterOption[],
     } satisfies Record<Facet, GalleryFilterOption[]>,
