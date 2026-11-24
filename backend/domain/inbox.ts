@@ -32,6 +32,7 @@ import {
 } from "../persistence/runtime.ts";
 import { promptInstruction } from "./../prompt-instructions.js";
 import type { GenerationAccount } from "./admission.ts";
+import type { ChatNotes } from "./chat-notes.ts";
 import type { DreamItem } from "./dream.ts";
 import type { Issue } from "./issues.ts";
 import { type Projects, projectPatch, stylesWithChoice } from "./projects.ts";
@@ -74,6 +75,8 @@ interface InboxRecord {
   snoozed: { key: string; until: string; evidence?: string[] }[];
   /** What the person turned down, newest first, with any reason they gave, which the text model reads. */
   reasons: { title: string; reason: string }[];
+  /** Proposals declined within `limits.declinedMs`, newest first, with their drafts kept for Undo. */
+  declined?: { proposal: Stored; index: number; at: string; reason: string }[];
   /** Keys of the cards Dream saved on its own, which it never proposes again once gone. */
   autoSaved?: string[];
   /** When the latest batch began, and how many proposals Dream made on its latest day. */
@@ -95,7 +98,8 @@ interface InboxWriter {
 /**
  * Batches start at most every `batchMs` while Studio is idle; Dream makes at most `daily`
  * proposals a day, keeps `pending` waiting and `perProject` per project. A dismissal snoozes for
- * `snoozeMs`. Undo reaches the latest `accepted`; the text model reads the latest `reasons`.
+ * `snoozeMs`. Undo reaches the latest `accepted`, and a declined proposal for `declinedMs`, past its
+ * banner; the text model reads the latest `reasons`.
  */
 const limits = {
   batchMs: 6 * 3_600_000,
@@ -103,6 +107,7 @@ const limits = {
   pending: 12,
   perProject: 2,
   snoozeMs: 14 * 86_400_000,
+  declinedMs: 60_000,
   accepted: 20,
   reasons: 20,
 };
@@ -427,11 +432,12 @@ export function createInbox(options: {
     ): DreamItem[];
     drafts(ownerId: string, proposalId: string): DreamItem[];
     promote(ownerId: string, proposalId: string, projectId: string): void;
-    detachProject(ownerId: string, projectId: string): void;
+    detachProject(ownerId: string, projectId: string): Promise<void>;
     dropDrafts(ownerId: string, keep: Set<string>): Promise<void>;
   };
   /** The owner's results with these ids, as lists show them. */
   items(ownerId: string, ids: string[]): DreamItem[];
+  notes: Pick<ChatNotes, "untie">;
   now?: () => number;
 }) {
   const { projects, now = Date.now } = options;
@@ -449,8 +455,14 @@ export function createInbox(options: {
   const today = () => new Date(now()).toDateString();
   const projectOf = (ownerId: string, id?: string) =>
     projects.list(ownerId).find((project) => project.id === id);
+  const undoable = (record: InboxRecord) =>
+    (record.declined || []).filter((entry) => now() - Date.parse(entry.at) < limits.declinedMs);
   const keep = (record: InboxRecord) =>
-    new Set(record.proposals.filter((entry) => entry.kind === "project").map((entry) => entry.id));
+    new Set(
+      [...record.proposals, ...undoable(record).map((entry) => entry.proposal)]
+        .filter((entry) => entry.kind === "project")
+        .map((entry) => entry.id),
+    );
   /** Whether a proposal still applies: its project, rule and card are as it found them. */
   function current(ownerId: string, proposal: Stored) {
     if (proposal.sourceChat && Object.hasOwn(projects.chats(ownerId), proposal.sourceChat))
@@ -932,12 +944,29 @@ export function createInbox(options: {
       ...record.accepted,
     ].slice(0, limits.accepted);
   }
-  /** Takes proposals out of the Inbox, snoozed, noting the reason; drops their samples. */
+  async function removeProject(ownerId: string, projectId: string) {
+    await options.dream.detachProject(ownerId, projectId);
+    options.notes.untie(ownerId, projectId);
+    projects.remove(ownerId, projectId);
+  }
+  /**
+   * Takes proposals out of the Inbox, snoozed, noting the reason; their samples go once Undo can no
+   * longer bring them back.
+   */
   async function dismiss(ownerId: string, ids: string[] | "all", reason = "") {
     const record = load(ownerId);
     const gone = ids === "all" ? record.proposals : ids.map((id) => find(record, id));
     const until = new Date(now() + limits.snoozeMs).toISOString();
     const words = clean(reason, maxDismissReason);
+    record.declined = [
+      ...gone.map((proposal) => ({
+        proposal,
+        index: record.proposals.indexOf(proposal),
+        at: stamp(),
+        reason: words,
+      })),
+      ...undoable(record),
+    ];
     record.proposals = record.proposals.filter((entry) => !gone.includes(entry));
     record.snoozed = [
       ...record.snoozed.filter(
@@ -1082,28 +1111,46 @@ export function createInbox(options: {
     dismiss: (ownerId: string, id: string, reason?: string) => dismiss(ownerId, [id], reason),
     /** Clear Inbox: dismisses every proposal. */
     clear: (ownerId: string, reason?: string) => dismiss(ownerId, "all", reason),
-    /** Takes back an accepted proposal, while nothing has changed what it did since. */
-    undo(ownerId: string, id: string) {
-      runtimeTransaction(options.dataDir, () => {
+    /** Deletes a project: stops its open Dream work, and leaves its results, chats and notes without it. */
+    removeProject,
+    /**
+     * Brings back a declined proposal, or takes back an accepted one while nothing has changed
+     * what it did since.
+     */
+    async undo(ownerId: string, id: string) {
+      const declined = undoable(load(ownerId)).find((entry) => entry.proposal.id === id);
+      if (declined) {
+        const { proposal, index, reason } = declined;
         const record = load(ownerId);
-        const accepted = record.accepted.find((entry) => entry.id === id);
-        if (!accepted) throw failure("There is nothing to undo.", 409);
-        const { projectId, change, revision, rule, adoption, card, chat } = accepted.undo;
+        record.proposals.splice(index, 0, proposal);
+        record.declined = record.declined!.filter((entry) => entry.proposal.id !== id);
+        record.snoozed = record.snoozed.filter((entry) => entry.key !== proposal.key);
+        const said = record.reasons.findIndex(
+          (entry) => entry.title === proposal.title && entry.reason === reason,
+        );
+        if (said >= 0) record.reasons.splice(said, 1);
+        save(ownerId, record);
+        return read(ownerId);
+      }
+      const accepted = load(ownerId).accepted.find((entry) => entry.id === id);
+      if (!accepted) throw failure("There is nothing to undo.", 409);
+      const { projectId, change, revision, rule, adoption, card, chat } = accepted.undo;
+      if (projectId && !change) {
+        const project = projectOf(ownerId, projectId);
+        if (!project || revisionOf(project) !== revision)
+          throw failure("Undo can only remove a project unchanged since it was accepted.", 409);
+        const attached = Object.entries(projects.chats(ownerId)).filter(
+          ([, entry]) => entry.projectId === projectId,
+        );
+        if (attached.some(([id, entry]) => id !== chat?.id || entry.at !== chat.at))
+          throw failure("Detach the project's chats before undoing it.", 409);
+        await removeProject(ownerId, projectId);
+      }
+      runtimeTransaction(options.dataDir, () => {
         if (projectId && change) {
           if (projectOf(ownerId, projectId)?.previous?.change !== change)
             throw failure("A later change replaced it; undo that in the project first.", 409);
           projects.undo(ownerId, projectId);
-        } else if (projectId) {
-          const project = projectOf(ownerId, projectId);
-          if (!project || revisionOf(project) !== revision)
-            throw failure("Undo can only remove a project unchanged since it was accepted.", 409);
-          const attached = Object.entries(projects.chats(ownerId)).filter(
-            ([, entry]) => entry.projectId === projectId,
-          );
-          if (attached.some(([id, entry]) => id !== chat?.id || entry.at !== chat.at))
-            throw failure("Detach the project's chats before undoing it.", 409);
-          options.dream.detachProject(ownerId, projectId);
-          projects.remove(ownerId, projectId);
         } else if (rule) {
           if (adoption) options.taste.unadopt(ownerId, adoption);
         } else if (card) {
@@ -1112,12 +1159,13 @@ export function createInbox(options: {
             throw failure("Undo can only remove a card unchanged since it was accepted.", 409);
           options.deleteCard(ownerId, card.kind, card.id);
         }
+        const record = load(ownerId);
         if (accepted.autoKey)
           record.snoozed.push({
             key: accepted.autoKey,
             until: new Date(now() + limits.snoozeMs).toISOString(),
           });
-        record.accepted = record.accepted.filter((entry) => entry !== accepted);
+        record.accepted = record.accepted.filter((entry) => entry.id !== id);
         save(ownerId, record);
       });
       return read(ownerId);

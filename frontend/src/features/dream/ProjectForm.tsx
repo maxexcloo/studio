@@ -285,7 +285,7 @@ export function ProjectForm({
       >
         <MultiSelect
           label="Profiles"
-          description="Chats use only these; none for any."
+          description="Chats and Dream use only these; none for any."
           placeholder={draft.constraints.profiles.length ? undefined : "Any"}
           searchable
           nothingFoundMessage="No Matches"

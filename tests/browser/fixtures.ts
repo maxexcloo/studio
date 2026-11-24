@@ -1608,6 +1608,8 @@ export async function serveDream(
     known: new Map<string, any>(),
     projects: options.projects ?? [],
     proposals: options.proposals ?? [],
+    /** Declined proposals, by id, with their place, so Undo can bring one back. */
+    declined: new Map<string, { proposal: any; index: number }>(),
     requests: [] as { method: string; path: string; body: any }[],
   };
   const show = () => ({
@@ -1763,7 +1765,8 @@ export async function serveDream(
       });
     }
     if (path === "/api/dream/notes") return route.fulfill({ json: { notes: [] } });
-    // As the backend: Accept applies a rule or a brief edit (as edited), Dismiss and Clear drop.
+    // As the backend: Accept applies a rule or a brief edit (as edited), Dismiss and Clear drop,
+    // and Undo brings back a declined proposal.
     const inbox = () => ({ proposals: state.proposals });
     if (path === "/api/dream/inbox") return route.fulfill({ json: inbox() });
     if (path === "/api/dream/inbox/clear") {
@@ -1772,10 +1775,20 @@ export async function serveDream(
     }
     const proposalRoute = /^\/api\/dream\/inbox\/([^/]+)\/(accept|dismiss|undo)$/.exec(path);
     if (proposalRoute) {
-      const proposal = state.proposals.find((entry) => entry.id === proposalRoute[1]);
-      if (proposalRoute[2] === "undo") return route.fulfill({ json: inbox() });
+      const id = proposalRoute[1];
+      const proposal = state.proposals.find((entry) => entry.id === id);
+      if (proposalRoute[2] === "undo") {
+        const declined = state.declined.get(id);
+        if (declined) state.proposals.splice(declined.index, 0, declined.proposal);
+        state.declined.delete(id);
+        return route.fulfill({ json: inbox() });
+      }
+      const index = state.proposals.indexOf(proposal);
       state.proposals = state.proposals.filter((entry) => entry !== proposal);
-      if (proposalRoute[2] === "dismiss") return route.fulfill({ json: inbox() });
+      if (proposalRoute[2] === "dismiss") {
+        state.declined.set(id, { proposal, index });
+        return route.fulfill({ json: inbox() });
+      }
       const change = body.change ?? proposal.change;
       if (change.rule)
         taste.preferences.prefer = [taste.preferences.prefer, change.rule]

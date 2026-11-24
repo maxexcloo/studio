@@ -494,10 +494,13 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
           );
         return mcpJson({ project: await shown(await attach(found.id)) });
       }
-      const current = (await api("POST", "/api/dream/projects/activity", { chat: need() }, signal))
-        .project;
       if (action === "show") {
-        const { projects } = await api("GET", "/api/dream/projects", undefined, signal);
+        const { project: current, projects } = await api(
+          "GET",
+          `/api/dream/projects?chat=${encodeURIComponent(need())}`,
+          undefined,
+          signal,
+        );
         return mcpJson({
           project: await shown(current),
           projects: projects.map(({ name }) => name),
@@ -518,9 +521,12 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       };
       if (action === "create") {
         if (!name) throw new Error("Pass name for the new project.");
+        need();
         const created = (await api("POST", "/api/dream/projects", body, signal)).project;
         return mcpJson({ project: await shown(await attach(created.id)) });
       }
+      const current = (await api("POST", "/api/dream/projects/activity", { chat: need() }, signal))
+        .project;
       if (!current) throw new Error("This chat has no project: attach or create one first.");
       if (!Object.keys(body).length) throw new Error("Pass what the user changed.");
       const updated = (

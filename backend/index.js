@@ -1185,6 +1185,7 @@ const inbox = createInbox({
   likeness: (a, b) => imageSearch.likeness(a, b),
   dream,
   items: (ownerId, ids) => resultNumbers.numbered(galleryItems({ ownerId, ids })),
+  notes: chatNotes,
 });
 registerDreamRoutes(app, {
   dream,
