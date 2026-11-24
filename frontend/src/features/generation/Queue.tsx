@@ -475,19 +475,19 @@ function QueueRow({
           onClick={() => setOpened((open) => !open)}
         >
           <Stack gap={2}>
-            <Text size="sm" lineClamp={2}>
-              {String(job.input?.prompt || "Generation")}
-            </Text>
-            <Group gap={6} wrap="nowrap">
+            <Group gap={6} wrap="nowrap" align="flex-start">
+              <Text size="sm" lineClamp={2}>
+                {String(job.input?.prompt || "Generation")}
+              </Text>
               {job.dream && (
                 <Badge size="xs" color="gray" miw="max-content">
                   Dream
                 </Badge>
               )}
-              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
-                {status}
-              </Text>
             </Group>
+            <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
+              {status}
+            </Text>
             {reason && !paused && (
               <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2} title={reason}>
                 {reason}

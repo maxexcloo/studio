@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Group, Menu, Popover, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Button, Menu, Popover, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -72,17 +72,22 @@ function profileUse(stats?: ProfileStats) {
 }
 
 /** A saved version, or Default for one never edited; phones fold it under the name. */
-function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean }) {
+function Version({ version }: { version: number }) {
   const phone = usePhone();
   return (
-    <Group gap="xs" wrap="nowrap">
-      <Text size={phone ? "xs" : "sm"} c={!version || phone ? "dimmed" : undefined}>
-        {version ? `v${version}` : "Default"}
-      </Text>
-      {aiDrafted && <Badge color="orange">AI</Badge>}
-    </Group>
+    <Text size={phone ? "xs" : "sm"} c={!version || phone ? "dimmed" : undefined}>
+      {version ? `v${version}` : "Default"}
+    </Text>
   );
 }
+
+/** A drafted definition's AI badge, after its name. */
+const aiBadge = (aiDrafted?: boolean) =>
+  aiDrafted && (
+    <Badge component="span" size="sm" color="orange">
+      AI
+    </Badge>
+  );
 
 /** The definition editor that is open: an existing ID, or "" with `creating` for a new one. */
 interface Editing {
@@ -386,7 +391,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                     <TableRecord
                       name={
                         <>
-                          {entry.name || entry.id}{" "}
+                          {entry.name || entry.id} {aiBadge(entry.aiDrafted)}{" "}
                           {statsOf(entry.id)?.failing && (
                             <Badge component="span" size="sm" color="red">
                               Failing
@@ -570,7 +575,11 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               sortValue: (entry) => entry.name,
               cell: (entry) => (
                 <TableRecord
-                  name={entry.name}
+                  name={
+                    <>
+                      {entry.name} {aiBadge(entry.aiDrafted)}
+                    </>
+                  }
                   openLabel={`Edit ${entry.name}`}
                   onOpen={() => setEditing({ kind: "guide", id: entry.packId })}
                 />

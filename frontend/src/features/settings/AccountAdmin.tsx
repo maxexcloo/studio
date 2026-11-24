@@ -686,29 +686,29 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             sortValue: (account) => account.username,
             cell: (account) => (
               <>
-                {/* Phones keep the group on the name's line. */}
+                {/* Its badges follow the name; phones keep the group on the same line. */}
                 <Group gap="xs" wrap="nowrap" justify="space-between">
-                  <Text size="sm" fw={500} truncate miw={0}>
-                    {account.username}
-                  </Text>
+                  <Group gap={4} wrap="nowrap" miw={0}>
+                    <Text size="sm" fw={500} truncate miw={0}>
+                      {account.username}
+                    </Text>
+                    {(account.disabled || account.role === "administrator") && (
+                      <Badge miw="max-content" color={account.disabled ? "red" : "gray"}>
+                        {account.disabled ? "Disabled" : "Administrator"}
+                      </Badge>
+                    )}
+                    {account.signInLinked && (
+                      <Badge miw="max-content" color="gray">
+                        Single Sign-On
+                      </Badge>
+                    )}
+                    {identitiesOf(account).length > 0 && (
+                      <Badge miw="max-content" color="gray">
+                        Chat Gateway
+                      </Badge>
+                    )}
+                  </Group>
                   {phone && groupCell(account)}
-                </Group>
-                <Group gap={4} mt={4}>
-                  {(account.disabled || account.role === "administrator") && (
-                    <Badge miw="max-content" color={account.disabled ? "red" : "gray"}>
-                      {account.disabled ? "Disabled" : "Administrator"}
-                    </Badge>
-                  )}
-                  {account.signInLinked && (
-                    <Badge miw="max-content" color="gray">
-                      Single Sign-On
-                    </Badge>
-                  )}
-                  {identitiesOf(account).length > 0 && (
-                    <Badge miw="max-content" color="gray">
-                      Chat Gateway
-                    </Badge>
-                  )}
                 </Group>
               </>
             ),
