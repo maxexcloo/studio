@@ -170,6 +170,14 @@ test("new accounts start on the default access profile at once: local, single si
   assert.equal(chat.authenticated, true);
   assert.equal(profileOf("chat.two@example.com").accessProfileId, "starter");
   assert.equal(profileOf("chat.two@example.com").identity.provider, "gateway");
+  for (const id of [local.id, signedOn.access.userId, chat.userId]) {
+    const settings = store.accountDreamDefaults(id);
+    assert.equal(settings.enabled, true);
+    assert.equal(settings.paused, true);
+    assert.equal(settings.dailyImages, 100);
+    assert.equal(settings.dailyVideos, 50);
+    assert.equal(settings.videos, true);
+  }
   assert.equal(
     store.gatewayAccountAccess("chat-two").userId,
     chat.userId,

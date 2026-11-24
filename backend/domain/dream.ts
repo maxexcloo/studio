@@ -784,6 +784,7 @@ export function createDream(options: {
   idleMinutes(kind: Kind): number;
   /** The settings an administrator forces on every account, over its own choice. */
   overrides?(): Partial<DreamSettings>;
+  accountDefaults?(ownerId: string): Partial<DreamSettings> | undefined;
   store: Store;
   taste: Taste;
   owners(): string[];
@@ -914,13 +915,14 @@ export function createDream(options: {
       | Partial<DreamRecord>
       | undefined;
     const overrides = options.overrides?.() ?? {};
+    const defaults = options.accountDefaults?.(ownerId);
     return {
       recent: [],
       ...saved,
       settings: Object.fromEntries(
         (Object.keys(dreamDefaults) as (keyof DreamSettings)[]).map((key) => [
           key,
-          overrides[key] ?? saved?.settings?.[key] ?? dreamDefaults[key],
+          overrides[key] ?? saved?.settings?.[key] ?? defaults?.[key] ?? dreamDefaults[key],
         ]),
       ) as DreamSettings,
     };

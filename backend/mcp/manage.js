@@ -262,7 +262,7 @@ export function registerManageTools({
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings updates enabled, paused, images, videos, uncensored, dailyImages, dailyVideos and useLoadedProfile, subject to admin locks. discarded lists discards.",
+    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings sets enabled, paused, images, videos, uncensored, dailyImages, dailyVideos and useLoadedProfile. discarded lists discards.",
     {
       action: z.enum([
         "status",

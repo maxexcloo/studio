@@ -39,9 +39,9 @@ const { createModelCatalogue } = await import("./model/catalogue.js");
 const { imageRequest, radianceInfo } = await import("./providers/radiance.ts");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
-test("a cold Radiance profile retains installed LoRAs and catalogue triggers without waking another model or worker", async () => {
-  const name = "styles/ink.safetensors";
-  const model = "krea-2-turbo-bf16";
+const inventoryModel = "krea-2-turbo-bf16";
+{
+  const model = inventoryModel;
   const defaults = { model, width: 1024, height: 1024, steps: 8, cfg: 1, count: 1 };
   saveImportedWorkflow({
     studio: {
@@ -66,6 +66,11 @@ test("a cold Radiance profile retains installed LoRAs and catalogue triggers wit
       2: { class_type: "SaveImage", inputs: { images: ["1", 0], filename_prefix: "studio" } },
     },
   });
+}
+
+test("a cold Radiance profile retains installed LoRAs and catalogue triggers without waking another model or worker", async () => {
+  const name = "styles/ink.safetensors";
+  const model = inventoryModel;
   loraCatalogue().edit(`loras/${name}`, { families: ["krea2"], triggers: ["ink"] });
   const installed = { LoraLoader: { input: { required: { lora_name: [[name]] } } } };
   const store = {
@@ -102,7 +107,7 @@ test("a cold Radiance profile retains installed LoRAs and catalogue triggers wit
 test("a Dream profile proves the exact worker has its base model resident", async (t) => {
   const { inferModels } = await import("./model/models.js");
   const { createGenerationSubmission } = await import("./generation-routes.js");
-  const model = "krea-2-turbo-bf16";
+  const model = inventoryModel;
   const stats = { radiance: [{ id: model, state: "resident" }] };
   const info = radianceInfo(stats.radiance);
   const profileId = "custom:radiance-inventory";
