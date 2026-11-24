@@ -221,8 +221,8 @@ export function GallerySelectionBar({
         menu: assistMenu({
           settings: [
             length,
-            ...profiles,
             ...(modifiers.offered.length ? [modifiers.settingsAction()] : []),
+            ...profiles,
           ],
           templates: templates
             .filter((template) => template.id !== "custom")
