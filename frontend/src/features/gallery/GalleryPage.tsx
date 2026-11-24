@@ -37,6 +37,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
+import { ComparisonList } from "../compare/ComparisonList";
 import { comparisonMembersQuery } from "../compare/queries";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -105,18 +106,11 @@ type PageState = GalleryState &
 /** A built-in view, or a saved one (`saved:` and its ID). */
 type GalleryView = "gallery" | "uploads" | "comparisons" | "review" | `saved:${string}`;
 const loadReview = () => import("./GalleryReview");
-const loadComparisons = () => import("../compare/ComparisonList");
 const GalleryReview = lazy(() =>
   loadReview().then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
-const ComparisonList = lazy(() =>
-  loadComparisons().then(({ ComparisonList }) => ({ default: ComparisonList })),
-);
-// Review and Comparisons load once the page is idle, so opening them doesn't wait for their code.
-(window.requestIdleCallback || setTimeout)(() => {
-  void loadReview();
-  void loadComparisons();
-});
+// Review loads once the page is idle, so opening it doesn't wait for its code.
+(window.requestIdleCallback || setTimeout)(() => void loadReview());
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -858,13 +852,7 @@ function Gallery() {
       </Suspense>
     );
   }
-  if (routeView === "comparisons") {
-    return (
-      <Suspense fallback={loadingView("Loading Comparisons")}>
-        <ComparisonList view={view} />
-      </Suspense>
-    );
-  }
+  if (routeView === "comparisons") return <ComparisonList view={view} />;
   return (
     <Stack
       ref={page}
