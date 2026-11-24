@@ -13,8 +13,8 @@ import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout"
 import { ComparisonRatingButtons } from "./ComparisonRatingButtons";
 import { comparisonTitle, comparisonsQuery } from "./queries";
 
-import filterClasses from "../gallery/GalleryFilters.module.css";
 import toolbarClasses from "../../ui/PageToolbar.module.css";
+import filterClasses from "../gallery/GalleryFilters.module.css";
 import galleryClasses from "../gallery/GalleryPage.module.css";
 
 const ratings = [
