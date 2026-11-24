@@ -1,7 +1,7 @@
 import { Button, Group, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { maxLoras } from "../../../../shared/profiles";
 import type { ImageChangeAction } from "../../../../shared/suggestions";
@@ -106,16 +106,11 @@ export function usePromptAssistant({
   scopeKey?: string;
   /**
    * Sends Custom…'s text as a change to the draft (`useDraftChange`), proposed in the prompt for
-   * Undo, with `suggestions` (given what picking one does) beside the text. Without it, Custom…
-   * rewrites with the Custom style.
+   * Undo. Without it, Custom… rewrites with the Custom style.
    */
   change?: {
     send: (request: string) => void;
     pending: boolean;
-    suggestions?: (
-      pick: (request: string) => void,
-      render: (action: ToolAction) => ReactNode,
-    ) => ReactNode;
   };
 }) {
   const status = useQuery(assistantQuery);
@@ -477,7 +472,6 @@ export function usePromptAssistant({
       title="Custom Improvement"
       action="Improve Prompt"
       onSend={ask}
-      suggestions={change?.suggestions}
     />
   );
   const preview = negativeIdea?.key === negativeKey ? negativeIdea.value : undefined;

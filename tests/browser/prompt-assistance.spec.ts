@@ -366,7 +366,7 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
   await expect(dialog).toBeHidden();
 });
 
-test("Custom… rewrites the draft's prompt in place, for Generate to run or Undo to restore, and suggests changes", async ({
+test("Custom… rewrites the draft's prompt in place, for Generate to run or Undo to restore", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -430,24 +430,6 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(request).toHaveValue("make it night");
   await request.press("Enter");
   await expect(prompt).toHaveValue("A castle at night");
-  // A suggestion fits the draft as it was before the proposal, reusing the menu's answer, and asks
-  // at once.
-  await assist(page, "Custom…");
-  await promptMenu(dialog, "Change");
-  await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
-  await expect(dialog).toBeHidden();
-  await expect.poll(() => asked.length).toBe(4);
-  expect(asked.slice(2)).toEqual([
-    night,
-    {
-      surface: "draft",
-      kind: "image",
-      profileId: "image:test",
-      prompt: "A castle at noon",
-      request: "add rain",
-      actions: ["recreate"],
-    },
-  ]);
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.prompt).toBe("A castle at night");
