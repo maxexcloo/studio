@@ -176,7 +176,7 @@ export function ComparePage() {
   const aspect = aspects.length ? Math.min(...aspects) : 1;
   return (
     <Stack gap="md" className={classes.page} {...hold.handlers}>
-      <Group justify="space-between" wrap={phone ? "wrap" : "nowrap"} gap="sm">
+      <div className={classes.header}>
         <Group gap="xs" wrap="nowrap" miw={0}>
           <Tooltip label={backLabel}>
             <ActionIcon
@@ -197,8 +197,6 @@ export function ComparePage() {
           <Title order={1} size="h3">
             {comparisonTitle({ axis, dream })}
           </Title>
-        </Group>
-        <Group gap="xs" justify="flex-end" wrap="nowrap">
           <SegmentedControl
             aria-label="Compare Layout"
             size="xs"
@@ -210,11 +208,11 @@ export function ComparePage() {
               ...(canSplit ? [{ value: "split", label: "Split" }] : []),
             ]}
           />
-          <Text size="sm" c="dimmed" ta="right">
-            {[plural(variants.length, "Variant"), seed && `Seed ${seed}`]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
+        </Group>
+        <Text size="sm" c="dimmed" ta="center">
+          {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
+        </Text>
+        <Group gap="xs" justify="flex-end" wrap="nowrap">
           <ComparisonRatingButtons comparison={comparison.data} />
           {again.length > 1 &&
             (phone ? (
@@ -238,7 +236,7 @@ export function ComparePage() {
               </Button>
             ))}
         </Group>
-      </Group>
+      </div>
       {card && (
         <Text size="sm" c="dimmed">
           {`The winner joins ${card.name}'s images in Library.`}
