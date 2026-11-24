@@ -443,13 +443,33 @@ Reply with JSON only: {"issues": [{"issue": "...", "entries": [1, 4], "rule": ".
     label: "Image Change Directions",
     area: "Gallery",
     suggestions: true,
-    text: `Suggest {{maxSuggestions}} useful, distinct changes from areas such as {{areas}}. Keep the subject's identity. {{specifics}} Name the actual visible change, including when it concerns framing or style.`,
+    text: `Suggest {{maxSuggestions}} useful, distinct changes. Choose compatible angles from {{areas}}, and drop any that would be forced in this scene. Keep the subject's identity.
+{{specifics}}
+Name the actual visible change, including when it concerns framing or style. Spread the ideas across different parts of the scene and different reasons to make a new version. Do not turn the list into a series of outfit swaps, lighting presets or near-identical crops.`,
+  },
+  "image-edit-ideas": {
+    label: "Edit Idea Directions",
+    area: "Gallery",
+    suggestions: true,
+    text: `Every idea is an edit of this image. Name the part to alter and the visible result. Prioritize changes that preserve the viewpoint, geometry, subject and setting: a targeted correction, a material change, a specific replacement, a purposeful removal or a different local treatment. Keep the rest of the image intact. A style change may treat the whole image while preserving its content and composition. Leave major reframing, restaging and scene changes to Recreate.`,
+  },
+  "image-mixed-ideas": {
+    label: "Mixed Image Idea Directions",
+    area: "Gallery",
+    suggestions: true,
+    text: `Provide both small edits that retain the source composition and fuller alternatives that are worth recreating. Lead with ideas from different scales. Choose changes that work for the specific image and avoid giving two treatments of the same feature unless they serve different purposes.`,
+  },
+  "image-recreate-ideas": {
+    label: "Recreate Idea Directions",
+    area: "Gallery",
+    suggestions: true,
+    text: `Each idea is a new version of the source that can be described as a complete result. Keep its recognizable subject and premise. Prefer alternatives that change the visual story through a viewpoint, a different moment in the action, a changed subject–setting relationship, or a distinctly different medium. Include only the details that belong to the proposed change, and leave unrelated source details in place.`,
   },
   "image-style-suggestion": {
     label: "Image Style Suggestions",
     area: "Writing Standard",
     suggestions: true,
-    text: `Identify the image's rendering medium from the visible result, or its caption and prompt if the image is unavailable. If the current prompt explicitly changes that style, use its intended medium. For a draft, use the prompt and any relevant references. Include one option that names a distinct medium suited to this image. For an illustration or render, consider a photograph. For a photograph, consider a gouache painting, ink illustration or animation cel. Keep the subject, outfit, action, setting and framing.`,
+    text: `Identify the image's rendering medium from the visible result, or its caption and prompt if the image is unavailable. If the current prompt explicitly changes that style, use its intended medium. For a draft, use the prompt and any relevant references. Include one option that names a distinct medium suited to this image and a concrete trait of that medium that would suit this particular scene. For an illustration or render, consider a photograph. For a photograph, consider a painted, drawn, printmaking or animated treatment suited to the subject. Keep the subject, outfit, action, setting and framing.`,
   },
   "improve-card": {
     label: "Improve Card Description",
@@ -553,6 +573,12 @@ Prompting guide: {{guide}}`,
     area: "Compose",
     suggestions: true,
     text: `Write {{maxSuggestions}} useful, distinct, standalone {{kind}} prompts for the person, drawing on their taste when available and avoiding copies of liked prompts.`,
+  },
+  "opening-frame-idea-directions": {
+    label: "Opening Frame Idea Directions",
+    area: "Gallery",
+    suggestions: true,
+    text: `Consider whichever of these angles the frame actually supports: {{angles}}. Use a mix where possible. Choose a different anchor or consequence for each idea, and vary what drives the motion, how it progresses and where attention ends. For a static scene, animate what this frame genuinely offers: weather, light, reflections or materials, or give a camera move a reason to happen.`,
   },
   "preserve-identity": {
     label: "Preserve Subject Identity",
@@ -737,13 +763,13 @@ Candidates: {{candidates}}`,
     area: "Gallery",
     suggestions: true,
     text: `You suggest what could happen when a person's image becomes a short video. Treat {{availableImages}} as the opening frame. Use taste for tone only.
-Offer {{maxSuggestions}} distinct ideas. Each uses a different visible detail or relationship in this frame and gives it one plausible motion with a clear ending.
+Offer {{maxSuggestions}} distinct ideas. Anchor each in an existing subject, object or visible relationship. Give it a plausible trigger or first motion and a visible end state. Think in one short shot that can begin from this frame, with one main action and at most one supporting motion.
 {{contentRule}}
 {{suggestionChoices}}
-Mix subject action, interaction and environmental motion where supported. Include a camera move only when it reveals or follows something specific. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
+Include a camera move only when it reveals or follows something specific, and say what becomes visible or worth following. Skip generic push-ins, turns, hair movement, and audio-only ideas. Never make a body part's bounce, jiggle or sway the idea; the body moves naturally within whatever action you choose. Never add a new person, outfit, prop, or setting to force an idea, and avoid motion that would substantially change the subject's appearance.
 {{americanEnglish}}
 {{avoidFiller}}
-Name the distinctive action in a Title Case label of at most four words. Give one short sentence saying what moves and how it ends. Leave prompt syntax, shot timings and technical settings to the video prompt writer.
+Name the distinctive action in a Title Case label of at most four words. Give one short sentence naming the anchor, the motion and its visible ending. Leave prompt syntax, shot timings and technical settings to the video prompt writer.
 {{data}}
 Reply with JSON only: {"steps": [{"label": "<label>", "request": "<what happens>"}]}.`,
   },
@@ -810,7 +836,7 @@ Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}
     label: "Specific Change Suggestions",
     area: "Writing Standard",
     suggestions: true,
-    text: `First pick out what is particular to this subject and scene: their pose and expression, each piece of their outfit and accessories, the props, the setting's details, the light and the style. Most changes swap one of those named parts for a specific alternative (the denim jacket for a cropped leather one, standing for sitting on the steps, the cafe for a night market), weighted toward the outfit and pose; at most two are purely photographic (framing, lens or light). Add a material or finish word (shiny, glossy, latex) only when the fabric itself is the change.`,
+    text: `First pick out what is particular to this subject and scene: their pose and expression, each piece of their outfit and accessories, the props, the setting's details, the light and the style. Make each choice a concrete revision tied to one of those details. Where useful, replace one named part, remove a distraction, or name a different moment or spatial relationship. Choose changes for this scene instead of filling a quota of clothing, poses or camera settings. Name a material or finish only when the material itself changes.`,
   },
   "suggestion-variety": {
     label: "Taste & Suggestion Variety",
@@ -898,7 +924,7 @@ Reply with JSON only: {"title": "{{titleRule}}", "prompt": "the finished prompt"
     label: "Video Change Directions",
     area: "Gallery",
     suggestions: true,
-    text: `Suggest {{maxSuggestions}} distinct, concrete changes to the clip ({{angles}}), such as a slower pan or a different motion for the subject. Each changes one part of the clip and preserves its other details.`,
+    text: `Suggest {{maxSuggestions}} useful, distinct changes to the clip. Choose from compatible angles such as {{angles}}. Anchor each idea in the recorded clip's subject, props, setting or action, and name the change and its effect. Explore a different beat, reaction, camera motivation, time or pacing where each would make a meaningful difference. Avoid generic slow motion or camera moves without a purpose. Each changes one part of the clip and preserves its other details.`,
   },
   "visual-descriptions": {
     label: "Concrete Visual Descriptions",
