@@ -16,7 +16,6 @@ import {
 } from "../../shared/characters.ts";
 import { dreamPairAnswers } from "../../shared/dream.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
-import { shapeName } from "../../shared/taste.ts";
 import { mcpJson, outputIndex, scopeMarkdown } from "./media.js";
 
 const maxResults = 50;
@@ -467,7 +466,7 @@ export function registerManageTools({
     server,
     "taste",
     "taste & lora ratings",
-    "The user's taste, when asked: read, refresh or reset. rate_lora: a LoRA from models, like, dislike or none. note: context for Dream.",
+    "The user's taste, when asked: read lists their exclusions, refresh or reset. rate_lora: a LoRA from models, like, dislike or none. note: context for Dream.",
     {
       action: z.enum(["read", "refresh", "reset", "rate_lora", "note"]).default("read"),
       lora: z.string().trim().min(1).max(400).optional(),
@@ -503,20 +502,7 @@ export function registerManageTools({
           : action === "refresh"
             ? await api("POST", "/api/taste/refresh", {}, signal)
             : await api("DELETE", "/api/taste", undefined, signal);
-      return mcpJson({
-        summary: answer.summary || "",
-        likes: answer.likes,
-        dislikes: answer.avoid,
-        exclusions: answer.exclusions,
-        styles: answer.styles,
-        models: answer.models,
-        loras: answer.loras,
-        shapes: answer.shapes?.map(shapeName),
-        tags: answer.tags,
-        user_set: Object.keys(answer.preferences || {}),
-        updated_at: answer.updatedAt,
-        signals: answer.signals,
-      });
+      return mcpJson({ exclusions: answer.exclusions });
     },
   );
 }

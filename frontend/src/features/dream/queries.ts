@@ -149,6 +149,24 @@ export const chatNotesQuery = queryOptions({
   queryFn: () => api<{ notes: ChatNote[] }>("/api/dream/notes"),
 });
 
+/** A chat's model, by profile or tier, as MCP remembers it. */
+type ChatModel = { profile_id: string } | { tier: string };
+/** What a chat's later generate calls keep from its earlier ones (backend/mcp/project.js). */
+export interface RememberedChat {
+  chat: string;
+  image?: ChatModel;
+  video?: ChatModel;
+  loras?: false;
+  count?: number;
+  title?: string;
+  references?: { count: number; until: string };
+  at: string;
+}
+export const chatChoicesQuery = queryOptions({
+  queryKey: ["dream", "chat-choices"],
+  queryFn: () => api<{ chats: RememberedChat[] }>("/api/chat-choices"),
+});
+
 /** What Dream proposes in Dream › Projects' Inbox (backend/domain/inbox.ts). */
 export const inboxQuery = queryOptions({
   queryKey: ["dream", "inbox"],

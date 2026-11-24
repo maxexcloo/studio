@@ -855,6 +855,8 @@ export class McpMedia {
                     }
                   : {}),
                 ...(writing ? { writing } : {}),
+                // What Studio removed from this prompt for the account's Taste exclusions.
+                ...(record.excluded?.[prompt] ? { excluded: record.excluded[prompt] } : {}),
                 count: size,
                 seed: seed === undefined ? "" : String(seed + images),
               },

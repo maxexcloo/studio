@@ -548,7 +548,7 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
               <Text size="sm">
                 Dream and suggestion menus use your likes, dislikes and styles to guide new ideas.
                 Rules apply to Dream. MCP uses the Exclusions list and otherwise runs your prompt as
-                written. If it finds an exclusion, it asks for a revision before queuing.
+                written, removing any excluded words a chat prompt names and saying so.
               </Text>
               <SettingRow
                 label={label("note")}
