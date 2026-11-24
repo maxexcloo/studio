@@ -16,6 +16,7 @@ import { closeWhenTop } from "./ui/popupClicks";
 import { DialogKeyboard } from "./ui/useKeyboard";
 import { useLastWhileClosing } from "./ui/useLastWhileClosing";
 import { usePhone } from "./ui/usePhone";
+import { workspaceModal } from "./ui/workspaceModal";
 const [ComparePage, loadCompare] = lazyLoaded(() =>
   import("./features/compare/ComparePage").then((module) => module.ComparePage),
 );
@@ -135,10 +136,10 @@ function Workspace() {
         closeButtonProps={{
           "aria-label": `Close ${panel === "library" ? "Library" : "Settings"}`,
         }}
-        size={1320}
+        size={workspaceModal.size}
         styles={{
           content: {
-            height: phone ? "100dvh" : "min(92dvh, 1040px)",
+            height: phone ? "100dvh" : workspaceModal.height,
             display: "flex",
             flexDirection: "column",
           },
