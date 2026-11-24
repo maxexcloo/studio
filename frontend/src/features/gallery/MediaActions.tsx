@@ -562,7 +562,8 @@ export function useMediaActions(
           },
         ]
       : []),
-    ...(image && comparison
+    // Not on the comparison's own page.
+    ...(image && comparison && location.pathname !== `/compare/${comparison}`
       ? [
           {
             id: "open-comparison",

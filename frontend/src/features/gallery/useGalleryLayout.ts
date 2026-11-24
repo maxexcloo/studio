@@ -238,11 +238,11 @@ const holdSlop = 10;
 
 /**
  * Phone hold-to-select over any tile with `data-media-id`. With `onMenu`, holding a single tile
- * outside a selection opens its menu instead. `held` marks the tile whose release must not also
- * open it. A second finger, movement or a scroll cancels the hold. The release is watched on the
- * window, so it still ends the hold after virtualisation has removed the tile it began on; it then
- * cancels the click and mouse events, so a menu the hold opened doesn't take them as outside
- * presses. The result stays the same object, so memoised tiles skip scroll renders.
+ * outside a selection, or with no selection, opens its menu instead. `held` marks the tile whose
+ * release must not also open it. A second finger, movement or a scroll cancels the hold. The
+ * release is watched on the window, so it still ends the hold after virtualisation has removed the
+ * tile it began on; it then cancels the click and mouse events, so a menu the hold opened doesn't
+ * take them as outside presses. The result stays the same object, so memoised tiles skip scroll renders.
  */
 export function useHoldToSelect(
   items: MediaItem[],
@@ -278,12 +278,12 @@ export function useHoldToSelect(
     ] as const;
     const hold = () => {
       const { selection, items, onMenu } = latest.current;
-      if (!selection) return;
-      if (onMenu && !selection.selecting && !element.dataset.mediaGroup) {
+      if (onMenu && !selection?.selecting && !element.dataset.mediaGroup) {
         held.current = element.dataset.mediaId!;
         onMenu(held.current);
         return;
       }
+      if (!selection) return;
       const ids = element.dataset.mediaGroup?.split(" ") || [element.dataset.mediaId];
       const group = items.filter((item) => ids.includes(item.id));
       if (!group.length) return;

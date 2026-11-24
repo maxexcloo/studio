@@ -47,6 +47,8 @@ test("Import uploads many files or a folder, lists each failure and shows the ne
     page.getByText("broken.png: That image can't be read.", { exact: true }),
   ).toBeVisible();
   expect(sent).toEqual(["one.png", "broken.png", "two.png"]);
+  // A failure stays until dismissed; on phones it covers the toolbar.
+  await page.getByRole("button", { name: "Dismiss Notification", exact: true }).click();
   // The gallery turns to Uploads to show them.
   await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
     "Uploads",
