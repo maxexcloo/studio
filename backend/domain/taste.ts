@@ -19,6 +19,7 @@ import {
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
 import { promptInstruction } from "./../prompt-instructions.js";
+import type { DomainResponse } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 import { agePools, likeLedger } from "./like-spread.ts";
 
@@ -203,6 +204,8 @@ const maxPrompt = 300;
  * each time, so the profile follows what they like rather than what Dream showed them.
  */
 const galleryLikeSample = 20;
+/** The summariser reads this many of the newest signals. */
+const summarySignals = 50;
 /** The summariser writes after this many new signals, at most every ten minutes. */
 const summariseAfter = 10;
 const summariseGapMs = 10 * 60_000;
@@ -750,9 +753,7 @@ export function createTaste({
     if (!before.signals.length && !liked.length)
       throw failure("Like, compare or iterate on a few results first.", 400);
     attempted.set(ownerId, now());
-    const recent = before.signals.slice(0, Math.min(50, Math.max(before.since, 20)));
-    const list = (label: string, entries: string[]) =>
-      `${label}: ${entries.join("; ") || "(none)"}`;
+    const recent = before.signals.slice(0, summarySignals);
     let text: string;
     try {
       ({ text } = await model.chat({
@@ -763,12 +764,6 @@ export function createTaste({
           {
             role: "user",
             content: [
-              "Current profile:",
-              list("Likes", before.likes),
-              list("Styles", before.styles),
-              list("Avoid", before.avoid),
-              `Note: ${before.note || "(none)"}`,
-              "",
               "Recent signals, newest first:",
               ...(recent.length ? recent.map(describe) : ["(none)"]),
               "",
@@ -840,6 +835,16 @@ export function createTaste({
   return {
     read,
     refresh,
+    /**
+     * Forgets the learnt words, keeping the signals and the person's own fields, then rebuilds them
+     * from the signals where the account may use the text model.
+     */
+    resetLearnt(ownerId: string) {
+      const current = load(ownerId);
+      if (current.likes.length || current.styles.length || current.avoid.length || current.note)
+        write(ownerId, { ...current, likes: [], styles: [], avoid: [], note: "", updatedAt: "" });
+      return writer(ownerId) ? refresh(ownerId) : Promise.resolve(read(ownerId));
+    },
     /** Whether the text model may write this account's profile. */
     writable: (ownerId: string) => Boolean(writer(ownerId)),
     /** Adds one action's signals newest first. An atomic judgement requires the write to succeed. */
@@ -904,8 +909,18 @@ export function createTaste({
 export type Taste = ReturnType<typeof createTaste>;
 
 /** The caller's own taste profile: read, edit preferences, summarise and forget. */
-export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
-  const show = (account: RouteAccount, record: TasteRecord) => ({
+export function registerTasteRoutes(
+  app: object,
+  {
+    taste,
+    adminRefusal,
+  }: {
+    taste: Taste;
+    /** route-access.js's: why the account may not, or null. */
+    adminRefusal(account: RouteAccount): DomainResponse | null;
+  },
+) {
+  const show = (ownerId: string, record: TasteRecord) => ({
     status: 200,
     payload: {
       summary: record.summary,
@@ -924,7 +939,7 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
       loraScores: record.loraScores,
       updatedAt: record.updatedAt,
       signals: record.signals.length,
-      writer: taste.writable(owner(account)),
+      writer: taste.writable(ownerId),
     },
   });
   /** Whether a field's value fits it: null hands the field back to Studio. */
@@ -944,7 +959,18 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
       )
     );
   };
-  directRoute(app, "GET", "/api/taste", (account) => show(account, taste.read(owner(account))));
+  /** Answers with the owner's profile once `work` settles, or why it failed. */
+  const settle = async (ownerId: string, work: Promise<TasteRecord>) => {
+    try {
+      return show(ownerId, await work);
+    } catch (error) {
+      const { status = 500, message } = error as Error & { status?: number };
+      return { status, payload: { ok: false, error: message } };
+    }
+  };
+  directRoute(app, "GET", "/api/taste", (account) =>
+    show(owner(account), taste.read(owner(account))),
+  );
   directRoute(app, "PUT", "/api/taste", (account, { body }) => {
     const preferences = body?.preferences;
     if (
@@ -970,18 +996,22 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
         ],
       ),
     );
-    return show(account, taste.edit(owner(account), clean));
+    return show(owner(account), taste.edit(owner(account), clean));
   });
-  directRoute(app, "POST", "/api/taste/refresh", async (account) => {
-    try {
-      return show(account, await taste.refresh(owner(account)));
-    } catch (error) {
-      const { status = 500, message } = error as Error & { status?: number };
-      return { status, payload: { ok: false, error: message } };
-    }
+  directRoute(app, "POST", "/api/taste/refresh", (account) =>
+    settle(owner(account), taste.refresh(owner(account))),
+  );
+  directRoute(app, "POST", "/api/taste/reset", (account) =>
+    settle(owner(account), taste.resetLearnt(owner(account))),
+  );
+  // Administrators only (Settings › Users): another account's Reset Learnt Taste.
+  directRoute(app, "POST", "/api/taste/owners/:id/reset", (account, { params }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    return settle(params.id, taste.resetLearnt(params.id));
   });
   directRoute(app, "DELETE", "/api/taste", (account) => {
     taste.forget(owner(account));
-    return show(account, taste.read(owner(account)));
+    return show(owner(account), taste.read(owner(account)));
   });
 }

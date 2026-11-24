@@ -363,6 +363,7 @@ test("Administrators change roles, reset passwords and delete galleries, account
   await expect(page.getByRole("menuitem")).toHaveText([
     "Make Administrator",
     "Reset Password",
+    "Reset Learnt Taste",
     /^Delete Gallery/,
     "Disable",
     "Delete User",

@@ -130,7 +130,10 @@ test("taste routes read, set exclusions for and forget only the caller's own pro
     if (user) Object.assign(req, { studioAccount: { userId: user, role: "user" } });
     next();
   });
-  registerTasteRoutes(app as unknown as Parameters<typeof registerTasteRoutes>[0], { taste });
+  registerTasteRoutes(app as unknown as Parameters<typeof registerTasteRoutes>[0], {
+    taste,
+    adminRefusal: () => ({ status: 403, payload: { ok: false } }),
+  });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -306,7 +309,8 @@ test("every tenth signal summarises the words in the background, at most every t
   like("alice", 1);
   await settle();
   assert.equal(calls.length, 2);
-  assert.match(calls[1].messages[1].content, /^Likes: misty harbours$/m);
+  // Each summary starts afresh from the signals, never from the words it wrote before.
+  assert.doesNotMatch(calls[1].messages[1].content, /misty harbours|film grain|Quiet coastal/);
 
   // Offline text and accounts without the prompt assistant are skipped silently.
   offline = true;
@@ -429,7 +433,6 @@ test("the summariser rebuilds an empty profile from sampled gallery likes, keepi
   });
   taste.edit("alice", { avoid: ["crowds"] });
   const record = await taste.refresh("alice");
-  assert.match(sent[0], /Likes: \(none\)/);
   assert.match(
     sent[0],
     /Gallery likes, sampled from their whole history:\n- gallery like; title "Harbour at Dawn"; prompt "a fishing harbour at dawn"/,
@@ -601,5 +604,34 @@ test("liking a set's result prefers it over each other unliked run of the set", 
   assert.deepEqual(
     setPreferenceSignals([gallery[7]], gallery, () => ({})),
     [],
+  );
+});
+
+test("Reset Learnt Taste forgets only the learnt words and rebuilds them from the signals", async (t) => {
+  const replies = [
+    '{"likes": ["harbours"], "styles": ["film grain"], "note": "Harbours."}',
+    '{"likes": ["lighthouses"], "note": "Coastal light."}',
+  ];
+  const taste = tasteFixture(t, {
+    updates: () => false,
+    writer: () => ({
+      settings: () => ({}),
+      model: async () => "fixture-text",
+      chat: async () => ({ text: replies.shift()! }),
+    }),
+  });
+  taste.record("alice", [tasteSignal("like", "a")]);
+  await taste.refresh("alice");
+  taste.edit("alice", { exclusions: ["clowns"], rules: ["always photographic"] });
+  const record = await taste.resetLearnt("alice");
+  assert.deepEqual(
+    [record.likes, record.styles, record.note, record.signals.length, record.preferences],
+    [
+      ["lighthouses"],
+      [],
+      "Coastal light.",
+      1,
+      { exclusions: ["clowns"], rules: ["always photographic"] },
+    ],
   );
 });

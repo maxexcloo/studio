@@ -434,6 +434,7 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
     onSuccess: saved,
   });
   const [clearing, setClearing] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [editing, setEditing] = useState(false);
   const refresh = useMutation({
     meta: { inlineError: true },
@@ -447,6 +448,16 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
       saved(next);
       setClearing(false);
     },
+  });
+  // The words are forgotten even when the rebuild fails, so the profile reloads either way.
+  const reset = useMutation({
+    meta: { inlineError: true },
+    mutationFn: () => post<Taste>("/api/taste/reset"),
+    onSuccess: (next) => {
+      saved(next);
+      setResetting(false);
+    },
+    onError: () => client.invalidateQueries({ queryKey: tasteQuery.queryKey }),
   });
   const data = taste.data;
   const error = refresh.error || taste.error || keepRates.error;
@@ -596,6 +607,20 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
       <ChatNotes />
       <SettingGroup title="Danger Zone" danger>
         <SettingRow
+          label="Reset Learnt Taste"
+          description="Forget the learnt summary, likes, dislikes and styles and learn them again from your signals. Your edits stay."
+        >
+          <Button
+            size="compact-sm"
+            color="red"
+            variant="light"
+            disabled={!data}
+            onClick={() => setResetting(true)}
+          >
+            Reset
+          </Button>
+        </SettingRow>
+        <SettingRow
           label="Clear Taste Profile"
           description="Forget what Studio learnt and your own edits."
         >
@@ -635,6 +660,21 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
         }}
       >
         Studio forgets what it learnt and your edits. Your gallery and likes stay.
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={resetting}
+        title="Reset Learnt Taste"
+        action="Reset"
+        pending={reset.isPending}
+        error={reset.error?.message}
+        onConfirm={() => reset.mutate()}
+        onClose={() => {
+          setResetting(false);
+          reset.reset();
+        }}
+      >
+        Studio forgets the summary, likes, dislikes and styles it learnt and learns them again from
+        your likes, comparisons and other signals. Your edits, exclusions and rules stay.
       </ConfirmDialog>
     </>
   );
