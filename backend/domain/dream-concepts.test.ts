@@ -8,7 +8,6 @@ import {
   fashionableLooks,
   forbiddenMotifs,
   freshConceptProblem,
-  mentionsMotif,
   namedMotif,
   promptBody,
 } from "./dream-concepts.ts";
@@ -29,9 +28,8 @@ test("Conditional rules exclude only where nothing can lift them", () => {
   assert.deepEqual(forbiddenMotifs([], rules, true), ["smoking"]);
 });
 
-test("A prompt names an excluded motif even after 'no', and aliases catch rewordings", () => {
+test("A prompt names an excluded motif even after 'no'", () => {
   assert.equal(namedMotif("A quiet balcony, no smoking allowed", ["smoking"]), "smoking");
-  assert.ok(mentionsMotif("Her damp hair clings to her neck", "wet"));
 });
 
 test("Motifs of ideas passed as too similar pause unless the brief shows them", () => {
@@ -88,7 +86,7 @@ test("A shared style clause is no part of an idea's likeness", () => {
 
 test("Words recurring across motif labels cool, as whole labels do", () => {
   const motifs = [["amber glow"], ["amber lamp"], ["amber dress"], ["window light"], ["red light"]];
-  const cooled = cooledMotifs({ motifs, recent: [] });
+  const cooled = cooledMotifs({ motifs });
   assert.ok(cooled.includes("amber"));
   assert.ok(!cooled.includes("light"));
 });

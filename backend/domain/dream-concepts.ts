@@ -366,18 +366,6 @@ export const recentOpenings = (prompts: string[], count: number) => [
 export const subjectOf = (title: unknown, prompt: unknown) =>
   clean(title, 80) || clean(prompt, 400).split(" ").slice(0, 6).join(" ");
 
-const motifAliases = [
-  [
-    "laundry",
-    /\b(?:laundry|laundromats?|launderettes?|washing machines?|clotheslines?|wash(?:ing|es) clothes)\b/i,
-  ],
-  ["wet", /\b(?:wet|damp|soaked|soaking|drenched|dripping)\b/i],
-  [
-    "smoking",
-    /\b(?:smoking|cigarettes?|cigars?|ashtrays?|tobacco pipes?|smok(?:e[sd]?|ing) (?:an? |the )?(?:joint|hookah))\b/i,
-  ],
-] as const;
-
 const motifNegation =
   /\b(?:avoid(?:ing)?|omit|exclude|no|never|without|free of|do not|don['\u2019]t|not(?! just\b| only\b))\b/i;
 const conditionalMotif = /\b(?:except|if|only|unless|when|where|while)\b/i;
@@ -397,23 +385,15 @@ function motifClauses(text: string) {
     });
 }
 
-const aliasMotifs = (text: string) =>
-  motifAliases.filter(([, pattern]) => pattern.test(text)).map(([motif]) => motif);
-const shownMotifs = (clauses: string[]) => [...new Set(clauses.flatMap(aliasMotifs))];
-const promptMotifs = (prompt: string) =>
-  shownMotifs(motifClauses(prompt).map(({ shown }) => shown));
-
-export function mentionsMotif(text: string, motif: string) {
-  const alias = motifAliases.find(([name]) => name === motif)?.[1];
-  return alias?.test(text) || ` ${phraseWords(text)} `.includes(` ${motif} `);
-}
+export const mentionsMotif = (text: string, motif: string) =>
+  ` ${phraseWords(text)} `.includes(` ${phraseWords(motif)} `);
 
 /** The first excluded motif a prompt names at all: an image model draws what it names, even after "no". */
 export const namedMotif = (prompt: string, forbidden: string[]) =>
   forbidden.find((motif) => mentionsMotif(prompt, motif));
 
 /**
- * Explicit avoids and negative rules. For unrecognised concepts use only short, literal phrases.
+ * Explicit avoids and negative rules, as short literal phrases.
  * `unasked` (Dream, which takes no requests) keeps a rule's exclusion before "unless".
  */
 export function forbiddenMotifs(avoids: string[], rules: string[], unasked = false) {
@@ -429,8 +409,6 @@ export function forbiddenMotifs(avoids: string[], rules: string[], unasked = fal
         .flatMap((text) =>
           // "black and white photos" is one phrase, so "and" never separates items; "or" does.
           text.split(/[,;\n]+|\bor\b/gi).flatMap((part) => {
-            const aliases = aliasMotifs(part);
-            if (aliases.length) return aliases;
             const phrase = phraseWords(part.replace(motifNegation, "")).replace(
               /^(?:any|an?|the) /,
               "",
@@ -442,20 +420,10 @@ export function forbiddenMotifs(avoids: string[], rules: string[], unasked = fal
   ];
 }
 
-/** Literal user exclusions and their known equivalent motifs. */
-export function explicitExclusions(entries: string[]) {
-  const terms = entries.map(phraseWords).filter(Boolean);
-  return [
-    ...new Set([
-      ...terms,
-      ...terms.flatMap((term) => {
-        if (/^laundry(?: rooms?)?$/.test(term)) return ["laundry"];
-        if (/^(?:smoking|cigarettes?|tobacco smoking)$/.test(term)) return ["smoking"];
-        return [];
-      }),
-    ]),
-  ];
-}
+/** The user's own exclusions as phrases; the writer judges what else is equivalent. */
+export const explicitExclusions = (entries: string[]) => [
+  ...new Set(entries.map(phraseWords).filter(Boolean)),
+];
 
 export function ideaMotifs(value: unknown, prompt = "") {
   const clauses = motifClauses(prompt);
@@ -465,14 +433,13 @@ export function ideaMotifs(value: unknown, prompt = "") {
         .slice(0, 5)
         .map((motif) => phraseWords(clean(motif, 48)))
         .filter(Boolean)
-        .map((label) => aliasMotifs(label)[0] ?? label)
         .filter(
           (label) =>
             shown.some((part) => mentionsMotif(part, label)) ||
             !clauses.some(({ excluded }) => mentionsMotif(excluded, label)),
         )
     : [];
-  return [...new Set([...shownMotifs(shown), ...labels])].slice(0, 5);
+  return [...new Set(labels)];
 }
 
 /** Labels in at least two ideas, and their words in at least three (as "amber" in "amber glow"). */
@@ -499,19 +466,13 @@ function recurringMotifs(history: string[][]) {
  * passed as too similar (`paused`), unless the fixed brief or rules show them.
  */
 export function cooledMotifs(
-  { motifs = [], recent }: { motifs?: string[][]; recent: string[] },
+  { motifs = [] }: { motifs?: string[][] },
   fixed = "",
   forbidden: string[] = [],
   paused: string[] = [],
 ) {
   const shown = motifClauses(fixed).map((clause) => clause.shown);
-  return [
-    ...new Set([
-      ...recurringMotifs(motifs.slice(0, motifWindow)),
-      ...recurringMotifs(recent.map(promptMotifs)),
-      ...paused,
-    ]),
-  ].filter(
+  return [...new Set([...recurringMotifs(motifs.slice(0, motifWindow)), ...paused])].filter(
     (motif) => forbidden.includes(motif) || !shown.some((part) => mentionsMotif(part, motif)),
   );
 }

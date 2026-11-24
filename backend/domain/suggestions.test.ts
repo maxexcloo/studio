@@ -248,14 +248,14 @@ test("older saved suggestions refresh on access, and a new short answer stays ca
   assert.equal(calls.length, 1);
 });
 
-test("updated account exclusions discard matching composer ideas, including aliases", async () => {
+test("updated account exclusions discard composer ideas naming them and reach the writer", async () => {
   const exclusions: string[] = [];
   const { suggestions, calls } = fixture({
     exclusions,
     reply: () =>
       JSON.stringify({
         ideas: [
-          { label: "Quiet Machines", prompt: "A washing machine on a stage" },
+          { label: "Quiet Machines", prompt: "Laundry rooms lit like a stage" },
           { label: "Misty Jetty", prompt: "A lone ferry pulls away from a misty jetty" },
         ],
       }),
@@ -267,7 +267,10 @@ test("updated account exclusions discard matching composer ideas, including alia
     (await suggestions.suggest("alice", ask)).suggestions.map(({ label }) => label),
     ["Misty Jetty"],
   );
-  assert.match(calls.at(-1)![1].content, /Exclude from new ideas: laundry rooms/);
+  assert.match(
+    calls.at(-1)![1].content,
+    /Exclude from new ideas, with anything equivalent: laundry rooms/,
+  );
   assert.equal((await suggestions.suggest("bob", ask)).suggestions.length, 2);
 });
 

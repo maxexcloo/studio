@@ -1052,7 +1052,7 @@ export function registerGenerateTools({
     if (remembered.kept.length)
       projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
     if (exclusions.length && review(`exclusions:${JSON.stringify(exclusions)}`))
-      projectNote = `The user excludes these subjects, props or settings: ${exclusions.join(", ")}. Leave them out of positive prompts. Keep the user's own wording and vary only details they left open. If an explicit request conflicts with an exclusion, tell the user before changing it. ${projectNote}`;
+      projectNote = `The user excludes these subjects, props or settings: ${exclusions.join(", ")}. Leave them and anything equivalent out of positive prompts. Keep the user's own wording and vary only details they left open. If an explicit request conflicts with an exclusion, tell the user before changing it. ${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)

@@ -3,12 +3,7 @@ import { z } from "zod";
 
 import { briefSummary } from "../../shared/projects.ts";
 import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
-import {
-  explicitExclusions,
-  forbiddenMotifs,
-  mentionsMotif,
-  namedMotif,
-} from "../domain/dream-concepts.ts";
+import { explicitExclusions, namedMotif } from "../domain/dream-concepts.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -156,11 +151,10 @@ export function assertAvoided({ name, brief }, prompts) {
     .map((term) => ({
       term,
       exact: new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu"),
-      motifs: forbiddenMotifs([term], []),
     }));
   for (const [index, prompt] of prompts.entries())
-    for (const { term, exact, motifs } of terms)
-      if (exact.test(prompt) || motifs.some((motif) => mentionsMotif(prompt, motif)))
+    for (const { term, exact } of terms)
+      if (exact.test(prompt))
         throw new Error(
           `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again; never remove an avoid to get past this.`,
         );

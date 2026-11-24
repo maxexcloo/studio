@@ -8450,8 +8450,8 @@ test("MCP preserves supplied prompts and stops at explicit exclusions", async (t
   assert.equal(f.submitted.at(-1).prompt, "A coat with buttons");
   const beforeExclusions = f.submitted.length;
   for (const [prompt, expected] of [
-    ["A coat beside a washing machine", /"laundry rooms", which your Taste Profile excludes/],
-    ["A coat beside an ashtray", /"smoking", which your Taste Profile excludes/],
+    ["A coat in the laundry rooms", /"laundry rooms", which your Taste Profile excludes/],
+    ["A coat beside a man smoking", /"smoking", which your Taste Profile excludes/],
     ["Same as above, but switch to silk", /depends on an earlier prompt or image/],
   ]) {
     const refused = await call(client, "generate", { prompts: [prompt] });

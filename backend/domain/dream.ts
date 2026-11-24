@@ -2118,7 +2118,7 @@ export function createDream(options: {
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
     const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
-      ...(exclusions.length ? [`Exclude: ${exclusions.join(", ")}`] : []),
+      ...(exclusions.length ? [`Exclude, with anything equivalent: ${exclusions.join(", ")}`] : []),
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
       ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
       ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),

@@ -660,7 +660,9 @@ export function createSuggestions({
     const limits = [
       ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
       ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
-      ...(record.exclusions ?? []).map((motif) => `Exclude from new ideas: ${motif}`),
+      ...(record.exclusions ?? []).map(
+        (motif) => `Exclude from new ideas, with anything equivalent: ${motif}`,
+      ),
     ];
     return {
       known: Boolean(record.summary || liked.length),
