@@ -36,14 +36,14 @@ export function ComparisonRatingButtons({ comparison }: { comparison: Comparison
       {(["liked", "disliked"] as const).map((rating) => {
         const action = rating === "liked" ? "like" : "dislike";
         const Icon = icons[action];
-        const label = `${ratingLabel(action)} Comparison`;
+        const label = ratingLabel(action);
         const pressed = comparison.rating === rating;
         return (
           <Tooltip key={rating} label={label}>
             <ActionIcon
               variant="subtle"
               color={pressed ? undefined : "gray"}
-              aria-label={label}
+              aria-label={`${label} Comparison`}
               aria-pressed={pressed}
               disabled={save.isPending}
               onClick={() => save.mutate(pressed ? null : rating)}
