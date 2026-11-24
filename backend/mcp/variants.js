@@ -1,10 +1,8 @@
 // Lettered options: one result varied in one thing, side by side (domain/compare.ts), and the user's pick.
 import { z } from "zod";
 
-import { compareVariants } from "../../shared/compare.ts";
+import { compareVariants, letter } from "../../shared/compare.ts";
 import { mcpJson, scopeMarkdown } from "./media.js";
-
-const letter = (index) => String.fromCharCode(65 + index);
 
 /** Registers variants: offer lettered options of a result, or record which one the user picked. */
 export function registerVariantsTool({

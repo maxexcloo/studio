@@ -1,9 +1,9 @@
 import { Group, Paper, SegmentedControl } from "@mantine/core";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
+import { letter } from "../../../../shared/compare";
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
-import { letter } from "../compare/inputs";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { useDreamPlayback } from "./DeckMedia";
 

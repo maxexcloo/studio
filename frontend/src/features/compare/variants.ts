@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { compareVariants } from "../../../../shared/compare";
+import { compareVariants, letter } from "../../../../shared/compare";
 import { isCloudProfile, loraName, loraStrengthSweep } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
@@ -28,7 +28,7 @@ import {
   usesNegative,
 } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
-import { letter, runSeeds, variantLabels } from "./inputs";
+import { runSeeds, variantLabels } from "./inputs";
 import type { Comparison } from "./queries";
 
 /**

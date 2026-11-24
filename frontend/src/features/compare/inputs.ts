@@ -1,3 +1,4 @@
+import { letter } from "../../../../shared/compare.ts";
 import type { GenerationInput } from "../../types";
 import type { Variant } from "../generation/GenerationProvider";
 
@@ -63,8 +64,6 @@ export const promptLines = (prompt: string) =>
 /** `input` once per line of its prompt. */
 export const promptInputs = (input: GenerationInput) =>
   promptLines(input.prompt).map((prompt) => ({ ...input, prompt }));
-
-export const letter = (index: number) => String.fromCharCode(65 + index);
 
 /** Each variant's seed as it runs: its own, else the first variant's that has one, else random (""). */
 export function runSeeds(variants: Variant[]) {
