@@ -693,9 +693,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
       { videos: false },
       { dailyImages: 200 },
     ]);
-  await imagesGroup
-    .getByRole("switch", { name: "Enabled", exact: true })
-    .click({ force: true });
+  await imagesGroup.getByRole("switch", { name: "Enabled", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
 });
