@@ -2,13 +2,9 @@ import {
   Alert,
   Badge,
   Button,
-  Code,
   FocusTrap,
-  Group,
-  Menu,
   Modal,
   NumberInput,
-  ScrollArea,
   Select,
   SimpleGrid,
   Stack,
@@ -24,19 +20,19 @@ import { useEffect, useId, useState } from "react";
 import { sharedProfileFields } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
-import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable } from "../../ui/DataTable";
-import { icons } from "../../ui/icons";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
-import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { SettingGroup } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useReturnFocus } from "../../ui/useReturnFocus";
+import { workspaceModal } from "../../ui/workspaceModal";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { backendLabel } from "../generation/payload";
 import { catalogueQuery, definitionsKey } from "./queries";
+import { VersionTitle } from "./Versions";
 import { WorkflowConnections } from "./WorkflowConnections";
 
 export type DefinitionKind = "profile" | "guide";
@@ -63,6 +59,13 @@ interface Check {
 export const definitionPath = (kind: DefinitionKind, id: string) =>
   `/api/profiles/${kind === "profile" ? "editable" : "guides"}/${encodeURIComponent(id)}`;
 const pretty = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
+/** A saved version's text as the editor holds it. */
+export async function definitionVersionText(kind: DefinitionKind, id: string, number: number) {
+  const { version } = await api<{ version: { text?: string; pack?: Record<string, unknown> } }>(
+    `${definitionPath(kind, id)}/versions/${number}`,
+  );
+  return version.text || pretty(version.pack);
+}
 function object(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -70,6 +73,7 @@ function DefinitionForm({
   kind,
   id,
   loaded,
+  restored,
   creating,
   existingIds,
   close,
@@ -77,6 +81,7 @@ function DefinitionForm({
   kind: DefinitionKind;
   id: string;
   loaded: LoadedDefinition;
+  restored?: string;
   creating: boolean;
   existingIds: string[];
   close: () => void;
@@ -87,8 +92,10 @@ function DefinitionForm({
   });
   const [tab, setTab] = useState<string | null>("details");
   const [check, setCheck] = useState<Check | null>(null);
-  const [versionText, setVersionText] = useState("");
-  const [removing, setRemoving] = useState(false);
+  // A restored version opens as an unsaved change over the current one.
+  useEffect(() => {
+    if (restored) form.setFieldValue("text", restored);
+  }, []);
   const path = definitionPath(kind, form.values.id);
   let raw: Record<string, unknown> | undefined,
     error = "";
@@ -162,52 +169,29 @@ function DefinitionForm({
   });
   const action = useMutation({
     meta: { inlineError: true },
-    mutationFn: ({ action, version }: { action: "approve" | "revert"; version?: number }) =>
-      post(`${path}/${action}`, { baseHash: loaded.hash, version }),
+    mutationFn: (action: "approve") => post(`${path}/${action}`, { baseHash: loaded.hash }),
     onSuccess: () => {
       refresh();
       close();
     },
-  });
-  const remove = useMutation({
-    meta: { inlineError: true },
-    mutationFn: () => post(`${path}/remove`, { baseHash: loaded.hash }),
-    onSuccess: () => {
-      refresh();
-      close();
-    },
-  });
-  const versions = useQuery({
-    queryKey: ["definition-versions", kind, id],
-    queryFn: () => api<{ versions: DefinitionMeta[] }>(`${path}/versions`),
-    enabled: !creating && tab === "versions",
-  });
-  const version = useMutation({
-    meta: { inlineError: true },
-    mutationFn: (number: number) =>
-      api<{ version: { text?: string; pack?: Record<string, unknown> } }>(
-        `${path}/versions/${number}`,
-      ),
-    onSuccess: ({ version }) => setVersionText(version.text || pretty(version.pack)),
   });
   const meta = loaded.version || loaded.meta;
   const noun = kind === "profile" ? "Profile" : "Guide";
-  const busy = save.isPending || action.isPending || remove.isPending;
+  const busy = save.isPending || action.isPending;
   const collision = creating && existingIds.includes(form.values.id);
   return (
-    <form
+    // The fields scroll above a pinned footer when the dialog has a fixed height (a roomy guide).
+    <Stack
+      component="form"
+      gap="md"
+      flex={1}
+      mih={0}
       onSubmit={(event) => {
         event.preventDefault();
         save.mutate();
       }}
     >
-      <Stack gap="md">
-        <Group gap="xs">
-          <Text size="sm" c="dimmed">
-            {creating ? "New Definition" : `Version ${meta?.version || 0}`}
-          </Text>
-          {meta?.aiDrafted && <Badge color="orange">AI</Badge>}
-        </Group>
+      <Stack gap="md" flex={1} mih={0} style={{ overflowY: "auto" }}>
         <TextInput
           label="Definition ID"
           value={form.values.id}
@@ -236,7 +220,6 @@ function DefinitionForm({
             <Tabs.Tab value="details">Details</Tabs.Tab>
             {kind === "profile" && <Tabs.Tab value="connections">Connections</Tabs.Tab>}
             <Tabs.Tab value="advanced">Advanced JSON</Tabs.Tab>
-            {!creating && <Tabs.Tab value="versions">Versions</Tabs.Tab>}
           </Tabs.List>
           <Tabs.Panel value="details" pt="md">
             <Stack gap="md">
@@ -352,7 +335,7 @@ function DefinitionForm({
                       </SettingGroup>
                     </>
                   ) : (
-                    <>
+                    <SimpleGrid cols={{ base: 1, sm: 2 }}>
                       <TextBox
                         label="Summary"
                         autosize
@@ -394,7 +377,7 @@ function DefinitionForm({
                           onChange={(value) => field("rules", value.split("\n"))}
                         />
                       )}
-                    </>
+                    </SimpleGrid>
                   )}
                 </>
               )}
@@ -438,73 +421,6 @@ function DefinitionForm({
               />
             </Stack>
           </Tabs.Panel>
-          <Tabs.Panel value="versions" pt="md">
-            <Stack gap="sm">
-              {versions.error ? (
-                <Alert color="red">{versions.error.message}</Alert>
-              ) : (
-                <DataTable
-                  label="Definition Versions"
-                  rows={versions.data?.versions || []}
-                  rowKey={(entry) => `${entry.version}`}
-                  rowName={(entry) => `Version ${entry.version}`}
-                  loading={versions.isPending && "Loading Versions"}
-                  empty="No Versions"
-                  columns={[
-                    {
-                      key: "version",
-                      header: "Version",
-                      sortValue: (entry) => entry.version,
-                      cell: (entry) => (
-                        <Group gap="xs" wrap="nowrap">
-                          <Text size="sm">v{entry.version}</Text>
-                          {entry.aiDrafted && <Badge color="orange">AI</Badge>}
-                        </Group>
-                      ),
-                    },
-                    {
-                      key: "by",
-                      header: "Saved By",
-                      main: true,
-                      sortValue: (entry) => entry.by || entry.origin,
-                      cell: (entry) => (
-                        <Text size="sm" truncate>
-                          {entry.by || entry.origin}
-                        </Text>
-                      ),
-                    },
-                  ]}
-                  rowActions={(entry) => (
-                    <>
-                      <Menu.Item
-                        leftSection={<icons.show size={16} />}
-                        disabled={version.isPending}
-                        onClick={() => version.mutate(entry.version)}
-                      >
-                        View
-                      </Menu.Item>
-                      <Menu.Item
-                        leftSection={<icons.reset size={16} />}
-                        disabled={busy || form.isDirty()}
-                        onClick={() => action.mutate({ action: "revert", version: entry.version })}
-                      >
-                        Restore
-                      </Menu.Item>
-                    </>
-                  )}
-                />
-              )}
-              {version.error && <Alert color="red">{version.error.message}</Alert>}
-              {versionText && (
-                <ScrollArea.Autosize mah={480} role="region" aria-label="Saved Definition">
-                  <Code block>{versionText}</Code>
-                </ScrollArea.Autosize>
-              )}
-              <Text size="xs" c="dimmed">
-                Restoring saves it as a new version. Save or discard your edits first.
-              </Text>
-            </Stack>
-          </Tabs.Panel>
         </Tabs>
         {validate.error && <Alert color="red">{validate.error.message}</Alert>}
         {check && (
@@ -519,71 +435,40 @@ function DefinitionForm({
             ))}
           </Alert>
         )}
-        {!creating && (
-          <SettingGroup danger>
-            <SettingRow
-              label={`Delete ${noun}`}
-              description="Removes it from the Library for everyone."
-            >
-              <Button
-                size="compact-sm"
-                color="red"
-                variant="light"
-                disabled={busy}
-                onClick={() => setRemoving(true)}
-              >
-                Delete
-              </Button>
-            </SettingRow>
-          </SettingGroup>
-        )}
-        <DialogFooter
-          onCancel={close}
-          secondary={[
-            ...(kind === "profile" && !creating
-              ? [
-                  {
-                    label: "Check",
-                    loading: validate.isPending,
-                    disabled: !!error,
-                    onClick: () => validate.mutate(),
-                  },
-                ]
-              : []),
-            ...(meta?.aiDrafted
-              ? [
-                  {
-                    label: "Approve",
-                    disabled: busy || form.isDirty(),
-                    onClick: () => action.mutate({ action: "approve" }),
-                  },
-                ]
-              : []),
-          ]}
-        >
-          <Button
-            type="submit"
-            loading={save.isPending}
-            disabled={!!error || collision || busy || (!creating && !form.isDirty())}
-          >
-            {creating ? "Create" : "Save"}
-          </Button>
-        </DialogFooter>
       </Stack>
-      <ConfirmDialog
-        opened={removing}
-        title={`Delete ${noun}`}
-        action="Delete"
-        pending={remove.isPending}
-        error={remove.error?.message}
-        onConfirm={() => remove.mutate()}
-        onClose={() => setRemoving(false)}
+      <DialogFooter
+        onCancel={close}
+        secondary={[
+          ...(kind === "profile" && !creating
+            ? [
+                {
+                  label: "Check",
+                  loading: validate.isPending,
+                  disabled: !!error,
+                  onClick: () => validate.mutate(),
+                },
+              ]
+            : []),
+          ...(meta?.aiDrafted
+            ? [
+                {
+                  label: "Approve",
+                  disabled: busy || form.isDirty(),
+                  onClick: () => action.mutate("approve"),
+                },
+              ]
+            : []),
+        ]}
       >
-        {kind === "profile"
-          ? `Delete ${id}? Its version history keeps it restorable; gallery items made with it stay.`
-          : `Delete ${id}? Its version history keeps it restorable. A guide that profiles still use stays until they use another.`}
-      </ConfirmDialog>
-    </form>
+        <Button
+          type="submit"
+          loading={save.isPending}
+          disabled={!!error || collision || busy || (!creating && !form.isDirty())}
+        >
+          {creating ? "Create" : "Save"}
+        </Button>
+      </DialogFooter>
+    </Stack>
   );
 }
 export function DefinitionEditor({
@@ -591,12 +476,15 @@ export function DefinitionEditor({
   id,
   close,
   creating,
+  restored,
   existingIds = [],
 }: {
   kind: DefinitionKind;
   id: string;
   close: () => void;
   creating?: LoadedDefinition;
+  /** A saved version's text to open as an unsaved change (Versions › Restore…). */
+  restored?: string;
   existingIds?: string[];
 }) {
   const dialog = useId();
@@ -616,13 +504,39 @@ export function DefinitionEditor({
   useEffect(() => {
     if (loaded.error) void client.invalidateQueries({ queryKey: definitionsKey });
   }, [loaded.error, client]);
+  const title = `${creating ? "Create" : "Edit"} ${kind === "profile" ? "Profile" : "Guide"}`;
+  const meta = data?.version || data?.meta;
+  // A guide's many text fields take the Library's room on desktop, its footer pinned below them.
+  const roomy = kind === "guide" && !phone;
   return (
     <Modal
       id={dialog}
       opened
       onClose={closeWhenTop(dialog, close)}
-      title={`${creating ? "Create" : "Edit"} ${kind === "profile" ? "Profile" : "Guide"}`}
+      title={
+        creating ? (
+          title
+        ) : (
+          <>
+            <VersionTitle title={title} version={meta?.version} />{" "}
+            {meta?.aiDrafted && (
+              <Badge component="span" size="sm" color="orange">
+                AI
+              </Badge>
+            )}
+          </>
+        )
+      }
       fullScreen={phone}
+      size={roomy ? workspaceModal.size : undefined}
+      styles={
+        roomy
+          ? {
+              content: { height: workspaceModal.height, display: "flex", flexDirection: "column" },
+              body: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" },
+            }
+          : undefined
+      }
       closeButtonProps={{ "aria-label": "Close Definition Editor" }}
     >
       <FocusTrap.InitialFocus />
@@ -646,6 +560,7 @@ export function DefinitionEditor({
           kind={kind}
           id={id}
           loaded={data}
+          restored={restored}
           creating={!!creating}
           existingIds={existingIds}
           close={close}

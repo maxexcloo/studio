@@ -118,5 +118,10 @@ export interface PromptInstruction {
 export const promptInstructionsPath = "/api/profiles/prompt-instructions";
 export const promptInstructionsQuery = queryOptions({
   queryKey: [...definitionsKey, "prompt-instructions"],
-  queryFn: () => api<{ instructions: PromptInstruction[] }>(promptInstructionsPath),
+  queryFn: () =>
+    api<{
+      instructions: PromptInstruction[];
+      /** What each variable reads like when Studio runs an instruction, for its preview. */
+      examples: Record<string, string>;
+    }>(promptInstructionsPath),
 });

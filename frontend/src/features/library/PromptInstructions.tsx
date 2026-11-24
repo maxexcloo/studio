@@ -7,7 +7,6 @@ import {
   Group,
   Menu,
   Modal,
-  Select,
   Stack,
   Tabs,
   Text,
@@ -19,7 +18,6 @@ import { promptVariable, promptVariables } from "../../../../shared/prompt-varia
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
-import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
@@ -27,6 +25,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useReturnFocus } from "../../ui/useReturnFocus";
 import { librarySections } from "./LibraryNavigation";
 import { type PromptInstruction, promptInstructionsPath, promptInstructionsQuery } from "./queries";
+import { VersionTitle, VersionsDialog } from "./Versions";
 
 const animateVariables: Record<string, string> = {
   americanEnglish: "American English wording rules.",
@@ -39,29 +38,23 @@ const animateVariables: Record<string, string> = {
   suggestionChoices: "Motion directions and variety guidance for the opening frame.",
 };
 
+const instructionPath = (id: string) => `${promptInstructionsPath}/${encodeURIComponent(id)}`;
+
+/** An instruction's editor; `restored` opens it on a saved version's text as an unsaved change. */
 function InstructionEditor({
   instruction,
+  restored,
   close,
 }: {
   instruction: PromptInstruction;
+  restored?: string;
   close: () => void;
 }) {
   const client = useQueryClient();
   const phone = usePhone();
   useReturnFocus();
-  const [text, setText] = useState(instruction.text);
-  const [loadedVersion, setLoadedVersion] = useState(instruction.version);
-  const changeText = (value: string) => {
-    setText(value);
-    setLoadedVersion(null);
-  };
-  const path = `${promptInstructionsPath}/${encodeURIComponent(instruction.id)}`;
-  const history = useQuery({
-    queryKey: [...promptInstructionsQuery.queryKey, instruction.id, "history"],
-    queryFn: () =>
-      api<{ versions: { version: number; text: string; at: string }[] }>(`${path}/history`),
-    enabled: instruction.version !== null,
-  });
+  const [text, changeText] = useState(restored ?? instruction.text);
+  const path = instructionPath(instruction.id);
   const save = useMutation({
     meta: { inlineError: true },
     mutationFn: () =>
@@ -74,6 +67,7 @@ function InstructionEditor({
         promptInstructionsQuery.queryKey,
         (current) =>
           current && {
+            ...current,
             instructions: current.instructions.map((entry) =>
               entry.id === saved.id ? saved : entry,
             ),
@@ -83,7 +77,7 @@ function InstructionEditor({
       close();
     },
   });
-  const versions = history.data?.versions ?? [];
+  const examples = useQuery(promptInstructionsQuery).data?.examples ?? {};
   const required = promptVariables(instruction.initial);
   const present = new Set(promptVariables(text));
   const meanings = instruction.id === "suggest-motion" ? animateVariables : undefined;
@@ -123,7 +117,13 @@ function InstructionEditor({
     </Stack>
   );
   return (
-    <Modal opened onClose={close} title={instruction.label} size="xl" fullScreen={phone}>
+    <Modal
+      opened
+      onClose={close}
+      title={<VersionTitle title={instruction.label} version={instruction.version} />}
+      size="xl"
+      fullScreen={phone}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -132,26 +132,6 @@ function InstructionEditor({
       >
         <Stack>
           {save.error && <Alert color="red">{save.error.message}</Alert>}
-          {history.error && <Alert color="red">{history.error.message}</Alert>}
-          {versions.length > 0 && (
-            <Select
-              label="Load Version"
-              value={loadedVersion === null ? null : String(loadedVersion)}
-              placeholder="Choose a saved version"
-              allowDeselect={false}
-              comboboxProps={{ withinPortal: false }}
-              data={versions.map(({ version, at }) => ({
-                value: String(version),
-                label: at ? `v${version} · ${formatDateTime(at)}` : `v${version}`,
-              }))}
-              onChange={(version) => {
-                const previous = versions.find((entry) => String(entry.version) === version);
-                if (!previous) return;
-                setText(previous.text);
-                setLoadedVersion(previous.version);
-              }}
-            />
-          )}
           <Tabs defaultValue="edit">
             <Tabs.List aria-label="Instruction View">
               <Tabs.Tab value="edit">Edit</Tabs.Tab>
@@ -166,8 +146,8 @@ function InstructionEditor({
                 inline
                 value={text}
                 onChange={changeText}
-                below={legend}
               />
+              {legend}
             </Tabs.Panel>
             <Tabs.Panel value="preview" pt="xs">
               <Box
@@ -181,13 +161,24 @@ function InstructionEditor({
                 style={{ whiteSpace: "pre-wrap", overflow: "auto", overflowWrap: "anywhere" }}
                 tabIndex={0}
               >
+                {/* Each variable reads as Studio fills it in, marked, its name on hover. */}
                 {text.split(promptVariable).map((part, index) =>
-                  index % 2 ? (
+                  index % 2 === 0 ? (
+                    part
+                  ) : required.includes(part) && Object.hasOwn(examples, part) ? (
+                    <Text
+                      key={index}
+                      span
+                      inherit
+                      bg="var(--mantine-color-blue-light)"
+                      title={`{{${part}}}`}
+                    >
+                      {examples[part]}
+                    </Text>
+                  ) : (
                     <Code key={index} color={required.includes(part) ? "blue" : "red"}>
                       {`{{${part}}}`}
                     </Code>
-                  ) : (
-                    part
                   ),
                 )}
               </Box>
@@ -197,13 +188,15 @@ function InstructionEditor({
           <DialogFooter
             pending={save.isPending}
             onCancel={close}
-            secondary={[
-              {
-                label: "Use Default",
-                onClick: () => changeText(instruction.initial),
-                disabled: text === instruction.initial,
-              },
-            ]}
+            leading={
+              <Button
+                variant="default"
+                disabled={text === instruction.initial}
+                onClick={() => changeText(instruction.initial)}
+              >
+                Use Default
+              </Button>
+            }
           >
             <Button
               type="submit"
@@ -230,7 +223,11 @@ export function PromptInstructions({
   const list = useQuery(promptInstructionsQuery);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState<string | null>(null);
-  const [editing, setEditing] = useState<PromptInstruction | null>(null);
+  const [editing, setEditing] = useState<{
+    instruction: PromptInstruction;
+    restored?: string;
+  } | null>(null);
+  const [versions, setVersions] = useState<PromptInstruction | null>(null);
   const instructions = (list.data?.instructions ?? []).filter(
     ({ suggestions }) => Boolean(suggestions) === (section === "suggestionInstructions"),
   );
@@ -291,7 +288,7 @@ export function PromptInstructions({
                 <TableRecord
                   name={instruction.label}
                   openLabel={`Edit ${instruction.label}`}
-                  onOpen={() => setEditing(instruction)}
+                  onOpen={() => setEditing({ instruction })}
                 />
               ),
             },
@@ -311,16 +308,41 @@ export function PromptInstructions({
             },
           ]}
           rowActions={(instruction) => (
-            <Menu.Item
-              leftSection={<icons.edit size={16} />}
-              onClick={() => setEditing(instruction)}
-            >
-              Edit
-            </Menu.Item>
+            <>
+              <Menu.Item
+                leftSection={<icons.edit size={16} />}
+                onClick={() => setEditing({ instruction })}
+              >
+                Edit
+              </Menu.Item>
+              {instruction.version !== null && (
+                <Menu.Item
+                  leftSection={<icons.versions size={16} />}
+                  onClick={() => setVersions(instruction)}
+                >
+                  Versions…
+                </Menu.Item>
+              )}
+            </>
           )}
         />
       )}
-      {editing && <InstructionEditor instruction={editing} close={() => setEditing(null)} />}
+      {editing && <InstructionEditor {...editing} close={() => setEditing(null)} />}
+      {versions && (
+        <VersionsDialog
+          name={versions.label}
+          path={`${instructionPath(versions.id)}/history`}
+          current={versions.version}
+          load={async (number) => {
+            const { versions: saved } = await api<{
+              versions: { version: number; text: string }[];
+            }>(`${instructionPath(versions.id)}/history`);
+            return saved.find(({ version }) => version === number)!.text;
+          }}
+          onRestore={(restored) => setEditing({ instruction: versions, restored })}
+          close={() => setVersions(null)}
+        />
+      )}
     </Stack>
   );
 }
