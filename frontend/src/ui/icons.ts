@@ -17,7 +17,9 @@ import {
   Columns2,
   ContactRound,
   Copy,
+  CopyCheck,
   CopyPlus,
+  CopyX,
   Dices,
   Download,
   Ellipsis,
@@ -201,8 +203,10 @@ export const icons = {
   image: Image,
   /** Bringing something in from elsewhere: Library › Imports and the gallery's Import ▾. */
   import: Import,
-  /** Keeping something: Dream's Accept and a comparison's Both. */
+  /** Keeping something: Dream's Accept. */
   keep: CircleCheck,
+  /** Keeping every side of a comparison: its Accept Both or All. */
+  keepAll: CopyCheck,
   /** Less Of in Settings › Taste: a soft down-weight. */
   less: CircleMinus,
   library: Library,
@@ -228,6 +232,8 @@ export const icons = {
   outfit: Shirt,
   /** A Dream project's pacing: its share of turns, pausing it or varying its results. */
   pacing: Activity,
+  /** Passing every side of a comparison: its Pass Both or All. */
+  passAll: CopyX,
   /** Setting or resetting a password. */
   password: KeyRound,
   paste: ClipboardPaste,
