@@ -31,7 +31,7 @@ export function ViewMenu<T extends string>({
   /** A setting for the views, checked like them, in its own section after the first group. */
   rating?: {
     value: string;
-    choices: readonly { value: string; label: string }[];
+    choices: readonly { value: string; label: string; count?: number }[];
     onChange: (value: string) => void;
   };
   /** Actions on the views, after a divider: saving the one shown, say. */
@@ -77,10 +77,7 @@ export function ViewMenu<T extends string>({
                     key={choice.value}
                     aria-label={choice.label}
                     rightSection={
-                      <Check
-                        size={14}
-                        visibility={choice.value === rating.value ? undefined : "hidden"}
-                      />
+                      <Marks count={choice.count} checked={choice.value === rating.value} />
                     }
                     onClick={() => rating.onChange(choice.value)}
                   >
@@ -95,16 +92,7 @@ export function ViewMenu<T extends string>({
                 key={choice.value}
                 aria-label={choice.label}
                 disabled={choice.disabled}
-                rightSection={
-                  <Group gap="xs" wrap="nowrap">
-                    {choice.count !== undefined && (
-                      <Text size="xs" c="dimmed" className={classes.count}>
-                        {choice.count.toLocaleString()}
-                      </Text>
-                    )}
-                    <Check size={14} visibility={choice.value === value ? undefined : "hidden"} />
-                  </Group>
-                }
+                rightSection={<Marks count={choice.count} checked={choice.value === value} />}
                 onClick={() => onChange(choice.value)}
               >
                 {choice.label}
@@ -120,5 +108,19 @@ export function ViewMenu<T extends string>({
         ))}
       </Menu.Dropdown>
     </Menu>
+  );
+}
+
+/** A menu choice's count, once known, and its check. */
+function Marks({ count, checked }: { count?: number; checked: boolean }) {
+  return (
+    <Group gap="xs" wrap="nowrap">
+      {count !== undefined && (
+        <Text size="xs" c="dimmed" className={classes.count}>
+          {count.toLocaleString()}
+        </Text>
+      )}
+      <Check size={14} visibility={checked ? undefined : "hidden"} />
+    </Group>
   );
 }

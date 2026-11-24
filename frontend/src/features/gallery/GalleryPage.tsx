@@ -4,6 +4,7 @@ import {
   type InfiniteData,
   focusManager,
   useInfiniteQuery,
+  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -68,6 +69,7 @@ import {
   type GalleryResultsPage,
   galleryArrivalsQuery,
   galleryKey,
+  galleryListingCountQuery,
   galleryListingKey,
   galleryPage,
   galleryQuery,
@@ -816,6 +818,21 @@ function Gallery() {
     if (routeView) leaveView(uploads);
   }
   const counts = useQuery({ ...galleryViewCountsQuery(kind), enabled: countsWanted }).data;
+  // Each rating's count in the listing shown, Gallery or Uploads.
+  const ratingCounts = useQueries({
+    queries: ratingChoices.map(({ value }) => ({
+      ...galleryListingCountQuery({
+        search: "",
+        kind,
+        filters: {
+          ...emptyGalleryFilters,
+          uploads: results.uploads,
+          rating: value === "all" ? "" : value,
+        },
+      }),
+      enabled: countsWanted,
+    })),
+  });
   const comparisons = useQuery({
     ...comparisonMembersQuery,
     enabled: countsWanted || (!routeView && !filters.uploads && loaded.length > 0),
@@ -863,7 +880,10 @@ function Gallery() {
           ? undefined
           : {
               value: filters.rating || "all",
-              choices: ratingChoices,
+              choices: ratingChoices.map((choice, index) => ({
+                ...choice,
+                count: ratingCounts[index].data,
+              })),
               onChange: (rating) =>
                 setFilters({
                   ...filters,
