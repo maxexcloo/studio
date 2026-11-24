@@ -36,6 +36,7 @@ import { backendLabel, isProfile, profileForBackend } from "../generation/payloa
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
+import { enabledLoras } from "./editProfile";
 import { mediaProfileName, mediaTitle, modelSummary } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { galleryItemQuery } from "./queries";
@@ -84,11 +85,6 @@ interface Details {
   output: Row[];
   timing: Row[];
 }
-
-const enabledLoras = (settings: MediaItem["settings"]) =>
-  Array.isArray(settings?.loras)
-    ? settings.loras.filter((lora) => lora?.name && lora.enabled !== false)
-    : undefined;
 
 function actualSeed(value: unknown) {
   const seed = typeof value === "number" || typeof value === "string" ? String(value).trim() : "";
