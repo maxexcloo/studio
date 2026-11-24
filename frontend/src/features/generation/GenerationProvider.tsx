@@ -88,17 +88,38 @@ export interface Draft {
    */
   defaultedProfileId?: string;
   /**
-   * A comparison being set up (features/compare/variants.ts): every variant's settings, the one at
-   * `active` being edited as `input` and `references`, whose stored copy is stale meanwhile.
+   * A comparison being set up (features/compare/variants.ts). Every variant runs on the draft's own
+   * settings, changing only what is compared.
    */
-  compare?: { variants: Variant[]; active: number };
+  compare?: Comparing;
 }
-/** One compared variant's settings. */
+/** One compared variant's settings, as it runs. */
 export interface Variant {
   input: GenerationInput;
   references: ReferenceAsset[];
   label?: string;
 }
+/**
+ * What a comparison varies: seeds after the draft's own, each line of the prompt, models beside
+ * the draft's, LoRAs added to its stack, one LoRA's strengths or sizes; or set variants (Compare
+ * Again, Vary), each changing the draft as recorded, the first being the draft itself.
+ */
+export type Comparing =
+  | { axis: "Seed"; seeds: string[] }
+  | { axis: "Prompt" }
+  | { axis: "Model"; profileIds: string[] }
+  | { axis: "LoRA"; loras: { name: string; strength: number }[]; without: boolean }
+  | { axis: "LoRA Strength"; lora: string; strengths: number[] }
+  | { axis: "Resolution"; sizes: string[]; native: boolean }
+  | {
+      axis?: undefined;
+      variants: {
+        changes: Partial<GenerationInput>;
+        references?: ReferenceAsset[];
+        label?: string;
+      }[];
+    };
+export type CompareAxis = NonNullable<Comparing["axis"]>;
 /**
  * The draft moved to `profile` for a picked character (CharacterChoices): the profile's settings,
  * the prompt led by the character, and its references placed for that profile.
@@ -193,18 +214,7 @@ function draftStore(initial: Draft) {
     get: () => draft,
     settled: () => settled as Draft,
     set(next: Draft) {
-      const variants = next.compare?.variants;
-      draft = {
-        ...next,
-        input: plain(next.input),
-        ...(next.compare &&
-          variants?.some((variant) => settledInputs.has(variant.input)) && {
-            compare: {
-              ...next.compare,
-              variants: variants.map((variant) => ({ ...variant, input: plain(variant.input) })),
-            },
-          }),
-      };
+      draft = { ...next, input: plain(next.input) };
       settle();
       for (const listener of listeners) listener();
     },

@@ -781,7 +781,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
   expect(state.jobs).toHaveLength(1);
   await page
     .getByRole("group", { name: "Generation Actions", exact: true })
-    .getByRole("button", { name: "Compare", exact: true })
+    .getByRole("button", { name: "Generate Images", exact: true })
     .click();
   await expect.poll(() => state.jobs.length).toBe(4);
   for (const [index, direction] of directions.entries()) {

@@ -16,66 +16,44 @@ import {
   viewerAction,
 } from "./fixtures";
 
-const openCompare = async (page: Page) => {
-  await page
+const compareChip = (page: Page) =>
+  page
     .getByRole("group", { name: "Generation Inputs", exact: true })
-    .getByRole("button", { name: "Compare", exact: true })
-    .click();
+    .getByRole("button", { name: /^Compare\b/ });
+const openCompare = async (page: Page) => {
+  await compareChip(page).click();
   return page.getByRole("dialog", { name: "Compare", exact: true });
 };
-const compareMenu = async (page: Page, item: string) => {
-  const setup = await openCompare(page);
-  await setup.getByRole("button", { name: item, exact: true }).click();
-  await expect(setup).toBeHidden();
-};
+// Choices apply as they are made; Done only closes the popup.
 const axis = async (page: Page, name: string) => {
   const setup = await openCompare(page);
   await setup.getByRole("combobox", { name: "What to Vary", exact: true }).click();
   await page.getByRole("option", { name, exact: true }).click();
   return setup;
 };
-const start = async (page: Page) => {
+const done = async (page: Page) => {
   const setup = page.getByRole("dialog", { name: "Compare", exact: true });
-  await setup.getByRole("button", { name: "Add Variant", exact: true }).click();
+  await setup.getByRole("button", { name: "Done", exact: true }).click();
   await expect(setup).toBeHidden();
 };
-const variants = (page: Page) =>
-  page
-    .getByRole("group", { name: "Generation Inputs", exact: true })
-    .getByRole("radiogroup", { name: "Variant", exact: true });
-const variantSelect = (page: Page) => page.getByRole("combobox", { name: "Variant", exact: true });
+const clearComparison = async (page: Page) => {
+  const setup = await openCompare(page);
+  await setup.getByRole("button", { name: "Clear", exact: true }).click();
+  await done(page);
+};
+const expectVariantCount = (page: Page, count: number) =>
+  expect(compareChip(page)).toHaveText(count ? `Compare · ${count}` : "Compare");
 const submitCompare = (page: Page) =>
   page
     .getByRole("group", { name: "Generation Actions", exact: true })
-    .getByRole("button", { name: "Compare", exact: true });
+    .getByRole("button", { name: "Generate Images", exact: true });
 const runComparison = async (page: Page) => {
   await finishTyping(page);
   await submitCompare(page).click();
 };
-const pickVariant = async (page: Page, label: string) => {
-  if (!test.info().project.use.isMobile)
-    return variants(page).getByText(label, { exact: true }).click();
-  await finishTyping(page);
-  await variantSelect(page).click();
-  await page.getByRole("option", { name: `Variant ${label}`, exact: true }).click();
-};
-const expectVariant = async (page: Page, label: string) => {
-  if (test.info().project.use.isMobile)
-    return expect(variantSelect(page)).toHaveText(`Variant ${label}`);
-  await expect(variants(page).getByRole("radio", { name: label, exact: true })).toBeChecked();
-};
-const expectVariantCount = async (page: Page, count: number) => {
-  if (!test.info().project.use.isMobile)
-    return expect(variants(page).getByRole("radio")).toHaveCount(count);
-  const select = variantSelect(page);
-  if (count === 0) return expect(select).toHaveCount(0);
-  await select.click();
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(count);
-  await page.getByRole("option", { selected: true }).click();
-};
 const prompt = (page: Page) => page.getByRole("textbox", { name: "Prompt", exact: true });
 
-test("The composer compares variants that each change one thing, as one labelled set", async ({
+test("Every compared variant runs on the composer's settings, changing only the chosen axis", async ({
   page,
 }, testInfo) => {
   const state = await fixtures(page);
@@ -88,36 +66,22 @@ test("The composer compares variants that each change one thing, as one labelled
     .click();
   await closeLoras(page);
 
-  // Variant B copies A, then runs on another profile.
-  await compareMenu(page, "Add Variant");
-  await expectVariant(page, "B");
-  await expect(prompt(page)).toHaveValue("A copper fox");
+  // Picking an axis applies at once; a model comparison waits for a second model.
+  const models = await axis(page, "Model");
+  await expectVariantCount(page, 1);
   await expect(submitCompare(page)).toHaveAttribute("aria-disabled", "true");
-  await page.getByRole("combobox", { name: "Profile", exact: true }).click();
-  await page.getByRole("option", { name: /^Image Fast\b/ }).click();
-  await expect(page.getByText("Image Fast", { exact: true }).first()).toBeVisible();
-  // Variant C duplicates B with another prompt; A keeps its own settings.
-  await compareMenu(page, "Add Variant");
+  await models.getByRole("checkbox", { name: "Image Fast", exact: true }).check();
+  await done(page);
+  await expectVariantCount(page, 2);
+  // A change in the composer reaches every variant, and no control edits one alone.
   await prompt(page).fill("A silver fox");
-  await pickVariant(page, "A");
-  await expect(prompt(page)).toHaveValue("A copper fox");
-  // Each variant's tooltip names what sets it apart.
-  if (!testInfo.project.use.isMobile) {
-    await variants(page).getByText("A", { exact: true }).hover();
-    await expect(
-      page.getByRole("tooltip", { name: "Image Quality · Prompt A", exact: true }),
-    ).toBeVisible();
-  }
+  await expect(page.getByRole("radiogroup", { name: "Variant", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Variant", exact: true })).toHaveCount(0);
 
-  // The draft keeps its variants across a reload.
+  // The draft keeps its comparison across a reload.
   await page.reload();
-  await expectVariantCount(page, 3);
+  await expectVariantCount(page, 2);
   if (testInfo.project.use.isMobile) {
-    await expect(
-      page
-        .getByRole("dialog", { name: "Generate", exact: true })
-        .getByRole("combobox", { name: "Variant", exact: true }),
-    ).toBeInViewport();
     const controls = page.getByRole("group", { name: "Generation Actions", exact: true });
     await expect(
       controls.getByRole("radiogroup", { name: "Generation Output", exact: true }),
@@ -127,11 +91,6 @@ test("The composer compares variants that each change one thing, as one labelled
     expect(await controls.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
       true,
     );
-    await expect(
-      page
-        .getByRole("group", { name: "Generation Inputs", exact: true })
-        .getByRole("button", { name: "Compare", exact: true }),
-    ).toBeVisible();
   }
   await runComparison(page);
 
@@ -146,22 +105,20 @@ test("The composer compares variants that each change one thing, as one labelled
       variant.input.count,
     ]),
   ).toEqual([
-    ["Image Quality · Prompt A", "image:test", "A copper fox", ["detail.safetensors"], 1],
-    ["Image Fast · Prompt A", "image:fast", "A copper fox", ["detail.safetensors"], 1],
-    ["Image Fast · Prompt C", "image:fast", "A silver fox", ["detail.safetensors"], 1],
+    ["Image Quality", "image:test", "A silver fox", ["detail.safetensors"], 1],
+    ["Image Fast", "image:fast", "A silver fox", ["detail.safetensors"], 1],
   ]);
+  expect(run.requests[0].input.seed).toBe(run.requests[1].input.seed);
   await expect(page.getByRole("heading", { name: "Compare", exact: true })).toBeVisible();
 
   // Picking the winner likes it without touching the composer; Use This takes one there.
-  await page
-    .getByRole("button", { name: "Pick Image Fast · Prompt A as Winner", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Pick Image Fast as Winner", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Clear Winner Image Fast · Prompt A", exact: true }),
+    page.getByRole("button", { name: "Clear Winner Image Fast", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(run.vote).toBe(run.jobIds[1]);
   expect(state.gallery.find((item) => item.jobId === run.jobIds[1]).rating).toBe("liked");
-  await page.getByRole("button", { name: "Use Image Fast · Prompt C", exact: true }).click();
+  await page.getByRole("button", { name: "Use Image Fast", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(prompt(page)).toHaveValue("A silver fox");
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
@@ -171,33 +128,23 @@ test("The composer compares variants that each change one thing, as one labelled
   await expectVariantCount(page, 0);
 });
 
-test("Compare ▾ builds several variants at once from prompt lines and seeds", async ({ page }) => {
+test("Compare ▾ varies each line of the prompt, then seeds", async ({ page }) => {
   const state = await fixtures(page);
   await create(page);
   await prompt(page).fill("A copper fox\nA silver fox\nA golden fox");
   await axis(page, "Prompt");
-  await start(page);
+  await done(page);
   await expectVariantCount(page, 3);
-  await expect(prompt(page)).toHaveValue("A copper fox");
+  await prompt(page).fill("A copper fox\nA silver fox");
+  await expectVariantCount(page, 2);
 
-  // Duplicating copies the variant being edited, not A.
-  await pickVariant(page, "B");
-  await compareMenu(page, "Add Variant");
-  await expectVariant(page, "D");
-  await expect(prompt(page)).toHaveValue("A silver fox");
-  // Remove drops one variant; Clear drops them all.
-  const overview = await openCompare(page);
-  await overview.getByRole("button", { name: "Remove Variant D", exact: true }).click();
-  await expect(overview.getByRole("listitem")).toHaveCount(3);
-  await page.keyboard.press("Escape");
-  await expect(overview).toBeHidden();
-  await expectVariant(page, "C");
-
-  // Seeds start over from the variant being edited, each run with its own seed.
-  await compareMenu(page, "Clear");
+  // Clear ends the comparison; another axis starts afresh.
+  await clearComparison(page);
+  await expectVariantCount(page, 0);
+  await prompt(page).fill("A golden fox");
   const setup = await axis(page, "Seed");
   await setup.getByRole("textbox", { name: "Seeds", exact: true }).fill("3");
-  await start(page);
+  await done(page);
   await expectVariantCount(page, 3);
   await runComparison(page);
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
@@ -231,15 +178,13 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   await values.getByText("-2", { exact: true }).click();
   await expect(chip("-2")).not.toBeChecked();
   await values.getByText("10", { exact: true }).click();
-  await start(page);
+  await done(page);
   await expectVariantCount(page, 4);
 
-  // Models start over from the variant being edited (A, without the LoRA), keeping its seed.
-  await compareMenu(page, "Clear");
+  // Another axis replaces it, on the composer's own LoRA stack and seed.
   const models = await axis(page, "Model");
-  await expect(models.getByRole("button", { name: "Add Variant", exact: true })).toBeDisabled();
   await models.getByRole("checkbox", { name: "Image Fast", exact: true }).check();
-  await start(page);
+  await done(page);
   await runComparison(page);
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const requests = state.comparisons[0].requests;
@@ -251,8 +196,8 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
       variant.input.loras.length,
     ]),
   ).toEqual([
-    ["Image Quality", "image:test", "A copper fox", 0],
-    ["Image Fast", "image:fast", "A copper fox", 0],
+    ["Image Quality", "image:test", "A copper fox", 1],
+    ["Image Fast", "image:fast", "A copper fox", 1],
   ]);
   expect(requests[0].input.seed).toBe(requests[1].input.seed);
 });
@@ -283,7 +228,7 @@ test("Compare searches a long model list, reaches its last choice and retains th
   await search.fill("Quality");
   await expect(options.getByRole("checkbox")).toHaveCount(1);
   await last.check();
-  await start(page);
+  await done(page);
   await runComparison(page);
   await expect.poll(() => state.comparisons.length).toBe(1);
   expect(state.comparisons[0].requests.map((variant: any) => variant.input.profileId)).toEqual([
@@ -311,16 +256,15 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   const loras = await axis(page, "LoRA");
   await loras.getByRole("checkbox", { name: "Detail Slider", exact: true }).check();
   await loras.getByRole("checkbox", { name: "Soft Style", exact: true }).check();
-  await start(page);
+  await done(page);
   await expectVariantCount(page, 3);
-  await pickVariant(page, "B");
-  await compareMenu(page, "Clear");
+  // Resolution replaces the LoRA comparison, which left the composer's own stack empty.
   const resolutions = await axis(page, "Resolution");
   const sizes = resolutions.getByRole("group", { name: "Resolutions", exact: true });
   await expect(sizes.getByRole("checkbox")).toHaveCount(2);
   await sizes.getByRole("checkbox", { name: "1K", exact: true }).check();
   await sizes.getByRole("checkbox", { name: "2K", exact: true }).check();
-  await start(page);
+  await done(page);
   await runComparison(page);
   await expect.poll(() => state.comparisons.length).toBe(1);
   const requests = state.comparisons[0].requests;
@@ -328,9 +272,7 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
     [1024, 1024],
     [2048, 2048],
   ]);
-  expect(
-    requests.every((variant: any) => variant.input.loras[0].name === "detail.safetensors"),
-  ).toBe(true);
+  expect(requests.every((variant: any) => variant.input.loras.length === 0)).toBe(true);
   expect(requests[0].input.seed).toBe(requests[1].input.seed);
 });
 
@@ -348,7 +290,7 @@ test("Compare preserves provider resolution enum values without converting them 
   await expect(choices.getByRole("checkbox")).toHaveCount(2);
   await choices.getByRole("checkbox", { name: "1K", exact: true }).check();
   await choices.getByRole("checkbox", { name: "2K", exact: true }).check();
-  await start(page);
+  await done(page);
   await runComparison(page);
   await expect.poll(() => state.comparisons.length).toBe(1);
   expect(state.comparisons[0].requests.map((variant: any) => variant.input.resolution)).toEqual([
@@ -445,19 +387,25 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(page.getByRole("menu")).toHaveCount(1);
   await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Compare in Composer", exact: true }).click();
-  await expectVariant(page, "B");
+  // It compares seeds from the result's own, on its exact settings.
+  await expectVariantCount(page, 4);
   await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
+  const setup = await openCompare(page);
+  await setup.getByRole("textbox", { name: "Seeds", exact: true }).fill("3");
+  await done(page);
   await prompt(page).fill("A jade bird");
   await runComparison(page);
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const [run] = state.comparisons;
-  expect(run.requests.map((variant: any) => [variant.input.seed, variant.input.prompt])).toEqual([
-    [1234567, "An amber bird"],
-    [1234567, "A jade bird"],
-  ]);
+  const seeds = run.requests.map((variant: any) => variant.input.seed);
+  expect(seeds[0]).toBe("1234567");
+  expect(new Set(seeds).size).toBe(3);
+  expect(run.requests.map((variant: any) => variant.input.prompt)).toEqual(
+    Array(3).fill("A jade bird"),
+  );
   expect(state.jobs.every((job: any) => job.parentItemId === "source")).toBe(true);
-  await page.getByRole("button", { name: "Open Prompt B", exact: true }).click();
+  await page.getByRole("button", { name: `Open Seed ${seeds[1]}`, exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer).toBeVisible();
   if (!test.info().project.use.isMobile) {
@@ -469,19 +417,27 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(viewer).toBeHidden();
   await page.keyboard.press("2");
   await expect(
-    page.getByRole("button", { name: "Clear Winner Prompt B", exact: true }),
+    page.getByRole("button", { name: `Clear Winner Seed ${seeds[1]}`, exact: true }),
   ).toBeAttached();
+
+  // Compare Again brings the variants back, the winner first; one can go, and a change reaches all.
   await page.getByRole("button", { name: "Compare Again", exact: true }).click();
   await expect(prompt(page)).toHaveValue("A jade bird");
-  await pickVariant(page, "B");
+  await expectVariantCount(page, 3);
+  const overview = await openCompare(page);
+  await overview.getByRole("button", { name: "Remove Variant C", exact: true }).click();
+  await expect(overview.getByRole("listitem")).toHaveCount(2);
+  await done(page);
   await prompt(page).fill("A jade bird in flight");
   await runComparison(page);
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
-  expect(state.comparisons[1].requests.map((variant: any) => variant.input.prompt)).toEqual([
-    "A jade bird",
-    "A jade bird in flight",
+  expect(
+    state.comparisons[1].requests.map((variant: any) => [variant.input.seed, variant.input.prompt]),
+  ).toEqual([
+    [seeds[1], "A jade bird in flight"],
+    [seeds[0], "A jade bird in flight"],
   ]);
-  expect(state.jobs.slice(2).map((job: any) => [job.parentJobId, job.parentItemId])).toEqual([
+  expect(state.jobs.slice(3).map((job: any) => [job.parentJobId, job.parentItemId])).toEqual([
     [run.jobIds[1], `${run.jobIds[1]}:0`],
     [run.jobIds[1], `${run.jobIds[1]}:0`],
   ]);
@@ -489,7 +445,12 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   // The run is a set in the gallery that links back to its comparison.
   await page.getByRole("link", { name: "Show in Gallery", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
-  await page.getByRole("button", { name: "Open image: Prompt B", exact: true }).click();
+  // Its results keep the prompt's title; the variant's label is secondary.
+  await page
+    .getByRole("button", { name: "Open image: Jade Bird in Flight", exact: true })
+    .first()
+    .click();
+  await expect(viewer.getByText(/^Seed \d+ · /).first()).toBeVisible();
   // The viewer's AI menu opens the comparison the image belongs to.
   await viewerAction(page, "Discover");
   await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();

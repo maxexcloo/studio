@@ -124,7 +124,7 @@ export function GenerationForm({
   });
   const single = useDraftSubmit({ onSubmitted });
   const submit = draft.compare ? compareRun : single;
-  const submitLabel = draft.compare ? "Compare" : undefined;
+  const submitLabel = draft.compare ? "Generate Images" : undefined;
   const submitState = useSubmitState({
     input,
     profile,

@@ -10,7 +10,7 @@ import { useTouch } from "../../ui/usePhone";
 import { JobProgressBar, jobReason, jobStatus, statusLabels } from "../generation/JobProgress";
 import { queueQuery, useQueueAction, withQueuePosition } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
-import { mediaTimestamp, mediaTitle } from "./mediaLabels";
+import { comparisonVariant, mediaTimestamp, mediaTitle } from "./mediaLabels";
 import { mediaOriginBadge } from "./mediaOriginBadge";
 import { mediaSource } from "./mediaSource";
 import { upscaling, useStopUpscale } from "./UpscaleControls";
@@ -236,7 +236,7 @@ export function MediaTile({
   const drifted = !selecting && item.identity?.drifted;
   const faceMark = "Face Check: Face Differs";
   const description = [badge?.label, drifted ? faceMark : undefined].filter(Boolean).join(". ");
-  const subtitle = item.resultSet?.caption || detail;
+  const subtitle = item.resultSet?.caption || detail || comparisonVariant(item);
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
   );

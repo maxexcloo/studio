@@ -425,7 +425,7 @@ test("Keep & Vary accepts a Dream card and stages four variations of one thing t
   );
   await page
     .getByRole("group", { name: "Generation Actions", exact: true })
-    .getByRole("button", { name: "Compare", exact: true })
+    .getByRole("button", { name: "Generate Images", exact: true })
     .click();
   await expect.poll(() => state.jobs.length).toBe(4);
   expect(state.jobs.map((job) => job.input.prompt)).toEqual(poses.map(({ prompt }) => prompt));
