@@ -6,6 +6,8 @@ import test from "node:test";
 
 import express from "express";
 
+import { promptVariables } from "../../shared/prompt-variables.ts";
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_WORKERS = JSON.stringify([
@@ -108,6 +110,9 @@ test("Library prompt edits reach the writer immediately and preserve history and
   assert.ok(listing.body.instructions.some(({ id }) => id === "summarise-taste"));
   const title = listing.body.instructions.find(({ id }) => id === "gallery-title");
   assert.equal(title.version, null);
+  // The preview has an example for every variable an instruction can hold.
+  for (const { initial } of listing.body.instructions)
+    for (const name of promptVariables(initial)) assert.ok(name in listing.body.examples, name);
 
   const edit = `${path}/${title.id}`;
   assert.equal(

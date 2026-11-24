@@ -26,6 +26,7 @@ import {
   type DefinitionKind,
   type LoadedDefinition,
   definitionPath,
+  definitionVersionText,
 } from "./DefinitionEditor";
 import {
   type ProfileRow,
@@ -34,6 +35,7 @@ import {
   editableProfilesQuery,
   profileStatsQuery,
 } from "./queries";
+import { VersionsDialog } from "./Versions";
 interface GuideRow {
   packId: string;
   /** The pack's name, else the label of a family it guides, else its id (GET /api/profiles/guides). */
@@ -94,6 +96,33 @@ interface Editing {
   kind: DefinitionKind;
   id: string;
   creating?: LoadedDefinition;
+  /** A saved version's text it opens on, as an unsaved change. */
+  restored?: string;
+}
+/** A definition whose Versions dialog is open. */
+type Versioned = Deleting & { version: number };
+
+/** A definition's Versions dialog; Restore… opens its editor on the chosen version. */
+function DefinitionVersions({
+  versions,
+  close,
+  edit,
+}: {
+  versions: Versioned;
+  close: () => void;
+  edit: (editing: Editing) => void;
+}) {
+  const { kind, id, name, version } = versions;
+  return (
+    <VersionsDialog
+      name={name}
+      path={`${definitionPath(kind, id)}/versions`}
+      current={version}
+      load={(number) => definitionVersionText(kind, id, number)}
+      onRestore={(restored) => edit({ kind, id, restored })}
+      close={close}
+    />
+  );
 }
 
 /**
@@ -141,12 +170,15 @@ function rowMenu({
   kind,
   id,
   name,
+  version,
   edit,
+  versions,
   remove,
   duplicate,
   more,
-}: Deleting & {
+}: Versioned & {
   edit: (editing: Editing) => void;
+  versions: (versioned: Versioned) => void;
   remove: (deleting: Deleting) => void;
   duplicate?: () => void;
   more?: ReactNode;
@@ -156,6 +188,14 @@ function rowMenu({
       <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
         Edit
       </Menu.Item>
+      {version > 0 && (
+        <Menu.Item
+          leftSection={<icons.versions size={16} />}
+          onClick={() => versions({ kind, id, name, version })}
+        >
+          Versions…
+        </Menu.Item>
+      )}
       {more}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
@@ -232,6 +272,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [profileQuery, setProfileQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [versions, setVersions] = useState<Versioned | null>(null);
   const [converting, setConverting] = useState<ProfileRow | null>(null);
   const [deleting, setDeleting] = useState<Deleting | null>(null);
   const { profileList, profiles, guideOf } = useDefinitions();
@@ -444,7 +485,9 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                   kind: "profile",
                   id: entry.id,
                   name: entry.name || entry.id,
+                  version: entry.version,
                   edit: setEditing,
+                  versions: setVersions,
                   remove: setDeleting,
                   duplicate: () => duplicating.mutate(entry.id),
                   // A Krea 2 profile on ComfyUI can take a converted Radiance backend, or a newer one.
@@ -464,12 +507,16 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
       </Stack>
       <ConvertToRadiance profile={converting} onClose={() => setConverting(null)} />
       <DeleteDefinition deleting={deleting} close={() => setDeleting(null)} />
+      {versions && (
+        <DefinitionVersions versions={versions} close={() => setVersions(null)} edit={setEditing} />
+      )}
       {editing && (
         <DefinitionEditor
           kind={editing.kind}
           id={editing.id}
           close={() => setEditing(null)}
           creating={editing.creating}
+          restored={editing.restored}
           existingIds={profiles.map((entry) => entry.id)}
         />
       )}
@@ -530,6 +577,7 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
   const phone = usePhone();
   const [guideQuery, setGuideQuery] = useState("");
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [versions, setVersions] = useState<Versioned | null>(null);
   const [deleting, setDeleting] = useState<Deleting | null>(null);
   const { guideList, guides, users } = useDefinitions();
   return (
@@ -619,7 +667,9 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               kind: "guide",
               id: entry.packId,
               name: entry.name,
+              version: entry.version,
               edit: setEditing,
+              versions: setVersions,
               remove: setDeleting,
             })
           }
@@ -631,10 +681,14 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
           id={editing.id}
           close={() => setEditing(null)}
           creating={editing.creating}
+          restored={editing.restored}
           existingIds={guides.map((entry) => entry.packId)}
         />
       )}
       <DeleteDefinition deleting={deleting} close={() => setDeleting(null)} />
+      {versions && (
+        <DefinitionVersions versions={versions} close={() => setVersions(null)} edit={setEditing} />
+      )}
     </Stack>
   );
 }

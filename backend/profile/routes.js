@@ -47,6 +47,7 @@ import { directRoute } from "../domain/direct-route.ts";
  * same routes in process: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
 import { families as familyCatalogue } from "../family-catalogue.js";
+import { promptInstructionExamples } from "../prompt-instruction-examples.ts";
 import { promptInstructionStore } from "../prompt-instructions.js";
 import { adminRefusal, fromChat, requireAdmin } from "../route-access.js";
 import { backendCandidates, combineBackends } from "./backends.js";
@@ -66,7 +67,8 @@ import { removeProfile } from "./remove.js";
  * `profiles()` and `guides()` give the profile/store.js stores, `promptStyles()` prompt-styles.js's; `objectInfo(kind)` ComfyUI's
  * object_info for revert's check; `exportOptions()` what writeExport needs besides the stores;
  * `onSaved(id)` runs after any change that affects who sees which profile; `onConverted(by)` after a
- * converted Radiance model joins its profile; `accountName(account)` names who made a change.
+ * converted Radiance model joins its profile; `accountName(account)` names who made a change, and
+ * `accountLabel(id)` reads that name back as people know the account.
  */
 export function registerProfileRoutes(
   app,
@@ -79,8 +81,22 @@ export function registerProfileRoutes(
     onSaved = () => {},
     onConverted = () => {},
     accountName = () => "",
+    accountLabel = (id) => id,
   },
 ) {
+  // Who saved a version, as its Versions list names them: Studio's own start reads Studio Default.
+  const saved = (entries) =>
+    entries.map((entry) => ({
+      ...entry,
+      savedBy:
+        entry.origin === "seed" || entry.by === "seed"
+          ? "Studio Default"
+          : !entry.by || entry.by === entry.origin
+            ? entry.origin === "chat"
+              ? "Chat"
+              : "Studio"
+            : accountLabel(entry.by) || entry.by,
+    }));
   const info = async (kind) => {
     try {
       return await objectInfo(kind);
@@ -113,7 +129,7 @@ export function registerProfileRoutes(
 
   route("GET", "/api/profiles/editable/:id/versions", (_account, { params }) => {
     readEditableProfile(params.id);
-    return { versions: profiles().versions(params.id), meta: profiles().meta(params.id) };
+    return { versions: saved(profiles().versions(params.id)), meta: profiles().meta(params.id) };
   });
   app.get(
     "/api/profiles/editable/:id/download",
@@ -244,7 +260,11 @@ export function registerProfileRoutes(
   });
   route("GET", "/api/profiles/guides/:packId/versions", (_account, { params }) => {
     const current = guides().pack(params.packId);
-    return { versions: guides().versions(params.packId), meta: current.meta, hash: current.hash };
+    return {
+      versions: saved(guides().versions(params.packId)),
+      meta: current.meta,
+      hash: current.hash,
+    };
   });
   route("GET", "/api/profiles/guides/:packId/versions/:n", (_account, { params }) => ({
     version: guides().version(params.packId, versionNumber(params.n)),
@@ -322,9 +342,10 @@ export function registerProfileRoutes(
   );
   route("GET", "/api/profiles/prompt-instructions", () => ({
     instructions: promptInstructionStore().list(),
+    examples: promptInstructionExamples(),
   }));
   route("GET", "/api/profiles/prompt-instructions/:id/history", (_account, { params }) => ({
-    versions: promptInstructionStore().history(params.id),
+    versions: saved(promptInstructionStore().history(params.id)),
   }));
   route("PUT", "/api/profiles/prompt-instructions/:id", (account, { body, params }) =>
     promptInstructionStore().save(params.id, body?.text, {

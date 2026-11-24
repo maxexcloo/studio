@@ -612,6 +612,7 @@ registerProfileRoutes(app, {
   promptStyles: () => promptStyleStore(),
   objectInfo: profileObjectInfo,
   accountName: (account) => account?.userId || "",
+  accountLabel: (id) => listAccounts().find((account) => account.id === id)?.username,
   // Radiance reads a converted model's entry (studio_worker/convert.py) when its pod starts, so a
   // running one restarts; a stopped one reads it when it next starts.
   onConverted: async (by) => {

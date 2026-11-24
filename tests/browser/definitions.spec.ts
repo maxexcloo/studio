@@ -137,7 +137,7 @@ test("Guide editing and restoring an earlier version create distinct saved revis
       return route.fulfill({
         json: {
           versions: saved
-            .map((_, i) => ({ version: i + 1, origin: "studio", by: "Administrator" }))
+            .map((_, i) => ({ version: i + 1, origin: "studio", savedBy: "Administrator" }))
             .reverse(),
         },
       });
@@ -192,36 +192,35 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Updated guidance.",
   );
-  await editor.getByRole("tab", { name: "Versions", exact: true }).click();
-  const versionActions = async (action: string) => {
-    await editor.getByRole("button", { name: "Actions for Version 1", exact: true }).click();
-    await page.getByRole("menuitem", { name: action, exact: true }).click();
-  };
-  await versionActions("View");
-  await expect(editor.getByRole("region", { name: "Saved Definition", exact: true })).toContainText(
-    "Original guidance.",
-  );
-  await versionActions("Restore");
+  await editor.getByRole("button", { name: "Close Definition Editor", exact: true }).click();
   await expect(editor).toBeHidden();
-  expect(saved).toEqual([original, { ...original, summary: "Updated guidance." }, original]);
-  await editDefinition(page, "Guide");
+  // Versions… lists its saved versions; Restore… opens the editor on one as an unsaved change.
+  const rowAction = async (name: string) => {
+    await page.getByRole("button", { name: "Actions for Owned Guide", exact: true }).click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+  };
+  await rowAction("Versions…");
+  const versions = page.getByRole("dialog", { name: "Owned Guide Versions", exact: true });
+  await expect(versions.getByRole("table", { name: "Versions", exact: true })).toContainText(
+    "Administrator",
+  );
+  await versions.getByRole("button", { name: "Actions for Version 1", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Restore…", exact: true }).click();
+  await expect(versions).toBeHidden();
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Original guidance.",
   );
-  // A guide that profiles still use stays, and the confirmation says why.
-  await editor.getByRole("button", { name: "Delete", exact: true }).click();
+  expect(saved).toHaveLength(2);
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(saved).toEqual([original, { ...original, summary: "Updated guidance." }, original]);
+  // A guide that profiles still use stays, and the confirmation says why; the row menu deletes
+  // over the hash it reads first.
+  await rowAction("Delete");
   const confirm = page.getByRole("dialog", { name: "Delete Guide", exact: true });
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(confirm).toContainText("This guide is still used by custom:fixture.");
-  // The row menu deletes too, over the hash it reads first.
-  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
-  await editor.getByRole("button", { name: "Close Definition Editor", exact: true }).click();
-  await expect(editor).toBeHidden();
-  await page.getByRole("button", { name: "Actions for Owned Guide", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(confirm).toContainText("This guide is still used by custom:fixture.");
-  expect(removals).toEqual([{ baseHash: "hash-3" }, { baseHash: "hash-3" }]);
+  expect(removals).toEqual([{ baseHash: "hash-3" }]);
 });
 
 test("Model classification saves and reads back while definition administration stays restricted", async ({
@@ -577,7 +576,9 @@ test("Library edits a background prompt and reads the saved version back", async
     version: null as number | null,
   };
   await page.route("**/api/profiles/prompt-instructions", (route) =>
-    route.fulfill({ json: { instructions: [instruction] } }),
+    route.fulfill({
+      json: { instructions: [instruction], examples: { request: "make it night" } },
+    }),
   );
   await page.route("**/api/profiles/prompt-instructions/summarise-taste", (route) => {
     const { text, baseHash } = route.request().postDataJSON();
@@ -589,8 +590,8 @@ test("Library edits a background prompt and reads the saved version back", async
     route.fulfill({
       json: {
         versions: [
-          { version: 2, text: instruction.text },
-          { version: 1, text: initial },
+          { version: 2, text: instruction.text, savedBy: "Administrator" },
+          { version: 1, text: initial, savedBy: "Administrator" },
         ],
       },
     }),
@@ -616,16 +617,21 @@ test("Library edits a background prompt and reads the saved version back", async
   await expect(editor).toBeHidden();
   await open();
   await expect(text).toHaveValue(changed);
-  const version = editor.getByRole("combobox", { name: "Load Version", exact: true });
-  await expect(version).toHaveValue("v2");
-  await version.click();
-  await editor.getByRole("option", { name: "v1", exact: true }).click();
-  await expect(version).toHaveValue("v1");
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  // Versions… restores a saved version into the editor as an unsaved change.
+  await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Versions…", exact: true }).click();
+  const versions = page.getByRole("dialog", { name: "Summarise Taste Versions", exact: true });
+  await versions.getByRole("button", { name: "Actions for Version 1", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Restore…", exact: true }).click();
+  await expect(versions).toBeHidden();
   await expect(text).toHaveValue(initial);
   await editor.getByRole("tab", { name: "Preview", exact: true }).click();
-  await expect(editor.getByLabel("Highlighted Instruction").locator("code")).toHaveText(
-    "{{request}}",
-  );
+  // Preview fills each variable with what Studio puts there, naming it on hover.
+  const preview = editor.getByLabel("Highlighted Instruction");
+  await expect(preview).toHaveText("Summarise the recurring subjects in make it night.");
+  await expect(preview.getByTitle("{{request}}")).toHaveText("make it night");
+  await expect(legend.getByText("{{request}}", { exact: true })).toBeVisible();
   await editor.getByRole("tab", { name: "Edit", exact: true }).click();
   await expect(text).toHaveValue(initial);
   await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();

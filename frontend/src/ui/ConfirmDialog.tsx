@@ -20,7 +20,8 @@ interface FooterAction {
  * Every dialog's and sheet's footer, on one line at the right: any `secondary` actions (default
  * buttons, such as Check), Cancel, then its one filled primary action (`children`). Without
  * `onCancel`, where there is nothing to cancel, the action (Done, Close) follows the secondary
- * ones. A `leading` action that adds content (Add, Upload) sits apart at the left edge. Phones fold
+ * ones. A `leading` action that adds content (Add, Upload) or restores a default (Use Default) sits
+ * apart at the left edge. Phones fold
  * two or more secondary actions into one ⋯ menu, so the row never wraps.
  */
 export function DialogFooter({
