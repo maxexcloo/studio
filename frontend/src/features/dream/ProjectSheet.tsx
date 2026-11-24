@@ -1,20 +1,21 @@
 import {
   Alert,
+  AspectRatio,
   Badge,
   Button,
+  Center,
   Group,
-  Image,
   Modal,
   SimpleGrid,
   Stack,
   Text,
   UnstyledButton,
 } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useId, useState } from "react";
 
 import type { ChangeBy, Project, ProjectChange } from "../../../../shared/projects";
-import { api } from "../../api";
+import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
@@ -24,7 +25,10 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
-import { useMediaPreview } from "../gallery/MediaPreview";
+import { MediaViewer } from "../gallery/MediaViewer";
+import { type Verdict, viewerChoices } from "./choices";
+import { Thumbnail } from "./DiscardedDreams";
+import { useJudge } from "./DreamDeck";
 import {
   ProjectEnabled,
   ProjectMoreTurns,
@@ -32,8 +36,15 @@ import {
   constraintBadges,
 } from "./ProjectCard";
 import { ProjectPins, briefFields } from "./ProjectForm";
-import { ProposalList } from "./ProjectInbox";
-import { inboxQuery, projectPath, projectResultsQuery, projectsQuery } from "./queries";
+import { BriefDiff, ProposalList } from "./ProjectInbox";
+import {
+  type DreamItem,
+  chatChoicesQuery,
+  inboxQuery,
+  projectPath,
+  projectResultsQuery,
+  projectsQuery,
+} from "./queries";
 
 const byNames: Record<ChangeBy, string> = { you: "You", chat: "Chat", dream: "Dream" };
 const fieldNames: Record<string, string> = {
@@ -47,7 +58,10 @@ const fieldNames: Record<string, string> = {
   created: "Created",
 };
 
-/** One change: who made it, when and to what, why Dream proposed it, and Undo on the latest. */
+/**
+ * One change: who made it and when, why Dream proposed it, the words it changed, and Undo on the
+ * latest.
+ */
 function ChangeRow({
   change,
   undo,
@@ -70,6 +84,9 @@ function ChangeRow({
         <Text size="xs" c="dimmed">
           {[formatDateTime(change.at), change.why].filter(Boolean).join(" · ")}
         </Text>
+        {Object.entries(change.text || {}).map(([field, { before, after }]) => (
+          <BriefDiff key={field} label={fieldNames[field] ?? field} before={before} after={after} />
+        ))}
       </Stack>
       {undo && (
         <Button
@@ -86,38 +103,121 @@ function ChangeRow({
   );
 }
 
-/** The project's results, newest first, each opening full size. */
+/**
+ * The project's results, newest first, a page at a time, each opening the viewer: one still waiting
+ * for a verdict offers Dream's, the rest their item actions.
+ */
 function Results({ projectId }: { projectId: string }) {
-  const results = useQuery(projectResultsQuery(projectId));
-  const preview = useMediaPreview();
+  const results = useInfiniteQuery(projectResultsQuery(projectId));
+  const [viewing, setViewing] = useState<string | null>(null);
+  const judge = useJudge(() => undefined);
   if (results.isPending) return <LoadingState label="Loading Results" />;
   if (results.isError) return <Alert color="red">{results.error.message}</Alert>;
-  const items = results.data.items;
+  const items = results.data.pages.flatMap((page) => page.items);
   if (!items.length)
     return (
       <Text size="sm" c="dimmed">
         No results yet.
       </Text>
     );
+  const current = viewing ? items.find((item) => item.id === viewing) : undefined;
+  if (viewing && !current) setViewing(null);
+  function act(item: DreamItem, verdict: Verdict) {
+    // A disliked result leaves the project's results, so the viewer moves on.
+    if (verdict === "discard") {
+      const index = items.indexOf(item);
+      setViewing((items[index + 1] || items[index - 1])?.id ?? null);
+    }
+    judge.mutate({ card: { kind: "dream", key: item.id, item }, verdict });
+  }
   return (
-    <SimpleGrid cols={{ base: 3, sm: 4 }} spacing={6}>
-      {items.map((item, index) => (
-        <UnstyledButton
-          key={item.id}
-          aria-label={`Preview ${item.title || `Result ${index + 1}`}`}
-          onClick={() => preview.open(items, index)}
-        >
-          <Image
-            src={item.thumbnailUrl || item.url}
-            alt=""
-            radius="md"
-            loading="lazy"
-            style={{ aspectRatio: "1", objectFit: "cover" }}
-          />
-        </UnstyledButton>
-      ))}
-      {preview.element}
-    </SimpleGrid>
+    <Stack gap="sm">
+      <SimpleGrid cols={{ base: 3, sm: 4 }} spacing={6}>
+        {items.map((item) => (
+          <UnstyledButton
+            key={item.id}
+            aria-label={`View ${item.title || item.prompt || "Dream Result"}`}
+            style={{ borderRadius: "var(--mantine-radius-md)", overflow: "hidden" }}
+            onClick={() => setViewing(item.id)}
+          >
+            <AspectRatio ratio={1}>
+              <Thumbnail item={item} />
+            </AspectRatio>
+          </UnstyledButton>
+        ))}
+      </SimpleGrid>
+      {results.hasNextPage && (
+        <Center>
+          <Button
+            variant="default"
+            size="compact-sm"
+            loading={results.isFetchingNextPage}
+            onClick={() => void results.fetchNextPage()}
+          >
+            {results.isFetchNextPageError ? "Retry Loading" : "Load More"}
+          </Button>
+        </Center>
+      )}
+      {current && (
+        <MediaViewer
+          item={current}
+          items={items}
+          navigate={(item) => setViewing(item.id)}
+          close={() => setViewing(null)}
+          actions={
+            current.dream?.state === "unseen"
+              ? viewerChoices({ kind: "dream", key: current.id, item: current }, (choice) =>
+                  act(current, choice as Verdict),
+                )
+              : undefined
+          }
+        />
+      )}
+    </Stack>
+  );
+}
+
+/** The chats attached to the project, named as their chats named their work, each with Detach. */
+function Chats({ project }: { project: Project }) {
+  const client = useQueryClient();
+  const attached = (useQuery(projectsQuery).data?.chats || []).filter(
+    (entry) => entry.projectId === project.id,
+  );
+  const named = useQuery({ ...chatChoicesQuery, enabled: attached.length > 0 });
+  const detach = useMutation({
+    mutationFn: (chat: string) => post("/api/dream/projects/attach", { chat, projectId: null }),
+    onSettled: () => client.invalidateQueries({ queryKey: projectsQuery.queryKey }),
+  });
+  return (
+    <SettingGroup title="Chats">
+      {attached.length ? (
+        attached.map(({ chat, at }) => (
+          <SettingRow
+            key={chat}
+            label={
+              <span style={{ overflowWrap: "anywhere" }}>
+                {named.data?.chats.find((entry) => entry.chat === chat)?.title ||
+                  `Chat ${chat.slice(0, 8)}`}
+              </span>
+            }
+            description={`Last used ${formatDateTime(at)}`}
+          >
+            <Button
+              size="compact-sm"
+              variant="default"
+              loading={detach.isPending && detach.variables === chat}
+              onClick={() => detach.mutate(chat)}
+            >
+              Detach
+            </Button>
+          </SettingRow>
+        ))
+      ) : (
+        <Text size="sm" c="dimmed">
+          No chats attached.
+        </Text>
+      )}
+    </SettingGroup>
   );
 }
 
@@ -204,6 +304,7 @@ function ProjectDetail({
       <SettingGroup title="Results">
         <Results projectId={project.id} />
       </SettingGroup>
+      <Chats project={project} />
       <SettingGroup title="Changes">
         {changes.length ? (
           <Stack gap="xs" role="list" aria-label="Changes">
@@ -238,7 +339,7 @@ function ProjectDetail({
 
 /**
  * A project's detail view at /dream/projects/:projectId: its switches, brief, constraints, pending
- * proposals, results, changes with Undo and Delete; Edit opens the project's editor. Once
+ * proposals, results, chats, changes with Undo and Delete; Edit opens the project's editor. Once
  * `projects` load, an id none of them has says so.
  */
 export function ProjectSheet({

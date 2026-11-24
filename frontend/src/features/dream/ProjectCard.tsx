@@ -2,7 +2,6 @@ import {
   ActionIcon,
   Badge,
   Group,
-  Image,
   Menu,
   Paper,
   Progress,
@@ -25,8 +24,8 @@ import { type DreamItem, projectPath, projectsQuery } from "./queries";
 const resultsShown = 8;
 
 /**
- * A project's results so far, as chips, and its share of Dream's turns, or Disabled; More Turns
- * where set.
+ * A project's results so far, as chips, and its share of Dream's project turns while another
+ * project shares them, or Disabled; More Turns where set.
  */
 export function ProjectStatsLine({
   project,
@@ -58,13 +57,13 @@ export function ProjectStatsLine({
           ))}
         </Group>
       )}
-      {!project.paused && stats && (
+      {!project.paused && stats && stats.share < 1 && (
         <Group gap="xs" wrap="nowrap">
           <Progress.Root flex={1} size="sm">
-            <Progress.Section value={share} aria-label={`${share}% of turns`} />
+            <Progress.Section value={share} aria-label={`${share}% of project turns`} />
           </Progress.Root>
           <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-            {share}% of turns
+            {share}% of project turns
           </Text>
         </Group>
       )}
@@ -169,7 +168,8 @@ export function ProjectCard({
     .map(([key, label]) => `${label}: ${project.brief[key]}`)
     .join(" · ");
   const badges = constraintBadges(project, profileLabel);
-  const results = (stats?.results || []).slice(0, resultsShown);
+  const waiting = unseen.length > 0;
+  const strip = (waiting ? unseen : stats?.results || []).slice(0, resultsShown);
   return (
     <Paper withBorder p="md" radius="md" component="section" aria-label={project.name}>
       <Stack gap="xs">
@@ -235,12 +235,16 @@ export function ProjectCard({
             {summary}
           </Text>
         )}
-        {unseen.length > 0 ? (
+        {strip.length > 0 && (
           <Group gap={6} wrap="nowrap" style={{ overflow: "hidden" }}>
-            {unseen.slice(0, resultsShown).map((item) => (
+            {strip.map((item) => (
               <UnstyledButton
                 key={item.id}
-                aria-label={`View ${item.title || item.prompt || "Dream Result"}`}
+                aria-label={
+                  waiting ? `View ${item.title || item.prompt || "Dream Result"}` : undefined
+                }
+                aria-hidden={!waiting || undefined}
+                tabIndex={waiting ? undefined : -1}
                 w={56}
                 h={56}
                 style={{
@@ -248,31 +252,12 @@ export function ProjectCard({
                   borderRadius: "var(--mantine-radius-md)",
                   overflow: "hidden",
                 }}
-                onClick={() => onView(item)}
+                onClick={() => (waiting ? onView(item) : open())}
               >
                 <Thumbnail item={item} />
               </UnstyledButton>
             ))}
           </Group>
-        ) : (
-          results.length > 0 && (
-            <UnstyledButton onClick={open} tabIndex={-1} aria-hidden>
-              <Group gap={6} wrap="nowrap" style={{ overflow: "hidden" }}>
-                {results.map((item) => (
-                  <Image
-                    key={item.id}
-                    src={item.thumbnailUrl || item.url}
-                    alt=""
-                    h={56}
-                    w={56}
-                    radius="md"
-                    loading="lazy"
-                    style={{ flexShrink: 0 }}
-                  />
-                ))}
-              </Group>
-            </UnstyledButton>
-          )
         )}
         {badges.length > 0 && (
           <Group gap={6}>
