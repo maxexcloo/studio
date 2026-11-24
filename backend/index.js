@@ -1220,8 +1220,8 @@ async function smallImage(item, upscaled = false) {
   return { mime: "image/jpeg", data: data.toString("base64") };
 }
 // The gallery as idle work walks it (domain/idle-work.ts).
-const idleItems = (since, after) =>
-  eachGalleryItem({ since, status: "done" }, after && galleryKey(after));
+const idleItems = (since, after, ownerId) =>
+  eachGalleryItem({ since, status: "done", ownerId }, after && galleryKey(after));
 // Gallery captions (domain/captions.ts) let search match what an image shows.
 const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
@@ -1241,6 +1241,11 @@ const captioner = createCaptioner({
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
+registerIdlePassRoutes(app, "/api/gallery/captions/me", {
+  work: captioner,
+  requireAdmin,
+  owner: ownerIdForRequest,
+});
 // Self-review (domain/review.ts): recent results scored against their owner's rules and any project's brief.
 const selfReview = createReview({
   enabled: () => flagEnabled("STUDIO_SELF_REVIEW"),

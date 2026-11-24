@@ -37,6 +37,8 @@ const passScopes: PassScope[] = ["all", "outdated", "missing"];
 interface PassTarget {
   scope: PassScope;
   startedAt: string;
+  /** Omitted for a pass over all accounts, including passes saved before accounts could opt in. */
+  ownerId?: string;
 }
 /** An administrator's pass, saved so a restart resumes or reports it. */
 interface IdlePass extends PassTarget {
@@ -54,6 +56,8 @@ interface IdleStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
   /** Whether a pass is under way (also while it waits or is unavailable). */
   active: boolean;
+  /** Another pass is using the worker. */
+  blocked?: boolean;
   /** Why the work can't run now; empty when it can. */
   reason: string;
   done: number;
@@ -120,9 +124,9 @@ export function createIdleWork<Item extends IdleItem>(options: {
   allowed(ownerId: string): boolean;
   /**
    * Every gallery record newest first, or only those made from `since` (ms) and pending ones, or
-   * those after the record `after` in that order.
+   * those after the record `after` in that order. An owner narrows a personal pass.
    */
-  items(since?: number, after?: Item): Iterable<Item>;
+  items(since?: number, after?: Item, ownerId?: string): Iterable<Item>;
   /**
    * Counts saved gallery changes: after a walk that found nothing, a change walks only recent
    * records, and the whole gallery is walked again only after `recheckMs`.
@@ -152,7 +156,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   let trickle = saved.trickle || { day: "", count: 0 };
   const persist = () => options.persist?.({ ...(pass && { pass }), trickle });
   const failed = new Set<string>();
-  const inflight = new Map<string, AbortController>();
+  const inflight = new Map<string, { controller: AbortController; pass?: IdlePass }>();
   const pending = new Set<Promise<unknown>>();
   let streak: string[] = [];
   let backoff = { until: -Infinity, reason: "" };
@@ -174,18 +178,19 @@ export function createIdleWork<Item extends IdleItem>(options: {
   let resume = top;
   const priority = new Map<string, Item>();
   const running = () => options.continuous || pass?.state === "running";
-  const counting = () => !options.continuous && pass?.state === "running";
+  const activePass = () => (!options.continuous && pass?.state === "running" ? pass : undefined);
+  const occupied = "Another catch-up pass is running.";
+  const conflict = () => Object.assign(new Error(occupied), { status: 409 });
 
   const direct = new Set<string>();
   // Counts finished runs: a walk that one finished during may hold that item as it was before.
   let finished = 0;
-  const target = (): PassTarget => ({
-    scope: pass?.scope || "outdated",
-    startedAt: pass?.startedAt || "",
-  });
+  const defaultTarget: PassTarget = { scope: "outdated", startedAt: "" };
   /** Whether a record is open to the work before `wanted` weighs it. */
   const open = (item: Item) =>
     item.status === "done" && !failed.has(key(item)) && !direct.has(key(item));
+  const inScope = (item: Item, ownerId?: string) =>
+    ownerId === undefined || (item.ownerId || "") === ownerId;
   /** Whether the item's owner may have the work done and the item shows in the gallery. */
   function shown() {
     const allowed = new Map<string, boolean>();
@@ -195,33 +200,42 @@ export function createIdleWork<Item extends IdleItem>(options: {
       return allowed.get(owner)! && options.visible(item);
     };
   }
-  async function* eligible(all: boolean, items: Iterable<Item> = options.items()) {
-    const passing = all ? target() : undefined;
+  async function* eligible(items: Iterable<Item>, passing?: PassTarget) {
     const visible = shown();
     for await (const item of turns(items))
-      if (open(item) && options.wanted(item, all, passing) && visible(item)) yield item;
+      if (
+        inScope(item, passing?.ownerId) &&
+        open(item) &&
+        options.wanted(item, !!passing, passing) &&
+        visible(item)
+      )
+        yield item;
   }
   /** How many items each scope's pass would take, counted in one walk over the gallery. */
-  // The last counts, until the gallery, the pass or the failures change (or a while passes):
-  // status is asked for every few seconds while Settings shows it.
-  let counted = { state: "", at: -Infinity, counts: { all: 0, outdated: 0, missing: 0 } };
-  async function scopeCounts() {
+  // Status is asked for every few seconds while Settings shows it.
+  const counted = new Map<
+    string | undefined,
+    { state: string; at: number; counts: Record<PassScope, number> }
+  >();
+  async function scopeCounts(ownerId: string | undefined, shownPass: IdlePass | undefined) {
     // Work done outside the gallery (an image's search vector) moves the pass and trickle counts.
-    const state = `${options.changes?.()}|${options.revision?.()}|${pass?.state}|${pass?.startedAt}|${pass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
-    if (options.changes && state === counted.state && now() - counted.at <= recheckMs)
-      return counted.counts;
-    counted = { state, at: now(), counts: await walkScopeCounts() };
-    return counted.counts;
-  }
-  async function walkScopeCounts() {
-    const startedAt = running() ? target().startedAt : stamp();
+    const state = `${options.changes?.()}|${options.revision?.()}|${shownPass?.state}|${shownPass?.startedAt}|${shownPass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
+    const last = counted.get(ownerId);
+    if (options.changes && state === last?.state && now() - last.at <= recheckMs)
+      return last.counts;
+    const startedAt = options.continuous
+      ? defaultTarget.startedAt
+      : shownPass?.state === "running"
+        ? shownPass.startedAt
+        : stamp();
     const counts = { all: 0, outdated: 0, missing: 0 };
     const visible = shown();
-    for await (const item of turns(options.items())) {
-      if (!open(item)) continue;
+    for await (const item of turns(options.items(undefined, undefined, ownerId))) {
+      if (!inScope(item, ownerId) || !open(item)) continue;
       const wanted = passScopes.filter((scope) => options.wanted(item, true, { scope, startedAt }));
       if (wanted.length && visible(item)) for (const scope of wanted) counts[scope] += 1;
     }
+    counted.set(ownerId, { state, at: now(), counts });
     return counts;
   }
 
@@ -250,13 +264,13 @@ export function createIdleWork<Item extends IdleItem>(options: {
       }
     });
     if (typeof claim === "string") return claim;
-    const { item, controller, all } = claim;
+    const { item, controller, all, pass: claimedPass } = claim;
     if (all && inflight.size < passConcurrency) spawn();
     const watch = setInterval(() => {
       if (!options.idle()) controller.abort();
     }, watchMs);
     watch.unref?.();
-    const result = await runOne(item, controller, all).finally(() => {
+    const result = await runOne(item, controller, all, claimedPass).finally(() => {
       clearInterval(watch);
       inflight.delete(key(item));
       finished += 1;
@@ -269,10 +283,14 @@ export function createIdleWork<Item extends IdleItem>(options: {
   }
 
   async function select(): Promise<
-    IdleTick | { item: Item; controller: AbortController; all: boolean }
+    IdleTick | { item: Item; controller: AbortController; all: boolean; pass?: IdlePass }
   > {
     if (!options.enabled()) return "off";
     const all = running();
+    const current = activePass();
+    const passing = all ? (current ?? defaultTarget) : undefined;
+    const ownerId = passing?.ownerId;
+    const samePass = () => running() === all && activePass() === current;
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     if (!options.idle()) return "busy";
     const time = now();
@@ -288,12 +306,12 @@ export function createIdleWork<Item extends IdleItem>(options: {
       return "unavailable";
     }
     // Choosing and claiming happen together, so parallel ticks never take the same item.
-    if (!options.idle() || running() !== all) return "busy";
+    if (!options.idle() || !samePass()) return "busy";
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     let item: Item | null = null;
     const changes = options.changes?.();
-    const revision = all && pass?.scope === "outdated" ? options.revision?.() : "";
-    const passState = `${all}|${pass?.scope}|${pass?.startedAt}|${revision}`;
+    const revision = current?.scope === "outdated" ? options.revision?.() : "";
+    const passState = JSON.stringify([all, ownerId, passing?.scope, passing?.startedAt, revision]);
     const state = `${passState}|${failed.size}|${direct.size}`;
     const whole = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
     const recent = !whole && changes !== nothing.changes;
@@ -308,7 +326,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
         passed = item;
       }
     }
-    for await (const candidate of eligible(all, priority.values()))
+    for await (const candidate of eligible(priority.values(), passing))
       if (!inflight.has(key(candidate))) {
         item = candidate;
         break;
@@ -316,23 +334,23 @@ export function createIdleWork<Item extends IdleItem>(options: {
     const prioritised = Boolean(item);
     if (!item && walk)
       for await (const candidate of eligible(
-        all,
         recent
-          ? options.items(nothing.at - recentMs)
-          : noting(options.items(undefined, resume.after)),
+          ? options.items(nothing.at - recentMs, undefined, ownerId)
+          : noting(options.items(undefined, resume.after, ownerId)),
+        passing,
       ))
         if (!inflight.has(key(candidate))) {
           item = candidate;
           break;
         }
     // The walk gave other work turns: what it checked first may have changed meanwhile.
-    if (finished !== finishedBefore || !options.idle() || running() !== all) return "busy";
+    if (finished !== finishedBefore || !options.idle() || !samePass()) return "busy";
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     if (item && inflight.has(key(item))) return "busy";
     if (!item) {
       if (!inflight.size && walk) nothing = { state, changes, at: whole ? resume.at : nothing.at };
-      if (counting() && !inflight.size) {
-        pass = { ...pass!, state: "finished", endedAt: stamp() };
+      if (current && !inflight.size) {
+        pass = { ...current, state: "finished", endedAt: stamp() };
         persist();
       }
       return "none";
@@ -344,18 +362,26 @@ export function createIdleWork<Item extends IdleItem>(options: {
     }
     if (!all) last = time;
     const controller = new AbortController();
-    inflight.set(key(item), controller);
-    return { item, controller, all };
+    inflight.set(key(item), { controller, pass: current });
+    return { item, controller, all, pass: current };
   }
 
-  async function runOne(item: Item, controller: AbortController, all: boolean): Promise<IdleTick> {
+  async function runOne(
+    item: Item,
+    controller: AbortController,
+    all: boolean,
+    claimedPass?: IdlePass,
+  ): Promise<IdleTick> {
+    if (controller.signal.aborted) return "yielded";
+    const ownPass = () => (activePass() === claimedPass ? claimedPass : undefined);
     try {
       await options.run(item, controller.signal);
       if (controller.signal.aborted) return "yielded";
-      streak = [];
+      if (activePass() === claimedPass) streak = [];
       noted = "";
-      if (all && counting()) {
-        pass!.done += 1;
+      const current = ownPass();
+      if (current) {
+        current.done += 1;
         finishes = [...finishes, now()].slice(-rateWindow);
       } else if (!all) trickle.count += 1;
       persist();
@@ -366,20 +392,22 @@ export function createIdleWork<Item extends IdleItem>(options: {
       note(reason);
       // A missing file fails only its own item; it says nothing about the service.
       const missing = (error as { status?: number }).status === 404;
-      if (!missing) streak.push(key(item));
-      if (streak.length >= failureStreak) {
+      const samePass = activePass() === claimedPass;
+      if (!missing && samePass) streak.push(key(item));
+      const current = ownPass();
+      if (samePass && streak.length >= failureStreak) {
         // Not these items' fault: give them back and wait before trying again.
         for (const failure of streak) failed.delete(failure);
         resume = top;
-        if (all && counting()) pass!.failed -= streak.length - 1;
+        if (current) current.failed -= streak.length - 1;
         streak = [];
         backoff = { until: now() + backoffMs, reason };
         persist();
         return "failing";
       }
       failed.add(key(item));
-      if (all && counting()) {
-        pass!.failed += 1;
+      if (current) {
+        current.failed += 1;
         persist();
       }
       return "failed";
@@ -428,7 +456,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     async completed(items: Item[]) {
       if (!options.enabled() || (await options.unavailable())) return;
       const wanted: Item[] = [];
-      for await (const item of eligible(false, items)) wanted.push(item);
+      for await (const item of eligible(items)) wanted.push(item);
       for (const item of wanted) {
         if (inflight.has(key(item)) || direct.has(key(item))) continue;
         direct.add(key(item));
@@ -448,7 +476,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     async take(items: Item[]) {
       const taken: Item[] = [];
       if (options.enabled() && !(await options.unavailable()))
-        for await (const item of eligible(false, items))
+        for await (const item of eligible(items))
           if (!inflight.has(key(item))) {
             direct.add(key(item));
             taken.push(item);
@@ -463,46 +491,58 @@ export function createIdleWork<Item extends IdleItem>(options: {
     },
     /** Other work was admitted: items in progress step aside at once. */
     interrupt() {
-      for (const controller of inflight.values()) controller.abort();
+      for (const { controller } of inflight.values()) controller.abort();
     },
     /** Work through every item the scope takes, flat out while idle, until done or stopped. */
-    startPass(scope: PassScope) {
+    startPass(scope: PassScope, ownerId?: string) {
+      const current = activePass();
+      if (current && current.ownerId !== ownerId) throw conflict();
       if (!running()) {
-        pass = { state: "running", scope, startedAt: stamp(), done: 0, failed: 0 };
+        pass = { state: "running", scope, startedAt: stamp(), done: 0, failed: 0, ownerId };
         failed.clear();
+        streak = [];
+        counted.clear();
+        resume = top;
+        nothing = cleared;
         finishes = [];
         backoff = { until: -Infinity, reason: "" };
         persist();
       }
       spawn();
     },
-    stopPass() {
-      if (!counting()) return;
-      pass = { ...pass!, state: "stopped", endedAt: stamp() };
+    stopPass(ownerId?: string) {
+      const current = activePass();
+      if (!current) return;
+      if (current.ownerId !== ownerId) throw conflict();
+      pass = { ...current, state: "stopped", endedAt: stamp() };
       persist();
-      for (const controller of inflight.values()) controller.abort();
+      for (const work of inflight.values()) if (work.pass === current) work.controller.abort();
     },
-    async status(): Promise<IdleStatus> {
-      const reason = await unavailable();
-      const scopes = await scopeCounts();
-      const scope = target().scope;
+    async status(ownerId?: string): Promise<IdleStatus> {
+      const unavailableReason = await unavailable();
+      const shownPass = pass?.ownerId === ownerId ? pass : undefined;
+      const active = Boolean(options.continuous || shownPass?.state === "running");
+      const blocked = Boolean(running() && !active);
+      const reason = unavailableReason || (blocked ? occupied : "");
+      const scopes = await scopeCounts(ownerId, shownPass);
+      const scope = shownPass?.scope || "outdated";
       const remaining = scopes[scope];
-      const done = pass?.done || 0;
-      const failures = pass?.failed || 0;
+      const done = shownPass?.done || 0;
+      const failures = shownPass?.failed || 0;
       const span = finishes.length > 1 ? finishes.at(-1)! - finishes[0] : 0;
-      const perMinute = running() && span ? ((finishes.length - 1) * 60_000) / span : 0;
-      const state = running()
-        ? reason
-          ? "unavailable"
-          : options.idle() || inflight.size
+      const perMinute = active && span ? ((finishes.length - 1) * 60_000) / span : 0;
+      const working = [...inflight.values()].some((work) => work.pass === shownPass);
+      const state = reason
+        ? "unavailable"
+        : active
+          ? options.idle() || working
             ? "running"
             : "waiting"
-        : reason
-          ? "unavailable"
-          : pass?.state || "ready";
+          : shownPass?.state || "ready";
       return {
         state,
-        active: Boolean(running()),
+        active,
+        ...(blocked && { blocked }),
         reason,
         done,
         failed: failures,
@@ -512,8 +552,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
         scopes,
         perMinute: Math.round(perMinute * 10) / 10,
         etaSeconds: perMinute ? Math.round((remaining / perMinute) * 60) : null,
-        startedAt: pass?.startedAt || "",
-        endedAt: pass?.endedAt || "",
+        startedAt: shownPass?.startedAt || "",
+        endedAt: shownPass?.endedAt || "",
       };
     },
   };
@@ -531,7 +571,7 @@ type Handler = (req: Request, res: Response) => unknown;
 /**
  * An administrator's pass in Settings › Studio, such as Gallery Captions at
  * `/api/gallery/captions`: its status there, and `/start` (with a `scope`, Out of Date when none)
- * and `/stop`.
+ * and `/stop`. A personal route gets its owner from the authenticated request.
  */
 export function registerIdlePassRoutes(
   app: {
@@ -542,25 +582,29 @@ export function registerIdlePassRoutes(
   {
     work,
     requireAdmin,
+    owner,
   }: {
     work: Pick<ReturnType<typeof createIdleWork>, "status" | "startPass" | "stopPass">;
     requireAdmin(req: Request, res: Response): boolean;
+    owner?(req: Request): string;
   },
 ) {
   app.get(route, async (req, res) => {
-    if (requireAdmin(req, res)) res.json(await work.status());
+    if (requireAdmin(req, res)) res.json(await work.status(owner?.(req)));
   });
   app.post(`${route}/start`, async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const scope = (req.body?.scope ?? "outdated") as PassScope;
     if (!passScopes.includes(scope))
       return res.status(400).json({ error: `Choose a scope: ${passScopes.join(", ")}.` });
-    work.startPass(scope);
-    res.json(await work.status());
+    const ownerId = owner?.(req);
+    work.startPass(scope, ownerId);
+    res.json(await work.status(ownerId));
   });
   app.post(`${route}/stop`, async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    work.stopPass();
-    res.json(await work.status());
+    const ownerId = owner?.(req);
+    work.stopPass(ownerId);
+    res.json(await work.status(ownerId));
   });
 }

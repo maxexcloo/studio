@@ -10,6 +10,7 @@ type PassScope = "all" | "outdated" | "missing";
 interface PassStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
   active: boolean;
+  blocked?: boolean;
   reason: string;
   done: number;
   failed: number;
@@ -27,7 +28,8 @@ const passQuery = (route: string) =>
     queryKey: ["gallery-pass", route],
     queryFn: () => api<PassStatus>(route),
     // Progress moves while a pass runs; otherwise only a new image changes it.
-    refetchInterval: (query) => (query.state.data?.active ? 2_000 : 60_000),
+    refetchInterval: (query) =>
+      query.state.data?.active || query.state.data?.blocked ? 2_000 : 60_000,
   });
 
 const count = (value: number) => value.toLocaleString();
@@ -63,6 +65,7 @@ export function GalleryPass({
   remaining,
   progressLabel,
   scopeLabel,
+  pairedRoute,
 }: {
   route: string;
   label: string;
@@ -72,6 +75,8 @@ export function GalleryPass({
   progressLabel: string;
   /** The scope selector's accessible name; without it every pass is Out of Date. */
   scopeLabel?: string;
+  /** The other view of a shared catch-up worker. */
+  pairedRoute?: string;
 }) {
   const client = useQueryClient();
   const query = passQuery(route);
@@ -80,7 +85,10 @@ export function GalleryPass({
   const change = useMutation({
     mutationFn: (action: "start" | "stop") =>
       post<PassStatus>(`${route}/${action}`, action === "start" ? { scope: chosen } : undefined),
-    onSuccess: (data) => client.setQueryData(query.queryKey, data),
+    onSuccess: (data) => {
+      client.setQueryData(query.queryKey, data);
+      if (pairedRoute) void client.invalidateQueries({ queryKey: passQuery(pairedRoute).queryKey });
+    },
   });
   const data = status.data;
   // A running pass shows its own scope; otherwise the one to start.
@@ -98,6 +106,7 @@ export function GalleryPass({
   return (
     <SettingRow
       label={label}
+      wide={Boolean(scopeLabel)}
       description={
         <>
           {description}
