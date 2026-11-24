@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import type { CardKind } from "../../../../shared/characters";
+import type { ComparisonRating } from "../../../../shared/compare";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
@@ -19,6 +20,7 @@ export interface Comparison {
   negative?: string;
   /** The winner's job ID. */
   vote: string | null;
+  rating: ComparisonRating | null;
   /** The exact winning image, even when variants share a batch. */
   winnerItemId: string | null;
   variants: { jobId: string; label: string; item: MediaItem | null }[];
@@ -28,7 +30,7 @@ export interface Comparison {
   proposal?: { projectId: string; name: string };
   /** The card whose Generate References these are: the winner joins its images. */
   card?: { kind: CardKind; id: string; name: string };
-  /** A Dream comparison the account kept a side of, with its question; it is read-only. */
+  /** A Dream comparison and its question, with the winning side already set. */
   dream?: { question: string };
 }
 

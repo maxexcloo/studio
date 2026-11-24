@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import { compareVariants } from "../../shared/compare.ts";
+import { type ComparisonRating, compareVariants } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import { storedChatRecord } from "../gallery/records.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
@@ -87,6 +87,8 @@ export function registerCompareRoutes(
     cancel(ownerId: string, jobId: string): Promise<unknown>;
     read(): ComparisonRecord[];
     write(records: ComparisonRecord[]): void;
+    ratings(ownerId: string): Partial<Record<string, ComparisonRating>>;
+    rate(ownerId: string, comparisonId: string, rating: ComparisonRating | null): void;
     /** The caller's gallery, disliked items included, or `null` when the account may not use it. */
     gallery(req: Request, ids: ComparisonIds): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
@@ -143,7 +145,11 @@ export function registerCompareRoutes(
   }
   const recordItem = (record: ComparisonRecord, items: GalleryItem[], index: number) =>
     variantItem(record.ownerId, items, record.jobIds[index], record.itemIds?.[index]);
-  function show(record: ComparisonRecord, items: GalleryItem[]) {
+  function show(
+    record: ComparisonRecord,
+    items: GalleryItem[],
+    rating: ComparisonRating | null = null,
+  ) {
     const variants = record.jobIds.map((jobId, index) => {
       const item = recordItem(record, items, index);
       return {
@@ -173,6 +179,7 @@ export function registerCompareRoutes(
       // The result set every variant belongs to, which the gallery shows together.
       ...(sets.size === 1 && set ? { set } : {}),
       ...(record.axis ? { axis: record.axis } : {}),
+      rating,
       ...shared("prompt"),
       ...shared("negative"),
       vote: winner ? record.vote : null,
@@ -181,10 +188,14 @@ export function registerCompareRoutes(
     };
   }
   /**
-   * The Dream comparisons the owner kept a side of, read-only as `dream-` and the pair's ID, with the
+   * The Dream comparisons the owner kept a side of, named by `dream-` and the pair's ID, with the
    * one side kept as the winner.
    */
-  function dreamComparisons(ownerId: string, sides: GalleryItem[]) {
+  function dreamComparisons(
+    ownerId: string,
+    sides: GalleryItem[],
+    ratings: Partial<Record<string, ComparisonRating>>,
+  ) {
     const pairs = new Map<string, GalleryItem[]>();
     for (const item of [...sides].sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side))
       pairs.set(item.dream!.pair!.id, [...(pairs.get(item.dream!.pair!.id) || []), item]);
@@ -204,7 +215,12 @@ export function registerCompareRoutes(
         vote: winner ? String(winner.jobId) : null,
         ...(winner ? { winnerItemId: String(winner.id) } : {}),
       };
-      return [{ ...show(record, items), dream: { question: items[0].dream!.pair!.question } }];
+      return [
+        {
+          ...show(record, items, ratings[record.id]),
+          dream: { question: items[0].dream!.pair!.question },
+        },
+      ];
     });
   }
   function save(record: ComparisonRecord) {
@@ -268,16 +284,17 @@ export function registerCompareRoutes(
 
   directRoute(app, "GET", "/api/comparisons", (account, { query }) => {
     const jobs = typeof query.jobIds === "string" ? new Set(query.jobIds.split(",")) : null;
+    const ownerId = account?.userId || "";
+    const members = query.members === "1";
     const records = options
       .read()
       .filter(
         (record) =>
-          record.ownerId === (account?.userId || "") &&
-          (!jobs || record.jobIds.some((id) => jobs.has(id))),
+          record.ownerId === ownerId && (!jobs || record.jobIds.some((id) => jobs.has(id))),
       );
     const items = galleryFor(
       account,
-      query.members === "1"
+      members
         ? {}
         : {
             jobIds: records.flatMap((record) => record.jobIds),
@@ -286,39 +303,43 @@ export function registerCompareRoutes(
     );
     if (!items) return galleryOff;
     // `members=1` lists only which results each comparison holds, for finding an item's comparison.
+    const ratings = members ? {} : options.ratings(ownerId);
+    const showRecord = (record: ComparisonRecord) => show(record, items, ratings[record.id]);
     return {
       status: 200,
       payload: {
-        comparisons:
-          query.members === "1"
-            ? records.map(({ id, jobIds, itemIds }) => ({
-                id,
-                jobIds,
-                ...(itemIds ? { itemIds } : {}),
-              }))
-            : jobs
-              ? records.map((record) => show(record, items))
-              : // The whole list also holds the kept Dream comparisons, newest first.
-                [
-                  ...records.map((record) => show(record, items)),
-                  ...dreamComparisons(
-                    account?.userId || "",
-                    options.dreamSides({ studioAccount: account ?? undefined, params: {} }, 100),
-                  ),
-                ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        comparisons: members
+          ? records.map(({ id, jobIds, itemIds }) => ({
+              id,
+              jobIds,
+              ...(itemIds ? { itemIds } : {}),
+            }))
+          : jobs
+            ? records.map(showRecord)
+            : // The whole list also holds the kept Dream comparisons, newest first.
+              [
+                ...records.map(showRecord),
+                ...dreamComparisons(
+                  ownerId,
+                  options.dreamSides({ studioAccount: account ?? undefined, params: {} }, 100),
+                  ratings,
+                ),
+              ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       },
     };
   });
   app.get("/api/comparisons/:id", (req, res) => {
+    const ownerId = owner(req);
     const record = options
       .read()
-      .find((item) => item.id === req.params.id && item.ownerId === owner(req));
+      .find((item) => item.id === req.params.id && item.ownerId === ownerId);
     const items = gallery(req, res, idsOf(record));
     if (!items) return;
+    const ratings = options.ratings(ownerId);
     const comparison = record
-      ? show(record, items)
+      ? show(record, items, ratings[record.id])
       : req.params.id.startsWith("dream-") &&
-        dreamComparisons(owner(req), options.dreamSides(req)).find(
+        dreamComparisons(ownerId, options.dreamSides(req), ratings).find(
           ({ id }) => id === req.params.id,
         );
     return comparison
@@ -557,6 +578,27 @@ export function registerCompareRoutes(
       projectId,
     });
   });
+  directRoute(app, "PUT", "/api/comparisons/:id/rating", (account, { params, body }) => {
+    if (!galleryFor(account, {})) return galleryOff;
+    const ownerId = account?.userId || "";
+    const { id } = params;
+    const { rating } = body || {};
+    if (rating !== null && rating !== "liked" && rating !== "disliked")
+      return {
+        status: 400,
+        payload: { ok: false, error: "Choose Like, Dislike or clear the rating." },
+      };
+    const found =
+      options.read().some((record) => record.id === id && record.ownerId === ownerId) ||
+      (id.startsWith("dream-") &&
+        options
+          .dreamSides({ studioAccount: account ?? undefined, params })
+          .some(({ dream }) => dream?.state === "kept" && id === `dream-${dream.pair?.id}`));
+    if (!found)
+      return { status: 404, payload: { ok: false, error: "That comparison is unavailable." } };
+    options.rate(ownerId, id, rating);
+    return { status: 200, payload: { id, rating } };
+  });
   directRoute(app, "PUT", "/api/comparisons/:id/vote", (account, { params, body }) => {
     const records = options.read();
     const record = records.find(
@@ -596,7 +638,13 @@ export function registerCompareRoutes(
       if (record.axis && record.projectId && label)
         proposal = options.picked?.(record, label, by === "chat" ? "chat" : "you") ?? null;
     }
-    return { status: 200, payload: { ...show(record, items), ...(proposal ? { proposal } : {}) } };
+    return {
+      status: 200,
+      payload: {
+        ...show(record, items, options.ratings(record.ownerId)[record.id]),
+        ...(proposal ? { proposal } : {}),
+      },
+    };
   });
   return { queue };
 }

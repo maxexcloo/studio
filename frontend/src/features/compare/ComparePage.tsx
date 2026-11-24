@@ -14,7 +14,7 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -31,6 +31,7 @@ import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { type GalleryState, galleryViewPath } from "../gallery/viewerLink";
+import { ComparisonRatingButtons } from "./ComparisonRatingButtons";
 import { type Comparison, comparisonQuery, comparisonTitle, comparisonsQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
@@ -42,6 +43,9 @@ import classes from "./ComparePage.module.css";
  */
 export function ComparePage() {
   const id = useParams().id!;
+  const location = useLocation();
+  const comparisonSearch = (location.state as { comparisonSearch?: string } | null)
+    ?.comparisonSearch;
   const comparison = useQuery(comparisonQuery(id));
   const client = useQueryClient();
   const stage = useStageComparison();
@@ -110,6 +114,8 @@ export function ComparePage() {
       </Alert>
     );
   const { variants, seed, prompt, negative, set, axis, dream, card } = comparison.data;
+  const gallerySet = comparisonSearch === undefined ? set : undefined;
+  const backLabel = gallerySet ? "Show in Gallery" : "Back to Comparisons";
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   // Compare Again brings back every finished variant, the winner first.
   const again = items
@@ -124,14 +130,18 @@ export function ComparePage() {
     <Stack gap="md" className={classes.page}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
-          <Tooltip label={set ? "Show in Gallery" : "Back to Comparisons"}>
+          <Tooltip label={backLabel}>
             <ActionIcon
               component={Link}
-              to={set ? "/images" : galleryViewPath("image", "comparisons")}
-              state={set ? ({ set } satisfies GalleryState) : undefined}
+              to={
+                gallerySet
+                  ? "/images"
+                  : `${galleryViewPath("image", "comparisons")}${comparisonSearch || ""}`
+              }
+              state={gallerySet ? ({ set: gallerySet } satisfies GalleryState) : undefined}
               variant="subtle"
               color="gray"
-              aria-label={set ? "Show in Gallery" : "Back to Comparisons"}
+              aria-label={backLabel}
             >
               <ArrowLeft size={18} />
             </ActionIcon>
@@ -140,9 +150,14 @@ export function ComparePage() {
             {comparisonTitle({ axis, dream })}
           </Title>
         </Group>
-        <Text size="sm" c="dimmed" ta="right">
-          {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
-        </Text>
+        <Group gap="xs" justify="flex-end" wrap="nowrap">
+          <Text size="sm" c="dimmed" ta="right">
+            {[plural(variants.length, "Variant"), seed && `Seed ${seed}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+          <ComparisonRatingButtons comparison={comparison.data} />
+        </Group>
       </Group>
       {card && (
         <Text size="sm" c="dimmed">

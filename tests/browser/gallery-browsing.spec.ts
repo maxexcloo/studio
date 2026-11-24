@@ -2461,9 +2461,7 @@ for (const captions of [false, true])
     ).toBeVisible();
   });
 
-test("Comparisons lists each comparison and kept Dream comparison as a card that opens all its variants", async ({
-  page,
-}) => {
+test("Comparisons open all variants and filter by the comparison rating", async ({ page }) => {
   const state = await fixtures(page);
   const items = results(5).map((item, index) => ({ ...item, jobId: `job-${index}` }));
   state.gallery.push(...items.slice(0, 4), {
@@ -2506,12 +2504,33 @@ test("Comparisons lists each comparison and kept Dream comparison as a card that
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toHaveAccessibleDescription("In Comparison");
   await showGalleryView(page, "Comparisons");
-  // A kept Dream comparison opens read-only, its kept side as the winner.
+  // A kept Dream comparison's winner stays fixed when rating the comparison.
   await page.getByRole("button", { name: "Open Comparison: Which Steps?", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/dream-pair$/);
   await expect(page.getByRole("button", { name: "Open 30 Steps", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^(Pick|Clear Winner)/ })).toHaveCount(0);
-  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  const dislike = page.getByRole("button", { name: "Dislike Comparison", exact: true });
+  await dislike.click();
+  await expect(dislike).toHaveAttribute("aria-pressed", "true");
+  expect(state.comparisons.find(({ id }) => id === "dream-pair")?.winnerItemId).toBe("browse-3");
+  const back = page.getByRole("link", { name: "Back to Comparisons", exact: true });
+  await back.click();
+  const filter = async (rating: "All Ratings" | "Liked" | "Disliked") => {
+    await page.getByRole("button", { name: "Rating", exact: true }).click();
+    await page.getByRole("menuitem", { name: rating, exact: true }).click();
+  };
+  await filter("Disliked");
+  const dreamCard = page.getByRole("button", {
+    name: "Open Comparison: Which Steps?",
+    exact: true,
+  });
+  await expect(dreamCard).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Open Comparison:/ })).toHaveCount(1);
+  await dreamCard.click();
+  await expect(dislike).toHaveAttribute("aria-pressed", "true");
+  await back.click();
+  await expect(page).toHaveURL(/\/images\/comparisons\?rating=disliked$/);
+  await filter("All Ratings");
   const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
   await expect(card).toBeVisible();
   await expect(page.getByText(/^2 Variants\b/)).toHaveCount(2);
@@ -2521,7 +2540,16 @@ test("Comparisons lists each comparison and kept Dream comparison as a card that
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   for (const label of ["Variant A", "Variant B"])
     await expect(page.getByRole("button", { name: `Open ${label}`, exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Back to Comparisons", exact: true }).click();
+  const like = page.getByRole("button", { name: "Like Comparison", exact: true });
+  await like.click();
+  await expect(like).toHaveAttribute("aria-pressed", "true");
+  await back.click();
+  await filter("Liked");
+  await expect(card).toBeVisible();
+  await expect(dreamCard).toHaveCount(0);
+  expect(state.gallery.every((item) => !item.rating)).toBe(true);
+  await like.click();
+  await expect(page.getByText("No Liked Comparisons", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
     "Comparisons",
   );

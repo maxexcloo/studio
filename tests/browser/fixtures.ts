@@ -137,6 +137,7 @@ export async function fixtures(page: Page) {
     id: comparison.id,
     seed: comparison.seed,
     vote: comparison.vote,
+    rating: comparison.rating ?? null,
     winnerItemId: comparison.winnerItemId || null,
     ...(comparison.dream ? { dream: comparison.dream } : {}),
     ...(new Set(comparison.requests.map((variant: any) => variant.input.prompt)).size === 1
@@ -645,6 +646,10 @@ export async function fixtures(page: Page) {
       return respond(showComparison(comparison), 201);
     }
     const comparison = comparisons.find((entry) => entry.id === path.split("/")[3]);
+    if (comparison && path.endsWith("/rating") && method === "PUT") {
+      comparison.rating = body.rating;
+      return respond({ id: comparison.id, rating: comparison.rating });
+    }
     if (comparison && path.endsWith("/vote") && method === "PUT") {
       const winner = gallery.find((item) => item.id === body.itemId);
       comparison.vote = winner?.jobId || null;
