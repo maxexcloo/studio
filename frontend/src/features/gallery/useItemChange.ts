@@ -7,7 +7,7 @@ import type { MediaItem } from "../../types";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askChange } from "../taste/suggestions";
-import { automaticEditProfile } from "./mediaProfiles";
+import { automaticEditProfile } from "./editProfile";
 import { useItemMutation } from "./useItemMutation";
 import type { Iteration } from "./useMediaAction";
 

@@ -403,6 +403,35 @@ test("Clear during a manual refresh wins even with no new signals", async (t) =>
   assert.equal(taste.read("alice").signals.length, 0);
 });
 
+test("the summariser rebuilds an empty profile from sampled gallery likes, keeping the person's own fields", async (t) => {
+  const sent: string[] = [];
+  const taste = tasteFixture(t, {
+    updates: () => false,
+    galleryLikes: (_ownerId, count) =>
+      [{ id: "liked-1", title: "Harbour at Dawn", prompt: "a fishing harbour at dawn" }].slice(
+        0,
+        count,
+      ),
+    writer: () => ({
+      settings: () => ({}),
+      model: async () => "fixture-text",
+      chat: async ({ messages }) => {
+        sent.push(messages[1].content);
+        return { text: '{"likes": ["harbours"], "styles": ["muted neutrals"]}' };
+      },
+    }),
+  });
+  taste.edit("alice", { avoid: ["crowds"] });
+  const record = await taste.refresh("alice");
+  assert.match(sent[0], /Likes: \(none\)/);
+  assert.match(
+    sent[0],
+    /Gallery likes, sampled from their whole history:\n- gallery like; title "Harbour at Dawn"; prompt "a fishing harbour at dawn"/,
+  );
+  assert.deepEqual(record.likes, ["harbours"]);
+  assert.deepEqual(record.avoid, ["crowds"]);
+});
+
 test("with Taste Updates off, signals never summarise, but Refresh still does", async (t) => {
   let calls = 0;
   const writer = {

@@ -120,6 +120,7 @@ test("Dream reads its results, an owner's liked items and a chat's items by quer
   assert.deepEqual(ids({ dreamState: ["kept", "discarded"] }), ["gone", "kept"]);
   assert.deepEqual(ids({ dreamProject: "coast", dreamState: "kept", status: "done" }), ["kept"]);
   assert.deepEqual(ids({ liked: true }), ["kept", "liked"]);
+  assert.deepEqual(ids({ notDream: true }), ["asked", "liked", "plain"]);
   assert.deepEqual(ids({ conversationIds: ["chat-1"] }), ["asked"]);
   assert.deepEqual(ids({ before: Date.now() + 1000, jobIds: ["job-plain", "job-asked"] }), [
     "asked",

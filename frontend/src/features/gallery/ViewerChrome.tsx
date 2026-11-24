@@ -1,90 +1,57 @@
-import { ActionIcon, Group, Paper, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Paper, Text, type TextProps, Tooltip } from "@mantine/core";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { mediaProfileName, mediaTimestamp, mediaTitle } from "./mediaLabels";
+import { mediaTimestamp, mediaTitle, modelSummary } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 
 import classes from "./MediaViewer.module.css";
 
-/** `title`, when given, is the heading above: a model it already names isn't repeated. */
-export function ViewerMetadata({
-  item,
-  compact,
-  title,
-}: {
-  item: MediaItem;
-  compact?: boolean;
-  title?: string;
-}) {
+/** Its model and steps, then its size and length, under the viewer header's title. */
+export function ViewerMetadata({ item }: { item: MediaItem }) {
   const { profiles } = useGenerationActions();
-  const named = mediaProfileName(item, profiles);
-  const model = title?.includes(named) ? "" : named;
+  const summary = modelSummary(item, profiles);
   const { width, height } = mediaSource(item);
-  const timestamp = compact && !title ? undefined : mediaTimestamp(item);
   const settings = item.settings || {};
-  const steps = Number(settings.steps);
-  const stepLabel =
-    steps > 0 && !/\b\d+\s+steps?\b/i.test(`${title ?? ""} ${named}`) ? `${steps} Steps` : "";
   const seconds = Number(settings.duration) || Number(settings.frames) / Number(settings.fps);
-  const sizeAndDuration = [
+  const line = [
+    summary,
     width && height ? `${width} × ${height}` : "",
     item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10}s` : "",
   ]
     .filter(Boolean)
     .join(" · ");
-  const hasModel = Boolean(model || stepLabel);
-  const hasFacts = Boolean(timestamp || sizeAndDuration);
-  const summary = (
-    <>
-      {model && <span>{model}</span>}
-      {model && stepLabel && " · "}
-      {stepLabel}
-    </>
-  );
-  const facts = (
-    <>
-      {timestamp && <time dateTime={timestamp.value}>{timestamp.label}</time>}
-      {timestamp && sizeAndDuration && " · "}
-      {sizeAndDuration}
-    </>
-  );
-  if (compact)
-    return (
-      (hasModel || hasFacts) && (
-        <Text
-          size="xs"
-          lh={1.25}
-          truncate
-          title={[model, stepLabel, timestamp?.label, sizeAndDuration].filter(Boolean).join(" · ")}
-        >
-          {summary}
-          {hasModel && hasFacts && " · "}
-          {facts}
-        </Text>
-      )
-    );
   return (
-    <>
-      {hasModel && (
-        <Text
-          size="xs"
-          lh={1.25}
-          lineClamp={2}
-          title={[model, stepLabel].filter(Boolean).join(" · ")}
-        >
-          {summary}
-        </Text>
+    line && (
+      <Text size="xs" lh={1.25} truncate title={line}>
+        {line}
+      </Text>
+    )
+  );
+}
+
+/** An item's title with when it was made beside it, as the viewer header and Details show it. */
+export function ViewerTitle({
+  item,
+  title = mediaTitle(item),
+  ...props
+}: TextProps & { item: MediaItem; title?: string; component?: "h2" }) {
+  const timestamp = mediaTimestamp(item);
+  return (
+    <Text {...props} title={[title, timestamp?.label].filter(Boolean).join(" · ")}>
+      <span>{title}</span>
+      {timestamp && (
+        <>
+          {" · "}
+          <Text component="time" dateTime={timestamp.value} size="xs" fw={400} c="dimmed">
+            {timestamp.label}
+          </Text>
+        </>
       )}
-      {hasFacts && (
-        <Text size="xs" c="dimmed" lh={1.25}>
-          {facts}
-        </Text>
-      )}
-    </>
+    </Text>
   );
 }
 
@@ -108,8 +75,6 @@ export function ViewerChrome({
   focusClose?: boolean;
 }) {
   if (hidden) return null;
-  const title = item && mediaTitle(item);
-  const timestamp = item && mediaTimestamp(item);
   return (
     <Group
       className={classes.topBar}
@@ -124,23 +89,8 @@ export function ViewerChrome({
       <Group gap={6} wrap="nowrap" miw={0}>
         {item && (
           <Paper withBorder radius="md" px="sm" py={4} miw={0}>
-            <Text
-              size="sm"
-              fw={500}
-              truncate
-              title={[title, timestamp?.label].filter(Boolean).join(" · ")}
-            >
-              <span>{title}</span>
-              {timestamp && (
-                <>
-                  {" · "}
-                  <Text component="time" dateTime={timestamp.value} size="xs" c="dimmed">
-                    {timestamp.label}
-                  </Text>
-                </>
-              )}
-            </Text>
-            <ViewerMetadata item={item} compact />
+            <ViewerTitle item={item} size="sm" fw={500} truncate />
+            <ViewerMetadata item={item} />
           </Paper>
         )}
         {label}

@@ -1,8 +1,9 @@
 import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
 import { Check, Heart, X } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 
 import { icons } from "../../ui/icons";
+import { useHold } from "../../ui/useHold";
 import { type Choice, dreamChoices } from "./choices";
 import type { DeckCard } from "./deck";
 
@@ -17,81 +18,21 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   both: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
 };
 
-const holdTime = 500;
-const holdSlop = 10;
-
-function usePassHold(cardId: string, open: () => void) {
-  const press = useRef<{ x: number; y: number; timer: number }>(undefined);
-  const suppressClick = useRef(false);
-  function stop() {
-    window.clearTimeout(press.current?.timer);
-    press.current = undefined;
-  }
-  function cancel() {
-    if (press.current) suppressClick.current = true;
-    stop();
-  }
-  useEffect(() => stop, [cardId]);
-  return {
-    onPointerDown(event: React.PointerEvent<HTMLButtonElement>) {
-      stop();
-      if (!event.isPrimary) {
-        suppressClick.current = true;
-        return;
-      }
-      if (event.button !== 0) return;
-      suppressClick.current = false;
-      const button = event.currentTarget;
-      button.setPointerCapture(event.pointerId);
-      press.current = {
-        x: event.clientX,
-        y: event.clientY,
-        timer: window.setTimeout(() => {
-          suppressClick.current = true;
-          button.focus({ preventScroll: true });
-          open();
-        }, holdTime),
-      };
-    },
-    onPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
-      const start = press.current;
-      if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) <= holdSlop)
-        return;
-      cancel();
-    },
-    onPointerUp: stop,
-    onPointerCancel: cancel,
-    onLostPointerCapture: cancel,
-    onContextMenu(event: React.MouseEvent<HTMLButtonElement>) {
-      event.preventDefault();
-      if (event.button === 2) open();
-    },
-    onKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
-      if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-      event.preventDefault();
-      open();
-    },
-    consumeClick(event: React.MouseEvent<HTMLButtonElement>) {
-      if (!event.detail || !suppressClick.current) return false;
-      suppressClick.current = false;
-      return true;
-    },
-  };
-}
+/** Undo and Suggestions, the smaller bordered controls either side of the verdicts. */
+export const sideControl = { variant: "default", size: "lg", radius: "xl" } as const;
+export const sideIconSize = 20;
 
 export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
     <Tooltip label="Undo">
       <ActionIcon
-        variant="subtle"
-        color="gray"
-        size="md"
+        {...sideControl}
         data-touch-target
         aria-label="Undo"
         disabled={disabled}
         onClick={onClick}
       >
-        <icons.undo size={18} />
+        <icons.undo size={sideIconSize} />
       </ActionIcon>
     </Tooltip>
   );
@@ -129,7 +70,7 @@ export function DeckButtons({
     neither: "Pass",
   };
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
-  const { consumeClick, ...hold } = usePassHold(card.key, askPass);
+  const { consumeClick, ...hold } = useHold(card.key, askPass);
   return (
     <div
       role="group"
@@ -156,6 +97,7 @@ export function DeckButtons({
           <Tooltip key={id} label={description ?? title}>
             <ActionIcon
               className={classes.answer}
+              data-touch-target
               variant="light"
               color={side ? "blue" : looks[id].color}
               radius="50%"

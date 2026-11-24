@@ -37,9 +37,10 @@ import {
 } from "../taste/suggestions";
 import { AnimateDialog } from "./AnimateDialog";
 import { videoGif } from "./download";
+import { automaticEditProfile } from "./editProfile";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
-import { automaticEditProfile, useActionProfile } from "./mediaProfiles";
+import { useActionProfile } from "./mediaProfiles";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
 import { ReportIssueDialog, issues, useReportIssue } from "./ReportIssueDialog";

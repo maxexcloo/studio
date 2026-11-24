@@ -164,7 +164,7 @@ test("a run with LoRAs moves to the stack's model, records it, and takes the ada
   ]);
 });
 
-test("Noct profiles refuse optional LoRAs and discard their fixed adapters, even with a model override", async () => {
+test("Noct profiles refuse optional LoRAs and keep their fixed adapters only on a base that takes them", async () => {
   const id = "custom:noct-adapter";
   const lightning = { name: "qwen-image-2.1-lightning-4step", strength: 1 };
   const profile = raw(
@@ -182,7 +182,7 @@ test("Noct profiles refuse optional LoRAs and discard their fixed adapters, even
   profile.graph[1].inputs.loras = JSON.stringify([lightning]);
   saveImportedWorkflow(profile);
   const info = radianceInfo(
-    [{ id: "noctq-v4-iq8r" }, { id: "qwen-image-2.1-bf16" }],
+    [{ id: "noctq-v4-iq8r" }, { id: "noctq-v4-bf16" }, { id: "qwen-image-2.1-bf16" }],
     ["slider.safetensors"],
   );
   const [listed] = inferModels(info).profiles.filter((entry) => entry.id === id);
@@ -203,7 +203,10 @@ test("Noct profiles refuse optional LoRAs and discard their fixed adapters, even
   assert.equal(graph[1].inputs.model, "noctq-v4-iq8r");
   assert.equal(graph[1].inputs.loras, "[]");
   const overridden = await customWorkflowGraph({ ...body, modelName: "qwen-image-2.1-bf16" });
-  assert.equal(overridden[1].inputs.loras, "[]");
+  assert.deepEqual(JSON.parse(overridden[1].inputs.loras), [lightning]);
+  const bf16 = await customWorkflowGraph({ ...body, loras: [], modelName: "noctq-v4-bf16" });
+  assert.equal(bf16[1].inputs.model, "noctq-v4-bf16");
+  assert.deepEqual(JSON.parse(bf16[1].inputs.loras), [lightning]);
 });
 
 test("Radiance checks catalogue families and exact base constraints against the model that runs the stack", async () => {

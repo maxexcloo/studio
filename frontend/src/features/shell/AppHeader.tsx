@@ -95,6 +95,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
                 display="inline-flex"
                 disabled={!count}
                 label={<span aria-hidden>{count > 99 ? "99+" : count}</span>}
+                classNames={{ indicator: classes.count }}
                 size={16}
                 offset={4}
                 zIndex={2}

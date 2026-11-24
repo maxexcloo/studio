@@ -128,7 +128,7 @@ export interface GenerationInput extends Record<string, unknown> {
   cfg: number;
   seed: string | number;
   count: number;
-  denoise: number;
+  denoise?: number;
   fps: number;
   frames: number;
   /** `triggers`: all the LoRA's trigger words (true or unset), none (false) or the ones listed. */

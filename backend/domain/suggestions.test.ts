@@ -460,7 +460,7 @@ test("Animate saves its own image-grounded motion instructions", async () => {
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
-  assert.match(calls[1][0].content, /each in a distinct area/);
+  assert.match(calls[1][0].content, /changes from areas such as/);
 });
 
 test("viewer next steps vary across relevant areas, specific, and uncensored only where the account may", async () => {
@@ -486,13 +486,14 @@ test("viewer next steps vary across relevant areas, specific, and uncensored onl
     "Neon Rim Light",
   ]);
   // The areas come in a different order each time.
-  for (const area of ["interaction", "color palette", "framing"])
-    assert.match(calls[0][0].content, new RegExp(`distinct area \\([^)]*${area}`));
+  for (const area of ["interaction", "outfit", "pose"])
+    assert.match(calls[0][0].content, new RegExp(`areas such as [^.]*${area}`));
+  assert.match(calls[0][0].content, /pick out what is particular to this subject and scene/);
   assert.match(calls[0][0].content, /Name the actual visible change/);
   assert.match(calls[0][0].content, /Keep the subject's identity/);
-  assert.doesNotMatch(calls[0][0].content, /body-shape, proportion or build alternative/);
+  assert.doesNotMatch(calls[0][0].content, /non-graphic body alternatives/);
   await labels("bob", "job-b");
-  assert.match(calls[1][0].content, /clearly adult human subject.*body-shape, proportion or build/);
+  assert.match(calls[1][0].content, /clearly adult human subject.*non-graphic body alternatives/);
 });
 
 test("suggestions never repeat a fixed option in the same menu, and the writer is told them", async () => {
@@ -536,9 +537,9 @@ test("all creative suggestion surfaces share context and variety while motion ke
       assert.match(context.content, /35-year-old woman with a broad build/);
       if (surface === "animate" || kind === "video") {
         assert.match(system.content, /Vary motion, subject action/);
-        assert.doesNotMatch(system.content, /include a non-graphic body-shape/);
+        assert.doesNotMatch(system.content, /include one or two non-graphic body alternatives/);
       } else {
-        assert.match(system.content, /include a non-graphic body-shape/);
+        assert.match(system.content, /include one or two non-graphic body alternatives/);
       }
     }
   }
@@ -972,6 +973,43 @@ test("a change lands where an edit can make it, else recreates with the seed, wr
   assert.match(redraw, /- recreate: [^\n]*to the person \(body, figure, face/);
   // The prompt changes the words concerned, in absolute terms, and nothing else.
   assert.match(redraw, /rewrite the words it concerns in place[^\n]*never "a redder dress"/);
+});
+
+test("figure changes recreate where an edit would lose the source's model or LoRAs", async () => {
+  const ask = async (settings: Record<string, unknown>, profileId?: string) => {
+    const { calls, items, suggestions } = fixture({
+      reply: () => JSON.stringify({ action: "edit", label: "Red Dress", prompt: "x" }),
+      target: async (_owner, _source, editor) =>
+        editor === "image:other"
+          ? { label: "Other Editor", guide: {}, edits: "instruction" }
+          : { label: "Krea 2", guide: {}, edits: "instruction" },
+    });
+    items["alice:job-a"].settings = settings;
+    await suggestions.suggest("alice", {
+      surface: "change",
+      jobId: "job-a",
+      request: "longer legs",
+      actions: ["edit", "recreate"],
+      profileId,
+    });
+    return calls[0][0].content;
+  };
+  const figure = /- recreate: [^\n]*subject, figure, body proportions, build or style/;
+  const plain = { profileId: "image:krea", profileName: "Krea 2" };
+  // A LoRA source or another editor: Edit keeps clothing and light, Recreate takes the figure.
+  for (const system of [
+    await ask({ ...plain, loras: [{ name: "curvy", enabled: true }] }),
+    await ask(plain, "image:other"),
+  ]) {
+    assert.match(system, /- edit: [^\n]*clothing, light[^\n]*never for the figure/);
+    assert.match(system, figure);
+  }
+  assert.match(await ask(plain, "image:other"), /it runs on Other Editor, not this model/);
+  // Editing on the source's own model without LoRAs still makes small body details.
+  for (const system of [await ask(plain), await ask(plain, "image:krea")]) {
+    assert.match(system, /- edit: [^\n]*clothing, a body detail, light/);
+    assert.doesNotMatch(system, figure);
+  }
 });
 
 test("a requested change is written by the account's Text model", async () => {
