@@ -116,6 +116,16 @@ const gradeColours: Record<string, string> = {
   partial: "orange",
 };
 /** A state or grade as words, such as Downloading. */
+/** A model import with one main model file and no profile yet, from which a profile can be drafted. */
+export const draftable = (record: ImportRecord) =>
+  !record.results?.profileId &&
+  record.state !== "failed" &&
+  ["civitai-model", "hf-file"].includes(record.input?.kind || "") &&
+  (record.resources || []).filter(
+    (resource) =>
+      ["checkpoint", "diffusion_model"].includes(resource.role || "") && !resource.optional,
+  ).length === 1;
+
 export const stateLabel = (state: string) => titleCase(state.replaceAll("-", " "));
 /** An import still resolving, downloading or verifying, which polling follows until it settles. */
 export const importBusy = (record: ImportRecord) =>
@@ -217,16 +227,7 @@ export function LibraryImportReview({
   const record = query.data?.import;
   const run = (actionName: string, body?: unknown) => action.mutate({ action: actionName, body });
   const resources = record?.resources || [];
-  const canDraft =
-    admin &&
-    !!record &&
-    !record.results?.profileId &&
-    record.state !== "failed" &&
-    ["civitai-model", "hf-file"].includes(record.input?.kind || "") &&
-    resources.filter(
-      (resource) =>
-        ["checkpoint", "diffusion_model"].includes(resource.role || "") && !resource.optional,
-    ).length === 1;
+  const canDraft = admin && !!record && draftable(record);
   const missing = resources.some((resource) => !resource.optional && resource.downloadable);
   const preset: LibraryPreset | undefined = record?.preset
     ? {

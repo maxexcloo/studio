@@ -318,7 +318,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 iconOnly
               />
               <ToolbarAction
-                label="Import Workflow"
+                label="Import"
                 icon={icons.upload}
                 loading={importing.isPending}
                 onClick={workflowFile.open}

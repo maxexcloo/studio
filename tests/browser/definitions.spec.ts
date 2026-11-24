@@ -357,9 +357,7 @@ test("A combined profile's Backend select is a saved edit that switches what the
   expect(studio.description).toBeUndefined();
 });
 
-test("The Profiles toolbar gives Download All its own link beside Import Workflow", async ({
-  page,
-}) => {
+test("The Profiles toolbar gives Download All its own link beside Import", async ({ page }) => {
   await fixtures(page);
   await page.goto("/images");
   await openNav(page, "Library");
@@ -370,18 +368,18 @@ test("The Profiles toolbar gives Download All its own link beside Import Workflo
   const search = toolbar.getByRole("textbox", { name: "Search Profiles", exact: true });
   const filter = toolbar.getByRole("button", { name: "Filter Profiles", exact: true });
   const download = toolbar.getByRole("link", { name: "Download All", exact: true });
-  const importing = toolbar.getByRole("button", { name: "Import Workflow", exact: true });
+  const importing = toolbar.getByRole("button", { name: "Import", exact: true });
   const controls = search.or(filter).or(download).or(importing);
   await expect(controls).toHaveCount(4);
   await expect(controls.nth(0)).toHaveAccessibleName("Search Profiles");
   await expect(controls.nth(1)).toHaveAccessibleName("Filter Profiles");
   await expect(controls.nth(2)).toHaveAccessibleName("Download All");
-  await expect(controls.nth(3)).toHaveAccessibleName("Import Workflow");
+  await expect(controls.nth(3)).toHaveAccessibleName("Import");
   await expect(download).toHaveAttribute("href", "/api/profiles/export");
   await expect(download).toHaveAttribute("download", "");
 });
 
-test("Import Workflow opens a workflow, and a row's Duplicate copies its profile under a new ID", async ({
+test("Import opens a workflow, and a row's Duplicate copies its profile under a new ID", async ({
   page,
 }) => {
   await fixtures(page);
@@ -412,7 +410,11 @@ test("Import Workflow opens a workflow, and a row's Duplicate copies its profile
   await section(page, "Library", "Profiles");
   const editor = page.getByRole("dialog", { name: "Create Profile", exact: true });
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Import Workflow", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Filter Profiles", exact: true })
+    .locator("xpath=..")
+    .getByRole("button", { name: "Import", exact: true })
+    .click();
   await (
     await chooser
   ).setFiles({
