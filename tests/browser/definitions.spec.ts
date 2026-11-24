@@ -470,8 +470,8 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
     const menu = page.getByRole("menu", { name: `Actions for ${row}`, exact: true });
     const entries =
       part === "Models"
-        ? ["Edit", "Copy ID", "Download", "Duplicate…", "Delete"]
-        : ["Edit", "Copy ID", "Download", "Delete"];
+        ? ["Edit", "Versions…", "Copy ID", "Download", "Duplicate…", "Delete"]
+        : ["Edit", "Versions…", "Copy ID", "Download", "Delete"];
     await expect(menu.getByRole("menuitem")).toHaveText(entries);
     const download = page.waitForEvent("download");
     await page.getByRole("menuitem", { name: item, exact: true }).click();
