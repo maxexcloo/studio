@@ -85,7 +85,7 @@ export function DreamPreferences() {
         {toggle(
           "useLoadedProfile",
           "Run on Loaded Profile",
-          "Skip the idle delay when the exact profile and LoRA settings are already loaded.",
+          "Skip the idle delay when Studio can confirm that the profile and its LoRA settings are already loaded.",
         )}
         {dream.data.uncensoredAvailable &&
           toggle("uncensored", "Uncensored", "Allow explicit themes.")}
