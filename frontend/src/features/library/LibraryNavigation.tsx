@@ -32,7 +32,7 @@ export const librarySections = {
   },
   characters: {
     label: "Characters",
-    description: "Reuse character descriptions and reference images.",
+    description: "Reuse characters' descriptions and reference images across generations.",
     icon: icons.character,
     group: "Personal",
   },
@@ -51,7 +51,7 @@ export const librarySections = {
   // Imports come first: they bring in what Files, LoRAs and Models then manage.
   imports: {
     label: "Imports",
-    description: "Import shared models and recipes from Civitai, Hugging Face or recipe images.",
+    description: "Import shared models, LoRAs and recipes from Civitai, Hugging Face or images.",
     icon: icons.import,
     admin: true,
     group: "Profiles",
