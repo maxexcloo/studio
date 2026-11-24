@@ -205,6 +205,7 @@ export function LibraryImportReview({
       active && query.state.data && importBusy(query.state.data.import) ? 4000 : false,
   });
   const action = useMutation({
+    meta: { inlineError: true },
     mutationFn: ({ action, body }: { action: string; body?: unknown }) =>
       post<{ import: ImportRecord; failures?: string[]; queued?: number }>(
         `/api/library/imports/${encodeURIComponent(id)}/${action}`,
@@ -310,6 +311,7 @@ export function LibraryImportReview({
               )}
             </Group>
             {record.error && <Alert color="red">{record.error}</Alert>}
+            {action.error && <Alert color="red">{action.error.message}</Alert>}
             {canDraft && (
               <Button
                 variant="default"
