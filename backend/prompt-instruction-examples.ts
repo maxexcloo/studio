@@ -125,6 +125,7 @@ export function promptInstructionExamples(): Record<string, string> {
     tasks: "caption, tags",
     tasteDirection: "more warm light, less clutter",
     theme: "cinematic",
+    modifiers: "Bounce & Jiggle, Body Movement",
     tierWords: "fast",
     title: "Red Fox at Dawn",
     titleRule: `Write the title in ${australianEnglish}.`,

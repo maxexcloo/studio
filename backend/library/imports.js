@@ -22,7 +22,6 @@ import crypto from "node:crypto";
 import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { imageRecipe, readImageMetadata } from "../image-metadata.js";
-import { minorAgeRefusal } from "../minor-age.js";
 import { runtimeDatabase } from "../persistence/runtime.ts";
 import { catalogueKinds } from "./catalogue.js";
 import { gradeImport, presetGrade } from "./grade.js";
@@ -880,8 +879,6 @@ export function createImportEngine({
         approximate: recipe.approximate,
         extraProcessing: recipe.extraProcessing,
       };
-      const refusal = minorAgeRefusal(recipe.prompt);
-      if (refusal) throw new Error(refusal);
       record.preset = {
         prompt: recipe.prompt,
         negative: recipe.negative,

@@ -35,6 +35,7 @@ export function AnimateDialog({
   theme,
   instruction: chosen,
   profileId,
+  modifiers,
   onClose,
 }: AnimateRequest & {
   item: MediaItem;
@@ -68,6 +69,7 @@ export function AnimateDialog({
         theme,
         instruction: instruction.trim() || undefined,
         profileId,
+        modifiers,
         signal: writing.current.signal,
       },
       { onSuccess: (written) => setPrompt(written.prompt) },
@@ -81,7 +83,7 @@ export function AnimateDialog({
   const animate = () => {
     if (!instruction.trim()) return;
     if (review) return write();
-    run({ kind: "animate", theme, instruction: instruction.trim(), profileId });
+    run({ kind: "animate", theme, instruction: instruction.trim(), profileId, modifiers });
     onClose();
   };
   const submitPrompt = () => {
@@ -89,6 +91,7 @@ export function AnimateDialog({
     run({
       kind: "animate",
       theme,
+      modifiers,
       instruction: instruction.trim() || undefined,
       written: { ...written, prompt: prompt.trim() },
     });

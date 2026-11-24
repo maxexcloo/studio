@@ -9,7 +9,7 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { askChange } from "../taste/suggestions";
 import { automaticEditProfile } from "./editProfile";
 import { useItemMutation } from "./useItemMutation";
-import type { Iteration } from "./useMediaAction";
+import { type Iteration, useAnimateModifiers } from "./useMediaAction";
 
 export const canSuggestChangeForItem = (item: MediaItem) =>
   item.status === "done" && Boolean(item.url);
@@ -51,6 +51,7 @@ export function useItemChange<T extends string>(
   const video = item.type === "video";
   const client = useQueryClient();
   const assistant = useQuery(assistantQuery);
+  const { ticked: modifiers } = useAnimateModifiers();
   const [change, setChange] = useState<{
     proposal: Change;
     typed: T;
@@ -91,7 +92,7 @@ export function useItemChange<T extends string>(
     // An image's animation, as proposed, has Animate's writer word the request for the video
     // model; a prompt the person edited runs as they wrote it.
     if (action === "animate" && !video && prompt.trim() === proposal.prompt.trim())
-      iterate({ kind: "animate", theme: "custom", instruction: proposal.request });
+      iterate({ kind: "animate", theme: "custom", instruction: proposal.request, modifiers });
     else
       iterate({
         kind: "prompt",

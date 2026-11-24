@@ -57,7 +57,6 @@ import { defaultTextProfileKey, defaultTextSide } from "./generation-defaults.js
 import { cleanTriggers } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
-import { minorAgeRefusal } from "./minor-age.js";
 import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
@@ -148,15 +147,6 @@ const reasoningEfforts = {
 };
 const maxCandidates = 20;
 const maxExamples = 6;
-// Calls whose replies are prompts, prompt ideas or card text; Dream's writer checks its own.
-const promptCalls = new Set([
-  "animate",
-  "character",
-  "describe",
-  "rewrite",
-  "sheet",
-  "suggestions",
-]);
 const lookupTtlMs = 10 * 60_000;
 const failedLookupTtlMs = 60_000;
 
@@ -865,8 +855,6 @@ export function createAssistant(
     const what = `Prompt assistant ${options.call} with ${options.model}`;
     try {
       const reply = await request(options);
-      const refusal = promptCalls.has(options.call) && minorAgeRefusal(reply.text);
-      if (refusal) throw new AssistantError(refusal, { status: 400 });
       const by = reply.served && reply.served !== options.model ? ` (${reply.served})` : "";
       log.info?.(`${what}${by} in ${reply.ms} ms`);
       return reply;
@@ -921,8 +909,6 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const refusal = minorAgeRefusal(`${original}\n${asked}\n${notes}`);
-    if (refusal) throw new AssistantError(refusal, { status: 400 });
     const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
     const maker = upsampler && (await listModels()).includes(upsampler.model);
     const model = maker ? upsampler.model : await modelFor("rewrite", explicit, writer);
@@ -1345,7 +1331,7 @@ Prompt: ${context}`
       const written = cleanPrompt(
         typeof parsed.prompt?.prompt === "string" ? parsed.prompt.prompt : "",
       );
-      if (written && !minorAgeRefusal(written)) read.prompt = written;
+      if (written) read.prompt = written;
     }
     if (steps && parsed.steps) read.steps = parsed.steps;
     if (Object.keys(read).length === 1) throw new AssistantError("unusable reply");

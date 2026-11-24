@@ -273,16 +273,26 @@ export function registerAssistantRoutes(
               .usable(kind)
               .filter((style) => uncensored || !style.uncensored)
               // A fixed AI edit runs as its instruction, as a picked suggestion's request does.
-              .map(({ id, label, description, instruction, actions, uncensored }) => ({
+              .map(({ id, label, description, instruction, actions, system, uncensored }) => ({
                 id,
                 label,
                 description,
+                ...(system ? { system } : {}),
                 ...(uncensored ? { uncensored } : {}),
                 ...(kind !== "improve" ? { instruction } : {}),
                 ...(kind === "change" && actions ? { actions } : {}),
               })),
           ]),
         ),
+        modifiers: promptStyleStore()
+          .modifiers()
+          .filter((style) => uncensored || !style.uncensored)
+          .map(({ id, label, description, uncensored }) => ({
+            id,
+            label,
+            description,
+            ...(uncensored ? { uncensored } : {}),
+          })),
         uncensored,
         loras: allowed(account, "loras"),
         noNegative,

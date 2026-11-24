@@ -963,8 +963,6 @@ export function createDream(options: {
     propose(ownerId: string, account?: GenerationAccount): Promise<boolean>;
     drafts(ownerId: string): { id: string; project: ProjectContent }[];
   };
-  /** The words in `text` that state an age under 18 (minor-age.js), or "". */
-  minorAge(text: string): string;
   admit(
     input: GenerationInput,
     account?: GenerationAccount,
@@ -2155,8 +2153,6 @@ export function createDream(options: {
       outfit: outfit?.description,
       scene: scene?.description,
     });
-    if (pinnedPrompt && options.minorAge(pinnedPrompt))
-      throw new Error("A pinned card describes someone under 18.");
     const brief = project
       ? [
           ["Brief", project.brief.description],
@@ -2513,9 +2509,6 @@ export function createDream(options: {
     /** Why a reply can't be used, or "" when it can. */
     const problem = (prompt: string, title: string, motifs: string[], cooling: string[]) => {
       if (!prompt) return "Your reply had no usable prompt.";
-      const minor = options.minorAge(prompt);
-      if (minor)
-        return `"${minor}" reads as someone under 18; drop it, without adding "adult" or an age.`;
       const excluded = namedMotif(prompt, forbidden);
       if (excluded)
         return `Your prompt includes "${excluded}", which their exclusions or brief say to avoid.`;

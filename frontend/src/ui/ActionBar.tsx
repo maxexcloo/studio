@@ -126,7 +126,7 @@ const itemLabel = ({ label, description }: Action, describedBy: string) =>
   description ? (
     <>
       {label}
-      <Text id={describedBy} size="xs" c="dimmed">
+      <Text id={describedBy} size="xs" c="dimmed" lineClamp={2}>
         {description}
       </Text>
     </>

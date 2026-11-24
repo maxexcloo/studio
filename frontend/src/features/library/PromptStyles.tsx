@@ -2,6 +2,7 @@ import {
   Alert,
   Badge,
   Button,
+  Checkbox,
   Input,
   Menu,
   Modal,
@@ -143,6 +144,14 @@ function StyleEditor({
               />
             </Input.Wrapper>
           )}
+          {draft.kind === "animate" && (
+            <Checkbox
+              label="Modifier"
+              description="Applies alongside the chosen theme."
+              checked={Boolean(draft.modifier)}
+              onChange={(event) => change({ modifier: event.currentTarget.checked || undefined })}
+            />
+          )}
           <TextInput
             label="Name"
             required
@@ -151,8 +160,10 @@ function StyleEditor({
             onChange={(event) => change({ label: event.currentTarget.value })}
           />
           <TextInput
-            label="Description"
-            description="One short line under its name in the menu."
+            label="Brief"
+            description="One short line under its name in the menu, about 40 characters."
+            required
+            maxLength={60}
             value={draft.description}
             onChange={(event) => change({ description: event.currentTarget.value })}
           />
@@ -183,7 +194,9 @@ function StyleEditor({
             <Button
               type="submit"
               loading={mutation.isPending}
-              disabled={!draft.label.trim() || !draft.instruction.trim()}
+              disabled={
+                !draft.label.trim() || !draft.description.trim() || !draft.instruction.trim()
+              }
             >
               {style ? "Save" : "Create"}
             </Button>
@@ -302,11 +315,18 @@ export function PromptTemplates({
                 <TableRecord
                   name={style.label}
                   flags={
-                    style.uncensored && (
-                      <Badge size="sm" color="orange" leftSection={<icons.uncensored size={12} />}>
-                        Uncensored
-                      </Badge>
-                    )
+                    <>
+                      {style.modifier && <Badge size="sm">Modifier</Badge>}
+                      {style.uncensored && (
+                        <Badge
+                          size="sm"
+                          color="orange"
+                          leftSection={<icons.uncensored size={12} />}
+                        >
+                          Uncensored
+                        </Badge>
+                      )}
+                    </>
                   }
                   detail={style.description}
                   openLabel={`Edit ${style.label}`}

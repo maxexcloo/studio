@@ -1,5 +1,6 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
+import { animationModifierIds } from "../../shared/animate.ts";
 import {
   cardKinds,
   maxCardDescription,
@@ -152,7 +153,13 @@ export function storedWritingRecord(value) {
   if (!["animate", "request", "dream", "set", "sheet"].includes(value.kind)) return null;
   const model = typeof value.model === "string" ? value.model.trim().slice(0, 200) : "";
   const thinking = typeof value.thinking === "string" ? value.thinking.trim().slice(0, 20_000) : "";
-  return { kind: value.kind, ...(model ? { model } : {}), ...(thinking ? { thinking } : {}) };
+  const modifiers = value.kind === "animate" ? animationModifierIds(value.modifiers) : [];
+  return {
+    kind: value.kind,
+    ...(model ? { model } : {}),
+    ...(thinking ? { thinking } : {}),
+    ...(modifiers.length ? { modifiers } : {}),
+  };
 }
 
 /** A stored `assistant` record (assistant-routes.js assistantRecord), kept to its known fields, or null. */

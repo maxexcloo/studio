@@ -343,16 +343,17 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
   await expect(menu.getByRole("menuitem")).toHaveText([
     /^Suggestions/,
     "Templates",
-    "Custom…",
+    /^Custom…/,
     "Refresh",
     "Write Negative",
     "Recent",
   ]);
   await expandAssistantMenu(menu, "Templates");
   const templates = menu.getByRole("group", { name: "Templates", exact: true });
-  await expect(templates.getByRole("menuitem")).toHaveText(["Candid", "Enhance", "Portrait"]);
-  // Styles show their names alone.
-  await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);
+  await expect(templates.getByRole("menuitem")).toHaveText(["Candid", "Enhance", /^Portrait/]);
+  await expect(
+    templates.getByRole("menuitem", { name: "Portrait", exact: true }),
+  ).toHaveAccessibleDescription("A person in focus.");
   await backToActionMenu(menu);
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });

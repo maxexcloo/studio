@@ -53,6 +53,7 @@ import {
   animateProfileQuery,
   typedPrompt,
   useAnimateLengthSetting,
+  useAnimateModifiers,
   useAnimateReview,
   useAnimateTemplates,
   useMediaAction,
@@ -411,16 +412,19 @@ export function useMediaActions(
     length.loading ||
     ((!video || Boolean(animationProfileId)) && !animation.data);
   const templates = useAnimateTemplates();
+  const modifiers = useAnimateModifiers();
+  const request = { profileId: animationProfileId, modifiers: modifiers.ticked };
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
     label: `${template.label}${template.id === "custom" ? "…" : ""}`,
+    description: template.description,
     icon: template.id === "custom" ? icons.custom : undefined,
     marker: template.uncensored ? icons.uncensored : undefined,
     disabled: animateDisabled,
     onClick:
       template.id === "custom" || review
-        ? () => onAnimate({ theme: template.id, profileId: animationProfileId })
-        : () => run({ kind: "animate", theme: template.id, profileId: animationProfileId }),
+        ? () => onAnimate({ ...request, theme: template.id })
+        : () => run({ ...request, kind: "animate", theme: template.id }),
   });
   // Load the image's saved motions when its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
@@ -431,8 +435,8 @@ export function useMediaActions(
     disabled: animateDisabled,
     onPick: (instruction) =>
       review
-        ? onAnimate({ theme: "custom", instruction, profileId: animationProfileId })
-        : run({ kind: "animate", theme: "custom", instruction, profileId: animationProfileId }),
+        ? onAnimate({ ...request, theme: "custom", instruction })
+        : run({ ...request, kind: "animate", theme: "custom", instruction }),
   });
   const motionsOffered = image && assisted;
   // Templates write the prompt into an editable review before anything queues.
@@ -586,7 +590,12 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: assistant.isPending,
-          settings: [length, ...animateProfiles, ...reviewItems],
+          settings: [
+            length,
+            ...animateProfiles,
+            ...reviewItems,
+            ...(modifiers.offered.length ? [modifiers.settingsAction()] : []),
+          ],
           suggestions: motionsOffered ? motions : undefined,
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
           custom: templates.filter((template) => template.id === "custom").map(templateItem),
