@@ -534,6 +534,7 @@ export function LibraryImports({
                     {
                       key: "substitute",
                       header: "Substitute",
+                      wrap: true,
                       sortValue: (row) => row.resource.substitute?.file,
                       cell: (row) => (
                         <>

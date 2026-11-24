@@ -35,10 +35,13 @@ interface DataColumn<T> {
    * other secondary columns (those without it) into the main cell themselves.
    */
   hideOnPhone?: boolean;
-  /** Sizes the column to keep short values such as counts and dates on one line. */
-  nowrap?: boolean;
+  /**
+   * Lets a secondary column's long text wrap. Beside a main column the others size to their
+   * content on one line, so counts, dates and statuses never break.
+   */
+  wrap?: boolean;
   width?: number;
-  /** The column that takes the free width and lets its text truncate. */
+  /** The column that takes the free width and wraps its text. */
   main?: boolean;
 }
 type Sort = { key: string; descending: boolean };
@@ -172,7 +175,8 @@ export function DataTable<T>({
 }) {
   const [sort, setSort] = useState<Sort | undefined>(initialSort);
   const phone = usePhone();
-  const fold = phone && !minWidth && columns.some((column) => column.main);
+  const hasMain = columns.some((column) => column.main);
+  const fold = phone && !minWidth && hasMain;
   const folded = fold ? columns.filter((column) => !column.main && !column.hideOnPhone) : [];
   const shown = columns.filter(
     (column) => !folded.includes(column) && !(phone && column.hideOnPhone),
@@ -278,7 +282,7 @@ export function DataTable<T>({
               {shown.map((column) => (
                 <Table.Td
                   key={column.key}
-                  className={column.nowrap ? classes.nowrap : undefined}
+                  className={hasMain && !column.main && !column.wrap ? classes.nowrap : undefined}
                   maw={column.main ? 0 : undefined}
                   w={column.main ? "100%" : undefined}
                 >
