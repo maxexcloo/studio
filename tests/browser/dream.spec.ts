@@ -366,6 +366,7 @@ test("Suggest can queue a variation of a library import without a job or prompt"
 
 test("Keep & Vary accepts a Dream card and stages four variations of one thing to compare", async ({
   page,
+  isMobile,
 }) => {
   const state = await fixtures(page);
   const dream = await serveDream(page, { unseen: [dreamItem("harbour"), dreamItem("next")] });
@@ -383,7 +384,28 @@ test("Keep & Vary accepts a Dream card and stages four variations of one thing t
   });
   await page.goto("/dream");
   await page.getByRole("button", { name: "Suggestions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Keep & Vary", exact: true }).click();
+  const vary = page.getByRole("menuitem", { name: "Keep & Vary", exact: true });
+  const pose = page.getByRole("menuitem", { name: "Vary Pose", exact: true });
+  await vary.click();
+  if (isMobile) {
+    const back = page.getByRole("menuitem", { name: "Back", exact: true });
+    await back.click();
+    await expect(vary).toBeVisible();
+    await vary.click();
+  } else {
+    // A desktop submenu must sit outside its parent so neither list covers the other.
+    await expect
+      .poll(async () => {
+        const parent = await vary.boundingBox();
+        const child = await pose.boundingBox();
+        return Boolean(
+          parent &&
+          child &&
+          (child.x >= parent.x + parent.width || child.x + child.width <= parent.x),
+        );
+      })
+      .toBe(true);
+  }
   await expect(page.getByRole("menuitem")).toContainText([
     "Vary Light",
     "Vary Outfit",
@@ -392,7 +414,7 @@ test("Keep & Vary accepts a Dream card and stages four variations of one thing t
     "Vary Style",
     "Explore Three Directions",
   ]);
-  await page.getByRole("menuitem", { name: "Vary Pose", exact: true }).click();
+  await pose.click();
   const review = page.getByRole("dialog", { name: "Vary Pose", exact: true });
   await review.getByRole("button", { name: "Open Composer", exact: true }).click();
   await expect
