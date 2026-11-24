@@ -536,7 +536,7 @@ function groupedEntries(
   all: QueueJob[],
   shown: QueueJob[],
   group: (job: QueueJob) => string | undefined,
-  title: (input: QueueJob["input"]) => string,
+  title: (job: QueueJob) => string,
 ): QueueEntry[] {
   const members = new Map<string, QueueJob[]>();
   for (const job of all) {
@@ -560,7 +560,7 @@ function groupedEntries(
     const created = {
       id: `set:${id}`,
       jobs: [job],
-      set: { id, title: title(together[0].input), members: together },
+      set: { id, title: title(together[0]), members: together },
     };
     groups.set(id, created);
     entries.push(created);
@@ -571,14 +571,18 @@ const resultSetOf = (input: QueueJob["input"]) =>
   input?.resultSet as { title?: string; variation?: string } | undefined;
 
 /**
- * The queue's rows in dispatch order, with each set where its first shown job is.
+ * The queue's rows in dispatch order, with each set where its first shown job is. Dream's work is
+ * one set of its own.
  */
 export function queueEntries(all: QueueJob[], waiting?: string[]): QueueEntry[] {
   return groupedEntries(
     all,
     jobsInDispatchOrder(all, waiting),
-    (job) => (job.dream ? undefined : job.queueSet),
-    (input) => String(resultSetOf(input)?.title || input?.prompt || "Generations"),
+    (job) => (job.dream ? "dream" : job.queueSet),
+    (job) =>
+      job.dream
+        ? "Dream"
+        : String(resultSetOf(job.input)?.title || job.input?.prompt || "Generations"),
   );
 }
 
@@ -592,7 +596,7 @@ function promptEntries({ jobs, set }: QueueEntry) {
     set!.members,
     jobs,
     (job) => (prompts ? job.queueBatch : undefined),
-    (input) => String(resultSetOf(input)?.variation || input?.prompt || "Generation"),
+    (job) => String(resultSetOf(job.input)?.variation || job.input?.prompt || "Generation"),
   );
 }
 
