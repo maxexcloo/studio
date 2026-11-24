@@ -2543,12 +2543,12 @@ export function createDream(options: {
     if ([imageBackend, videoBackend].includes("cloud") && (await options.cloudHeld?.()))
       record.settings = { ...record.settings, imageBackend: "local", videoBackend: "local" };
     for (const kind of due) {
+      const backend = record.settings[kind === "image" ? "imageBackend" : "videoBackend"];
       const delay = idleWait(ownerId, kind);
       if (delay) {
         idle = delay;
-        continue;
+        if (!record.settings.useLoadedProfile || backend !== "local") continue;
       }
-      const backend = record.settings[kind === "image" ? "imageBackend" : "videoBackend"];
       const online = await options.online(kind, backend);
       if (online.text !== "online")
         return { status: "unavailable", reason: unreachable("The text model", online.text) };
@@ -2651,7 +2651,7 @@ export function createDream(options: {
       for (const card of deck ? deckOrder(deck) : []) {
         if (card === "new") break;
         if (card === "comparison") {
-          if (counts.usage.images + 2 > record.settings.dailyImages) continue;
+          if (delay || counts.usage.images + 2 > record.settings.dailyImages) continue;
           const pair = await comparison(
             ownerId,
             record,
@@ -3923,6 +3923,8 @@ export function createDream(options: {
     /** Ticks now: a Dream job finished, freeing its worker, or the deck runs low (dream-routes.ts). */
     wake,
     idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
+    idleWait,
+    useLoadedProfile: (ownerId: string) => read(ownerId).settings.useLoadedProfile,
     access: (ownerId: string) => options.access(ownerId),
     status(
       ownerId: string,

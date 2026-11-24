@@ -686,7 +686,11 @@ export class RuntimeController {
    * Admit work on the first ready candidate. Several deployments can serve one worker address (a
    * one- and a two-GPU video deployment behind one Service); the first is the one to start.
    */
-  async acquire(candidates: string | string[], priority?: number): Promise<RuntimeLease> {
+  async acquire(
+    candidates: string | string[],
+    priority?: number,
+    readyOnly = false,
+  ): Promise<RuntimeLease> {
     const choices = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!choices.length) throw new RuntimeUnavailable("The selected workload is not configured.");
     const states = await Promise.all(choices.map((workload) => this.admissionState(workload)));
@@ -703,6 +707,7 @@ export class RuntimeController {
             priority < swapTier)),
     );
     if (ready) return this.retain(ready.id);
+    if (readyOnly) throw new RuntimeUnavailable("Waiting for the selected worker to be ready.");
     const leaving = choices.find((workload) => this.stopping.has(workload.id));
     if (leaving)
       throw new RuntimeUnavailable(

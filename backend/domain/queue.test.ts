@@ -779,6 +779,7 @@ test("Dream reuses a loaded model but waits for an empty queue before loading an
   t.after(() => store.close());
   let now = 0;
   queue.now = () => now;
+  adapter.dreamImageSwitchMinutes = () => 2;
   const session = store.createSession("alice").id;
   const enqueue = (model: string, priority: number = queuePriority.manual) =>
     store.enqueue(
@@ -868,6 +869,73 @@ test("Dream can reuse a loaded photo setup immediately but waits the shared swit
   minutes = 0;
   await queue.tick();
   assert.deepEqual(submitted, [foreground.id, same.id, changed.id]);
+});
+
+test("Dream only bypasses a wait on its verified worker, and yields to new foreground work", async (t) => {
+  const { store, queue, adapter, submitted, observations } = fixture();
+  t.after(() => store.close());
+  const session = store.createSession("alice").id;
+  const enqueue = (profileId: string, resource: string, priority: number) =>
+    store.enqueue(
+      "alice",
+      session,
+      { kind: "image", profileId },
+      "image",
+      undefined,
+      resource,
+      undefined,
+      { priority },
+    );
+  const warm = enqueue("warm-profile", "worker:gpu", queuePriority.manual);
+  await queue.tick();
+  observations.set(warm.id, { status: "completed" });
+  const other = enqueue("another-profile", "worker:gpu", queuePriority.manual);
+  await queue.tick();
+  observations.set(other.id, { status: "completed" });
+  await queue.tick();
+
+  assert.equal(queue.usedProfile(warm.input, "worker:gpu"), true);
+  assert.equal(queue.usedProfile(warm.input, "worker:other"), false);
+  assert.equal(
+    queue.usedProfile({ ...warm.input, profileId: "same-model-different-profile" }, "worker:gpu"),
+    false,
+  );
+  assert.equal(
+    queue.usedProfile({ ...warm.input, loras: [{ name: "grain", strength: 0.5 }] }, "worker:gpu"),
+    false,
+  );
+
+  const dream = enqueue("warm-profile", "worker:gpu", queuePriority.dream);
+  adapter.dreamIdleWait = () => "Dream waits after a request.";
+  await queue.tick();
+  assert.equal(store.job("alice", dream.id)?.status, "waiting");
+  let intervening: OwnedJob | undefined;
+  adapter.dreamResidentModel = async (job) => {
+    intervening ??= enqueue("warm-profile", "worker:other", queuePriority.manual);
+    return queue.usedProfile(job.input, job.resource) ? "engine-warm-model" : undefined;
+  };
+  await queue.tick();
+  assert.match(store.job("alice", dream.id)?.reason || "", /user work/);
+  assert.ok(intervening);
+  await queue.tick();
+  observations.set(intervening.id, { status: "completed" });
+
+  const submit = adapter.submit;
+  adapter.submit = async (job, model) => {
+    if (job.id === dream.id) {
+      assert.equal(model, "engine-warm-model");
+      return { status: "waiting", deferredBeforeSubmission: true, reason: "It was unloaded." };
+    }
+    return submit(job);
+  };
+  await queue.tick();
+  assert.equal(store.job("alice", dream.id)?.reason, "It was unloaded.");
+  assert.deepEqual(submitted, [warm.id, other.id, intervening.id]);
+  adapter.submit = submit;
+  await queue.tick();
+  assert.deepEqual(submitted, [warm.id, other.id, intervening.id, dream.id]);
+  queue.unload("worker:gpu");
+  assert.equal(queue.usedProfile(warm.input, "worker:gpu"), false);
 });
 
 test("an idle worker takes waiting work, manual work first", async () => {

@@ -8,11 +8,12 @@ import test from "node:test";
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-radiance-inventory-"));
 process.env.STUDIO_DATA_DIR = scratch;
 const requests = [];
+let modelState = "cold";
 const server = http.createServer((req, res) => {
   requests.push(req.url);
   res.setHeader("content-type", "application/json");
   if (req.url === "/v1/models")
-    res.end(JSON.stringify({ data: [{ id: "krea-2-turbo-bf16", state: "cold" }] }));
+    res.end(JSON.stringify({ data: [{ id: "krea-2-turbo-bf16", state: modelState }] }));
   else {
     res.statusCode = 404;
     res.end("{}");
@@ -96,6 +97,34 @@ test("a cold Radiance profile retains installed LoRAs and catalogue triggers wit
     () => sanitizeGenerateBody(input, radianceInfo([{ id: model, state: "cold" }])),
     /no LoRA inventory/,
   );
+});
+
+test("a Dream profile proves the exact worker has its base model resident", async (t) => {
+  const { inferModels } = await import("./model/models.js");
+  const { createGenerationSubmission } = await import("./generation-routes.js");
+  const model = "krea-2-turbo-bf16";
+  const stats = { radiance: [{ id: model, state: "resident" }] };
+  const info = radianceInfo(stats.radiance);
+  const profileId = "custom:radiance-inventory";
+  const models = inferModels(info, stats);
+  const profile = models.profiles.find(({ id }) => id === profileId);
+  const routes = createGenerationSubmission({
+    loadComfyContext: async () => ({ info, stats }),
+    mediaModels: async () => ({ models }),
+  });
+  const input = { profileId, model: profile.model, workflow: profile.workflow, kind: "image" };
+  const check = (overrides = {}, worker = "radiance") =>
+    routes.residentProfileModel({ ...input, ...overrides }, worker);
+
+  assert.equal(await check(), undefined);
+  modelState = "resident";
+  t.after(() => {
+    modelState = "cold";
+  });
+  assert.equal(await check(), model);
+  assert.equal(await check({}, "primary"), undefined);
+  assert.equal(await check({ prompt: "A lighthouse <lora:ink:0.8>" }), undefined);
+  assert.equal(await check({ profileId: "custom:other-profile" }), undefined);
 });
 
 test("LoRA info lists the library's last LoRAs while its ComfyUI is parked at a new address", async () => {
