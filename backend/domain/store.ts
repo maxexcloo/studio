@@ -173,10 +173,11 @@ export class Store {
     this.db.exec(
       "DROP INDEX IF EXISTS studio_queue_prompted; CREATE INDEX IF NOT EXISTS studio_queue_profile ON studio_queue(owner_id, profile_id, created_at, status)",
     );
-    // Includes any a run still finishing wrote after its job ended (save drops the rest).
+    // Includes any a run still finishing wrote after its job ended (save drops the rest). Each
+    // provider job looks up its own job, so the start never scans the whole queue.
     this.db
       .prepare(
-        `DELETE FROM studio_provider_jobs WHERE id IN (SELECT id FROM studio_queue WHERE status IN (${placeholders(terminalStatuses)}))`,
+        `DELETE FROM studio_provider_jobs WHERE EXISTS (SELECT 1 FROM studio_queue WHERE studio_queue.id = studio_provider_jobs.id AND status IN (${placeholders(terminalStatuses)}))`,
       )
       .run(...terminalStatuses);
   }
