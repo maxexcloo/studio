@@ -34,6 +34,7 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { inboxQuery } from "../dream/queries";
+import type { ComparisonImage } from "../gallery/MediaComparison";
 import { mediaSource } from "../gallery/mediaSource";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
@@ -50,7 +51,7 @@ import classes from "./ComparePage.module.css";
 const MediaComparison = lazy(() =>
   import("../gallery/MediaComparison").then((module) => ({ default: module.MediaComparison })),
 );
-type SplitImage = { value: string; label: string; src: string; width?: number; height?: number };
+type SplitImage = ComparisonImage & { value: string; width?: number; height?: number };
 
 /**
  * A compare set side by side, labelled by what sets each variant apart: pick the winner (liking it), take one
@@ -125,7 +126,12 @@ export function ComparePage() {
   if (comparison.error)
     return (
       <Alert color="red" title="Couldn't Load the Comparison">
-        {comparison.error.message}
+        <Stack gap="sm" align="flex-start">
+          {comparison.error.message}
+          <Button variant="subtle" onClick={() => void comparison.refetch()}>
+            Retry
+          </Button>
+        </Stack>
       </Alert>
     );
   const { variants, seed, prompt, negative, set, axis, dream, card } = comparison.data;
@@ -395,25 +401,29 @@ function Variants({
         />
         {layout === "scroll" && (
           <Group gap="xs" wrap="nowrap">
-            <ActionIcon
-              variant="default"
-              aria-label="Previous Variant"
-              disabled={shown === 0}
-              onClick={() => move(-1)}
-            >
-              <icons.previous size={20} />
-            </ActionIcon>
+            <Tooltip label="Previous Variant">
+              <ActionIcon
+                variant="default"
+                aria-label="Previous Variant"
+                disabled={shown === 0}
+                onClick={() => move(-1)}
+              >
+                <icons.previous size={20} />
+              </ActionIcon>
+            </Tooltip>
             <Text size="sm" c="dimmed" aria-live="polite">
               {shown + 1} of {count}
             </Text>
-            <ActionIcon
-              variant="default"
-              aria-label="Next Variant"
-              disabled={shown === count - 1}
-              onClick={() => move(1)}
-            >
-              <icons.next size={20} />
-            </ActionIcon>
+            <Tooltip label="Next Variant">
+              <ActionIcon
+                variant="default"
+                aria-label="Next Variant"
+                disabled={shown === count - 1}
+                onClick={() => move(1)}
+              >
+                <icons.next size={20} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         )}
       </Group>
