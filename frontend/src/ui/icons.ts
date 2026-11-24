@@ -22,6 +22,7 @@ import {
   FastForward,
   Files,
   Flag,
+  Flame,
   FolderOpen,
   FolderUp,
   GalleryHorizontalEnd,
@@ -258,6 +259,8 @@ export const icons = {
   sound: Volume2,
   stop: filled(Square),
   templates: PanelsTopLeft,
+  /** Explicit content: templates only accounts with Uncensored Models see. */
+  uncensored: Flame,
   undo: Undo2,
   unfinished: ListRestart,
   /** Removing a link to another account, such as a chat gateway identity. */

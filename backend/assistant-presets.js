@@ -166,15 +166,6 @@ export const seedStyles = Object.freeze([
       "Candid Continuation. Treat the source as the first instant of an ordinary moment. Let the activity already under way continue through one small step, then settle. Describe one visible contact and its consequence, such as a hand tilting a cup it already holds. Keep the shot size and visual treatment. A slight reframe is useful only if it keeps the action in view.",
   },
   {
-    id: "locked-camera",
-    kind: "animate",
-    enabled: true,
-    label: "Fixed Shot",
-    description: "Hold the exact shot while a foreground gesture changes the frame.",
-    instruction:
-      "Fixed Shot. Keep camera position, focus distance and framing fixed from the first frame. Choose a gesture or shift of weight that the current pose can turn into clearly. Let it start early and show a clear end position within the existing frame. With no living subject, move an existing object in a way the source can physically support. Preserve the scene and camera throughout.",
-  },
-  {
     id: "playful",
     kind: "animate",
     enabled: true,
@@ -202,22 +193,13 @@ export const seedStyles = Object.freeze([
       "Reveal a Detail. Find a detail the opening frame has partly hidden or points toward. Identify what is obscuring it and what motion can bring it into view. Show the cue first and end with the detail readable in relation to the original subject. Use the subject's own movement or one motivated camera move. Preserve the original setting and supply only details the source supports.",
   },
   {
-    id: "focus-pull",
+    id: "two-beats",
     kind: "animate",
     enabled: true,
-    label: "Focus Pull",
-    description: "Shift focus between two visible depths in a fixed shot.",
+    label: "Two-Beat Story",
+    description: "Two linked actions that tell a tiny story and end clearly.",
     instruction:
-      "Focus Pull. Hold the camera and start with a visible detail at one distance in focus. Pull focus once to an established subject at another distance and hold their new sharpness. Preserve the scene and subject poses unless the source implies a small continuation. In a single-plane source, hold focus and let the subject draw attention with one small movement instead.",
-  },
-  {
-    id: "loop",
-    kind: "animate",
-    enabled: true,
-    label: "Seamless Loop",
-    description: "Repeat one natural motion and return to the opening frame.",
-    instruction:
-      "Seamless Loop. Choose one repeating movement the source already suggests, such as a turn of a fan or a sway of a hanging object. Hold the viewpoint and make the movement return to the opening position and direction by the last frame. Keep light, framing and every nonmoving detail steady. Avoid making time run backward to reset a one-way action.",
+      "Two-Beat Story. Read what the subject is doing and what the scene offers. Plan two linked actions where the first sets up the second, such as reaching for an object and then using it, or turning toward a sound and then stepping toward it. Give each beat its own visible moment and end on a settled pose. Draw both beats from what is in the frame. Keep the people, outfit, place and framing.",
   },
   {
     id: "uncensored",
@@ -230,16 +212,6 @@ export const seedStyles = Object.freeze([
       "Uncensored. Work with the adults already in the frame, the established setting and the intimacy the request supports. Start from the present pose, show a deliberate change in expression, contact or weight, and keep the movement continuous through the last frame. Use close framing only where it helps the action stay readable. Follow the content guidance.",
   },
   {
-    id: "closer",
-    kind: "change",
-    enabled: true,
-    label: "Closer Crop",
-    description: "Crop around the subject and preserve the existing viewpoint.",
-    instruction:
-      "Crop in from the existing viewpoint until the main subject occupies more of the frame. Keep the nearest point of contact or detail that explains the action inside the crop. Preserve the subject's identity, pose, lighting, perspective and all retained details.",
-    actions: ["edit"],
-  },
-  {
     id: "wider",
     kind: "change",
     enabled: true,
@@ -250,23 +222,53 @@ export const seedStyles = Object.freeze([
     actions: ["recreate"],
   },
   {
-    id: "warmer",
+    id: "relight",
     kind: "change",
     enabled: true,
-    label: "Warm the Light",
-    description: "Warm the established light while keeping the original scene and shadows.",
+    label: "Relight",
+    description: "Change the light, time of day, season or weather of the same scene.",
     instruction:
-      "Warm the existing light, keeping its direction, shadow softness and time of day. Specify which lit surfaces gain a gentle amber cast and leave the shadows neutral enough for the original material colors to read. Preserve the subject, pose, setting and framing.",
+      "Change the light or conditions in one clear way that suits this scene: warm golden light, soft overcast light, dramatic side light, another time of day, another season, or weather such as rain, fog or snow. Choose one that clearly differs from the current light. Describe where the new light falls and how surfaces and the sky respond. Keep the subject, identity, pose, outfit, setting and framing.",
     actions: ["edit"],
   },
   {
-    id: "night",
+    id: "expression",
     kind: "change",
     enabled: true,
-    label: "After Dark",
-    description: "Show the same place and action after dark.",
+    label: "Change Expression",
+    description: "Give the subject a different expression that fits the moment.",
     instruction:
-      "Set the same subject, location and action after dark. Light them with one source that belongs in this place and describe where that light reaches. Keep the composition, identities, wardrobe and essential props. Make the subject readable against the darker surroundings.",
+      "Give the main subject a clearly different, natural expression that suits the scene, such as a broad laugh, a soft smile, surprise, concentration, a playful smirk or calm. Choose one that differs from the current expression and describe the eyes, brows and mouth. Keep identity, face shape, pose, hands, outfit, lighting and framing. For a nonhuman subject, change a posture cue such as raised ears or a tilted head.",
+    actions: ["edit"],
+  },
+  {
+    id: "hairstyle",
+    kind: "change",
+    enabled: true,
+    label: "Change Hairstyle",
+    description: "Restyle the subject's hair while keeping their identity.",
+    instruction:
+      "Give the subject a different hairstyle that suits their look and the setting, such as an updo, loose waves, a braid, a sleek ponytail, a short cut or a new color. Choose one clearly different from the current hair. Describe its length, texture, parting and how it falls around the face and shoulders. Keep the face, identity, expression, pose, outfit, lighting and framing.",
+    actions: ["edit"],
+  },
+  {
+    id: "add-prop",
+    kind: "change",
+    enabled: true,
+    label: "Add a Prop",
+    description: "Place one fitting object in the subject's hand or the scene.",
+    instruction:
+      "Add one object that belongs in this place and moment, such as a drink, a book, flowers, a phone, an umbrella, a bag or a pet. Choose it from the setting and activity rather than a stock item. Place it in a free hand or on a nearby surface with believable contact, scale, shadow and reflections. Keep the subject, identity, pose, outfit, lighting and the rest of the frame.",
+    actions: ["edit"],
+  },
+  {
+    id: "time-season-weather",
+    kind: "change",
+    enabled: true,
+    label: "Time, Season or Weather",
+    description: "Show the same place and action at another time, season or weather.",
+    instruction:
+      "Set the same subject, location and action at a clearly different time, season or weather that fits the place: dawn, golden hour, blue hour, night, falling snow, rain, fog or autumn leaves. Choose one that differs from the source. Light it with sources that belong there and show how surfaces and the sky respond. Keep the composition, identities, wardrobe and essential props, and keep the subject readable.",
     actions: ["recreate"],
   },
   {
@@ -300,6 +302,26 @@ export const seedStyles = Object.freeze([
     actions: ["recreate"],
   },
   {
+    id: "new-pose",
+    kind: "change",
+    enabled: true,
+    label: "New Pose",
+    description: "Show the same subject in a different, natural pose in the same place.",
+    instruction:
+      "Recreate the scene with the same subject in a clearly different pose that suits the setting and their activity, such as seated instead of standing, leaning on something nearby, glancing over a shoulder, mid-stride or relaxed with their hands occupied. Describe the body position, where the weight rests and what the hands do. Keep identity, outfit, location, lighting and visual style.",
+    actions: ["recreate"],
+  },
+  {
+    id: "closer-shot",
+    kind: "change",
+    enabled: true,
+    label: "Closer Shot",
+    description: "Recompose tighter as a portrait, a detail or a close new angle.",
+    instruction:
+      "Recompose this scene as a closer shot. Choose what suits the image best: a head-and-shoulders portrait, a waist-up shot, a close detail of hands, an object or a texture, or a close view from a new angle. Describe the framing, where focus falls and what the background becomes. Keep the same subject, identity, outfit, place, lighting and visual style.",
+    actions: ["recreate"],
+  },
+  {
     id: "new-setting",
     kind: "change",
     enabled: true,
@@ -307,6 +329,16 @@ export const seedStyles = Object.freeze([
     description: "Move the original subject and action to a distinctly different place.",
     instruction:
       "Choose a different place where the same action remains plausible. Give it two distinctive spatial or material details and light it in a way that belongs there. Keep the same subject, identity, outfit and activity, along with the shot scale and visual style. Choose the location from the brief and source rather than a stock scene.",
+    actions: ["recreate"],
+  },
+  {
+    id: "new-outfit-and-place",
+    kind: "change",
+    enabled: true,
+    label: "New Outfit & Place",
+    description: "Restyle the subject in a new outfit and a location that suits it.",
+    instruction:
+      "Choose a new location and an outfit that belongs there, both different from the source, such as summer linen on a beach, a tailored coat on a city street at night or knitwear in a mountain cabin. Give the place two distinctive details and fitting light, and describe the outfit's cut, fabric and colors. Keep the subject's identity, build, expression and visual style, in a natural pose for the new place.",
     actions: ["recreate"],
   },
   {

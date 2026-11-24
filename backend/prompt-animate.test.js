@@ -76,8 +76,7 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("atmosphere"), /Lock the opening composition.*element of the surroundings/);
   assert.match(theme("dialogue"), /makes sound.*brief line.*listener's glance/);
   assert.match(theme("reaction"), /eyes, ears or head.*new expression or settled pose/);
-  assert.match(theme("focus-pull"), /in focus.*Pull focus once.*another distance/);
-  assert.match(theme("loop"), /return to the opening position and direction by the last frame/);
+  assert.match(theme("two-beats"), /two linked actions where the first sets up the second/);
   assert.match(
     theme("uncensored"),
     /already in the frame[\s\S]*Every person in it must be 18 or older/,
