@@ -168,6 +168,7 @@ import { recommendedNegative } from "./lora/prompts.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
+import { registerChatChoiceRoutes } from "./mcp/project.js";
 import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
 import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
@@ -923,6 +924,7 @@ registerCardReferenceRoutes(app, {
   queue: comparisons.queue,
 });
 registerTasteRoutes(app, { taste, adminRefusal });
+registerChatChoiceRoutes(app, { dataDir });
 const mcpRecords = mcpOwnership(runtimeDatabase(dataDir));
 // Recurring issues (domain/issues.ts) propose rules in Dream's Inbox.
 const issues = createIssues({

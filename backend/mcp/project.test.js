@@ -14,6 +14,7 @@ import {
   projectArgs,
   projectTargets,
   registerProjectTool,
+  withoutTasteExclusions,
 } from "./project.js";
 
 const dataDir = (t) => {
@@ -78,6 +79,42 @@ test("a conversation keeps its own LoRAs off, tier and count where a call leaves
   assert.deepEqual(choices.read("alice", "chat-b"), {});
   assert.deepEqual(choices.read("bob", "chat-a"), {});
   assert.deepEqual(choices.read("alice", ""), {});
+  // Taste › Chat Notes lists and clears only the account's own chats.
+  const alice = { userId: "alice" };
+  const bob = { userId: "bob" };
+  assert.deepEqual(
+    choices.list(alice).map(({ at: _at, ...shown }) => shown),
+    [{ chat: "chat-a", image: { tier: "fast" }, count: 2 }],
+  );
+  assert.deepEqual(choices.list(bob), []);
+  choices.forget(bob, "chat-a");
+  assert.equal(choices.list(alice).length, 1);
+  choices.forget(alice, "chat-a");
+  assert.deepEqual(choices.read("alice", "chat-a"), {});
+});
+
+test("Taste exclusions leave a prompt with what they name removed, unless little would remain", () => {
+  const exclusions = ["smoking", "laundry rooms"];
+  const { prompts, excluded, note } = withoutTasteExclusions(exclusions, [
+    "A man with a cigarette, on a bench at dusk",
+    "A sunlit hall with a washing machine",
+    "A smokestack over the harbour",
+  ]);
+  assert.deepEqual(prompts, [
+    "A man, on a bench at dusk",
+    "A sunlit hall",
+    "A smokestack over the harbour",
+  ]);
+  assert.deepEqual(excluded, {
+    "A man, on a bench at dusk": ["cigarette"],
+    "A sunlit hall": ["washing machine"],
+  });
+  assert.match(note, /"cigarette" from prompt 1 \(smoking\), "washing machine" from prompt 2/);
+  assert.deepEqual(withoutTasteExclusions(exclusions, ["A quiet harbour"]).note, "");
+  assert.throws(
+    () => withoutTasteExclusions(exclusions, ["A lit cigarette"]),
+    /Prompt 1 is little more than "cigarette"/,
+  );
 });
 
 test("set names persist per account and conversation while explicit names take priority", (t) => {

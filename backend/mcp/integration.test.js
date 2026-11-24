@@ -7774,7 +7774,9 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.deepEqual(seen.at(-1).body, { paused: true, dailyImages: 5 });
 
   // Taste: the profile and a LoRA's rating.
-  f.app.get("/api/taste", (_req, res) => res.json({ summary: "Moody light", signals: 3 }));
+  f.app.get("/api/taste", (_req, res) =>
+    res.json({ summary: "Moody light", likes: ["fog"], exclusions: ["clowns"], signals: 3 }),
+  );
   f.app.put(
     "/api/taste",
     record("taste", (req) => ({
@@ -7790,7 +7792,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     "/api/loras/library/ops",
     record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "liked" } } }),
   );
-  assert.equal(data(await call(mine, "taste")).summary, "Moody light");
+  assert.deepEqual(data(await call(mine, "taste")), { exclusions: ["clowns"] });
   assert.deepEqual(
     data(
       await call(mine, "taste", {
@@ -8431,7 +8433,7 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   assert.equal(f.submitted.length, 0);
 });
 
-test("MCP preserves supplied prompts and stops at explicit exclusions", async (t) => {
+test("MCP preserves supplied prompts and removes what explicit exclusions name", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const taste = {
@@ -8448,17 +8450,20 @@ test("MCP preserves supplied prompts and stops at explicit exclusions", async (t
   });
   assert.match(texts(first), /user excludes[^:]*: smoking, laundry rooms/);
   assert.equal(f.submitted.at(-1).prompt, "A coat with buttons");
-  const beforeExclusions = f.submitted.length;
+  const cleaned = await call(client, "generate", { prompts: ["A red coat with an ashtray"] });
+  assert.match(texts(cleaned), /Removed for the user's Taste exclusions: "ashtray" \(smoking\)/);
+  assert.equal(f.submitted.at(-1).prompt, "A red coat");
+  assert.deepEqual(f.submitted.at(-1).excluded, ["ashtray"]);
+  const beforeRefusals = f.submitted.length;
   for (const [prompt, expected] of [
-    ["A coat beside a washing machine", /"laundry rooms", which your Taste Profile excludes/],
-    ["A coat beside an ashtray", /"smoking", which your Taste Profile excludes/],
+    ["A washing machine", /"washing machine", which your Taste Profile excludes/],
     ["Same as above, but switch to silk", /depends on an earlier prompt or image/],
   ]) {
     const refused = await call(client, "generate", { prompts: [prompt] });
     assert.equal(refused.isError, true);
     assert.match(texts(refused), expected);
   }
-  assert.equal(f.submitted.length, beforeExclusions);
+  assert.equal(f.submitted.length, beforeRefusals);
   const reply = await call(client, "generate", { prompts: ["A woollen coat"] });
   assert.doesNotMatch(texts(reply), /The user's brief|the user's favourite/);
   assert.equal(f.submitted.at(-1).prompt, "A woollen coat");
