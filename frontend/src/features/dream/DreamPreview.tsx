@@ -14,7 +14,6 @@ import {
   type KeyboardEvent,
   type RefObject,
   Suspense,
-  lazy,
   useId,
   useLayoutEffect,
   useRef,
@@ -32,6 +31,7 @@ import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
+import { zoomImage } from "../gallery/zoomImage";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
 import type { DeckCard } from "./deck";
@@ -44,10 +44,6 @@ import { type Fly, SwipeCard } from "./SwipeCard";
 
 import viewerClasses from "../gallery/MediaViewer.module.css";
 import classes from "./DreamPage.module.css";
-
-const ZoomImage = lazy(() =>
-  import("../gallery/ZoomImage").then((module) => ({ default: module.ZoomImage })),
-);
 
 /** Why Dream made a result and the LoRAs it tried, each rated here. */
 function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?: string }) {
@@ -121,11 +117,21 @@ export function CardText({
   );
 }
 
-function PreviewImage({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
+interface FaceProps {
+  item: MediaItem;
+  swipe: SwipeGesture;
+  /** A tap or click on the media, which cycles the chrome. */
+  onTap: () => void;
+  bare: boolean;
+}
+
+function PreviewImage({ item, swipe, onTap, bare }: FaceProps) {
   const source = mediaSource(item);
+  const [ZoomImage] = useState(zoomImage);
   return (
     <div className={classes.fit}>
-      <MediaBackdrop src={source.thumbnailUrl || source.displayUrl} />
+      {/* The deck card's own picture, already loaded, so the fill is there from the first frame. */}
+      <MediaBackdrop src={source.displayUrl} />
       <Suspense fallback={<DeckMedia item={item} />}>
         <ZoomImage
           mediaId={item.id}
@@ -136,13 +142,15 @@ function PreviewImage({ item, swipe }: { item: MediaItem; swipe: SwipeGesture })
           width={source.width}
           height={source.height}
           swipe={swipe}
+          onTap={onTap}
+          hideControls={bare}
         />
       </Suspense>
     </div>
   );
 }
 
-function PreviewFace({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
+function PreviewFace({ item, swipe, onTap, bare }: FaceProps) {
   const videoSwipe = useTouchSwipe(swipe);
   const dragged = useRef(false);
   return (
@@ -159,11 +167,13 @@ function PreviewFace({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) 
         },
         onClick(event: React.MouseEvent) {
           if (dragged.current) event.stopPropagation();
+          else if (!isPreviewBackdrop(event.target as HTMLElement, event.clientX, event.clientY))
+            onTap();
         },
       })}
     >
       {item.type === "image" ? (
-        <PreviewImage item={item} swipe={swipe} />
+        <PreviewImage item={item} swipe={swipe} onTap={onTap} bare={bare} />
       ) : (
         <DeckMedia key={item.id} item={item} playing />
       )}
@@ -236,7 +246,15 @@ export function DreamPreview({
   const closeIfTop = closeWhenTop(id, close);
   const phone = usePhone();
   const [details, setDetails] = useState(false);
+  // Taps cycle the chrome, then the chrome with the card's text, then the media alone.
+  const [chrome, setChrome] = useState<"standard" | "text" | "bare">("standard");
+  const bare = chrome === "bare";
   const stage = useRef<HTMLDivElement>(null);
+  const cycleChrome = () => {
+    // Hiding the chrome removes any focused control in it; the stage keeps the shortcuts working.
+    if (chrome === "text") stage.current?.focus({ preventScroll: true });
+    setChrome(chrome === "standard" ? "text" : chrome === "text" ? "bare" : "standard");
+  };
   const [playbackRoot, setPlaybackRoot] = useState<HTMLDivElement | null>(null);
   const stageRef = useMergedRef(stage, setPlaybackRoot);
   const items = card.kind === "pair" || card.kind === "set" ? card.items : undefined;
@@ -272,6 +290,7 @@ export function DreamPreview({
     )
       return;
     if (event.key === "u" || event.key === "z") return undo();
+    if (event.key === "c") return cycleChrome();
     const direction = previewKeys[event.key];
     if (!direction) return;
     event.preventDefault();
@@ -299,6 +318,7 @@ export function DreamPreview({
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
           <div
             ref={stageRef}
+            tabIndex={-1}
             className={`${classes.previewStage} ${viewerClasses.viewerStage}`}
             onClick={(event) => {
               if (
@@ -321,16 +341,30 @@ export function DreamPreview({
                         : undefined
                   }
                 >
-                  <PreviewFace item={item} swipe={strip.gesture} />
+                  <PreviewFace item={item} swipe={strip.gesture} onTap={cycleChrome} bare={bare} />
                 </section>
                 <Neighbour item={next} side="next" />
               </div>
             </SwipeCard>
+            {chrome === "text" && (
+              <CardText
+                item={item}
+                dreamt={card.kind !== "library"}
+                title={
+                  card.kind === "set"
+                    ? card.title
+                    : card.kind === "pair"
+                      ? card.question
+                      : undefined
+                }
+              />
+            )}
             {play && <VideoPlayButton play={play} />}
           </div>
           <ViewerChrome
             item={item}
             actions={sound}
+            hidden={bare}
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
             closeLabel="Close Preview"
@@ -338,6 +372,7 @@ export function DreamPreview({
           />
           <div
             className={classes.previewButtons}
+            hidden={bare}
             data-actions-hidden={(phone && details) || undefined}
             inert={phone && details}
           >

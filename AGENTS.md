@@ -284,8 +284,9 @@ recur across features.
   Desktop controls float on the viewer backdrop, and phone controls use a
   separate bottom dock. A touch tap cycles through actions, actions with
   thumbnails and media alone. Hiding the chrome gives its space back to
-  the media. Swipe up opens Details. Dream fullscreen keeps its verdicts
-  and opens Details on swipe up. Both viewers fit media between the header
+  the media. Swipe up opens Details. In Dream fullscreen a tap or C cycles
+  through its chrome, the chrome with the card's text over a scrim, and
+  media alone; swipe up opens Details. Both viewers fit media between the header
   and bottom controls by default.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping

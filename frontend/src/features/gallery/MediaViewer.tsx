@@ -46,18 +46,12 @@ import { VideoPlayButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
+import { zoomImage } from "./zoomImage";
 
 import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
   import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
 );
-// The image chunk loads once the page is idle; a viewer opened after that renders it directly
-// instead of flashing the Suspense fallback.
-let zoomImage: typeof import("./ZoomImage").ZoomImage | undefined;
-const loadZoomImage = () =>
-  import("./ZoomImage").then((module) => ({ default: (zoomImage = module.ZoomImage) }));
-const LazyZoomImage = lazy(loadZoomImage);
-(window.requestIdleCallback || setTimeout)(() => void loadZoomImage());
 
 // Versions don't depend on progress, so the viewer skips the queue's progress polls; the strips
 // read progress themselves.
@@ -352,7 +346,7 @@ export function MediaViewer({
     }
     shownId.current = item.id;
   }, [item.id]);
-  const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
+  const [ZoomImage] = useState(zoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join their source's strip.
