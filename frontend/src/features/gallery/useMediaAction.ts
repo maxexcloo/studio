@@ -2,7 +2,6 @@ import { notifications } from "@mantine/notifications";
 import {
   type QueryClient,
   queryOptions,
-  useIsMutating,
   useMutation,
   useQuery,
   useQueryClient,
@@ -36,8 +35,7 @@ import {
 } from "../generation/payload";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
-import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
-import { animationInput, retainedAnimationProfile } from "./animateLength";
+import { type VideoSide, animationInput, retainedAnimationProfile } from "./animateLength";
 import { automaticEditProfile, enabledLoras } from "./editProfile";
 import { useItemMutation } from "./useItemMutation";
 
@@ -79,21 +77,23 @@ export const animateProfileQuery = (
     staleTime: 5000,
   });
 
+/** Where videos run: the side of Studio's default video model (Settings › Where Work Runs). */
+function useVideosSide(): VideoSide | undefined {
+  const models = useQuery(modelsQuery).data;
+  const profile = models?.profiles.find((entry) => entry.id === models.defaults?.videoModel);
+  return profile && (isCloudProfile(profile) ? "cloud" : "local");
+}
+
 /** The same per-account Length setting in every Animate menu. */
 export function useAnimateLengthSetting(item?: MediaItem, profileId?: string): Action {
   const [seconds, setSeconds] = useAnimateLength();
-  const [videos] = useVideosPreference();
-  const switching =
-    useIsMutating({
-      predicate: (mutation) =>
-        (mutation.state.variables as { videos?: SidePreference } | undefined)?.videos !== undefined,
-    }) > 0;
+  const videos = useVideosSide();
   const models = useQuery(modelsQuery);
   const retained =
     item && !profileId && retainedAnimationProfile(models.data?.profiles || [], item, videos);
   const choice = useQuery({
     ...animateProfileQuery(item || {}, profileId),
-    enabled: Boolean(item && !retained && !switching),
+    enabled: Boolean(item && !retained),
   });
   const listed =
     retained || models.data?.profiles.find((profile) => isProfile(profile, choice.data?.profileId));
@@ -110,9 +110,8 @@ export function useAnimateLengthSetting(item?: MediaItem, profileId?: string): A
   return {
     id: "animate-length",
     label: "Length",
-    loading: switching || models.isPending || (!retained && choice.isLoading),
-    disabled:
-      switching || !item || !options || options.data.length < 2 || (!retained && choice.isLoading),
+    loading: models.isPending || (!retained && choice.isLoading),
+    disabled: !item || !options || options.data.length < 2 || (!retained && choice.isLoading),
     choice: {
       value: options?.value || "fixed",
       options: options?.data || [{ value: "fixed", label: "Fixed Length" }],
@@ -126,7 +125,7 @@ export async function mediaDraft(
   item: MediaItem,
   operation: Operation,
   client: QueryClient,
-  videos?: SidePreference,
+  videos?: VideoSide,
   seconds?: number | null,
   profileId?: string,
   editBackend?: string,
@@ -343,7 +342,7 @@ export async function mediaDraft(
 export function useMediaAction(item: MediaItem, prepared?: () => void) {
   const { setDraft } = useGenerationActions();
   const client = useQueryClient();
-  const [videos] = useVideosPreference();
+  const videos = useVideosSide();
   const [seconds] = useAnimateLength();
   const openComposer = useOpenComposer();
   return useItemMutation(item.id, "prepare", {
@@ -427,7 +426,7 @@ export function useMediaIteration(item: MediaItem) {
 /** `useMediaIteration`'s run for any item, so a selection can iterate each of its items. */
 export function useIterate() {
   const client = useQueryClient();
-  const [videos] = useVideosPreference();
+  const videos = useVideosSide();
   const [seconds] = useAnimateLength();
   return async (item: MediaItem, iteration: Iteration) => {
     const animate = iteration.kind === "animate";
@@ -521,7 +520,7 @@ interface AnimateReview extends WrittenPrompt {
  */
 export function useAnimateWriter(item: MediaItem) {
   const client = useQueryClient();
-  const [videos] = useVideosPreference();
+  const videos = useVideosSide();
   const [seconds] = useAnimateLength();
   return useMutation({
     // Its failure shows in the dialog.

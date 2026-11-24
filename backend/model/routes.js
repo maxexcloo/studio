@@ -1,25 +1,16 @@
-import { ownerIdForRequest } from "../account-ownership.js";
-import { accountPreferences, kindDefaults } from "../account-preferences.js";
 import { animateProfile } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { step } from "../event-loop.js";
+import { defaultSides } from "../work-defaults.js";
 import { familyLabels, modelsForAccount, withFailing, withPreferredDefaults } from "./catalogue.js";
 
 /** The catalogue for the browser (/api/models) and Animate's model choice. `catalogue` is model/catalogue.js. */
 export function registerModelRoutes(app, { catalogue }) {
   directRoute(app, "GET", "/api/models", async (account, { query }) => {
     const req = { studioAccount: account };
-    // The account's catalogue, its defaults on the side its Images and Videos preferences choose.
-    // MCP (preferences=0) picks its own models but starts images at the account's size and count, as the composer does.
-    const forAccount = (models) => {
-      const preferences = accountPreferences(ownerIdForRequest(req));
-      const { imageAspect, imageCount, imageResolution } = preferences;
-      return withPreferredDefaults(
-        modelsForAccount(models, req),
-        query.preferences === "0" ? { imageAspect, imageCount, imageResolution } : preferences,
-      );
-    };
+    // The account's catalogue, with Studio's defaults (Settings › Where Work Runs).
+    const forAccount = (models) => withPreferredDefaults(modelsForAccount(models, req));
     try {
       // MCP submissions reuse backend metadata; the studio's rescan stays fresh.
       const { models } = await step("models: workers", () =>
@@ -51,18 +42,18 @@ export function registerModelRoutes(app, { catalogue }) {
 
   // Every Animate surface asks this before queuing or staging, so it shows the model that will run:
   // Animate's profile for the account (animate-profile.js), from its catalogue, whether a local video
-  // worker answered, where it prefers videos to run and its default video model on each side.
+  // worker answered, and the side Studio's default video model runs on.
   app.get("/api/animate/profile", async (req, res) => {
     try {
-      const videos = kindDefaults(accountPreferences(ownerIdForRequest(req)), "videos");
       const models = modelsForAccount(await catalogue.catalogueModels(), req);
+      const videos = defaultSides(models.profiles).video;
       const { profile, cloud, size, offers, note } = animateProfile(models.profiles || [], {
         defaultId: models.defaults?.videoModel,
         profileId: typeof req.query.profileId === "string" ? req.query.profileId : undefined,
         preferRadiance: true,
         localRunning: models.backends?.video?.available !== false,
         localParked: models.backends?.video?.parked === true,
-        prefer: videos.side,
+        prefer: videos.cloud ? "cloud" : "local",
         preferred: videos,
         width: Number(req.query.width),
         height: Number(req.query.height),

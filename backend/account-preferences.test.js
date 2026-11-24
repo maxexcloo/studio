@@ -27,19 +27,3 @@ test("Saved gallery views follow the account and refuse malformed views", () => 
   ])
     assert.throws(() => saveAccountPreferences("alice", { galleryViews }), /gallery views/);
 });
-
-test("Video sizing defaults follow the account and can be cleared", () => {
-  saveAccountPreferences("alice", { videoAspect: "9:16", videoResolution: "1080p" });
-  reloadAccountPreferences();
-  assert.equal(accountPreferences("alice").videoAspect, "9:16");
-  assert.equal(accountPreferences("alice").videoResolution, "1080p");
-  assert.equal(accountPreferences("bob").videoResolution, undefined);
-  assert.throws(() => saveAccountPreferences("alice", { videoAspect: "12:7" }), /videoAspect/);
-  assert.throws(
-    () => saveAccountPreferences("alice", { videoResolution: "4K" }),
-    /videoResolution/,
-  );
-  saveAccountPreferences("alice", { videoAspect: null, videoResolution: null });
-  assert.equal(accountPreferences("alice").videoAspect, undefined);
-  assert.equal(accountPreferences("alice").videoResolution, undefined);
-});

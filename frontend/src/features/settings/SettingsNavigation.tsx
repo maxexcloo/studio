@@ -34,12 +34,6 @@ const settingSections = {
     icon: icons.taste,
     group: "Personal",
   },
-  "where-work-runs": {
-    label: "Where Work Runs",
-    description: "Choose where your work runs and the models and image sizes it starts with.",
-    icon: icons.routing,
-    group: "Personal",
-  },
   "dream-policy": {
     label: "Dream",
     description: "Choose which Dream settings accounts can change and when Dream can start jobs.",
@@ -56,7 +50,7 @@ const settingSections = {
   },
   studio: {
     label: "Studio",
-    description: "Set Studio-wide defaults, the AI work Studio does on its own, and failed items.",
+    description: "Choose the AI work Studio does on its own, and clear failed items.",
     icon: icons.studio,
     admin: true,
     group: "Administration",
@@ -65,6 +59,13 @@ const settingSections = {
     label: "Users",
     description: "Manage accounts and linked chat identities.",
     icon: icons.users,
+    admin: true,
+    group: "Administration",
+  },
+  "where-work-runs": {
+    label: "Where Work Runs",
+    description: "Choose each kind's default model and how new work starts, for everyone.",
+    icon: icons.routing,
     admin: true,
     group: "Administration",
   },

@@ -463,10 +463,7 @@ test("Clear Failed Set removes the collapsed set from the queue and keeps failed
   expect(state.gallery).toContainEqual(tile);
 });
 
-for (const [role, link, section] of [
-  ["administrator", "Open Workers", "workers"],
-  ["user", "Open Where Work Runs", "where-work-runs"],
-] as const) {
+for (const [role, link, section] of [["administrator", "Open Workers", "workers"]] as const) {
   test(`a ${role} opens their work settings from the queue summary`, async ({ page }) => {
     await fixtures(page);
     await signIn(page, { id: role, role });

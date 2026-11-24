@@ -41,6 +41,14 @@ test("the migrations route answers administrators with every step's plan, and lo
     },
     tasteSimplify: { applied, accounts: [], conflicts: [] },
     projectsSimplify: { applied, projects: [], proposals: [], conflicts: [] },
+    whereWorkRunsServerWide: {
+      applied,
+      settings: {},
+      accounts: [],
+      dreams: [],
+      retiredOverrides: [],
+      conflicts: [],
+    },
   });
   assert.deepEqual(await post({}), {
     code: 200,
@@ -51,7 +59,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: cloudModelsPreference: 0 nothing to do; uncensoredNames: 0 nothing to do; tasteSimplify: 0 nothing to do; projectsSimplify: 0 nothing to do",
-    "[migrations] Apply: cloudModelsPreference: 0 nothing to do; uncensoredNames: 0 nothing to do; tasteSimplify: 0 nothing to do; projectsSimplify: 0 nothing to do",
+    "[migrations] Dry run: cloudModelsPreference: 0 nothing to do; uncensoredNames: 0 nothing to do; tasteSimplify: 0 nothing to do; projectsSimplify: 0 nothing to do; whereWorkRunsServerWide: 0 nothing to do",
+    "[migrations] Apply: cloudModelsPreference: 0 nothing to do; uncensoredNames: 0 nothing to do; tasteSimplify: 0 nothing to do; projectsSimplify: 0 nothing to do; whereWorkRunsServerWide: 0 nothing to do",
   ]);
 });

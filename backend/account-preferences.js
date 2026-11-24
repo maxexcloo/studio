@@ -1,13 +1,5 @@
 import { appearanceChoices } from "../shared/appearance.ts";
 import { gallerySortLabels } from "../shared/gallery-sort.ts";
-import { defaultModelKeys } from "../shared/profiles.ts";
-import {
-  grokVideoAspects,
-  imageAspects,
-  maxImageCount,
-  resolutions,
-  videoResolutions,
-} from "../shared/resolution.ts";
 import { maxTasteGuidance, tasteAreas } from "../shared/taste.ts";
 import { dataDir } from "./data-dir.js";
 import {
@@ -20,13 +12,8 @@ import {
  * Each account's own preferences, the `preferences:<account id>` document in studio.sqlite
  * (`preferences:` in single-user mode). LoRAs and Uncensored Models only narrow what the
  * account's group grants (account-policy.js); they start on wherever the group grants them. Uncensored Models also lets prompt writing word what it offers explicitly.
- * `images`, `videos` and `text` say where each kind runs by default, Cloud or Local (`sideOf`), and
- * `<kind>Cloud` and `<kind>Local` its default model on each side: an image or video profile ID, or
- * a gateway text model. Unsaved, a default is the deployment's (model/catalogue.js,
- * animate-profile.js, assistant.js). A side that can't run gives way to the other, saying so; a
- * model the person picks always wins. `imageAspect`, `imageCount` and `imageResolution` start new
- * image drafts and MCP runs that name none (model/catalogue.js). Video draft sizes use
- * `videoAspect` and `videoResolution`. `galleryWork` is which unfinished
+ * Where work runs and how new work starts are Studio's, not an account's (work-defaults.js).
+ * `galleryWork` is which unfinished
  * work the gallery shows: none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts). `galleryViews` are the gallery's saved views, each a name with
  * the search, filters and sort it restores (frontend gallery/savedViews.ts). `tasteAreas` says, per
@@ -41,23 +28,10 @@ const preferenceDefaults = Object.freeze({
 /** Preferences that take one of a few values rather than on or off; they have no default. */
 const preferenceChoices = Object.freeze({
   galleryWork: ["none", "running", "queued"],
-  images: ["cloud", "local"],
-  text: ["cloud", "local"],
-  videos: ["cloud", "local"],
 });
-const sizeChoices = Object.freeze({
-  imageAspect: imageAspects,
-  imageResolution: resolutions,
-  videoAspect: grokVideoAspects,
-  videoResolution: videoResolutions,
-});
-const modelKeys = new Set(Object.values(defaultModelKeys).flatMap((sides) => Object.values(sides)));
 const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
-  Object.hasOwn(sizeChoices, key) ||
-  key === "imageCount" ||
-  modelKeys.has(key) ||
   key === "appearance" ||
   key === "galleryViews" ||
   key === "tasteAreas";
@@ -96,25 +70,6 @@ export function accountPreferences(ownerId = "") {
   return { ...preferenceDefaults, ...saved(ownerId) };
 }
 
-export const defaultTextProfileKey = "STUDIO_DEFAULT_TEXT_PROFILE";
-export const defaultTextSide = (environment = process.env) =>
-  environment[defaultTextProfileKey]?.startsWith("local/") ? "local" : "cloud";
-
-/** Where a kind runs if an account has not chosen a side. */
-function sideOf(preferences, kind) {
-  return preferences[kind] || (kind === "text" ? defaultTextSide() : "local");
-}
-
-/** A kind's chosen side and the default model saved for each side, if any. */
-export function kindDefaults(preferences, kind) {
-  const keys = defaultModelKeys[kind];
-  return {
-    side: sideOf(preferences, kind),
-    cloud: preferences[keys.cloud],
-    local: preferences[keys.local],
-  };
-}
-
 /** Which preferences the account has saved, so a value carried over from a device never replaces one. */
 export const savedPreferenceKeys = (ownerId = "") => Object.keys(saved(ownerId));
 
@@ -122,16 +77,6 @@ export function saveAccountPreferences(ownerId, patch) {
   const entries = Object.entries(patch || {});
   if (!entries.length) throw new Error("Choose a preference to change.");
   for (const [key, value] of entries) {
-    if (Object.hasOwn(sizeChoices, key)) {
-      if (value !== null && !sizeChoices[key].includes(value))
-        throw new Error(`Set ${key} to ${sizeChoices[key].join(", ")}.`);
-      continue;
-    }
-    if (key === "imageCount") {
-      if (value !== null && !(Number.isInteger(value) && value >= 1 && value <= maxImageCount))
-        throw new Error(`Set imageCount to a whole number from 1 to ${maxImageCount}.`);
-      continue;
-    }
     const choices = preferenceChoices[key];
     if (choices) {
       if (!choices.includes(value)) throw new Error(`Set ${key} to ${choices.join(", ")}.`);
@@ -179,15 +124,10 @@ export function saveAccountPreferences(ownerId, patch) {
         );
       continue;
     }
-    if (modelKeys.has(key)) {
-      if (value !== null && (typeof value !== "string" || !value.trim() || value.length > 200))
-        throw new Error(`Choose a model for ${key}.`);
-      continue;
-    }
     if (!known(key)) throw new Error(`Unknown preference ${key}.`);
     if (typeof value !== "boolean") throw new Error(`Set ${key} to true or false.`);
   }
-  // Setting a generation preference to null restores its default.
+  // Setting a preference to null restores its default.
   const next = Object.fromEntries(
     Object.entries({ ...saved(ownerId), ...patch }).filter(([, value]) => value !== null),
   );

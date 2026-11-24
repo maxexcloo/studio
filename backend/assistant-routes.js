@@ -3,9 +3,7 @@ import sharp from "sharp";
 import { cardKinds } from "../shared/characters.ts";
 import { runBackend } from "../shared/profiles.ts";
 import { maxProjectBrief, projectBriefTextFields } from "../shared/projects.ts";
-import { ownerIdForRequest } from "./account-ownership.js";
 import { mayUseFeature, promptWriter } from "./account-policy.js";
-import { accountPreferences, defaultTextSide } from "./account-preferences.js";
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
  * access-profile feature, works only with profiles the account may use, and an uncensored style needs Uncensored Models.
@@ -29,6 +27,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { projectPatch } from "./domain/projects.ts";
 import { tasteLines } from "./domain/taste.ts";
 import { americanEnglish, contentRule } from "./domain/writing-standard.ts";
+import { defaultTextSide } from "./generation-defaults.js";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { promptInstruction } from "./prompt-instructions.js";
 import { promptStyleStore } from "./prompt-styles.js";
@@ -184,8 +183,7 @@ export function registerAssistantRoutes(
   };
   const refuse = (status, error) => ({ refusal: { status, payload: { ok: false, error } } });
   /** The account's prompt writer (account-policy.js `promptWriter`). */
-  const writerOf = (account) =>
-    promptWriter(account, accountPreferences(ownerIdForRequest({ studioAccount: account })));
+  const writerOf = (account) => promptWriter(account);
   /** The engine and the account's profile, or `refusal`: the answer explaining why not. */
   const ready = async (account, body) => {
     if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff);

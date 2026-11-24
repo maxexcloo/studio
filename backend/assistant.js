@@ -13,25 +13,6 @@ import {
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { maxSuggestions } from "../shared/suggestions.ts";
 import { replyTitle, titleRule } from "../shared/titles.ts";
-/**
- * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
- * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage
- * (prompt-stage.js) and the MCP assistant and admin tools, so they cannot drift apart.
- *
- * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
- * (`model()`) where the account runs text (its Text preference and that side's default model):
- * Local is available while a workload serves text. Studio's default profile applies on its side,
- * behind account choices, with the running local model and STUDIO_ASSISTANT_CLOUD_MODEL as
- * fallbacks. A local text call makes a shared GPU worker swap out its current image model.
- * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
- * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
- * Settings are read on every call, so a model picked in Settings applies at once.
- *
- * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
- * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
- * or the LoRA pre-filter.
- */
-import { defaultTextProfileKey, defaultTextSide } from "./account-preferences.js";
 import { familyUpsampler, maxInstructionCharacters } from "./assistant-presets.js";
 import { logger } from "./crash-log.js";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
@@ -54,6 +35,25 @@ import {
   suggestionChoices,
   writerGuide,
 } from "./domain/writing-standard.ts";
+/**
+ * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
+ * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage
+ * (prompt-stage.js) and the MCP assistant and admin tools, so they cannot drift apart.
+ *
+ * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
+ * (`model()`) where the account runs text (its Text preference and that side's default model):
+ * Local is available while a workload serves text. Studio's default profile applies on its side,
+ * behind account choices, with the running local model and STUDIO_ASSISTANT_CLOUD_MODEL as
+ * fallbacks. A local text call makes a shared GPU worker swap out its current image model.
+ * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
+ * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
+ * Settings are read on every call, so a model picked in Settings applies at once.
+ *
+ * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
+ * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
+ * or the LoRA pre-filter.
+ */
+import { defaultTextProfileKey, defaultTextSide } from "./generation-defaults.js";
 import { cleanTriggers } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
@@ -615,17 +615,14 @@ export function createAssistant(
     return resolved;
   };
 
-  /** A personal choice wins, then Studio's profile if it serves the chosen side and is allowed. */
+  /** Studio's default text profile where its side runs and it is allowed, else that side's own. */
   async function modelFor(task, explicit = false, writer) {
     const side = defaultTextSide(environment);
-    const local = (writer?.side ?? side) === "local" && (await localText());
-    const chosen = local ? writer?.local : writer?.cloud;
+    const local = side === "local" && (await localText());
     const configured = environment[defaultTextProfileKey];
     if (writer?.censoredOnly) {
       const candidates =
-        writer.side === "local"
-          ? local && [chosen, side === "local" && configured, local.model]
-          : [chosen, side === "cloud" && configured, settings().cloud];
+        side === "local" ? local && [configured, local.model] : [configured, settings().cloud];
       // The gateway's local/auto alias is itself uncensored.
       const allowed =
         candidates &&
@@ -636,7 +633,6 @@ export function createAssistant(
         });
       return allowed;
     }
-    if (chosen && (writer.uncensored || !uncensoredText(chosen))) return chosen;
     const fallback =
       configured &&
       side === (local ? "local" : "cloud") &&

@@ -16,6 +16,17 @@ interface Source {
 }
 export type Setting = Source & { key: string; configured: string; effective: string };
 export type Flag = Source & { key: string; label: string; description: string; value: boolean };
+/** Settings › Where Work Runs' values (backend/work-defaults.js); null leaves a profile's own. */
+export interface WorkValues {
+  imageAspect: string | null;
+  imageCount: number | null;
+  imageResolution: string | null;
+  videoAspect: string | null;
+  videoResolution: string | null;
+  videoSeconds: number | null;
+  dreamImageBackend: "local" | "cloud";
+  dreamVideoBackend: "local" | "cloud";
+}
 export interface Deployment {
   defaults: {
     image: Setting;
@@ -30,6 +41,7 @@ export interface Deployment {
   } & {
     [K in DreamLimit as `${K}Limit`]: Source & { key: string; value: number; bound: number };
   } & { unseenOff: Source & { key: string; value: boolean } };
+  work: { [K in keyof WorkValues]: Source & { key: string; value: WorkValues[K] } };
 }
 /** Values an administrator saves for everyone from Settings. */
 export const deploymentQuery = queryOptions({
@@ -43,6 +55,13 @@ type Change = { key: string; value: string | boolean | number | null };
 const applied = (data: Deployment, { key, value }: Change): Deployment => {
   const setting = (entry: Setting) =>
     entry.key === key ? { ...entry, configured: String(value), source: "studio" as const } : entry;
+  const entries = <T extends object>(group: T) =>
+    Object.fromEntries(
+      Object.entries(group).map(([name, entry]) => [
+        name,
+        entry.key === key ? { ...entry, value, source: "studio" } : entry,
+      ]),
+    ) as T;
   return {
     ...data,
     defaults: {
@@ -51,12 +70,8 @@ const applied = (data: Deployment, { key, value }: Change): Deployment => {
       video: setting(data.defaults.video),
       text: setting(data.defaults.text),
     },
-    dream: Object.fromEntries(
-      Object.entries(data.dream).map(([name, entry]) => [
-        name,
-        entry.key === key ? { ...entry, value, source: "studio" } : entry,
-      ]),
-    ) as Deployment["dream"],
+    dream: entries(data.dream),
+    work: entries(data.work),
     catalogue: data.catalogue.map((flag) =>
       flag.key === key ? { ...flag, value: Boolean(value), source: "studio" } : flag,
     ),
@@ -78,6 +93,7 @@ export function useDeploymentSetting() {
     onSettled: () => {
       void client.invalidateQueries({ queryKey: deploymentQuery.queryKey });
       void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
+      void client.invalidateQueries({ queryKey: ["animate-profile"] });
       void client.invalidateQueries({ queryKey: assistantQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["dream"] });
     },

@@ -329,9 +329,12 @@ recur across features.
 
 - Switching modes preserves unsent prompts, references and settings. Use
   `useRemembered` for settled UI state per account, including every setting in
-  an action menu, shared by every surface showing that menu; a setting Settings
-  also shows is an account preference instead. Do not persist open popups,
-  selection or search queries.
+  an action menu, shared by every surface showing that menu. Settings hold
+  how Studio runs for everyone under Administration (Where Work Runs starts new
+  work; a menu's remembered choice still wins for its person), and under
+  Personal only what is about the person (account, taste, their own Dream and
+  preferences), never a per-account copy of a Studio-wide setting. Do not
+  persist open popups, selection or search queries.
 - Keep credentials and private account records out of browser storage and
   query caches. A generated password shows once, in the view that issued it;
   an MCP token shows only to its own account, hidden until Show.

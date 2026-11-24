@@ -184,8 +184,6 @@ async function fixture(
   let defaults = { image: imageProfile.id, video: videoProfile.id };
   let visibleTo = null;
   let backends;
-  // The account's Images and Videos preferences, as Settings › Preferences saves them.
-  let preferences = {};
   app.use("/api", (req, _res, next) => {
     requests.push({
       path: req.path,
@@ -456,21 +454,18 @@ async function fixture(
   });
   // Registered after MCP, as in the studio, so a rescan reaches MCP's cache invalidation.
   // The studio limits each account's catalogue to its access profile and puts its defaults on the
-  // side its preferences choose, Local unless saved otherwise (model/catalogue.js).
+  // side Studio's default model runs on (model/catalogue.js).
   app.get("/api/models", (req, res) =>
     res.json(
-      withPreferredDefaults(
-        {
-          profiles: visibleTo
-            ? profiles.filter((profile) =>
-                visibleTo(req.headers["x-ai-user-id"] || req.headers.authorization, profile),
-              )
-            : profiles,
-          defaults: { imageModel: defaults.image, videoModel: defaults.video },
-          ...(backends ? { backends } : {}),
-        },
-        req.query.preferences === "0" ? {} : preferences,
-      ),
+      withPreferredDefaults({
+        profiles: visibleTo
+          ? profiles.filter((profile) =>
+              visibleTo(req.headers["x-ai-user-id"] || req.headers.authorization, profile),
+            )
+          : profiles,
+        defaults: { imageModel: defaults.image, videoModel: defaults.video },
+        ...(backends ? { backends } : {}),
+      }),
     ),
   );
   const server = app.listen(0, "127.0.0.1");
@@ -523,13 +518,9 @@ async function fixture(
     },
     // A model change reaches the studio as a rescan, which refreshes MCP's cached catalogues.
     // `videoAvailable` is the studio's report of whether its local video worker answered.
-    profiles: async (
-      value,
-      { defaults: chosen, visibleTo: filter, videoAvailable, preferences: saved } = {},
-    ) => {
+    profiles: async (value, { defaults: chosen, visibleTo: filter, videoAvailable } = {}) => {
       profiles = value;
       if (chosen) defaults = chosen;
-      if (saved) preferences = saved;
       if (filter) visibleTo = filter;
       if (videoAvailable !== undefined)
         backends = { video: { configured: true, available: videoAvailable } };
@@ -5015,11 +5006,11 @@ test("while local workers are Offline or Stopped, generate runs in the cloud whe
       : { ...profile, availability: profile.kind === "image" ? "parked" : "offline" },
   );
   await f.profiles(waiting, {
-    defaults: { image: imageProfile.id, video: "cloud-video" },
+    defaults: { image: imageProfile.id, video: videoProfile.id },
     videoAvailable: false,
   });
   const client = await f.client();
-  // The account's default gives way to the cloud, and the reply says so.
+  // Studio's local default gives way to the cloud, and the reply says so.
   const video = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
   assert.equal(data(video).status, "queued");
   assert.equal(data(video).profile.remote, true);
@@ -5242,7 +5233,7 @@ test("video stays local while the worker is up, and a plain request never reache
     videoAvailable: true,
   });
   const full = await f.client("", Object.keys(tokens)[1]);
-  // A cloud default still never wins a plain request while the worker is up.
+  // Studio's default video model decides where a plain request runs: a cloud default runs there.
   await f.profiles(videoCatalogue(), {
     defaults: { image: imageProfile.id, video: "cloud-video" },
     visibleTo,
@@ -5250,15 +5241,16 @@ test("video stays local while the worker is up, and a plain request never reache
   });
   assert.equal(
     data(await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 })).profile.id,
-    videoProfile.id,
+    "cloud-video",
   );
-  // Browser video preferences do not send a plain MCP request to the cloud.
-  await f.profiles(videoCatalogue(), { preferences: { videos: "cloud" } });
+  // A local default keeps a plain request local while its worker is up.
+  await f.profiles(videoCatalogue(), {
+    defaults: { image: imageProfile.id, video: videoProfile.id },
+  });
   const preferred = await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
   assert.equal(data(preferred).profile.remote, undefined);
   assert.doesNotMatch(texts(preferred), /No local/);
   f.submitted.pop();
-  await f.profiles(videoCatalogue(), { preferences: {} });
   const localResult = await call(full, "generate", {
     kind: "video",
     tier: "quality",
@@ -5301,7 +5293,7 @@ test("video stays local while the worker is up, and a plain request never reache
   assert.match(texts(nowhere), /Local video isn't running and cloud video isn't available/);
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
-    [videoProfile.id, videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],
+    ["cloud-video", videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],
   );
 });
 

@@ -517,7 +517,7 @@ export class McpMedia {
     // Concurrent submissions share discovery; do not queue repeated catalogue scans.
     if (stale && !this.profileRequests.has(owner)) {
       const generation = this.profileGeneration || 0;
-      const pending = this.request("GET", "/api/models?cached=1&preferences=0", undefined, owner)
+      const pending = this.request("GET", "/api/models?cached=1", undefined, owner)
         .then((result) => {
           // A scan that overlapped a model-list change is used once but not cached.
           if ((this.profileGeneration || 0) === generation) {

@@ -134,9 +134,9 @@ export function resolutionSize(
 }
 
 export const imageAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"] as const;
-/** Most images one composer run makes, and so the most an account's Default Count may be. */
+/** Most images one composer run makes, and so the most Studio's Default Count may be. */
 export const maxImageCount = 8;
-/** The account's starting values for new image drafts (backend/account-preferences.js). */
+/** Studio's starting values for new image drafts and chat runs (backend/work-defaults.js). */
 export type ImagePreference = {
   imageAspect?: (typeof imageAspects)[number] | null;
   imageCount?: number | null;
@@ -147,9 +147,11 @@ export const videoResolutions = ["480p", "720p", "1080p"] as const;
 export const grokVideoDefaultResolution = videoResolutions[1];
 export const grokPinnedResolutions: string[] = [videoResolutions[0], grokVideoDefaultResolution];
 
+/** Studio's starting values for new video drafts; `videoSeconds` is the length, unset for Auto. */
 export type VideoPreference = {
   videoAspect?: (typeof grokVideoAspects)[number] | null;
   videoResolution?: (typeof videoResolutions)[number] | null;
+  videoSeconds?: number | null;
 };
 export type VideoSizeLimits = {
   maxPixels: number;

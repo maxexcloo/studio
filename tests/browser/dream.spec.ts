@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string | RegExp) {
@@ -732,7 +732,7 @@ test("Dream settings an administrator forces stay locked for the account", async
   await serveDream(page, {
     enabled: false,
     uncensoredAvailable: true,
-    locked: ["enabled", "imageBackend"],
+    locked: ["enabled"],
   });
   await page.goto("/dream");
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
@@ -742,12 +742,6 @@ test("Dream settings an administrator forces stay locked for the account", async
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
   await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
   await expect(settings.getByRole("switch", { name: "Uncensored", exact: true })).toBeEnabled();
-  await section(page, "Settings", "Where Work Runs");
-  await expect(
-    page
-      .getByRole("radiogroup", { name: "Dream Images", exact: true })
-      .getByRole("radio", { name: "Cloud", exact: true }),
-  ).toBeDisabled();
 });
 
 test("An empty disabled video deck counts no held results, then counts verdicts and Undo", async ({

@@ -154,17 +154,22 @@ export function StatusAction() {
   );
   const admin = useIsAdmin();
   const location = useLocation();
-  const status = (
+  // Administrators manage the workers behind it; others only read it.
+  const status = admin ? (
     <UnstyledButton
       component={Link}
-      to={admin ? "/settings#workers" : "/settings#where-work-runs"}
+      to="/settings#workers"
       state={{ backgroundLocation: location }}
-      aria-label={admin ? "Open Workers" : "Open Where Work Runs"}
+      aria-label="Open Workers"
       className={classes.summary}
       onClick={close}
     >
       <ServiceHealthSummary />
     </UnstyledButton>
+  ) : (
+    <div className={classes.summary}>
+      <ServiceHealthSummary />
+    </div>
   );
   if (!phone)
     return (

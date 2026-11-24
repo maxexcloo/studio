@@ -1,9 +1,14 @@
 import { profileImageSize } from "../shared/resolution.ts";
 
+/** Each kind's default model for everyone; its side is where that kind runs (Settings › Where Work Runs). */
 export const mediaDefaultProfileKeys = {
   image: "STUDIO_DEFAULT_IMAGE_PROFILE",
   video: "STUDIO_DEFAULT_VIDEO_PROFILE",
 };
+export const defaultTextProfileKey = "STUDIO_DEFAULT_TEXT_PROFILE";
+/** Where text work runs: the side of the default text profile, Cloud unless it is local. */
+export const defaultTextSide = (environment = process.env) =>
+  environment[defaultTextProfileKey]?.startsWith("local/") ? "local" : "cloud";
 
 /** Fit a reference's proportions to the canvas budget and both dimension limits together. */
 export function referenceImageSize(profile, reference, { pixels, resize = true } = {}) {

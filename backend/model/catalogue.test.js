@@ -101,7 +101,16 @@ test("Dream offers ready local and cloud profiles the composer offers, unless th
   assert.deepEqual(defaults, { imageModel: "grok-image", videoModel: undefined });
 });
 
-test("default profiles sit on the preferred side while it can run, otherwise the other with a note", () => {
+test("default profiles sit on their default model's side while it can run, otherwise the other with a note", (t) => {
+  const keys = [
+    "STUDIO_DEFAULT_IMAGE_PROFILE",
+    "STUDIO_VIDEO_ASPECT",
+    "STUDIO_VIDEO_RESOLUTION",
+    "STUDIO_VIDEO_SECONDS",
+  ];
+  t.after(() => {
+    for (const key of keys) delete process.env[key];
+  });
   const models = {
     defaults: { imageModel: "flux", videoModel: "wan" },
     profiles: [
@@ -112,17 +121,26 @@ test("default profiles sit on the preferred side while it can run, otherwise the
       { id: "wan", label: "Wan", kind: "video", availability: "parked" },
     ],
   };
-  const local = withPreferredDefaults(models, {});
+  const local = withPreferredDefaults(models);
   assert.deepEqual(local.defaults, { imageModel: "flux", videoModel: "grok-video" });
   assert.deepEqual(local.defaultNotes, {
     video: "No local video model is running, so this runs in the cloud.",
   });
-  // The account's own default for its side wins over the deployment's where it can run.
-  assert.equal(withPreferredDefaults(models, { imageLocal: "krea" }).defaults.imageModel, "krea");
-  const cloud = withPreferredDefaults(models, { images: "cloud", imageLocal: "krea" });
-  assert.deepEqual(cloud.defaults, { imageModel: "grok-image", videoModel: "grok-video" });
-  const videoDefaults = { videoAspect: "9:16", videoResolution: "720p" };
-  const sized = withPreferredDefaults(models, videoDefaults);
+  // Studio's default model decides the side its kind runs on.
+  process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "krea";
+  assert.equal(withPreferredDefaults(models).defaults.imageModel, "krea");
+  process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "grok-image";
+  assert.deepEqual(withPreferredDefaults(models).defaults, {
+    imageModel: "grok-image",
+    videoModel: "grok-video",
+  });
+  Object.assign(process.env, {
+    STUDIO_VIDEO_ASPECT: "9:16",
+    STUDIO_VIDEO_RESOLUTION: "720p",
+    STUDIO_VIDEO_SECONDS: "8",
+  });
+  const sized = withPreferredDefaults(models);
+  const videoDefaults = { videoAspect: "9:16", videoResolution: "720p", videoSeconds: 8 };
   assert.deepEqual(
     sized.profiles
       .filter(({ kind }) => kind === "video")
@@ -131,11 +149,11 @@ test("default profiles sit on the preferred side while it can run, otherwise the
   );
   assert.equal(sized.profiles[0].videoPreference, undefined);
   assert.equal(models.profiles[3].videoPreference, undefined);
-  // Without a cloud profile for the account, Cloud gives way to the deployment's local default.
-  const noCloud = withPreferredDefaults(
-    { ...models, profiles: models.profiles.filter((profile) => !profile.id.startsWith("grok")) },
-    { images: "cloud" },
-  );
+  // Without a cloud profile for the account, a cloud default gives way to a local one.
+  const noCloud = withPreferredDefaults({
+    ...models,
+    profiles: models.profiles.filter((profile) => !profile.id.startsWith("grok")),
+  });
   assert.equal(noCloud.defaults.imageModel, "flux");
   assert.match(
     noCloud.defaultNotes.image,
@@ -145,15 +163,13 @@ test("default profiles sit on the preferred side while it can run, otherwise the
   assert.equal(noCloud.defaults.videoModel, "wan");
   assert.equal(noCloud.defaultNotes.video, undefined);
   // Where the deployment's default can't run, a profile on Radiance comes before the rest.
-  const parked = withPreferredDefaults(
-    {
-      ...models,
-      profiles: [
-        ...models.profiles.filter((profile) => profile.id !== "flux"),
-        { id: "radiant", label: "Radiant", kind: "image", backend: "radiance" },
-      ],
-    },
-    {},
-  );
+  delete process.env.STUDIO_DEFAULT_IMAGE_PROFILE;
+  const parked = withPreferredDefaults({
+    ...models,
+    profiles: [
+      ...models.profiles.filter((profile) => profile.id !== "flux"),
+      { id: "radiant", label: "Radiant", kind: "image", backend: "radiance" },
+    ],
+  });
   assert.equal(parked.defaults.imageModel, "radiant");
 });

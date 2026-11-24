@@ -1,7 +1,7 @@
-import { Alert, SegmentedControl, Select, Stack } from "@mantine/core";
+import { SegmentedControl, Select, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
+import { dreamVideoSeconds } from "../../../../shared/dream";
 import {
   grokVideoAspects,
   imageAspects,
@@ -13,260 +13,194 @@ import { LoadFailed } from "../../ui/LoadFailed";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { useGroupFeature } from "../auth/AccountGate";
-import { lockedByAdministrator, useDreamSettings } from "../dream/DreamSettings";
-import { dreamQuery } from "../dream/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
-import { assistantQuery } from "../generation/PromptAssistant";
-import { TextModelSelect } from "../generation/TextModelSelect";
+import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
 import {
-  type SidePreference,
-  type WorkKind,
-  preferencesQuery,
-  useSavePreferences,
-} from "./accountPreferences";
+  type Setting,
+  type WorkValues,
+  deploymentQuery,
+  lockedNote,
+  useDeploymentSetting,
+} from "./deployment";
 
-/** The choice of no preference, listed first and shown selected. */
-const studioDefault = "Default (Studio)";
+/** The choice of none, listed first: each model keeps its own default. */
 const profileDefault = { value: "", label: "Default (Model)" };
-const runs = { images: "images run", text: "writing runs", videos: "videos run" } as const;
-const sides: { value: SidePreference; label: string }[] = [
+const sides = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
-const kinds: { kind: WorkKind | "dream"; label: string; description?: string }[] = [
-  { kind: "images", label: "Images", description: "Applies to image generation and edits." },
-  { kind: "videos", label: "Videos", description: "Applies to video generation and Animate." },
-  { kind: "dream", label: "Dream" },
-  {
-    kind: "text",
-    label: "Text",
-    description: "Applies to writing and captions. Local shares a GPU with images.",
-  },
-];
 
-function DreamProcessing({ label }: { label: string }) {
-  const { data, error } = useQuery(dreamQuery);
-  const save = useDreamSettings();
-  return (
-    <SettingGroup title={label}>
-      {!data ? (
-        error ? (
-          <LoadFailed error={error}>Couldn't Load Dream</LoadFailed>
-        ) : (
-          <LoadingState label="Loading Dream" fill />
-        )
-      ) : (
-        (["images", "videos"] as const).map((kind) => {
-          const label = kind === "images" ? "Images" : "Videos";
-          const key = kind === "images" ? "imageBackend" : "videoBackend";
-          const locked = data.locked.includes(key);
-          const makes = data.settings[kind];
-          return (
-            <SettingRow
-              key={key}
-              wide
-              label={label}
-              description={
-                locked
-                  ? lockedByAdministrator
-                  : makes
-                    ? "Waits for an available model."
-                    : `Dream makes no ${kind}; turn them on in Settings › Dream.`
-              }
-            >
-              <SegmentedControl
-                role="radiogroup"
-                aria-label={`Dream ${label}`}
-                fullWidth
-                value={data.settings[key]}
-                disabled={locked || !makes}
-                data={sides}
-                onChange={(value) => save.mutate({ [key]: value })}
-              />
-            </SettingRow>
-          );
-        })
-      )}
-      {save.error && <Alert color="red">{save.error.message}</Alert>}
-    </SettingGroup>
-  );
-}
-
-/** Personal processing, model and output defaults. */
+/**
+ * Settings › Where Work Runs: how new work starts for everyone. Each kind's default model decides
+ * where it runs, giving way to the other side when that can't; a model someone picks in the
+ * composer, or a length they choose in Animate, still wins for them.
+ */
 export function WhereWorkRuns() {
-  const dream = useGroupFeature("dream");
-  const cloud = useGroupFeature("cloudModels");
-  const { data: status, error } = useQuery(preferencesQuery);
-  const profiles = useQuery(modelsQuery).data?.profiles;
-  const assistant = useQuery(assistantQuery).data;
-  const save = useSavePreferences();
-  if (!status)
-    return error ? (
-      <LoadFailed error={error}>Couldn't Load Where Work Runs</LoadFailed>
+  const deployment = useQuery(deploymentQuery);
+  const profiles = useQuery(modelsQuery).data?.profiles ?? [];
+  const save = useDeploymentSetting();
+  if (!deployment.data)
+    return deployment.error ? (
+      <LoadFailed error={deployment.error}>Couldn't Load Where Work Runs</LoadFailed>
     ) : (
       <LoadingState fill label="Loading Where Work Runs" />
     );
-  const { preferences } = status;
-  const defaultRow = (kind: WorkKind, side: SidePreference) => {
-    const key = defaultModelKeys[kind][side];
-    const sideLabel = side === "cloud" ? "Cloud" : "Local";
-    const name = `${sideLabel} Model`;
-    const value = preferences[key] ?? null;
-    const choose = (choice: string | null) => save.mutate({ [key]: choice || null });
-    const text = (assistant?.models || []).filter(
-      (model) => model.startsWith("local/") === (side === "local"),
-    );
+  const { defaults, work } = deployment.data;
+  const set = (name: keyof WorkValues, value: string | number | null) =>
+    save.mutate({ key: work[name].key, value });
+  const modelRow = (kind: "image" | "video", setting: Setting) => {
+    const offered = defaults.profiles.filter((profile) => profile.kind === kind);
+    const effective = offered.find((profile) => profile.id === setting.effective);
     return (
       <SettingRow
-        key={key}
         wide
-        label={name}
-        description={`Used when ${runs[kind]} ${side === "cloud" ? "in the cloud" : "on this machine"}.`}
+        label="Default Model"
+        description={`New drafts, chat runs and Dream start on ${effective?.label || "the first ready model"}, which also decides whether ${kind}s run locally or in the cloud.${lockedNote(setting)}`}
       >
-        {kind === "text" ? (
-          <TextModelSelect
-            name={name}
-            models={text}
-            unset={studioDefault}
-            value={value}
-            onChange={choose}
-          />
-        ) : (
-          <ProfileSelect
-            field
-            name={name}
-            unset={studioDefault}
-            profiles={(profiles || []).filter(
-              (profile) =>
-                profile.kind === (kind === "images" ? "image" : "video") &&
-                isCloudProfile(profile) === (side === "cloud"),
-            )}
-            value={value}
-            onChange={(profile) => choose(profile?.id ?? null)}
-          />
-        )}
+        <ProfileSelect
+          field
+          name={`Default ${kind === "image" ? "Image" : "Video"} Model`}
+          unset="Default (First Ready)"
+          profiles={profiles.filter((profile) => offered.some((item) => item.id === profile.id))}
+          value={setting.configured || null}
+          onChange={(profile) => save.mutate({ key: setting.key, value: profile?.id ?? "" })}
+          disabled={setting.locked}
+        />
       </SettingRow>
     );
   };
+  /** A choice from `choices`, or the profile's own default. */
+  const choiceRow = (
+    name: "imageAspect" | "imageResolution" | "videoAspect" | "videoResolution",
+    label: string,
+    description: string,
+    choices: readonly string[],
+  ) => (
+    <SettingRow wide label={label} description={description + lockedNote(work[name])}>
+      <Select
+        aria-label={label}
+        data={[profileDefault, ...choices]}
+        value={work[name].value ?? ""}
+        allowDeselect={false}
+        disabled={work[name].locked}
+        onChange={(choice) => set(name, choice || null)}
+      />
+    </SettingRow>
+  );
+  const dreamRow = (name: "dreamImageBackend" | "dreamVideoBackend", label: string) => (
+    <SettingRow
+      wide
+      label={label}
+      description={`Where Dream's ${label.toLowerCase()} run; Dream waits while that side is unavailable.${lockedNote(work[name])}`}
+    >
+      <SegmentedControl
+        role="radiogroup"
+        aria-label={`Dream ${label}`}
+        fullWidth
+        data={sides}
+        value={work[name].value}
+        disabled={work[name].locked}
+        onChange={(side) => set(name, side)}
+      />
+    </SettingRow>
+  );
   return (
     <Stack gap="lg">
-      {kinds.map(({ kind, label, description }) =>
-        kind === "dream" ? (
-          dream && cloud && <DreamProcessing key={kind} label={label} />
-        ) : kind === "text" && !assistant?.available ? null : (
-          <SettingGroup key={kind} title={label}>
-            {cloud && (
-              <SettingRow wide label="Run On" description={description}>
-                <SegmentedControl
-                  aria-label={`${label} Run On`}
-                  fullWidth
-                  data={sides}
-                  value={
-                    preferences[kind] ||
-                    (kind === "text" ? assistant?.defaultTextSide || "cloud" : "local")
-                  }
-                  onChange={(side) => save.mutate({ [kind]: side as SidePreference })}
-                />
-              </SettingRow>
-            )}
-            {cloud && defaultRow(kind, "cloud")}
-            {defaultRow(kind, "local")}
-            {(kind === "images" || kind === "videos") && (
-              <>
-                <SettingRow
-                  wide
-                  label="Default Aspect"
-                  description={
-                    kind === "images"
-                      ? "The starting shape for image drafts, where supported."
-                      : "The starting shape for video drafts. A start frame can override it."
-                  }
-                >
-                  <Select
-                    aria-label="Default Aspect"
-                    data={[
-                      profileDefault,
-                      ...(kind === "images" ? imageAspects : grokVideoAspects),
-                    ]}
-                    value={
-                      (kind === "images" ? preferences.imageAspect : preferences.videoAspect) ?? ""
-                    }
-                    allowDeselect={false}
-                    onChange={(choice) =>
-                      save.mutate(
-                        kind === "images"
-                          ? { imageAspect: imageAspects.find((value) => value === choice) ?? null }
-                          : {
-                              videoAspect:
-                                grokVideoAspects.find((value) => value === choice) ?? null,
-                            },
-                      )
-                    }
-                  />
-                </SettingRow>
-                {kind === "images" && (
-                  <SettingRow
-                    wide
-                    label="Default Count"
-                    description="How many images new drafts make, where the model can."
-                  >
-                    <Select
-                      aria-label="Default Count"
-                      data={[
-                        profileDefault,
-                        ...Array.from({ length: maxImageCount }, (_, index) => ({
-                          value: String(index + 1),
-                          label: plural(index + 1, "Image"),
-                        })),
-                      ]}
-                      value={preferences.imageCount ? String(preferences.imageCount) : ""}
-                      allowDeselect={false}
-                      onChange={(choice) =>
-                        save.mutate({ imageCount: choice ? Number(choice) : null })
-                      }
-                    />
-                  </SettingRow>
-                )}
-                <SettingRow
-                  wide
-                  label="Default Resolution"
-                  description={
-                    kind === "images"
-                      ? "The starting resolution for image drafts, where supported."
-                      : "The starting resolution for video drafts and Animate."
-                  }
-                >
-                  <Select
-                    aria-label="Default Resolution"
-                    data={[profileDefault, ...(kind === "images" ? resolutions : videoResolutions)]}
-                    value={
-                      (kind === "images"
-                        ? preferences.imageResolution
-                        : preferences.videoResolution) ?? ""
-                    }
-                    allowDeselect={false}
-                    onChange={(choice) =>
-                      save.mutate(
-                        kind === "images"
-                          ? {
-                              imageResolution:
-                                resolutions.find((value) => value === choice) ?? null,
-                            }
-                          : {
-                              videoResolution:
-                                videoResolutions.find((value) => value === choice) ?? null,
-                            },
-                      )
-                    }
-                  />
-                </SettingRow>
-              </>
-            )}
-          </SettingGroup>
-        ),
-      )}
+      <SettingGroup title="Images">
+        {modelRow("image", defaults.image)}
+        {choiceRow(
+          "imageAspect",
+          "Default Aspect",
+          "The starting shape for new image drafts and chat runs, where the model supports it.",
+          imageAspects,
+        )}
+        <SettingRow
+          wide
+          label="Default Count"
+          description={`How many images new drafts and chat runs make, where the model can.${lockedNote(work.imageCount)}`}
+        >
+          <Select
+            aria-label="Default Count"
+            data={[
+              profileDefault,
+              ...Array.from({ length: maxImageCount }, (_, index) => ({
+                value: String(index + 1),
+                label: plural(index + 1, "Image"),
+              })),
+            ]}
+            value={work.imageCount.value ? String(work.imageCount.value) : ""}
+            allowDeselect={false}
+            disabled={work.imageCount.locked}
+            onChange={(choice) => set("imageCount", choice ? Number(choice) : null)}
+          />
+        </SettingRow>
+        {choiceRow(
+          "imageResolution",
+          "Default Resolution",
+          "The starting resolution for new image drafts and chat runs, where the model supports it.",
+          resolutions,
+        )}
+      </SettingGroup>
+      <SettingGroup title="Videos">
+        {modelRow("video", defaults.video)}
+        <SettingRow
+          wide
+          label="Video Length"
+          description={`How long new video drafts and Dream's videos run; Animate starts here until someone picks a length in its menu. Each model keeps to the lengths it allows.${lockedNote(work.videoSeconds)}`}
+        >
+          <SegmentedControl
+            role="radiogroup"
+            aria-label="Video Length"
+            fullWidth
+            value={String(work.videoSeconds.value ?? 0)}
+            disabled={work.videoSeconds.locked}
+            data={dreamVideoSeconds.map((seconds) => ({
+              value: String(seconds),
+              label: seconds ? `${seconds} s` : "Auto",
+            }))}
+            onChange={(value) => set("videoSeconds", Number(value) || null)}
+          />
+        </SettingRow>
+        {choiceRow(
+          "videoAspect",
+          "Default Aspect",
+          "The starting shape for new video drafts. A start frame can override it.",
+          grokVideoAspects,
+        )}
+        {choiceRow(
+          "videoResolution",
+          "Default Resolution",
+          "The starting resolution for new video drafts and Animate.",
+          videoResolutions,
+        )}
+      </SettingGroup>
+      <SettingGroup title="Dream">
+        {dreamRow("dreamImageBackend", "Images")}
+        {dreamRow("dreamVideoBackend", "Videos")}
+      </SettingGroup>
+      <SettingGroup title="Text">
+        <SettingRow
+          wide
+          label="Default Model"
+          description={
+            (defaults.text.effective
+              ? `Prompt writing and other text work use ${textModelName(defaults.text.effective)}, which also decides whether text runs locally or in the cloud.`
+              : "The model for prompt writing and other text work.") + lockedNote(defaults.text)
+          }
+        >
+          <TextModelSelect
+            name="Default Text Model"
+            models={defaults.textModels}
+            unset="Default (Gateway)"
+            value={defaults.text.configured || null}
+            onChange={(model) => save.mutate({ key: defaults.text.key, value: model ?? "" })}
+            disabled={
+              defaults.text.locked || (!defaults.textModels.length && !defaults.text.configured)
+            }
+          />
+        </SettingRow>
+      </SettingGroup>
     </Stack>
   );
 }
