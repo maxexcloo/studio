@@ -802,6 +802,8 @@ export function createDream(options: {
   chats(ownerId: string): Chats;
   /** Whether the text model and the worker for a kind are reachable, or parked (stopped on purpose). */
   online(kind: Kind, backend: "local" | "cloud"): Promise<{ text: Reach; media: Reach }>;
+  /** Whether cloud work holds back near its usage limit, so Dream's Cloud runs locally. */
+  cloudHeld?(): Promise<boolean>;
   /** How many Dream jobs an account may have at once: one per media worker, so every idle GPU dreams. */
   slots(): number;
   writer: DreamWriter | null;
@@ -2451,6 +2453,10 @@ export function createDream(options: {
     let checkText = !allowUncensored;
     let reason = "";
     let idle = "";
+    const { imageBackend, videoBackend } = record.settings;
+    // Only for this attempt: the account's own choice stays saved.
+    if ([imageBackend, videoBackend].includes("cloud") && (await options.cloudHeld?.()))
+      record.settings = { ...record.settings, imageBackend: "local", videoBackend: "local" };
     for (const kind of due) {
       const delay = idleWait(ownerId, kind);
       if (delay) {
@@ -3750,6 +3756,7 @@ export function createDream(options: {
     read,
     /** The settings an administrator forces, which accounts can't change. */
     locked: () => Object.keys(options.overrides?.() ?? {}) as (keyof DreamSettings)[],
+    exploring,
     history(ownerId: string): DreamActivity[] {
       const labels = {
         "calibrate-like": "Chose Gallery Image",

@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import type { DreamCounts, DreamSettings, KeepRates } from "../../../../shared/dream";
+import type { DreamCounts, DreamDigest, DreamSettings, KeepRates } from "../../../../shared/dream";
 import type { Inbox } from "../../../../shared/inbox";
 import type { Project, ProjectStats } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
@@ -145,6 +145,12 @@ export const inboxQuery = queryOptions({
 });
 export const proposalPath = (proposal: { id: string }, action: "accept" | "dismiss" | "undo") =>
   `/api/dream/inbox/${encodeURIComponent(proposal.id)}/${action}`;
+
+/** Dream › This Week (backend/domain/dream-digest.ts). */
+export const weekQuery = queryOptions({
+  queryKey: ["dream", "week"],
+  queryFn: () => api<DreamDigest<DreamItem>>("/api/dream/week"),
+});
 
 export const historyQuery = (media: DreamMedia) =>
   queryOptions({

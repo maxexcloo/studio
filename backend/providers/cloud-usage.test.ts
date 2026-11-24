@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setImmediate } from "node:timers/promises";
 
-import { createCloudUsage } from "./cloud-usage.ts";
+import { cloudHeld, createCloudUsage } from "./cloud-usage.ts";
 
 const billing = {
   config: {
@@ -79,4 +79,19 @@ test("Unreadable Grok usage reads as unknown", async () => {
   assert.deepEqual(await createCloudUsage({ base: "http://cliproxy", fetchImpl })(), [
     { label: "Grok", reason: "Set STUDIO_CLIPROXYAPI_MANAGEMENT_KEY to read Grok's usage." },
   ]);
+});
+
+test("Cloud work holds back only once every account's known usage reaches the limit", () => {
+  const grok = (used?: number) => ({
+    label: "Grok",
+    reason: "",
+    ...(used === undefined ? {} : { used }),
+  });
+  assert.equal(cloudHeld([grok(83)], {}), true);
+  assert.equal(cloudHeld([grok(79)], {}), false);
+  assert.equal(cloudHeld([grok(83), grok(40)], {}), false);
+  assert.equal(cloudHeld([grok(83), grok()], {}), false);
+  assert.equal(cloudHeld([grok()], {}), false);
+  assert.equal(cloudHeld(undefined, {}), false);
+  assert.equal(cloudHeld([grok(83)], { STUDIO_CLOUD_USAGE_LIMIT: "90" }), false);
 });
