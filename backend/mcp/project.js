@@ -1,7 +1,7 @@
 // A chat's project (domain/projects.ts): the project tool, and how generate keeps to its brief and constraints.
 import { z } from "zod";
 
-import { briefSummary } from "../../shared/projects.ts";
+import { briefSummary, fitProjectInput, projectRangeInputs } from "../../shared/projects.ts";
 import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { directRoute } from "../domain/direct-route.ts";
@@ -158,11 +158,7 @@ export function keptChoices(choices, input, at = Date.now()) {
 
 /** The brief as one line for generate's reply, so the chat keeps writing to it; "" without one. */
 export function briefLine({ name, brief }) {
-  const summary = [
-    briefSummary(brief),
-    brief.loras?.length && `LoRAs ${brief.loras.join(", ")}`,
-    brief.avoid && `avoid ${brief.avoid}`,
-  ]
+  const summary = [briefSummary(brief), brief.loras?.length && `LoRAs ${brief.loras.join(", ")}`]
     .filter(Boolean)
     .join("; ");
   return summary ? `Project ${name}: ${summary}. Keep prompts to it. ` : "";
@@ -170,27 +166,43 @@ export function briefLine({ name, brief }) {
 
 /**
  * A generate call's arguments under the project's constraints, and what changed: LoRAs off runs
- * none, and its aspect and resolution replace the call's own size.
+ * none, an aspect or resolution it doesn't allow gives way to its first, and numbers keep to
+ * their ranges. Defaults the call leaves out are kept to them as it queues (`projectFit`).
  */
 export function projectArgs({ name, constraints }, args) {
   const next = { ...args };
   const notes = [];
-  if (!constraints.loras) {
+  if (constraints.loras === "none") {
     if (args.loras?.length) notes.push(`LoRAs are off in ${name}, so none ran.`);
     next.loras = [];
   }
-  if (constraints.aspect) {
-    if (args.aspect && args.aspect !== constraints.aspect)
-      notes.push(`${name} is ${constraints.aspect}, so it ran ${constraints.aspect}.`);
-    next.aspect = constraints.aspect;
+  for (const [key, allowed] of [
+    ["aspect", constraints.aspects],
+    ["resolution", constraints.resolutions],
+  ]) {
+    if (!allowed.length || allowed.includes(args[key])) continue;
+    if (args[key]) notes.push(`${name} allows ${allowed.join(", ")}, so it ran ${allowed[0]}.`);
+    next[key] = allowed[0];
   }
-  if (constraints.resolution) {
-    if (args.resolution && args.resolution !== constraints.resolution)
-      notes.push(`${name} is ${constraints.resolution}, so it ran ${constraints.resolution}.`);
-    next.resolution = constraints.resolution;
-  }
+  const numbers = Object.fromEntries(
+    projectRangeInputs.filter((key) => args[key] !== undefined).map((key) => [key, args[key]]),
+  );
+  const changes = fitProjectInput(constraints, undefined, numbers);
+  Object.assign(next, numbers);
+  if (changes.length) notes.push(`${name} keeps ${changes.join(", ")}.`);
   return { args: next, note: notes.map((note) => `${note} `).join("") };
 }
+
+/**
+ * What queueing checks of each submission under the project: it keeps the profile's defaults
+ * and the resolved LoRAs to the constraints and says what changed.
+ */
+export const projectFit =
+  ({ name, constraints }) =>
+  (profile, input) => {
+    const changes = fitProjectInput(constraints, profile.capabilities, input);
+    return changes.length ? `${name} keeps ${changes.join(", ")}.` : "";
+  };
 
 /**
  * Refuses prompts that name something the brief avoids, before any queues: an image model draws
@@ -266,20 +278,31 @@ export function assertProjectReuse(project, profile, input, known) {
   };
   const { targets } = projectTargets(project, [{ profile }], known);
   if (targets[0].profile.id !== profile.id) refuse(profile.label || profile.id);
-  if (!constraints.loras && input.loras.length) refuse("This LoRA stack");
-  if (constraints.aspect && !matchesAspect(constraints.aspect, input, profile))
+  if (
+    input.loras.length &&
+    (constraints.loras === "none" ||
+      (constraints.loras.length &&
+        input.loras.some((lora) => !constraints.loras.includes(lora.name))))
+  )
+    refuse("This LoRA stack");
+  if (
+    constraints.aspects.length &&
+    !constraints.aspects.some((aspect) => matchesAspect(aspect, input, profile))
+  )
     refuse(`This run's ${input.width}×${input.height} aspect`);
-  if (constraints.resolution) {
-    const { width, height } = input;
-    const dimension = width >= height ? "width" : "height";
-    const { step } = profile.constraints?.[dimension] ?? {};
-    const target = resolutionSize({ width: 1, height: 1 }, constraints.resolution).width;
-    const matches =
-      profile.options?.resolutions?.length && input.resolution
-        ? String(input.resolution).toUpperCase() === constraints.resolution
-        : Math.max(width, height) === snapDimension(target, { step });
-    if (!matches) refuse(`This run's ${input.resolution || `${width}×${height}`} size`);
-  }
+  const { width, height } = input;
+  const dimension = width >= height ? "width" : "height";
+  const { step } = profile.constraints?.[dimension] ?? {};
+  const sized = (resolution) =>
+    profile.options?.resolutions?.length && input.resolution
+      ? String(input.resolution).toUpperCase() === resolution
+      : Math.max(width, height) ===
+        snapDimension(resolutionSize({ width: 1, height: 1 }, resolution).width, { step });
+  if (constraints.resolutions.length && !constraints.resolutions.some(sized))
+    refuse(`This run's ${input.resolution || `${width}×${height}`} size`);
+  const changes = fitProjectInput(constraints, profile.capabilities, { ...input, loras: [] });
+  if (changes.length)
+    refuse(`This run's ${changes.map((change) => change.split(" ")[0]).join(", ")}`);
 }
 
 /** The only Taste constraint on generation submitted through MCP. */
@@ -436,44 +459,24 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       action: z.enum(["show", "attach", "create", "update", "detach"]).optional(),
       project: z.string().optional(),
       name: z.string().optional(),
-      subjects: z.string().optional(),
-      ethnicity: z.string().optional(),
-      age: z.string().optional(),
-      body: z.string().optional(),
+      description: z.string().optional(),
       styles: z.string().optional(),
-      rules: z.string().optional().describe("Banned changes and standing rules."),
       avoid: z.string().optional(),
-      profiles: z.array(z.string()).optional().describe('ids, names or a tier ("turbo"); [] any'),
-      loras: z.boolean().optional(),
-      lora_names: z.array(z.string()).optional(),
-      aspect: z.string().optional(),
-      resolution: z.string().optional(),
+      favourite_loras: z.array(z.string()).optional(),
+      profiles: z.array(z.string()).optional().describe('ids, names or a tier ("turbo")'),
+      // The other allowed inputs, as Studio's project constraints check them (shared/projects.ts).
+      allowed: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'aspects, resolutions, loras ([] any, "none"), sound, transparent (null either), ranges ({ steps: { min, max } })',
+        ),
     },
     async (
-      {
-        action = "show",
-        project,
-        name,
-        profiles,
-        loras,
-        aspect,
-        resolution,
-        ethnicity,
-        age,
-        body: bodyType,
-        lora_names,
-        ...brief
-      },
+      { action = "show", project, name, favourite_loras, profiles, allowed, ...brief },
       signal,
     ) => {
-      Object.assign(
-        brief,
-        Object.fromEntries(
-          Object.entries({ ethnicity, age, body: bodyType, loras: lora_names }).filter(
-            ([, value]) => value !== undefined,
-          ),
-        ),
-      );
+      if (favourite_loras !== undefined) brief.loras = favourite_loras;
       const attach = async (projectId) =>
         (await api("POST", "/api/dream/projects/attach", { chat: need(), projectId }, signal))
           .project;
@@ -506,14 +509,10 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
           projects: projects.map(({ name }) => name),
         });
       }
-      const constraints = Object.fromEntries(
-        Object.entries({
-          profiles: profiles && (await profileIds(profiles)),
-          loras,
-          aspect,
-          resolution,
-        }).filter(([, value]) => value !== undefined),
-      );
+      const constraints = {
+        ...allowed,
+        ...(profiles ? { profiles: await profileIds(profiles) } : {}),
+      };
       const body = {
         ...(name ? { name } : {}),
         ...(Object.keys(brief).length ? { brief } : {}),

@@ -1,27 +1,104 @@
 import type { CardKind } from "./characters.ts";
 import { type Resolution, imageAspects } from "./resolution.ts";
 
-/** A project brief's free-text fields, in the order its one-line summary lists them. */
-const briefTexts = ["subjects", "ethnicity", "age", "body", "styles", "rules"] as const;
-export const projectBriefTextFields = [...briefTexts, "avoid"] as const;
+/**
+ * A project brief's text: what its work shows and any standing rules (`description`), how it
+ * looks (`styles`) and what prompts never name (`avoid`).
+ */
+export const projectBriefTextFields = ["description", "styles", "avoid"] as const;
 export type ProjectBriefTextField = (typeof projectBriefTextFields)[number];
+export const briefLabels: Record<ProjectBriefTextField, string> = {
+  description: "Brief",
+  styles: "Style",
+  avoid: "Avoid",
+};
 
-/** What a project's work shows, how it looks and what it leaves out. */
-export interface ProjectBrief extends Partial<Record<(typeof briefTexts)[number], string>> {
-  subjects: string;
-  styles: string;
-  avoid: string;
+export interface ProjectBrief extends Record<ProjectBriefTextField, string> {
   /** Favourite LoRA names, best first. */
   loras?: string[];
 }
-/** What project generations in Dream and attached chats keep to. */
-interface ProjectConstraints {
-  /** The only profiles it runs on, by exact id; none for any. */
+/** Generate inputs a project can keep within a range, by their GenerationInput names. */
+export const projectRangeInputs = ["steps", "cfg", "denoise", "fps", "frames", "count"] as const;
+export type ProjectRangeInput = (typeof projectRangeInputs)[number];
+export const rangeLabels: Record<ProjectRangeInput, string> = {
+  steps: "Steps",
+  cfg: "CFG",
+  denoise: "Denoise",
+  fps: "FPS",
+  frames: "Frames",
+  count: "Count",
+};
+export interface ProjectRange {
+  min?: number;
+  max?: number;
+}
+/**
+ * The generate inputs Dream and attached chats keep to. A list allows only its values, empty for
+ * any; an unset switch allows either; a range bounds a number.
+ */
+export interface ProjectConstraints {
+  /** Profiles by exact id. */
   profiles: string[];
-  loras: boolean;
-  /** An aspect from `projectAspects`, or "" for any. */
-  aspect: string;
-  resolution: Resolution | "";
+  /** Aspects from `projectAspects`. */
+  aspects: string[];
+  resolutions: Resolution[];
+  /** LoRA names, or "none" to run without LoRAs. */
+  loras: string[] | "none";
+  sound?: boolean;
+  transparent?: boolean;
+  ranges: Partial<Record<ProjectRangeInput, ProjectRange>>;
+}
+export const anyConstraints = (): ProjectConstraints => ({
+  profiles: [],
+  aspects: [],
+  resolutions: [],
+  loras: [],
+  ranges: {},
+});
+/** Whether a project lets a LoRA run; without a project, any may. */
+export const loraAllowed = (
+  project: { constraints: ProjectConstraints } | undefined,
+  name: string,
+) =>
+  !project ||
+  (project.constraints.loras !== "none" &&
+    (!project.constraints.loras.length || project.constraints.loras.includes(name)));
+/**
+ * Keeps an input's LoRAs, sound, transparency and numbers to the constraints, in place, and says
+ * what changed ("Steps 20 → 8"). Sound and transparency apply only where the profile has them.
+ */
+export function fitProjectInput(
+  constraints: ProjectConstraints,
+  capabilities: Record<string, boolean> | undefined,
+  input: Record<string, unknown>,
+) {
+  const changes: string[] = [];
+  const { loras } = constraints;
+  const stack = (input.loras ?? []) as { name: string }[];
+  if (stack.length && (loras === "none" || loras.length)) {
+    const kept = stack.filter((lora) => loras !== "none" && loras.includes(lora.name));
+    if (kept.length < stack.length) {
+      changes.push(kept.length ? "Only its allowed LoRAs" : "No LoRAs");
+      input.loras = kept;
+    }
+  }
+  for (const key of ["sound", "transparent"] as const) {
+    const wanted = constraints[key];
+    if (wanted === undefined || !capabilities?.[key]) continue;
+    // Sound is on unless turned off; transparency is off unless turned on.
+    if ((input[key] ?? key === "sound") !== wanted)
+      changes.push(`${key === "sound" ? "Sound" : "Transparency"} ${wanted ? "on" : "off"}`);
+    input[key] = wanted;
+  }
+  for (const key of projectRangeInputs) {
+    const value = input[key];
+    const { min = -Infinity, max = Infinity } = constraints.ranges[key] ?? {};
+    if (typeof value !== "number" || (value >= min && value <= max)) continue;
+    const next = Math.min(max, Math.max(min, value));
+    changes.push(`${rangeLabels[key]} ${value} → ${next}`);
+    input[key] = next;
+  }
+  return changes;
 }
 export interface ProjectContent {
   name: string;
@@ -96,10 +173,13 @@ export interface Review {
   /** A short hash of the brief it was checked against: a changed brief makes it due again. */
   brief?: string;
 }
-/** The brief's free text as one line, "subjects …; age …"; "" when empty. */
+/** The brief's text as one line, "…; styles …; avoid …"; "" when empty. */
 export function briefSummary(brief: Partial<ProjectBrief>) {
-  return briefTexts
-    .filter((key) => brief[key])
-    .map((key) => `${key} ${brief[key]}`)
+  return [
+    brief.description,
+    brief.styles && `styles ${brief.styles}`,
+    brief.avoid && `avoid ${brief.avoid}`,
+  ]
+    .filter(Boolean)
     .join("; ");
 }

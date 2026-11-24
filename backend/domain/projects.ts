@@ -4,15 +4,21 @@ import { type Card, type CardKind, cardKinds } from "../../shared/characters.ts"
 import {
   type ChangeBy,
   type Project,
+  type ProjectConstraints,
   type ProjectContent,
+  type ProjectRange,
+  type ProjectRangeInput,
+  anyConstraints,
   maxProjectBrief,
   maxProjectChanges,
   maxProjectLoras,
   maxProjectName,
   maxProjectProfiles,
   projectAspects,
+  projectBriefTextFields,
+  projectRangeInputs,
 } from "../../shared/projects.ts";
-import { resolutions } from "../../shared/resolution.ts";
+import { type Resolution, resolutions } from "../../shared/resolution.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 
 /** Each chat's project and when the chat last asked for something (Dream takes over a quiet one). */
@@ -25,7 +31,11 @@ interface ProjectsRecord {
 interface ProjectPatch {
   name?: string;
   brief?: Partial<ProjectContent["brief"]>;
-  constraints?: Partial<ProjectContent["constraints"]>;
+  /** A null switch clears it, allowing either. */
+  constraints?: Partial<
+    Omit<ProjectConstraints, "sound" | "transparent"> &
+      Record<"sound" | "transparent", boolean | null>
+  >;
   cards?: ProjectContent["cards"];
   paused?: boolean;
   favoured?: boolean;
@@ -43,6 +53,60 @@ const text = (value: unknown, field: string, max: number) => {
     );
   return value.trim();
 };
+
+/** A list of distinct choices: at most `allowed` of them, or only those `allowed` names. */
+function list(value: unknown, field: string, allowed: number | readonly string[]) {
+  const max = typeof allowed === "number" ? allowed : allowed.length;
+  if (
+    !Array.isArray(value) ||
+    value.length > max ||
+    value.some(
+      (item) =>
+        typeof item !== "string" ||
+        !item ||
+        (typeof allowed !== "number" && !allowed.includes(item)),
+    )
+  )
+    throw failure(
+      typeof allowed === "number"
+        ? `List at most ${max} ${field}.`
+        : `List ${field} from ${allowed.join(", ")}, or none for any.`,
+      400,
+    );
+  return [...new Set(value as string[])];
+}
+const loraNames = (value: unknown, field: string) => {
+  if (
+    !Array.isArray(value) ||
+    value.length > maxProjectLoras ||
+    value.some((name) => typeof name !== "string" || !name.trim() || name.length > 200)
+  )
+    throw failure(`List at most ${maxProjectLoras} ${field}.`, 400);
+  return [...new Set(value.map((name: string) => name.trim()))];
+};
+/** Each range's bounds, either of which may be left open; an empty range is dropped. */
+function rangesOf(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw failure("Set ranges to an object of { min, max } by input.", 400);
+  const ranges: ProjectConstraints["ranges"] = {};
+  for (const [key, range] of Object.entries(value)) {
+    if (!(projectRangeInputs as readonly string[]).includes(key))
+      throw failure(`Ranges cover ${projectRangeInputs.join(", ")}, not ${key}.`, 400);
+    const { min, max, ...other } = (range || {}) as ProjectRange;
+    if (
+      Object.keys(other).length ||
+      [min, max].some((bound) => bound !== undefined && !Number.isFinite(bound)) ||
+      (min !== undefined && max !== undefined && min > max)
+    )
+      throw failure(`Give ${key} a min no greater than its max.`, 400);
+    if (min !== undefined || max !== undefined)
+      ranges[key as ProjectRangeInput] = {
+        ...(min !== undefined ? { min } : {}),
+        ...(max !== undefined ? { max } : {}),
+      };
+  }
+  return ranges;
+}
 
 /** A patch from a request body, checked field by field; unknown fields are refused. */
 export function projectPatch(body: unknown): ProjectPatch {
@@ -62,55 +126,34 @@ export function projectPatch(body: unknown): ProjectPatch {
     if (!patch.name) throw failure("Name the project.", 400);
   }
   if (brief !== undefined) {
-    const { subjects, styles, avoid, ethnicity, age, body, rules, loras, ...other } = brief || {};
-    if (Object.keys(other).length)
-      throw failure(`Unknown brief field ${Object.keys(other)[0]}.`, 400);
+    const { loras, ...texts } = brief || {};
+    const other = Object.keys(texts).find(
+      (key) => !(projectBriefTextFields as readonly string[]).includes(key),
+    );
+    if (other) throw failure(`Unknown brief field ${other}.`, 400);
     patch.brief = Object.fromEntries(
-      Object.entries({ subjects, styles, avoid })
+      Object.entries(texts)
         .filter(([, value]) => value !== undefined)
         .map(([key, value]) => [key, text(value, key, maxProjectBrief)]),
     );
-    for (const [key, value] of Object.entries({ ethnicity, age, body, rules }))
-      if (value !== undefined)
-        Object.assign(patch.brief, { [key]: text(value, key, maxProjectBrief) });
-    if (loras !== undefined) {
-      if (
-        !Array.isArray(loras) ||
-        loras.length > maxProjectLoras ||
-        loras.some((name) => typeof name !== "string" || !name.trim() || name.length > 200)
-      )
-        throw failure(`List at most ${maxProjectLoras} favourite LoRAs.`, 400);
-      patch.brief.loras = [...new Set(loras.map((name: string) => name.trim()))];
-    }
+    if (loras !== undefined) patch.brief.loras = loraNames(loras, "favourite LoRAs");
   }
   if (constraints !== undefined) {
-    const { profiles, loras, aspect, resolution, ...other } = constraints || {};
-    if (Object.keys(other).length)
-      throw failure(`Unknown constraint ${Object.keys(other)[0]}.`, 400);
+    const { profiles, aspects, resolutions: sizes, loras, ranges, ...switches } = constraints || {};
     const next: ProjectPatch["constraints"] = {};
-    if (profiles !== undefined) {
-      if (
-        !Array.isArray(profiles) ||
-        profiles.length > maxProjectProfiles ||
-        profiles.some((id) => typeof id !== "string" || !id)
-      )
-        throw failure(`List at most ${maxProjectProfiles} profile ids.`, 400);
-      next.profiles = [...new Set(profiles as string[])];
+    for (const [key, value] of Object.entries(switches)) {
+      if (key !== "sound" && key !== "transparent")
+        throw failure(`Unknown constraint ${key}.`, 400);
+      if (value !== null && typeof value !== "boolean")
+        throw failure(`Set ${key} to true, false or null for either.`, 400);
+      next[key as "sound" | "transparent"] = value as boolean | null;
     }
-    if (loras !== undefined) {
-      if (typeof loras !== "boolean") throw failure("Set loras to true or false.", 400);
-      next.loras = loras;
-    }
-    if (aspect !== undefined) {
-      if (aspect !== "" && !projectAspects.includes(aspect))
-        throw failure(`Set aspect to one of ${projectAspects.join(", ")}, or "" for any.`, 400);
-      next.aspect = aspect;
-    }
-    if (resolution !== undefined) {
-      if (resolution !== "" && !(resolutions as readonly string[]).includes(resolution))
-        throw failure(`Set resolution to one of ${resolutions.join(", ")}, or "" for any.`, 400);
-      next.resolution = resolution;
-    }
+    if (profiles !== undefined) next.profiles = list(profiles, "profiles", maxProjectProfiles);
+    if (aspects !== undefined) next.aspects = list(aspects, "aspects", projectAspects);
+    if (sizes !== undefined)
+      next.resolutions = list(sizes, "resolutions", resolutions) as Resolution[];
+    if (loras !== undefined) next.loras = loras === "none" ? "none" : loraNames(loras, "LoRAs");
+    if (ranges !== undefined) next.ranges = rangesOf(ranges);
     patch.constraints = next;
   }
   if (cards !== undefined) {
@@ -125,6 +168,15 @@ export function projectPatch(body: unknown): ProjectPatch {
   }
   return patch;
 }
+
+/** Constraints with a patch's over them; a null switch clears it. */
+export const mergedConstraints = (
+  base: ProjectConstraints,
+  patch: ProjectPatch["constraints"] = {},
+) =>
+  Object.fromEntries(
+    Object.entries({ ...base, ...patch }).filter(([, value]) => value !== null),
+  ) as unknown as ProjectConstraints;
 
 /**
  * Styles with a pick on one axis ("lighting: warm dusk"), replacing the axis's earlier pick; the
@@ -186,7 +238,7 @@ export function createProjects({
     content({
       name: patch.name ?? base.name,
       brief: { ...base.brief, ...patch.brief },
-      constraints: { ...base.constraints, ...patch.constraints },
+      constraints: mergedConstraints(base.constraints, patch.constraints),
       cards: patch.cards ?? base.cards,
       paused: patch.paused ?? base.paused,
       favoured: patch.favoured ?? base.favoured,
@@ -268,8 +320,8 @@ export function createProjects({
         ...merged(
           {
             name: patch.name,
-            brief: { subjects: "", styles: "", avoid: "" },
-            constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+            brief: { description: "", styles: "", avoid: "" },
+            constraints: anyConstraints(),
           },
           patch,
         ),

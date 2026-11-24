@@ -5833,8 +5833,8 @@ test("variants offers lettered options of a result, records the pick and takes l
   const project = {
     id: "foxes",
     name: "Foxes",
-    brief: { subjects: "", styles: "", avoid: "" },
-    constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+    brief: { description: "", styles: "", avoid: "" },
+    constraints: { profiles: [], aspects: [], resolutions: [], loras: [], ranges: {} },
   };
   f.app.post("/api/dream/projects/activity", (_req, res) => res.json({ project }));
   // Like Studio's: the source's run once per option, lettered, each numbered as it queues.
@@ -8235,18 +8235,18 @@ test("set reruns refuse changed project constraints before admission and preserv
     loras: [{ name: "fixture-effect", strength: 0.8 }],
   });
   const saved = structuredClone(f.submitted[0]);
-  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  const constraints = { profiles: [], aspects: [], resolutions: [], loras: [], ranges: {} };
   project = {
     id: "foxes",
     name: "Foxes",
-    brief: { subjects: "", styles: "", avoid: "" },
+    brief: { description: "", styles: "", avoid: "" },
     constraints,
   };
   for (const change of [
-    { loras: false },
+    { loras: "none" },
     { profiles: [other.id] },
-    { aspect: "portrait" },
-    { resolution: "2K" },
+    { aspects: ["portrait"] },
+    { resolutions: ["2K"] },
   ]) {
     project.constraints = { ...constraints, ...change };
     const refused = await call(client, "reuse", { job_id: original.set });
@@ -8254,7 +8254,7 @@ test("set reruns refuse changed project constraints before admission and preserv
     assert.match(texts(refused), /conflicts with Foxes's current constraints/);
     assert.equal(f.submitted.length, 1);
   }
-  project.constraints = { ...constraints, profiles: [imageProfile.id], aspect: "landscape" };
+  project.constraints = { ...constraints, profiles: [imageProfile.id], aspects: ["landscape"] };
   assert.equal((await call(client, "reuse", { job_id: original.set })).isError, undefined);
   assert.equal(f.submitted.length, 2);
   for (const key of ["prompt", "profileId", "count", "width", "height", "loras"])
@@ -8291,11 +8291,17 @@ test("single-result reuse checks the attached project against the effective run"
   });
   finish(f);
   const job_id = original.jobs[0].ref;
-  const base = { profiles: [profile.id], loras: true, aspect: "landscape", resolution: "1K" };
+  const base = {
+    profiles: [profile.id],
+    loras: [],
+    aspects: ["landscape"],
+    resolutions: ["1K"],
+    ranges: {},
+  };
   project = {
     id: "foxes",
     name: "Foxes",
-    brief: { subjects: "", styles: "", avoid: "lantern" },
+    brief: { description: "", styles: "", avoid: "lantern" },
     constraints: base,
   };
   const blocked = async (change, args, reason) => {
@@ -8306,14 +8312,20 @@ test("single-result reuse checks the attached project against the effective run"
     assert.match(texts(refused), reason);
     assert.equal(f.submitted.length, submitted);
   };
-  await blocked({ loras: false }, {}, /This LoRA stack conflicts with Foxes/);
+  await blocked({ loras: "none" }, {}, /This LoRA stack conflicts with Foxes/);
   await blocked({ profiles: [other.id] }, {}, /Fixture Image conflicts with Foxes/);
-  await blocked({ aspect: "portrait" }, {}, /1024×768 aspect conflicts with Foxes/);
-  await blocked({ resolution: "2K" }, {}, /1024×768 size conflicts with Foxes/);
+  await blocked({ aspects: ["portrait"] }, {}, /1024×768 aspect conflicts with Foxes/);
+  await blocked({ resolutions: ["2K"] }, {}, /1024×768 size conflicts with Foxes/);
   await blocked({}, { prompt: "A fox with a lantern" }, /which Foxes avoids/);
   await blocked({}, { profile_id: other.id }, /Other Image conflicts with Foxes/);
   // A retarget drops the LoRA. Its effective settings can fit even though the source's do not.
-  project.constraints = { profiles: [other.id], loras: false, aspect: "landscape", resolution: "" };
+  project.constraints = {
+    profiles: [other.id],
+    loras: "none",
+    aspects: ["landscape"],
+    resolutions: [],
+    ranges: {},
+  };
   data(await call(client, "reuse", { job_id, profile_id: other.id }));
   assert.deepEqual(f.submitted.at(-1).loras, []);
 
@@ -8323,19 +8335,19 @@ test("single-result reuse checks the attached project against the effective run"
 
   const animate = { mode: "animate", profile_id: video.id };
   await blocked({ profiles: [otherVideo.id] }, animate, /Fixture Video conflicts with Foxes/);
-  await blocked({ aspect: "portrait" }, animate, /1024×768 aspect conflicts with Foxes/);
-  await blocked({ resolution: "2K" }, animate, /1024×768 size conflicts with Foxes/);
-  project.constraints = { ...base, profiles: [video.id], loras: false };
+  await blocked({ aspects: ["portrait"] }, animate, /1024×768 aspect conflicts with Foxes/);
+  await blocked({ resolutions: ["2K"] }, animate, /1024×768 size conflicts with Foxes/);
+  project.constraints = { ...base, profiles: [video.id], loras: "none" };
   const animated = data(await call(client, "reuse", { job_id, ...animate }));
   finish(f, "mp4");
   const extend = { job_id: animated.jobs[0].ref, mode: "extend" };
-  await blocked({ resolution: "2K" }, extend, /1024×768 size conflicts with Foxes/);
+  await blocked({ resolutions: ["2K"] }, extend, /1024×768 size conflicts with Foxes/);
   await blocked({ profiles: [otherVideo.id] }, extend, /Fixture Video conflicts with Foxes/);
   project.constraints = { ...base, profiles: [video.id] };
   data(await call(client, "reuse", extend));
   assert.equal(f.submitted.at(-1).profileId, video.id);
 
-  project.constraints = { ...base, profiles: [other.id], resolution: "2K" };
+  project.constraints = { ...base, profiles: [other.id], resolutions: ["2K"] };
   const native = await generate(client, { profile_id: other.id });
   finish(f);
   data(await call(client, "reuse", { job_id: native.jobs[0].ref }));

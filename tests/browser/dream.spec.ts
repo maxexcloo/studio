@@ -53,15 +53,11 @@ async function fillBox(scope: Locator, name: string, value: string, phone: boole
   await sheet.getByRole("button", { name: `Close ${name}`, exact: true }).click();
 }
 
-/** Turns Use LoRAs on or off in a project form's LoRAs chip. */
+/** Turns Use LoRAs on or off in a project form's Allowed Inputs. */
 async function useLoras(form: Locator, on: boolean) {
-  await form.getByRole("button", { name: "LoRAs", exact: true }).click();
-  const popup = form.page().getByRole("dialog", { name: "LoRAs", exact: true });
-  const toggle = popup.getByRole("switch", { name: "Use LoRAs", exact: true });
+  const toggle = form.getByRole("switch", { name: "Use LoRAs", exact: true });
   await toggle.dispatchEvent("click");
   await expect(toggle).toBeChecked({ checked: on });
-  await popup.getByRole("button", { name: "Done", exact: true }).click();
-  await expect(popup).toBeHidden();
 }
 
 /**
@@ -574,8 +570,8 @@ test("Projects show what is new in each since the last visit, and the viewer jud
   isMobile,
 }) => {
   await fixtures(page);
-  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
-  const brief = { subjects: "", styles: "", avoid: "" };
+  const constraints = { profiles: [], aspects: [], resolutions: [], loras: [], ranges: {} };
+  const brief = { description: "", styles: "", avoid: "" };
   const result = (id: string, projectId: string, createdAt: string) =>
     dreamItem(id, { createdAt, dream: { ...dreamItem(id).dream, projectId } });
   const dream = await serveDream(page, {
@@ -1655,17 +1651,17 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   isMobile,
 }) => {
   await fixtures(page);
-  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  const constraints = { profiles: [], aspects: [], resolutions: [], loras: [], ranges: {} };
   const dream = await serveDream(page, {
     projects: [
       {
         id: "project-coast",
         name: "Coast",
-        brief: { subjects: "Seabirds", styles: "", avoid: "" },
+        brief: { description: "Seabirds", styles: "", avoid: "" },
         constraints,
         previous: {
           name: "Coast",
-          brief: { subjects: "Gulls", styles: "", avoid: "" },
+          brief: { description: "Gulls", styles: "", avoid: "" },
           constraints,
           change: "change-1",
         },
@@ -1675,8 +1671,8 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
             at: stamp,
             by: "chat",
             why: "",
-            fields: ["subjects"],
-            text: { subjects: { before: "Gulls", after: "Seabirds" } },
+            fields: ["description"],
+            text: { description: { before: "Gulls", after: "Seabirds" } },
           },
         ],
       },
@@ -1706,8 +1702,8 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await expect(page).toHaveURL(/\/dream\/projects\/project-coast$/);
   const detail = page.getByRole("dialog", { name: "Coast", exact: true });
   const changes = detail.getByRole("list", { name: "Changes", exact: true });
-  await expect(changes).toContainText("Chat · Subjects");
-  await expect(changes).toContainText("Subjects: GullsSeabirds");
+  await expect(changes).toContainText("Chat · Brief");
+  await expect(changes).toContainText("Brief: GullsSeabirds");
   await changes.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(detail.getByRole("region", { name: "Brief", exact: true })).toContainText("Gulls");
   await expect(changes).toContainText("Undone");
@@ -1772,7 +1768,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   expect(dream.requests.at(-1)).toMatchObject({
     method: "POST",
     path: "/api/dream/projects",
-    body: { name: "Harbour", brief: { avoid: "people" }, constraints: { loras: false } },
+    body: { name: "Harbour", brief: { avoid: "people" }, constraints: { loras: "none" } },
   });
 
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
@@ -1868,19 +1864,19 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
   await name.fill("Harbour Study");
   if (isMobile) await editor.getByRole("button", { name: "Done", exact: true }).click();
   // A single AI option runs at once; the menu returns with Undo while the proposal stands.
-  await editor.getByRole("button", { name: "Suggest Styles", exact: true }).click();
+  await editor.getByRole("button", { name: "Suggest Style", exact: true }).click();
   await expect(editor.getByRole("status")).toHaveText("Suggested");
-  await expect(editor.getByRole("textbox", { name: "Styles", exact: true })).toHaveValue(
+  await expect(editor.getByRole("textbox", { name: "Style", exact: true })).toHaveValue(
     "Soft morning light by the harbour.",
   );
   expect(requests).toEqual([
     {
       name: "Harbour Study",
       field: "styles",
-      brief: { subjects: "", styles: "", avoid: "" },
+      brief: { description: "", styles: "", avoid: "" },
     },
   ]);
-  await editor.getByRole("button", { name: "AI Styles Actions", exact: true }).click();
+  await editor.getByRole("button", { name: "AI Style Actions", exact: true }).click();
   await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(editor.getByRole("status")).toHaveCount(0);
 });
@@ -1890,7 +1886,7 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
   isMobile,
 }) => {
   await fixtures(page);
-  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  const constraints = { profiles: [], aspects: [], resolutions: [], loras: [], ranges: {} };
   const proposal = (id: string, kind: string, title: string, change: object, extra = {}) => ({
     id,
     kind,
@@ -1906,7 +1902,7 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
       {
         id: "coast",
         name: "Coast",
-        brief: { subjects: "gulls", styles: "film grain, cold light", avoid: "" },
+        brief: { description: "gulls", styles: "film grain, cold light", avoid: "" },
         constraints,
       },
     ],
@@ -1945,7 +1941,7 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
   ).toBeHidden();
   await light.getByRole("button", { name: "Edit", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Warmer Light for Coast", exact: true });
-  await fillBox(editor, "Styles", "film grain, dusk", isMobile);
+  await fillBox(editor, "Style", "film grain, dusk", isMobile);
   await editor.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(dream.requests.at(-1)).toEqual({

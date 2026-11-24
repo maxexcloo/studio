@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { anyConstraints } from "../../shared/projects.ts";
 import { createProjects, projectPatch } from "../domain/projects.ts";
 import { closeRuntimeDatabase } from "../persistence/runtime.ts";
 import {
@@ -12,6 +13,7 @@ import {
   createChatChoices,
   keptChoices,
   projectArgs,
+  projectFit,
   projectTargets,
   registerProjectTool,
   withoutTasteExclusions,
@@ -27,14 +29,8 @@ const dataDir = (t) => {
 };
 const project = (constraints = {}, brief = {}) => ({
   name: "Coast",
-  brief: { subjects: "", styles: "", avoid: "", ...brief },
-  constraints: {
-    profiles: [],
-    loras: true,
-    aspect: "",
-    resolution: "",
-    ...constraints,
-  },
+  brief: { description: "", styles: "", avoid: "", ...brief },
+  constraints: { ...anyConstraints(), ...constraints },
 });
 const turbo = {
   id: "turbo-image",
@@ -136,20 +132,36 @@ test("set names persist per account and conversation while explicit names take p
   );
 });
 
-test("a project's constraints replace a call's LoRAs and size, saying what changed", () => {
-  const { args, note } = projectArgs(project({ loras: false, aspect: "16:9", resolution: "2K" }), {
+test("a project's allowed inputs replace a call's LoRAs, size and numbers, saying what changed", () => {
+  const constrained = project({
+    loras: "none",
+    aspects: ["16:9", "4:3"],
+    resolutions: ["2K"],
+    ranges: { steps: { min: 4, max: 8 } },
+  });
+  const { args, note } = projectArgs(constrained, {
     loras: [{ name: "glow" }],
     aspect: "1:1",
     resolution: "1K",
+    steps: 20,
   });
-  assert.deepEqual(args, { loras: [], aspect: "16:9", resolution: "2K" });
+  assert.deepEqual(args, { loras: [], aspect: "16:9", resolution: "2K", steps: 8 });
   assert.match(note, /LoRAs are off in Coast/);
-  assert.match(note, /Coast is 16:9/);
-  assert.match(note, /Coast is 2K/);
+  assert.match(note, /Coast allows 16:9, 4:3, so it ran 16:9/);
+  assert.match(note, /Coast keeps Steps 20 → 8/);
+  assert.equal(projectArgs(constrained, { aspect: "4:3" }).args.aspect, "4:3");
   assert.deepEqual(projectArgs(project(), { count: 2 }), {
     args: { count: 2 },
     note: "",
   });
+  // As it queues, the profile's own defaults and resolved LoRAs keep to them too.
+  const body = { steps: 30, cfg: 7, sound: true, loras: [{ name: "film" }, { name: "glow" }] };
+  const fit = projectFit(project({ loras: ["film"], sound: false, ranges: { steps: { max: 8 } } }));
+  assert.equal(
+    fit({ capabilities: { sound: true } }, body),
+    "Coast keeps Only its allowed LoRAs, Sound off, Steps 30 → 8.",
+  );
+  assert.deepEqual(body, { steps: 8, cfg: 7, sound: false, loras: [{ name: "film" }] });
 });
 
 test("a project runs only its listed profiles of the work's kind", () => {
@@ -169,7 +181,7 @@ test("a project runs only its listed profiles of the work's kind", () => {
 });
 
 test("prompts naming what the brief avoids are refused before queuing", () => {
-  const coast = project({}, { subjects: "seabirds", avoid: "no people, text; boats" });
+  const coast = project({}, { description: "seabirds", avoid: "no people, text; boats" });
   assert.throws(
     () => assertAvoided(coast, ["Gulls", "Two people on a pier"]),
     /Prompt 2 names "people"/,
@@ -178,17 +190,29 @@ test("prompts naming what the brief avoids are refused before queuing", () => {
   assert.doesNotThrow(() => assertAvoided(coast, ["Peoples' coast", "Textured rocks"]));
   assert.equal(
     briefLine(coast),
-    "Project Coast: subjects seabirds; avoid no people, text; boats. Keep prompts to it. ",
+    "Project Coast: seabirds; avoid no people, text; boats. Keep prompts to it. ",
   );
   assert.equal(briefLine(project()), "");
 });
 
 test("projectPatch refuses unknown fields and values outside the constraints", () => {
   assert.throws(() => projectPatch({ colour: "red" }), /Unknown field colour/);
-  assert.throws(() => projectPatch({ constraints: { aspect: "5:4" } }), /Set aspect/);
-  for (const aspect of ["3:4", "4:3"])
-    assert.deepEqual(projectPatch({ constraints: { aspect } }).constraints, { aspect });
-  assert.throws(() => projectPatch({ constraints: { loras: "no" } }), /Set loras/);
+  assert.throws(() => projectPatch({ brief: { subjects: "x" } }), /Unknown brief field subjects/);
+  assert.throws(() => projectPatch({ constraints: { aspects: ["5:4"] } }), /List aspects/);
+  assert.deepEqual(projectPatch({ constraints: { aspects: ["3:4", "4:3"] } }).constraints, {
+    aspects: ["3:4", "4:3"],
+  });
+  assert.throws(() => projectPatch({ constraints: { loras: "no" } }), /List at most/);
+  assert.throws(() => projectPatch({ constraints: { sound: "on" } }), /Set sound/);
+  assert.throws(
+    () => projectPatch({ constraints: { ranges: { steps: { min: 9, max: 4 } } } }),
+    /min no greater/,
+  );
+  assert.throws(() => projectPatch({ constraints: { ranges: { seed: {} } } }), /not seed/);
+  assert.deepEqual(
+    projectPatch({ constraints: { ranges: { cfg: { max: 4 }, steps: {} } } }).constraints,
+    { ranges: { cfg: { max: 4 } } },
+  );
   assert.throws(() => projectPatch({ name: " " }), /Name the project/);
   assert.deepEqual(projectPatch({ name: " Coast ", constraints: { profiles: ["a", "a"] } }), {
     name: "Coast",
@@ -243,30 +267,28 @@ test("the project tool creates, attaches, updates and shows a chat's project", a
   const created = await call({
     action: "create",
     name: "Coast",
-    loras: false,
+    allowed: { loras: "none", sound: false },
     profiles: ["turbo"],
   });
   assert.equal(created.project.name, "Coast");
   assert.deepEqual(created.project.constraints.profiles, ["Moss · Super Fast"]);
-  assert.equal(created.project.constraints.loras, false);
+  assert.equal(created.project.constraints.loras, "none");
+  assert.equal(created.project.constraints.sound, false);
   const updated = await call({
     action: "update",
     avoid: "people",
-    ethnicity: "Australian",
-    age: "30–40",
-    body: "tall",
-    rules: "Keep the outfit",
-    lora_names: ["film"],
+    description: "A tall Australian surfer. Keep the outfit.",
+    favourite_loras: ["film"],
     profiles: ["Moss · Quality"],
+    allowed: { sound: null, ranges: { steps: { max: 8 } } },
   });
   assert.equal(updated.project.brief.avoid, "people");
-  assert.equal(updated.project.brief.ethnicity, "Australian");
-  assert.equal(updated.project.brief.age, "30–40");
-  assert.equal(updated.project.brief.body, "tall");
-  assert.equal(updated.project.brief.rules, "Keep the outfit");
+  assert.equal(updated.project.brief.description, "A tall Australian surfer. Keep the outfit.");
   assert.deepEqual(updated.project.brief.loras, ["film"]);
-  assert.match(briefLine(updated.project), /rules Keep the outfit; LoRAs film/);
+  assert.match(briefLine(updated.project), /Keep the outfit\.; avoid people; LoRAs film/);
   assert.deepEqual(updated.project.constraints.profiles, ["Moss · Quality"]);
+  assert.equal(updated.project.constraints.sound, undefined);
+  assert.deepEqual(updated.project.constraints.ranges, { steps: { max: 8 } });
   assert.match(updated.note, /undo/);
   // The chat's change is the one Undo restores on the Dream page.
   const [stored] = projects.list(owner);

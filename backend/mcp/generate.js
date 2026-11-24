@@ -25,6 +25,7 @@ import {
 } from "../../shared/characters.ts";
 import { compareVariants, letter } from "../../shared/compare.ts";
 import { isCloudProfile, loraStrengthSweep, profileBackendLabels } from "../../shared/profiles.ts";
+import { projectRangeInputs } from "../../shared/projects.ts";
 import { availableResolutions, profileStartingSize, resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
@@ -51,6 +52,7 @@ import {
   briefLine,
   keptChoices,
   projectArgs,
+  projectFit,
   projectTargets,
   withoutTasteExclusions,
 } from "./project.js";
@@ -1373,9 +1375,7 @@ export function registerGenerateTools({
               item.profile,
               { ...item.plan, seed, ...(axis ? { comparison: true } : {}) },
               recordOf(item),
-              {
-                guide: false,
-              },
+              { guide: false, validate: project && projectFit(project) },
             )
           ).queued,
         };
@@ -1409,7 +1409,9 @@ export function registerGenerateTools({
       faceNote = "Face detail on for the full-body person. ";
       plan.face_detail = true;
     }
-    const submission = await submit(profile, plan, recordOf({ plan }));
+    const submission = await submit(profile, plan, recordOf({ plan }), {
+      validate: project && projectFit(project),
+    });
     if (submission.queued.jobs.length)
       accepted.entries.push({ profile, plan, queued: submission.queued });
     const number = recordSet([{ plan, queued: submission.queued }]);
@@ -1498,19 +1500,21 @@ export function registerGenerateTools({
         );
       const profile = media.profileForBackend(listed, plan.args.profile_backend);
       if (project) {
-        const { args } = projectArgs(project, plan.args);
-        const required = {
-          ...args,
-          ...(project.constraints.aspect
-            ? profileAspectSize(profile, { aspect: project.constraints.aspect })
-            : {}),
-        };
+        const { args: required } = projectArgs(project, plan.args);
         const { targets } = projectTargets(project, [{ profile }], all, {
           references: plan.args.reference_asset_ids?.length || 0,
         });
+        // A set keeps its size, not the aspect it was asked for.
+        const sizes = project.constraints.aspects.map((aspect) =>
+          profileAspectSize(profile, { aspect }),
+        );
         if (
           targets[0].profile.id !== profile.id ||
-          ["width", "height", "resolution"].some((key) => required[key] !== plan.args[key]) ||
+          (sizes.length &&
+            !sizes.some(
+              ({ width, height }) => width === plan.args.width && height === plan.args.height,
+            )) ||
+          ["resolution", ...projectRangeInputs].some((key) => required[key] !== plan.args[key]) ||
           stableJson(required.loras || []) !== stableJson(plan.args.loras || [])
         )
           throw new Error(
