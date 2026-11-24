@@ -192,7 +192,6 @@ export function WorkflowConnections({
         )
       ).preview.detected.nodes,
     gcTime: 0,
-    retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

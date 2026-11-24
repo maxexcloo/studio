@@ -71,7 +71,6 @@ export function PodLog({ path }: { path: string }) {
     queryKey: ["runtime-logs", path, lines],
     queryFn: () => api<{ pods: RuntimePodLog[] }>(`${path}?lines=${lines}`),
     refetchInterval: 3000,
-    retry: false,
     // Keep showing the last tail while another line count loads, but never another source's.
     placeholderData: (previous, query) =>
       query?.queryKey[1] === path ? keepPreviousData(previous) : undefined,

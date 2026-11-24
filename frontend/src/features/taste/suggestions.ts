@@ -33,7 +33,6 @@ type DraftContext = ReturnType<typeof draftSuggestionContext>;
 const cached = {
   staleTime: (query: { state: { data?: { reason?: string } } }) =>
     query.state.data?.reason ? 0 : 10 * 60_000,
-  retry: false,
 } as const;
 
 /** The composer's AI menu offers ideas for an empty prompt or a draft with applied cards. */

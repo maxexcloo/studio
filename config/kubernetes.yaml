@@ -64,11 +64,13 @@ spec:
             httpGet:
               path: /api/ready
               port: http
+          # Checked every second, so a restart serves again as soon as Studio listens.
           startupProbe:
-            failureThreshold: 30
+            failureThreshold: 300
             httpGet:
               path: /api/ready
               port: http
+            periodSeconds: 1
           volumeMounts:
             - name: data
               mountPath: /data
