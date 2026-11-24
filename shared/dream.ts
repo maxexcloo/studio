@@ -7,6 +7,7 @@ export const dreamDefaults = {
   images: true,
   videos: false,
   uncensored: false,
+  useLoadedProfile: true,
   imageBackend: "local" as "local" | "cloud",
   videoBackend: "local" as "local" | "cloud",
 };
@@ -14,7 +15,7 @@ export type DreamSettings = typeof dreamDefaults;
 export const maxDreamIdleMinutes = 120;
 export const dreamTimingSettings = {
   imageIdleMinutes: { key: "STUDIO_DREAM_IMAGE_IDLE_MINUTES", defaultValue: 0 },
-  imageSwitchMinutes: { key: "STUDIO_DREAM_IMAGE_SWITCH_MINUTES", defaultValue: 2 },
+  imageSwitchMinutes: { key: "STUDIO_DREAM_IMAGE_SWITCH_MINUTES", defaultValue: 5 },
   videoIdleMinutes: { key: "STUDIO_DREAM_VIDEO_IDLE_MINUTES", defaultValue: 5 },
 };
 export type DreamTiming = keyof typeof dreamTimingSettings;

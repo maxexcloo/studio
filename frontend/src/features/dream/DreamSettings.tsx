@@ -42,7 +42,7 @@ export function DreamPreferences() {
   const locked = (key: keyof DreamSettings) => lockedKeys.includes(key);
   const note = (key: keyof DreamSettings) => (locked(key) ? ` ${lockedByAdministrator}` : "");
   const toggle = (
-    key: "enabled" | "images" | "uncensored" | "videos",
+    key: "enabled" | "images" | "uncensored" | "useLoadedProfile" | "videos",
     label: string,
     description: string,
   ) => (
@@ -82,6 +82,11 @@ export function DreamPreferences() {
           </Text>
         )}
         {toggle("enabled", "Dream", "Make new media from your taste while Studio is idle.")}
+        {toggle(
+          "useLoadedProfile",
+          "Run on Loaded Profile",
+          "Skip the idle delay when the exact profile and LoRA settings are already loaded.",
+        )}
         {dream.data.uncensoredAvailable &&
           toggle("uncensored", "Uncensored", "Allow explicit themes.")}
         {toggle("images", "Images", "Make new images.")}
