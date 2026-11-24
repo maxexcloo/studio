@@ -246,45 +246,42 @@ function TasteEditor({
     );
   };
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        save.mutate();
-      }}
-    >
-      <Stack>
-        <Text size="sm" c="dimmed">
-          A field you change stays yours; Studio keeps learning the others. Use Learnt hands a field
-          back.
-        </Text>
-        {fieldKeys.map((key) => (
-          <Stack key={key} gap={4}>
-            {input(key)}
-            {!own(key) &&
-              ((Object.hasOwn(data.preferences, key) && !resets.has(key)) ||
-                !same(draft[key], fields.learnt(data, key))) && (
-                <Button
-                  size="compact-sm"
-                  variant="subtle"
-                  w="fit-content"
-                  onClick={() => {
-                    setDraft({ ...draft, [key]: fields.learnt(data, key) });
-                    setResets(new Set([...resets, key]));
-                  }}
-                >
-                  Use Learnt {fieldLabels[key]}
-                </Button>
-              )}
-          </Stack>
-        ))}
-        {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <DialogFooter pending={save.isPending} onCancel={onClose}>
-          <Button type="submit" loading={save.isPending} disabled={!Object.keys(changes).length}>
-            Save
-          </Button>
-        </DialogFooter>
-      </Stack>
-    </form>
+    <Stack>
+      <Text size="sm" c="dimmed">
+        A field you change stays yours; Studio keeps learning the others. Use Learnt hands a field
+        back.
+      </Text>
+      {fieldKeys.map((key) => (
+        <Stack key={key} gap={4}>
+          {input(key)}
+          {!own(key) &&
+            ((Object.hasOwn(data.preferences, key) && !resets.has(key)) ||
+              !same(draft[key], fields.learnt(data, key))) && (
+              <Button
+                size="compact-sm"
+                variant="subtle"
+                w="fit-content"
+                onClick={() => {
+                  setDraft({ ...draft, [key]: fields.learnt(data, key) });
+                  setResets(new Set([...resets, key]));
+                }}
+              >
+                Use Learnt {fieldLabels[key]}
+              </Button>
+            )}
+        </Stack>
+      ))}
+      {save.error && <Alert color="red">{save.error.message}</Alert>}
+      <DialogFooter pending={save.isPending} onCancel={onClose}>
+        <Button
+          loading={save.isPending}
+          disabled={!Object.keys(changes).length}
+          onClick={() => save.mutate()}
+        >
+          Save
+        </Button>
+      </DialogFooter>
+    </Stack>
   );
 }
 
