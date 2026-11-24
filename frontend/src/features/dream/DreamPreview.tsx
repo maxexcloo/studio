@@ -63,8 +63,10 @@ function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?
           .join(" · ")
       : "");
   const [direction, ...details] = why.split(" · ");
-  const heading = title || direction || item.resultSet?.variation || item.title;
-  const reason = title ? why : details.join(" · ");
+  // How a clip was made heads nothing when the subject can: it belongs in the reason.
+  const made = /^(?:Extended|Animated) with /.test(direction);
+  const heading = title || (made ? "" : direction) || item.resultSet?.variation || item.title;
+  const reason = title || made ? why : details.join(" · ");
   // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
     .filter((lora) => lora?.name && lora.enabled !== false)

@@ -135,6 +135,19 @@
 .overlay > * {
   pointer-events: auto;
 }
+/* On a phone the text sits tighter and its scrim fades over less of the media. */
+:where(:root[data-phone]) .overlay {
+  padding-top: 2.5rem;
+  background: linear-gradient(
+    to top,
+    rgb(0 0 0 / 0.84),
+    rgb(0 0 0 / 0.7) calc(100% - 2.5rem),
+    transparent
+  );
+}
+:where(:root[data-phone]) .caption {
+  padding-block: var(--mantine-spacing-xs);
+}
 .label {
   position: absolute;
   top: var(--mantine-spacing-sm);
@@ -230,6 +243,9 @@
   .buttons[data-comparison-size]
   .answer[data-size="large"] {
   --answer-size: clamp(44px, 14vw, 66px);
+}
+:where(:root[data-phone]:not([data-phone="sideways"])) .answer {
+  --answer-size: 52px;
 }
 :where(:root[data-phone="sideways"]) .answer {
   --answer-size: 50px;
@@ -381,7 +397,7 @@
 }
 .previewButtons {
   grid-area: 3 / 1;
-  padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm) 0;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm) 0;
   padding-inline: max(var(--mantine-spacing-sm), env(safe-area-inset-left))
     max(var(--mantine-spacing-sm), env(safe-area-inset-right));
   background: var(--studio-glass-chrome);
