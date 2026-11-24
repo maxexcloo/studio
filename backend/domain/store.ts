@@ -404,21 +404,24 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
-  /** The last started job per resource, for restoring its loaded model and LoRAs on restart. */
-  loadedJobs(): OwnedJob[] {
+  /** The resources jobs ran on, read from the index alone. */
+  jobResources(): string[] {
     return this.db
+      .prepare(`SELECT DISTINCT ${jobResource} AS resource FROM studio_queue`)
+      .all()
+      .map((row) => row.resource as string)
+      .filter(Boolean);
+  }
+
+  /** The last started job of a resource, for restoring its loaded model and LoRAs on restart. */
+  loadedJob(resource: string): OwnedJob | undefined {
+    const row = this.db
       .prepare(
-        `SELECT record FROM studio_queue WHERE rowid IN (
-          SELECT job_rowid FROM (
-            SELECT rowid AS job_rowid, row_number() OVER (
-              PARTITION BY json_extract(record, '$.resource')
-              ORDER BY json_extract(record, '$.updatedAt') DESC, created_at DESC, rowid DESC
-            ) AS position FROM studio_queue WHERE status NOT IN (${placeholders(pendingStatuses)}, 'cancelled')
-          ) WHERE position = 1
-        )`,
+        `SELECT record FROM studio_queue WHERE ${jobResource} = ? AND status NOT IN (${placeholders(pendingStatuses)}, 'cancelled')
+         ORDER BY json_extract(record, '$.updatedAt') DESC, created_at DESC, rowid DESC LIMIT 1`,
       )
-      .all(...pendingStatuses)
-      .map((row) => JSON.parse(row.record as string));
+      .get(resource, ...pendingStatuses);
+    return row ? JSON.parse(row.record as string) : undefined;
   }
 
   /** Journal the confirmed provider failure before it is published to the in-memory adapter. */
