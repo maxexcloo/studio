@@ -220,12 +220,10 @@ function ProjectDetail({
   project,
   projects,
   profileLabel,
-  onDelete,
 }: {
   project: Project;
   projects: Project[];
   profileLabel: (id: string) => string;
-  onDelete: () => void;
 }) {
   const client = useQueryClient();
   const stats = useQuery(projectsQuery).data?.stats[project.id];
@@ -319,20 +317,13 @@ function ProjectDetail({
           <EmptyState fill>No Changes</EmptyState>
         )}
       </SettingGroup>
-      <SettingGroup danger>
-        <SettingRow label="Delete Project" description="Chats using it keep going without it.">
-          <Button size="compact-sm" color="red" variant="light" onClick={onDelete}>
-            Delete
-          </Button>
-        </SettingRow>
-      </SettingGroup>
     </Stack>
   );
 }
 
 /**
  * A project's detail view at /dream/projects/:projectId: its switches, brief, constraints, pending
- * proposals, results, chats, changes with Undo and Delete; Edit opens the project's editor. Once
+ * proposals, results, chats and changes with Undo; Edit opens the project's editor. Once
  * `projects` load, an id none of them has says so.
  */
 export function ProjectSheet({
@@ -340,14 +331,12 @@ export function ProjectSheet({
   projects,
   profileLabel,
   onEdit,
-  onDelete,
   onClose,
 }: {
   projectId?: string;
   projects?: Project[];
   profileLabel: (id: string) => string;
   onEdit: (project: Project) => void;
-  onDelete: (project: Project) => void;
   onClose: () => void;
 }) {
   const id = useId();
@@ -385,12 +374,7 @@ export function ProjectSheet({
           <EmptyState fill>That project no longer exists.</EmptyState>
         ) : (
           shown && (
-            <ProjectDetail
-              project={shown}
-              projects={projects || []}
-              profileLabel={profileLabel}
-              onDelete={() => onDelete(shown)}
-            />
+            <ProjectDetail project={shown} projects={projects || []} profileLabel={profileLabel} />
           )
         )}
         <DialogFooter
