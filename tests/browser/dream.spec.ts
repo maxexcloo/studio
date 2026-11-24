@@ -1140,7 +1140,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
   const answers = viewer.getByRole("group", { name: "Dream Actions" });
-  for (const name of ["Pass", "Super Like", "Accept", "Both", "Suggestions"])
+  for (const name of ["Pass Both", "Pass", "Super Like", "Accept", "Accept Both", "Suggestions"])
     await expect(answers.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
   await expect(viewer.getByRole("button", { name: "Close Preview" })).toBeFocused();
   await page.keyboard.press("Escape");
@@ -1172,7 +1172,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await undo.click();
   await expect(third).toContainText("Guidance 3");
   await third.getByRole("button", { name: "View A · Guidance 3", exact: true }).click();
-  await viewer.getByRole("button", { name: "Both", exact: true }).click();
+  await viewer.getByRole("button", { name: "Accept Both", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`))
@@ -1223,7 +1223,15 @@ test("A three-way comparison fits a small phone and can accept the selected side
   await card.getByRole("button", { name: "View C · Bold", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const previewActions = preview.getByRole("group", { name: "Dream Actions" });
-  for (const name of ["Undo", "Pass", "Super Like", "Accept", "All", "Suggestions"])
+  for (const name of [
+    "Undo",
+    "Pass All",
+    "Pass",
+    "Super Like",
+    "Accept",
+    "Accept All",
+    "Suggestions",
+  ])
     await expect(previewActions.getByRole("button", { name, exact: true })).toBeInViewport({
       ratio: 1,
     });
@@ -1433,7 +1441,7 @@ test("The preview swipes between comparison sides and Super Likes the shown imag
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Both", "Suggestions"]);
+    .toEqual(["Undo", "Pass Both", "Pass", "Super Like", "Accept", "Accept Both", "Suggestions"]);
   await answers.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();

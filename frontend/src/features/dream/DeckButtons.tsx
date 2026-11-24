@@ -15,8 +15,8 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   discard: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
   like: { glyph: <icons.superLike size={28} strokeWidth={2.5} />, color: likeColour },
   keep: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
-  neither: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
-  both: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
+  neither: { glyph: <icons.passAll size={28} strokeWidth={2.5} />, color: "red" },
+  both: { glyph: <icons.keepAll size={28} strokeWidth={2.5} />, color: "green" },
 };
 
 /** Undo and Suggestions, the smaller bordered controls either side of the verdicts. */
