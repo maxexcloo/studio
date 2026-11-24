@@ -170,6 +170,8 @@ export interface MediaItem {
   status: string;
   prompt?: string;
   negative?: string;
+  /** What was typed before the prompt assistant rewrote it as `prompt`. */
+  originalPrompt?: string;
   /** The prompt a provider's moderation refused; `prompt` is the assistant's softened retry. */
   refusedPrompt?: string;
   /** What MCP removed from the prompt for the account's Taste exclusions. */

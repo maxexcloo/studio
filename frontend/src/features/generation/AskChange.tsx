@@ -52,7 +52,7 @@ export function useAskChange<T>({
 }: {
   /** Asks for `request` to the text `typed`, as it was before any proposal. */
   ask: (request: string, typed: T) => Promise<Suggestions<Change>>;
-  show?: (proposal: Change) => void;
+  show?: (proposal: Change, typed: T) => void;
   restore?: (typed: T) => void;
 }) {
   const assistant = useQuery(assistantQuery);
@@ -63,7 +63,7 @@ export function useAskChange<T>({
       if (answer.reason) return void notifications.show({ message: answer.reason });
       const proposal = answer.suggestions[0];
       setChange({ proposal, typed });
-      show?.(proposal);
+      show?.(proposal, typed);
     },
   });
   return {
