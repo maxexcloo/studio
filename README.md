@@ -31,9 +31,9 @@ mise run setup
 mise run dev
 ```
 
-Open the address printed by the development server. Use `mise run dev:demo` for a preview with sample data and no GPU. Run `mise run check` before opening a pull request.
+Open the address printed by the development server. Use `mise run dev:demo` for a preview with sample data and no GPU. Run `mise run test` for the app tests. The full `mise run check` needs the shared Mise tasks configured in [CI](.github/workflows/container.yaml).
 
-Without Mise, install FFmpeg, run `npm ci` and start `node dev.mjs --demo`. The full check uses the shared tasks configured in [CI](.github/workflows/container.yaml).
+Without Mise, install FFmpeg, run `npm ci` and start `node dev.mjs --demo`.
 
 ## Credits & Licence
 
