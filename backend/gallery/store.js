@@ -670,6 +670,7 @@ export function* galleryRuns(since, size = 200) {
     const rows = statement(
       `SELECT key, status, rating, created_ms,
          json_extract(value, '$.settings.profileId') AS profileId,
+         json_extract(value, '$.timing.queueMs') AS queueMs,
          json_extract(value, '$.timing.runMs') AS runMs
        FROM studio_gallery INDEXED BY studio_gallery_runs
        WHERE (created_ms, key) > (?, ?) AND unlisted = 0 AND status IN ('done', 'failed')
@@ -683,7 +684,7 @@ export function* galleryRuns(since, size = 200) {
         rating: row.rating,
         createdAt: row.createdAt,
         settings: { profileId: row.profileId },
-        timing: { runMs: row.runMs },
+        timing: { queueMs: row.queueMs, runMs: row.runMs },
       }));
     if (rows.length < size) return;
     after = [rows.at(-1).created_ms, rows.at(-1).key];

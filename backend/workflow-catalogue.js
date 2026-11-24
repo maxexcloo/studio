@@ -16,6 +16,7 @@ import {
 import { dataDir } from "./data-dir.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { validateProfileText } from "./profile/editor.js";
+import { isRadianceNode } from "./providers/radiance.ts";
 import { workflowRisks } from "./workflow-risk.js";
 
 let preferencesCache = null;
@@ -94,7 +95,12 @@ function controlsList(controls = {}) {
 }
 
 /** A custom workflow's issues and warnings, with what it lacks on the worker (`info`). */
-export function validateWorkflow(workflow, info = {}, profile = null) {
+export function validateWorkflow(workflow, info = {}) {
+  // Grok and Radiance run the graph themselves, taking references by role rather than by input and
+  // saving their own output, so ComfyUI has nothing to check.
+  const atProvider =
+    usesGrokMedia(workflow) ||
+    Object.values(workflow.graph || {}).some((node) => isRadianceNode(node?.class_type));
   // Without ComfyUI's node list we can't tell a missing node from an offline server,
   // so node checks are skipped and the result is marked unverified instead.
   const online = Object.keys(info || {}).length > 0;
@@ -127,6 +133,7 @@ export function validateWorkflow(workflow, info = {}, profile = null) {
       issues.push(
         `Reference input ${mediaInput.label || mediaInput.id} requires ${mediaInput.min} images but its mapping accepts one filename.`,
       );
+    if (atProvider) continue;
     const mapping = mediaInput.control;
     const node = mapping?.node ? graphNode(mapping.node) : null;
     if (!mapping?.node || !mapping?.input)
@@ -157,11 +164,10 @@ export function validateWorkflow(workflow, info = {}, profile = null) {
   }
   if (workflow.kind !== "image" && workflow.kind !== "video")
     issues.push(`Unsupported workflow kind: ${workflow.kind}`);
-  // A Grok profile runs at its provider (providers/profiles.ts): it has no ComfyUI output to save.
   if (
     workflow.graph &&
     Object.keys(workflow.graph).length &&
-    !usesGrokMedia(workflow) &&
+    !atProvider &&
     !Object.values(workflow.graph).some((node) =>
       /Save|Preview|Video/i.test(node?.class_type || ""),
     )
@@ -169,8 +175,8 @@ export function validateWorkflow(workflow, info = {}, profile = null) {
     warnings.push("The workflow has no Save Image or other output node.");
   }
   return {
-    ok: issues.length === 0 && (profile ? true : !workflow.profileId || Boolean(profile)),
-    unverified: !online,
+    ok: issues.length === 0,
+    unverified: !online && !atProvider,
     issues,
     warnings,
     missingNodes: issues
@@ -264,7 +270,7 @@ export function workflowSummaries({
   const known = new Set(summaries.map((item) => item.profileId));
   for (const workflow of customRecords) {
     if (known.has(workflow.profileId)) continue;
-    const validation = validateWorkflow(workflow, info, null);
+    const validation = validateWorkflow(workflow, info);
     const summary = {
       id: workflow.profileId,
       profileId: workflow.profileId,
@@ -357,7 +363,6 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
       capabilities: detected.capabilities,
     },
     info,
-    null,
   );
   return {
     filename,
