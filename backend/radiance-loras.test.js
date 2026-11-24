@@ -164,49 +164,45 @@ test("a run with LoRAs moves to the stack's model, records it, and takes the ada
   ]);
 });
 
-test("Noct profiles refuse optional LoRAs and keep their fixed adapters only on a base that takes them", async () => {
-  const id = "custom:noct-adapter";
+test("Noct takes optional LoRAs after its fixed Lightning adapter only on its bf16 base", async () => {
   const lightning = { name: "qwen-image-2.1-lightning-4step", strength: 1 };
-  const profile = raw(
-    {
-      adapter: "radiance-tags-v1",
-      node: "1",
-      model: "qwen-image-2.1-bf16",
-      loras: [lightning],
-    },
-    "noct-adapter",
-  );
-  profile.studio.family = "qwen_image_21";
-  profile.studio.controls.model = { node: "1", input: "model" };
-  profile.graph[1].inputs.model = "noctq-v4-iq8r";
-  profile.graph[1].inputs.loras = JSON.stringify([lightning]);
-  saveImportedWorkflow(profile);
+  const slider = { name: "slider.safetensors", strength: 0.8 };
+  loraCatalogue().edit(`loras/${slider.name}`, { families: ["qwen_image_21"] });
   const info = radianceInfo(
     [{ id: "noctq-v4-iq8r" }, { id: "noctq-v4-bf16" }, { id: "qwen-image-2.1-bf16" }],
     ["slider.safetensors"],
   );
-  const [listed] = inferModels(info).profiles.filter((entry) => entry.id === id);
+  const noct = (id, model) => {
+    const profile = raw({ adapter: "radiance-tags-v1", node: "1", max: 3 }, id);
+    profile.studio.family = "qwen_image_21";
+    profile.graph[1].inputs.model = model;
+    profile.graph[1].inputs.loras = JSON.stringify([lightning]);
+    saveImportedWorkflow(profile);
+    return { workflow: `custom:${id}`, model: `custom:${id}`, prompt, loras: [slider] };
+  };
+
+  const quantised = noct("noct-iq8r", "noctq-v4-iq8r");
+  const [listed] = inferModels(info).profiles.filter((entry) => entry.id === quantised.workflow);
   assert.equal(listed.capabilities.lora, false);
   assert.deepEqual(listed.options.loras, []);
-  const body = {
-    workflow: id,
-    model: id,
-    prompt,
-    loras: [{ name: "slider.safetensors", strength: 1 }],
-  };
-  assert.throws(() => sanitizeGenerateBody(body, info), /takes no LoRAs on noctq-v4-iq8r/);
+  assert.throws(() => sanitizeGenerateBody(quantised, info), /takes no LoRAs on noctq-v4-iq8r/);
   assert.throws(
-    () => sanitizeGenerateBody({ ...body, modelName: "qwen-image-2.1-bf16" }, info),
+    () => sanitizeGenerateBody({ ...quantised, modelName: "qwen-image-2.1-bf16" }, info),
     /takes no LoRAs on noctq-v4-iq8r/,
   );
+  assert.equal((await customWorkflowGraph(quantised))[1].inputs.loras, "[]");
+
+  const bf16 = noct("noct-bf16", "noctq-v4-bf16");
+  const body = sanitizeGenerateBody(bf16, info);
+  assert.deepEqual(
+    body.loras.map(({ name }) => name),
+    [slider.name],
+  );
   const graph = await customWorkflowGraph(body);
-  assert.equal(graph[1].inputs.model, "noctq-v4-iq8r");
-  assert.equal(graph[1].inputs.loras, "[]");
-  const overridden = await customWorkflowGraph({ ...body, modelName: "qwen-image-2.1-bf16" });
-  assert.deepEqual(JSON.parse(overridden[1].inputs.loras), [lightning]);
-  const bf16 = await customWorkflowGraph({ ...body, loras: [], modelName: "noctq-v4-bf16" });
-  assert.equal(bf16[1].inputs.model, "noctq-v4-bf16");
-  assert.deepEqual(JSON.parse(bf16[1].inputs.loras), [lightning]);
+  assert.equal(graph[1].inputs.model, "noctq-v4-bf16");
+  assert.deepEqual(JSON.parse(graph[1].inputs.loras), [lightning, slider]);
+  const plain = await customWorkflowGraph({ ...bf16, loras: [] });
+  assert.deepEqual(JSON.parse(plain[1].inputs.loras), [lightning]);
 });
 
 test("Radiance checks catalogue families and exact base constraints against the model that runs the stack", async () => {
