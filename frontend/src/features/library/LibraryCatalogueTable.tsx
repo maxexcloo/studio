@@ -206,6 +206,36 @@ export function LibraryCatalogueTable({
         compareNames(resourceName(a), resourceName(b)),
     );
   const filterCount = Number(!!family) + Number(!!type) + Number(!!modelType);
+  // A filter shows only where its choices would narrow the list.
+  const types = unique(items.map(resourceType));
+  const modelTypesFound = unique(items.map((item) => item.modelType || "unclassified"));
+  const filterChoices = [
+    families.length > 1 && (
+      <FilterChoices
+        key="family"
+        label="Family"
+        data={families}
+        value={family}
+        onChange={setFamily}
+      />
+    ),
+    models && types.length > 1 && (
+      <FilterChoices key="type" label="Type" data={types} value={type} onChange={setType} />
+    ),
+    withModelType && modelTypesFound.length > 1 && (
+      <FilterChoices
+        key="model-type"
+        label="Model Type"
+        data={[
+          { value: "original", label: "Original" },
+          { value: "finetune", label: "Fine-Tune" },
+          { value: "unclassified", label: "Unclassified" },
+        ].filter(({ value }) => modelTypesFound.includes(value))}
+        value={modelType}
+        onChange={setModelType}
+      />
+    ),
+  ].filter(Boolean);
   const unclassified = items.filter((item) => libraryItemCategory(item) === "unclassified").length;
   return (
     <Stack gap="md">
@@ -217,31 +247,7 @@ export function LibraryCatalogueTable({
           onViewChange={setView}
           query={query}
           onQueryChange={setQuery}
-          filters={
-            <>
-              <FilterChoices label="Family" data={families} value={family} onChange={setFamily} />
-              {models && (
-                <FilterChoices
-                  label="Type"
-                  data={unique(items.map(resourceType))}
-                  value={type}
-                  onChange={setType}
-                />
-              )}
-              {withModelType && (
-                <FilterChoices
-                  label="Model Type"
-                  data={[
-                    { value: "original", label: "Original" },
-                    { value: "finetune", label: "Fine-Tune" },
-                    { value: "unclassified", label: "Unclassified" },
-                  ]}
-                  value={modelType}
-                  onChange={setModelType}
-                />
-              )}
-            </>
-          }
+          filters={filterChoices.length ? filterChoices : undefined}
           filterCount={filterCount}
           onClearFilters={() => {
             setFamily(null);

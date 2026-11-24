@@ -405,7 +405,7 @@ export function LibraryImports({
           view={view}
           onViewChange={setView}
           query={query}
-          onQueryChange={records.length ? setQuery : undefined}
+          onQueryChange={setQuery}
           actions={
             <>
               {view === "action" && stale > 0 && (

@@ -225,6 +225,7 @@ export function PromptInstructions({
   const list = useQuery(promptInstructionsQuery);
   const [query, setQuery] = useState("");
   const [suggests, setSuggests] = useState<string | null>(null);
+  const [edited, setEdited] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     instruction: PromptInstruction;
     restored?: string;
@@ -235,9 +236,12 @@ export function PromptInstructions({
   const mixed = new Set(inArea.map(({ suggestions }) => Boolean(suggestions))).size > 1;
   const writes = ({ suggestions }: PromptInstruction) =>
     suggestions ? "Suggestions" : "Prompts & Text";
+  // Edited (its Version column reads vN) and Default filter only where the page holds both.
+  const edits = new Set(inArea.map(({ version }) => version !== null)).size > 1;
   const instructions = inArea.filter(
     (instruction) =>
-      !mixed || !suggests || Boolean(instruction.suggestions) === (suggests === "suggestions"),
+      (!mixed || !suggests || Boolean(instruction.suggestions) === (suggests === "suggestions")) &&
+      (!edits || !edited || (instruction.version !== null) === (edited === "edited")),
   );
   const phone = usePhone();
   return (
@@ -247,20 +251,38 @@ export function PromptInstructions({
           label={label}
           query={query}
           onQueryChange={setQuery}
-          {...(mixed && {
+          {...((mixed || edits) && {
             filters: (
-              <FilterChoices
-                label="Writes"
-                data={[
-                  { value: "prompts", label: "Prompts & Text" },
-                  { value: "suggestions", label: "Suggestions" },
-                ]}
-                value={suggests}
-                onChange={setSuggests}
-              />
+              <>
+                {edits && (
+                  <FilterChoices
+                    label="Version"
+                    data={[
+                      { value: "default", label: "Default" },
+                      { value: "edited", label: "Edited" },
+                    ]}
+                    value={edited}
+                    onChange={setEdited}
+                  />
+                )}
+                {mixed && (
+                  <FilterChoices
+                    label="Writes"
+                    data={[
+                      { value: "prompts", label: "Prompts & Text" },
+                      { value: "suggestions", label: "Suggestions" },
+                    ]}
+                    value={suggests}
+                    onChange={setSuggests}
+                  />
+                )}
+              </>
             ),
-            filterCount: Number(suggests !== null),
-            onClearFilters: () => setSuggests(null),
+            filterCount: Number(mixed && suggests !== null) + Number(edits && edited !== null),
+            onClearFilters: () => {
+              setSuggests(null);
+              setEdited(null);
+            },
           })}
         />
       </SectionHeader>
@@ -274,7 +296,7 @@ export function PromptInstructions({
           rowName={({ label }) => label}
           loading={list.isPending && `Loading ${label}`}
           query={query}
-          searchText={({ label, text }) => [label, text]}
+          searchText={({ label, text, usedBy }) => [label, usedBy, text]}
           empty={`No ${label}`}
           initialSort={{ key: "name", descending: false }}
           columns={[
@@ -286,6 +308,7 @@ export function PromptInstructions({
               cell: (instruction) => (
                 <TableRecord
                   name={instruction.label}
+                  detail={`Used by ${instruction.usedBy}`}
                   openLabel={`Edit ${instruction.label}`}
                   onOpen={() => setEditing({ instruction })}
                 />

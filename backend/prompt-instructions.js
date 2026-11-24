@@ -5,6 +5,7 @@ import { currentDataDir } from "./data-dir.js";
 import { readJsonFile } from "./json-store.js";
 import { conflict, hashOf, versionsIn, writeVersion } from "./profile/store.js";
 import { promptInstructionDefaults } from "./prompt-instruction-defaults.js";
+import { promptInstructionUsedBy } from "./prompt-instruction-used-by.js";
 
 const failure = (message, status = 400) => Object.assign(new Error(message), { status });
 const maxInstructionLength = 24_000;
@@ -27,6 +28,7 @@ function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
     const record = Object.freeze({
       id,
       ...details,
+      usedBy: promptInstructionUsedBy[id],
       text,
       initial,
       hash: hashOf({ text, number }),

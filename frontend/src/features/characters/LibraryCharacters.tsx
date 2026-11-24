@@ -38,7 +38,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
         <SectionToolbar
           label="Characters"
           query={query}
-          onQueryChange={characters.data?.length ? setQuery : undefined}
+          onQueryChange={setQuery}
           actions={
             <>
               <SortMenu

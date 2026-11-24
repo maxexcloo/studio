@@ -113,6 +113,8 @@ test("Library prompt edits reach the writer immediately and preserve history and
   // The preview has an example for every variable an instruction can hold.
   for (const { initial } of listing.body.instructions)
     for (const name of promptVariables(initial)) assert.ok(name in listing.body.examples, name);
+  // Library names where Studio uses each one.
+  for (const { id, usedBy } of listing.body.instructions) assert.ok(usedBy, id);
 
   const edit = `${path}/${title.id}`;
   assert.equal(

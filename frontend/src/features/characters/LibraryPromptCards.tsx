@@ -42,7 +42,7 @@ export function LibraryPromptCards({
         <SectionToolbar
           label={label}
           query={query}
-          onQueryChange={listing.data?.length ? setQuery : undefined}
+          onQueryChange={setQuery}
           actions={
             <>
               <SortMenu

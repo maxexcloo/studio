@@ -345,16 +345,18 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           label="Models"
           query={profileQuery}
           onQueryChange={setProfileQuery}
-          filters={
-            <FilterChoices
-              label="Family"
-              data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
-              value={family}
-              onChange={setFamily}
-            />
-          }
-          filterCount={Number(!!family)}
-          onClearFilters={() => setFamily(null)}
+          {...(families.length > 1 && {
+            filters: (
+              <FilterChoices
+                label="Family"
+                data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
+                value={family}
+                onChange={setFamily}
+              />
+            ),
+            filterCount: Number(!!family),
+            onClearFilters: () => setFamily(null),
+          })}
           actions={
             <>
               <ToolbarAction
