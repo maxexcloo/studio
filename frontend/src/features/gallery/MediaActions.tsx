@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { CardKind } from "../../../../shared/characters";
+import { recreationPrompt } from "../../../../shared/media";
 import type { VariationDirection } from "../../../../shared/suggestions";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -339,9 +340,12 @@ export function useMediaActions(
       ),
   });
   const moreLike: Action[] =
-    ready && !item.uploaded && item.jobId && assisted
+    ready && assisted
       ? [
-          ...(image && (item.prompt?.trim() || typedPrompt(item).trim())
+          ...(image &&
+          (item.jobId
+            ? !item.uploaded && (item.prompt?.trim() || typedPrompt(item).trim())
+            : recreationPrompt(item))
             ? [
                 {
                   id: "more-like-image",
@@ -352,7 +356,7 @@ export function useMediaActions(
                 },
               ]
             : []),
-          ...(item.resultSet
+          ...(item.jobId && !item.uploaded && item.resultSet
             ? [
                 {
                   id: "more-like-set",

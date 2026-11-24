@@ -1,6 +1,7 @@
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { recreationPrompt } from "../../../../shared/media";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useDraft, useGeneration } from "../generation/GenerationProvider";
@@ -9,9 +10,8 @@ import { queueQuery } from "../generation/Queue";
 import { galleryKey } from "./queries";
 
 /**
- * Recreate › Run Suggested Prompts for several uploads at once: each with a suggested prompt queues that
- * prompt with the composer's model and settings, as a version of the upload
- * (backend/gallery/recreate.js). The notice counts those still without a prompt.
+ * Recreate › Run Suggested Prompts queues each upload from its saved text on the composer's model,
+ * as a version of the upload (backend/gallery/recreate.js).
  */
 export function useRecreateMany() {
   const { input } = useDraft();
@@ -22,20 +22,22 @@ export function useRecreateMany() {
       if (!profile) throw new Error("Choose an available model first.");
       // The draft's negative prompt is read live; one copy keeps every recreation on the same draft.
       const base = { ...input };
-      const ready = items.filter((item) => item.status === "done" && item.suggestedPrompt);
+      const ready = items.filter((item) => item.status === "done" && recreationPrompt(item));
+      let waiting = items.length - ready.length;
       let queued = 0;
       const failed: { id: string; reason: string }[] = [];
       for (const item of ready) {
         try {
-          const { sessionId, jobId } = await post<{ sessionId: string; jobId: string }>(
-            "/api/gallery/recreate",
-            { galleryItemId: item.id },
-          );
+          const { sessionId, jobId, prompt } = await post<{
+            sessionId: string;
+            jobId: string;
+            prompt: string;
+          }>("/api/gallery/recreate", { galleryItemId: item.id, savedPromptOnly: true });
           await post(`/api/sessions/${sessionId}/generations`, {
             ...generationInput(
               {
                 ...base,
-                prompt: item.suggestedPrompt || "",
+                prompt,
                 seed: "",
                 referenceAssets: [],
                 referenceDetails: [],
@@ -49,13 +51,20 @@ export function useRecreateMany() {
           });
           queued += 1;
         } catch (error) {
+          if (
+            error instanceof Error &&
+            (error.cause as { reason?: string } | undefined)?.reason === "no-saved-prompt"
+          ) {
+            waiting += 1;
+            continue;
+          }
           failed.push({
             id: item.id,
             reason: error instanceof Error ? error.message : String(error),
           });
         }
       }
-      return { queued, failed, waiting: items.length - ready.length };
+      return { queued, failed, waiting };
     },
     onSuccess: ({ queued, failed, waiting }) => {
       // Queued recreations show in the gallery; only what didn't queue needs saying.
@@ -67,7 +76,7 @@ export function useRecreateMany() {
             ? `Queued ${queued} ${queued === 1 ? "recreation" : "recreations"}.`
             : "Nothing was queued.",
           waiting > 0 &&
-            `${waiting} ${waiting === 1 ? "upload has" : "uploads have"} no suggested prompt yet.`,
+            `${waiting} ${waiting === 1 ? "upload has" : "uploads have"} no saved prompt or caption yet.`,
           failed.length > 0 && `${failed.length} failed: ${failed[0].reason}`,
         ]
           .filter(Boolean)

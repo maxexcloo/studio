@@ -997,7 +997,14 @@ export async function fixtures(page: Page) {
           },
         ],
       });
-    if (["/api/gallery/captions", "/api/gallery/embeddings", "/api/gallery/faces"].includes(path))
+    if (
+      [
+        "/api/gallery/captions",
+        "/api/gallery/captions/me",
+        "/api/gallery/embeddings",
+        "/api/gallery/faces",
+      ].includes(path)
+    )
       return respond({
         state: "finished",
         active: false,

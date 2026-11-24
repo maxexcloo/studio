@@ -76,7 +76,7 @@ export function createCaptioner(options: {
   allowed(ownerId: string): boolean;
   /** The owner's text writer (account-policy.js `promptWriter`). */
   text(ownerId: string): PromptWriter;
-  items(since?: number): Iterable<CaptionItem>;
+  items(since?: number, after?: CaptionItem, ownerId?: string): Iterable<CaptionItem>;
   changes?(): number;
   visible(item: CaptionItem): boolean;
   /** A small (≤512 px) copy of the image, or null when there is none. */

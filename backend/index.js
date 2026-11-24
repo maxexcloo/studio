@@ -174,7 +174,12 @@ import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { minorAge } from "./minor-age.js";
-import { createModelCatalogue, dreamCatalogue, modelsForAccount } from "./model/catalogue.js";
+import {
+  createModelCatalogue,
+  dreamCatalogue,
+  modelsForAccount,
+  withPreferredDefaults,
+} from "./model/catalogue.js";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { buildProfile, offlineModelResult } from "./model/models.js";
 import { registerModelRoutes } from "./model/routes.js";
@@ -830,6 +835,16 @@ registerResultSetRoutes(app, {
   store,
   admit: admitGeneration,
   item: resultItem,
+  defaultImageProfile: async (ownerId, account) => {
+    const { models } = await mediaModels(false);
+    const { profiles, defaults } = withPreferredDefaults(
+      modelsForAccount(models, { studioAccount: account }),
+      accountPreferences(ownerId),
+    );
+    return profiles.find(
+      (profile) => profile.kind === "image" && profile.id === defaults.imageModel,
+    );
+  },
 });
 registerMigrationRoutes(app, {
   dataDir,
@@ -1205,8 +1220,8 @@ async function smallImage(item, upscaled = false) {
   return { mime: "image/jpeg", data: data.toString("base64") };
 }
 // The gallery as idle work walks it (domain/idle-work.ts).
-const idleItems = (since, after) =>
-  eachGalleryItem({ since, status: "done" }, after && galleryKey(after));
+const idleItems = (since, after, ownerId) =>
+  eachGalleryItem({ since, status: "done", ownerId }, after && galleryKey(after));
 // Gallery captions (domain/captions.ts) let search match what an image shows.
 const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
@@ -1226,6 +1241,11 @@ const captioner = createCaptioner({
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
+registerIdlePassRoutes(app, "/api/gallery/captions/me", {
+  work: captioner,
+  requireAdmin,
+  owner: ownerIdForRequest,
+});
 // Self-review (domain/review.ts): recent results scored against their owner's rules and any project's brief.
 const selfReview = createReview({
   enabled: () => flagEnabled("STUDIO_SELF_REVIEW"),

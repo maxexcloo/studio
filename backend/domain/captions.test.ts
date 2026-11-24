@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { ownerIdForRequest } from "../account-ownership.js";
 import {
   type Caption,
   type CaptionItem,
@@ -8,7 +9,12 @@ import {
   captionVersion,
   createCaptioner,
 } from "./captions.ts";
-import { type IdleDocument, dailyItems, passConcurrency } from "./idle-work.ts";
+import {
+  type IdleDocument,
+  dailyItems,
+  passConcurrency,
+  registerIdlePassRoutes,
+} from "./idle-work.ts";
 
 const image = (id: string, ownerId = "alice", extra: Partial<CaptionItem> = {}): CaptionItem => ({
   id,
@@ -320,6 +326,78 @@ test("a stopped pass stays stopped across a restart; a running one resumes", asy
   assert.equal(await resumed.tick(), "done", "no spacing after a restart mid-pass");
   await resumed.settled();
   assert.equal((await resumed.status()).state, "finished");
+});
+
+test("a personal caption pass uses the signed-in owner, survives restart and keeps its own progress", async () => {
+  const { state, captioner, make } = fixture([
+    image("other", "bob", { caption: old }),
+    image("mine", "alice", { caption: old }),
+    image("fresh"),
+  ]);
+  state.idle = false;
+
+  type Handler = Parameters<Parameters<typeof registerIdlePassRoutes>[0]["post"]>[1];
+  const handlers = new Map<string, Handler>();
+  const route = "/api/gallery/captions/me";
+  const app = {
+    get: (path: string, handler: Handler) => handlers.set(path, handler),
+    post: (path: string, handler: Handler) => handlers.set(path, handler),
+  };
+  registerIdlePassRoutes(app, route, {
+    work: captioner,
+    requireAdmin: () => true,
+    owner: ownerIdForRequest,
+  });
+  const request = async (path: string, userId: string, body?: Record<string, unknown>) => {
+    let reply: unknown;
+    const req = { studioAccount: { userId }, body };
+    const res = { status: () => res, json: (value: unknown) => (reply = value) };
+    await handlers.get(route + path)!(req, res);
+    return reply as Awaited<ReturnType<typeof captioner.status>>;
+  };
+
+  const started = await request("/start", "alice", { scope: "outdated", ownerId: "bob" });
+  assert.equal(state.saved?.pass?.ownerId, "alice");
+  assert.deepEqual(started.scopes, { all: 2, outdated: 2, missing: 1 });
+  assert.equal(started.active, true);
+  const other = await request("", "bob");
+  assert.deepEqual([other.active, other.blocked, other.done, other.remaining], [false, true, 0, 1]);
+  await assert.rejects(request("/stop", "bob"), { status: 409 });
+  await assert.rejects(request("/start", "bob"), { status: 409 });
+  assert.throws(() => captioner.stopPass(), { status: 409 });
+  await captioner.settled();
+
+  const restarted = make();
+  state.idle = true;
+  await restarted.tick();
+  await restarted.settled();
+  assert.deepEqual(state.sent.sort(), ["fresh", "mine"]);
+  assert.deepEqual(state.items[0].caption, old);
+  const done = await restarted.status("alice");
+  assert.deepEqual([done.state, done.done, done.total, done.remaining], ["finished", 2, 2, 0]);
+  const global = await restarted.status();
+  assert.equal(global.done, 0);
+  assert.equal(global.remaining, 1);
+});
+
+test("stopping a personal caption pass leaves another owner's automatic caption running", async () => {
+  const { state, captioner, release } = fixture([image("other", "bob"), image("mine")]);
+  state.hold = true;
+  const trickle = captioner.tick();
+  await settle();
+  assert.deepEqual(state.sent, ["other"]);
+  captioner.startPass("outdated", "alice");
+  await settle();
+  assert.deepEqual(state.sent, ["other", "mine"]);
+  captioner.stopPass("alice");
+  await captioner.settled();
+  assert.equal(state.open, 1);
+  const stopped = await captioner.status("alice");
+  assert.deepEqual([stopped.state, stopped.done, stopped.remaining], ["stopped", 0, 1]);
+  assert.equal(state.items[1].caption, undefined);
+  release();
+  assert.equal(await trickle, "done");
+  assert.equal(state.items[0].caption?.version, captionVersion());
 });
 
 test("status counts the gallery again only once it changes", async () => {

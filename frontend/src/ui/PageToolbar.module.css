@@ -12,3 +12,8 @@
   padding-inline: max(var(--app-shell-padding), env(safe-area-inset-left))
     max(var(--app-shell-padding), env(safe-area-inset-right));
 }
+
+:where(:root[data-phone][data-standalone]) .band {
+  background: var(--mantine-color-body);
+  backdrop-filter: none;
+}
