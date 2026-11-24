@@ -716,6 +716,7 @@ test("Bulk accepting visible substitutes keeps the failed choice selected for re
     return route.fulfill({ json: { import: record } });
   });
   await page.goto("/library#imports");
+  await chooseView(page, "Imports", "Needs Action");
   const search = await toolbarSearch(page, "Imports");
   await search.fill("Close Recipe");
   const table = page.getByRole("table", { name: "Substitutes", exact: true });
@@ -880,6 +881,7 @@ test("Library shows import grades and what each imported image is missing", asyn
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An unsaved owl");
   await page.goto("/library#imports");
+  await chooseView(page, "Imports", "Needs Action");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(
     page.getByText("watercolour.safetensors: Not downloaded yet", { exact: true }),

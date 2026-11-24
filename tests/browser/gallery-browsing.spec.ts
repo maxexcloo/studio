@@ -1546,7 +1546,7 @@ test("Gallery Dates jumps past unloaded pages and scrolls either way from the ch
   await expect(scrubber).toBeHidden();
 });
 
-test("The Tags facet lists the most used caption tags with counts and filters by them", async ({
+test("The Tags facet lists caption tags by name with counts and filters by them", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -1561,10 +1561,10 @@ test("The Tags facet lists the most used caption tags with counts and filters by
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  // A list, most used first, each with its count.
+  // A list by name, each with its count.
   await page.getByRole("combobox", { name: "Tags", exact: true }).click();
   const options = page.getByRole("listbox").getByRole("option");
-  await expect(options).toHaveText(["beach2", "sunset2", "snow1"]);
+  await expect(options).toHaveText(["beach2", "snow1", "sunset2"]);
   await options.filter({ hasText: "snow" }).click();
   await expect.poll(() => state.galleryRequests.at(-1)).toContain("tag=snow");
   await page.keyboard.press("Escape");
@@ -2546,9 +2546,11 @@ test("Comparisons open all variants and filter by the comparison rating", async 
   await filter("All");
   const card = page.getByRole("button", { name: "Open Comparison: Browse Result 0", exact: true });
   await expect(card).toBeVisible();
-  await expect(page.getByText(/^2 Variants\b/)).toHaveCount(2);
+  // All hides the disliked comparison.
+  await expect(dreamCard).toHaveCount(0);
+  await expect(page.getByText(/^2 Variants\b/)).toHaveCount(1);
   // One card per comparison, without the gallery's tiles.
-  await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: /^Open (Comparison|image):/ })).toHaveCount(1);
   await card.click();
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   for (const label of ["Variant A", "Variant B"])
