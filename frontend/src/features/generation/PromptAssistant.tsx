@@ -66,7 +66,6 @@ const workingLabels: Record<Action, string> = {
 export const assistantQuery = queryOptions({
   queryKey: ["assistant"],
   queryFn: () => api<AssistantStatus>("/api/assistant"),
-  retry: false,
 });
 
 async function referenceImage(asset: ReferenceAsset, signal: AbortSignal) {

@@ -265,7 +265,6 @@ export const galleryItemQuery = (id: string) =>
   queryOptions({
     queryKey: ["gallery-item", id],
     queryFn: () => api<{ item: MediaItem }>(`/api/gallery/items/${encodeURIComponent(id)}`),
-    retry: false,
   });
 
 /** Resolves an account's result number without changing the media-ID API used by Details. */
@@ -274,6 +273,5 @@ export const viewerItemQuery = (id: string) =>
     ? queryOptions({
         queryKey: [...galleryKey, "result", id],
         queryFn: () => api<{ item: MediaItem }>(`/api/gallery/results/${id}`),
-        retry: false,
       })
     : galleryItemQuery(id);

@@ -325,7 +325,6 @@ function Gallery() {
   const refresh = useQuery({
     queryKey: refreshKey,
     enabled: false,
-    retry: false,
     queryFn: async ({ signal }) => {
       const held =
         client.getQueryData<InfiniteData<GalleryResultsPage, GalleryPageParam>>(listingKey);

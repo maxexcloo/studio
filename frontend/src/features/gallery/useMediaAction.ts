@@ -77,7 +77,6 @@ export const animateProfileQuery = (
         `/api/animate/profile?width=${item.width || 0}&height=${item.height || 0}${profileId ? `&profileId=${encodeURIComponent(profileId)}` : ""}`,
       ),
     staleTime: 5000,
-    retry: false,
   });
 
 /** The same per-account Length setting in every Animate menu. */

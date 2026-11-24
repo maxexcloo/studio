@@ -32,11 +32,8 @@ const client = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 10_000,
-      // Reads ride out a restart (server errors and unreachable Studio); refusals fail at once.
-      retry: (count, error) => {
-        const { status } = error as { status?: number };
-        return count < 2 && (status === undefined || status >= 500);
-      },
+      // request() rides out a restart; other failures show at once.
+      retry: false,
       refetchOnWindowFocus: true,
     },
   },
