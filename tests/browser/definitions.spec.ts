@@ -571,6 +571,7 @@ test("Library edits a background prompt and reads the saved version back", async
     id: "summarise-taste",
     label: "Summarise Taste",
     area: "Dream",
+    usedBy: "the Taste summary",
     text: initial,
     initial,
     hash: "current",
@@ -601,6 +602,8 @@ test("Library edits a background prompt and reads the saved version back", async
   await openNav(page, "Library");
   await section(page, "Library", "Dream");
   const table = page.getByRole("table", { name: "Dream Instructions", exact: true });
+  // Each instruction says where Studio uses it.
+  await expect(table.getByText("Used by the Taste summary", { exact: true })).toBeVisible();
   const open = async () => {
     await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
