@@ -186,8 +186,14 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
 
 test("Edit and Recreate share Custom and review each operation separately", async ({ page }) => {
   const asked: any[] = [];
-  const { state, viewer } = await seed(page, {}, (page) =>
-    page.route("**/api/suggestions", (route) => {
+  const { state, viewer } = await seed(page, {}, async (page) => {
+    await serveProfiles(
+      page,
+      profiles.map((profile) =>
+        profile.id === "image:fast" ? { ...profile, editReferences: true } : profile,
+      ),
+    );
+    await page.route("**/api/suggestions", (route) => {
       const body = route.request().postDataJSON();
       if (body.surface !== "change") return route.fallback();
       asked.push(body);
@@ -203,8 +209,8 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
           ],
         },
       });
-    }),
-  );
+    });
+  });
   await viewerChangeMenu(page);
   await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
   await page.keyboard.press("Escape");
@@ -213,6 +219,10 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const editProfile = async (name: string) => {
     const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
     await profileMenu.click();
+    await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
+    await expect(
+      page.getByRole("menuitemradio", { name: "Image Quality", exact: true }),
+    ).toHaveCount(0);
     const choice = page.getByRole("menuitemradio", { name, exact: true });
     await choice.click();
     await expect(choice).toBeHidden();

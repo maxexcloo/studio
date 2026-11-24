@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+import { editsReferences } from "../../../../shared/characters";
 import type { MediaKind } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { useRemembered } from "../auth/useRemembered";
@@ -16,12 +17,16 @@ export function useActionProfile(kind: MediaKind) {
   );
   const profiles = useQuery(modelsQuery).data?.profiles;
   const options = useMemo(() => {
-    const eligible = (profiles || []).filter(
-      (profile) =>
+    const eligible = (profiles || []).filter((profile) => {
+      const run = profileForBackend(profile, undefined, true);
+      return (
         profile.kind === kind &&
-        profileForBackend(profile, undefined, true)?.ready !== false &&
-        takesReferences(profile),
-    );
+        run &&
+        run.ready !== false &&
+        takesReferences(profile) &&
+        (kind === "video" || editsReferences(run))
+      );
+    });
     const priorities = new Map(
       eligible.map((profile) => [profile.id, referenceProfilePriority(profile)]),
     );
