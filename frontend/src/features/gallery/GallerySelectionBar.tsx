@@ -8,6 +8,7 @@ import { menuWidth } from "../../theme";
 import { ActionBarGroups, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { assistMenu } from "../generation/AskChange";
 import { useQueueAction } from "../generation/Queue";
@@ -51,6 +52,8 @@ export function GallerySelectionBar({
 }) {
   const phone = usePhone();
   const menuBounds = useActionMenuBounds(menu !== null);
+  // The menu stays where it opened while it fades out.
+  const menuAt = useLastWhileClosing(menu);
   const [confirm, setConfirm] = useState(false);
   const [choosingModel, setChoosingModel] = useState(false);
   const cancel = useQueueAction();
@@ -446,11 +449,11 @@ export function GallerySelectionBar({
         <Menu.Target>
           <div
             aria-hidden
-            style={{ position: "fixed", left: menu?.x, top: menu?.y, width: 0, height: 0 }}
+            style={{ position: "fixed", left: menuAt?.x, top: menuAt?.y, width: 0, height: 0 }}
           />
         </Menu.Target>
         <Menu.Dropdown aria-label="Selection Actions">
-          {menu && (
+          {menuAt && (
             <ActionMenuItems
               groups={actions}
               leading={<Menu.Label>{selected.length} Selected</Menu.Label>}

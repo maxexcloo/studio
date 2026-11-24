@@ -29,7 +29,17 @@ const client = new QueryClient({
       if (!mutation.meta?.inlineError && error.name !== "AbortError") failure(error);
     },
   }),
-  defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
+  defaultOptions: {
+    queries: {
+      staleTime: 10_000,
+      // Reads ride out a restart (server errors and unreachable Studio); refusals fail at once.
+      retry: (count, error) => {
+        const { status } = error as { status?: number };
+        return count < 2 && (status === undefined || status >= 500);
+      },
+      refetchOnWindowFocus: true,
+    },
+  },
 });
 function AccountAppearance({ children }: { children: ReactNode }) {
   return <AppearanceProvider {...useAppearancePreference()}>{children}</AppearanceProvider>;
@@ -140,9 +150,10 @@ document.addEventListener(
 // of the opening position would land afterwards and override it.
 history.scrollRestoration = "manual";
 const routerHistory = UNSAFE_createBrowserHistory({ v5Compat: true });
+// Only iOS's installed app lacks a system Back that closes viewers and dialogs through history.
 if (
-  matchMedia("(display-mode: standalone)").matches ||
-  (navigator as Navigator & { standalone?: boolean }).standalone === true
+  (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) && matchMedia("(display-mode: standalone)").matches)
 )
   singleEntry(routerHistory, sessionStorage);
 // The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.

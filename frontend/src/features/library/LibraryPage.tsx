@@ -8,10 +8,12 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
+import { charactersQuery, promptCardsQuery } from "../characters/queries";
 import { useStageComparison } from "../compare/variants";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { loraLibraryQuery } from "../generation/loraLibrary";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { presetsQuery } from "../generation/PresetPicker";
 import { CatalogueEditor } from "./CatalogueEditor";
 import {
   LibraryCatalogueTable,
@@ -22,10 +24,17 @@ import {
 import { LibraryImports } from "./LibraryImports";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
-import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
+import { GuideDefinitions, ProfileDefinitions, guidesQuery } from "./ProfileDefinitions";
 import { PromptInstructions } from "./PromptInstructions";
 import { PromptStyles } from "./PromptStyles";
-import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
+import {
+  catalogueQuery,
+  downloadsQuery,
+  editableProfilesQuery,
+  importsQuery,
+  promptInstructionsQuery,
+  promptStylesQuery,
+} from "./queries";
 
 /** Update All reports the updates that failed to start. */
 type UpdateResult = { failed?: { key: string; error: string }[] };
@@ -151,6 +160,18 @@ export function LibraryPage() {
       <WorkspaceSections
         label="Library"
         sections={options}
+        queries={{
+          characters: [charactersQuery],
+          guides: [guidesQuery],
+          imports: [importsQuery],
+          outfits: [promptCardsQuery("outfits")],
+          presets: [presetsQuery],
+          profiles: [editableProfilesQuery],
+          promptInstructions: [promptInstructionsQuery],
+          promptStyles: [promptStylesQuery],
+          scenes: [promptCardsQuery("scenes")],
+          suggestionInstructions: [promptInstructionsQuery],
+        }}
         content={{
           characters: (heading) => <LibraryCharacters heading={heading} />,
           outfits: (heading) => <LibraryPromptCards kind="outfits" heading={heading} />,

@@ -42,7 +42,7 @@
 .header > :last-child:has([data-adaptive-search]) {
   flex: 1 0 min(100%, 20rem);
 }
-[data-adaptive-search].enter {
+[data-adaptive-search] {
   container-type: inline-size;
   width: 100%;
 }

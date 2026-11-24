@@ -583,13 +583,12 @@ function Gallery() {
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
-  // Liked or Uploads alone already has its own control in the toolbar.
+  // Uploads alone already has its own control in the toolbar.
   const toggledOnly =
     !search &&
     !similar &&
-    (filters.uploads || filters.rating === "liked") &&
-    JSON.stringify({ ...filters, uploads: false, rating: "" }) ===
-      JSON.stringify(emptyGalleryFilters);
+    filters.uploads &&
+    JSON.stringify({ ...filters, uploads: false }) === JSON.stringify(emptyGalleryFilters);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
     removeSimilar();
@@ -1081,9 +1080,7 @@ function Gallery() {
           {similar
             ? "No Similar Images Yet"
             : toggledOnly
-              ? filters.uploads
-                ? "No Uploads"
-                : `No Liked ${kind === "video" ? "Videos" : "Images"}`
+              ? "No Uploads"
               : search || hasFilters
                 ? "No Matches"
                 : kind === "video"

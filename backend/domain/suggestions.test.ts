@@ -948,6 +948,43 @@ test("a change lands where an edit can make it, else recreates with the seed, wr
   assert.match(redraw, /rewrite the words it concerns in place[^\n]*never "a redder dress"/);
 });
 
+test("figure changes recreate where an edit would lose the source's model or LoRAs", async () => {
+  const ask = async (settings: Record<string, unknown>, profileId?: string) => {
+    const { calls, items, suggestions } = fixture({
+      reply: () => JSON.stringify({ action: "edit", label: "Red Dress", prompt: "x" }),
+      target: async (_owner, _source, editor) =>
+        editor === "image:other"
+          ? { label: "Other Editor", guide: {}, edits: "instruction" }
+          : { label: "Krea 2", guide: {}, edits: "instruction" },
+    });
+    items["alice:job-a"].settings = settings;
+    await suggestions.suggest("alice", {
+      surface: "change",
+      jobId: "job-a",
+      request: "longer legs",
+      actions: ["edit", "recreate"],
+      profileId,
+    });
+    return calls[0][0].content;
+  };
+  const figure = /- recreate: [^\n]*subject, figure, body proportions, build or style/;
+  const plain = { profileId: "image:krea", profileName: "Krea 2" };
+  // A LoRA source or another editor: Edit keeps clothing and light, Recreate takes the figure.
+  for (const system of [
+    await ask({ ...plain, loras: [{ name: "curvy", enabled: true }] }),
+    await ask(plain, "image:other"),
+  ]) {
+    assert.match(system, /- edit: [^\n]*clothing, light[^\n]*never for the figure/);
+    assert.match(system, figure);
+  }
+  assert.match(await ask(plain, "image:other"), /it runs on Other Editor, not this model/);
+  // Editing on the source's own model without LoRAs still makes small body details.
+  for (const system of [await ask(plain), await ask(plain, "image:krea")]) {
+    assert.match(system, /- edit: [^\n]*clothing, a body detail, light/);
+    assert.doesNotMatch(system, figure);
+  }
+});
+
 test("a requested change is written by the account's Text model", async () => {
   const reply = () =>
     JSON.stringify({ action: "edit", label: "Night", prompt: "A harbour at night" });
