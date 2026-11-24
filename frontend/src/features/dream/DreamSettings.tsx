@@ -100,18 +100,8 @@ export function DreamPreferences() {
           "Run on Loaded Model",
           "Skip the idle delay when the model is already loaded.",
         )}
-        {dream.data.uncensoredAvailable && (
-          <>
-            {toggle("uncensored", "Uncensored", "Allow explicit themes.")}
-            {settings.uncensored &&
-              number(
-                "uncensoredShare",
-                "Uncensored Share",
-                "Percent of ideas with explicit themes.",
-                false,
-              )}
-          </>
-        )}
+        {dream.data.uncensoredAvailable &&
+          toggle("uncensored", "Uncensored", "Allow explicit themes.")}
       </SettingGroup>
       <SettingGroup title="Mix">
         {mix("mixNew", "New Ideas", "Fresh concepts from your taste.")}

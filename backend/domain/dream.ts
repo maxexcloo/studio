@@ -489,8 +489,8 @@ export function remasterTargets(
 }
 
 /**
- * Shares of Dream's ideas, in percent. The deck mix (`deckOrder`), uncensored share (the account's
- * `uncensoredShare`) and More Like This are separate.
+ * Shares of Dream's ideas, in percent. The deck mix (`deckOrder`), uncensored share
+ * (`uncensoredPercent`) and More Like This are separate.
  * - inspiration: of fresh image concepts, those seeded from a Library import or Inspiration image,
  *   adapted, never copied; prompt-only exploration uses its ready profile and LoRAs, while
  *   equipment experiments retain their chosen profile and LoRAs
@@ -670,6 +670,8 @@ const maxBackoffMs = 600_000;
 const recentDays = 30;
 /** Dream sets a profile aside once its last three Dream jobs within six hours all failed. */
 const failStreak = 3;
+/** Percent of an account's ideas written uncensored, where Uncensored is on and allowed. */
+const uncensoredPercent = 40;
 const failWindowMs = 6 * 3_600_000;
 const judgedLimit = 2000;
 /** One comparison in this many compares three variants, where the base and quota allow. */
@@ -3364,11 +3366,9 @@ export function createDream(options: {
     return false;
   }
 
-  /** Whether a job is Uncensored: a share of them, where the setting and Uncensored Models allow. */
+  /** Whether a job is Uncensored: a fixed share of them, where the setting and Uncensored Models allow. */
   function uncensoredShare(record: DreamRecord, access: DreamAccess) {
-    return (
-      record.settings.uncensored && access.uncensored && chance(record.settings.uncensoredShare)
-    );
+    return record.settings.uncensored && access.uncensored && chance(uncensoredPercent);
   }
   function allowsUncensored(ownerId: string) {
     return read(ownerId).settings.uncensored && options.access(ownerId)?.uncensored === true;
