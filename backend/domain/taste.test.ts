@@ -407,10 +407,10 @@ test("the summariser rebuilds an empty profile from sampled gallery likes, keepi
   const sent: string[] = [];
   const taste = tasteFixture(t, {
     updates: () => false,
-    galleryLikes: (_ownerId, count) =>
+    galleryLikes: (_ownerId, { sample }) =>
       [{ id: "liked-1", title: "Harbour at Dawn", prompt: "a fishing harbour at dawn" }].slice(
         0,
-        count,
+        sample,
       ),
     writer: () => ({
       settings: () => ({}),

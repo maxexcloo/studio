@@ -3526,7 +3526,7 @@ test("Dream's content setting limits image and video model choices and waiting w
   assert.equal(unrestrictedImage.input.profileId, "flux");
 
   await dream.save("alice", { images: false, videos: true });
-  for (const id of ["first-still", "second-still"])
+  for (const [index, id] of ["first-still", "second-still"].entries())
     generated({
       id,
       ownerId: "alice",
@@ -3534,6 +3534,7 @@ test("Dream's content setting limits image and video model choices and waiting w
       status: "done",
       rating: "liked",
       prompt: `still ${id}`,
+      createdAt: new Date(state.clock - index * 30 * 86_400_000).toISOString(),
     });
   // Dream draws its video model by keep rate; this roll lands on the last of the even candidates.
   state.draws[1_000_000] = [999_999];
