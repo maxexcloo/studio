@@ -70,7 +70,7 @@ const ordinaryRoutes = [
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   [
     "GET",
-    /^\/api\/(comparisons(\/[\w-]+)?|taste(\/reflection)?|dream(\/count|\/discarded|\/history|\/inbox)?)$/,
+    /^\/api\/(comparisons(\/[\w-]+)?|taste(\/reflection)?|dream(\/count|\/discarded|\/history|\/inbox|\/keep-rates|\/week)?)$/,
   ],
   [
     "POST",
