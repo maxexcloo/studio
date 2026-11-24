@@ -22,6 +22,7 @@ function source(arm = "") {
     recreate: "Recreates a liked image",
     animate: "Animates an image",
     extend: "Extends a clip",
+    remaster: "Remasters a kept or liked clip",
   };
   return kinds[kind] ?? "";
 }
