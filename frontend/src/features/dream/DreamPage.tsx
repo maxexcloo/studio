@@ -91,7 +91,14 @@ function Empty({ dream }: { dream: Dream }) {
       </EmptyState>
     );
   return (
-    <EmptyState fill action={<Text size="xs">{dreamWhen(dream)}</Text>}>
+    <EmptyState
+      fill
+      action={dreamWhen(dream).map((line) => (
+        <Text key={line} size="xs">
+          {line}
+        </Text>
+      ))}
+    >
       Nothing New Yet
     </EmptyState>
   );

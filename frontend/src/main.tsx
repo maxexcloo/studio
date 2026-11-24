@@ -7,11 +7,12 @@ import { Notifications, notifications, useNotifications } from "@mantine/notific
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router";
+import { unstable_HistoryRouter as HistoryRouter, UNSAFE_createBrowserHistory } from "react-router";
 
 import { failure } from "./api";
 import { App } from "./App";
 import { useAppearancePreference } from "./features/settings/accountPreferences";
+import { singleEntry } from "./singleEntry";
 import { AppearanceProvider } from "./ui/Appearance";
 import "./ui/popupClicks";
 import { usePhone } from "./ui/usePhone";
@@ -28,7 +29,17 @@ const client = new QueryClient({
       if (!mutation.meta?.inlineError && error.name !== "AbortError") failure(error);
     },
   }),
-  defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
+  defaultOptions: {
+    queries: {
+      staleTime: 10_000,
+      // Reads ride out a restart (server errors and unreachable Studio); refusals fail at once.
+      retry: (count, error) => {
+        const { status } = error as { status?: number };
+        return count < 2 && (status === undefined || status >= 500);
+      },
+      refetchOnWindowFocus: true,
+    },
+  },
 });
 function AccountAppearance({ children }: { children: ReactNode }) {
   return <AppearanceProvider {...useAppearancePreference()}>{children}</AppearanceProvider>;
@@ -138,6 +149,13 @@ document.addEventListener(
 // The gallery places its own scroll when the viewer closes through Back; iOS Safari's restoration
 // of the opening position would land afterwards and override it.
 history.scrollRestoration = "manual";
+const routerHistory = UNSAFE_createBrowserHistory({ v5Compat: true });
+// Only iOS's installed app lacks a system Back that closes viewers and dialogs through history.
+if (
+  (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) && matchMedia("(display-mode: standalone)").matches)
+)
+  singleEntry(routerHistory, sessionStorage);
 // The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.
 const fontReady = Promise.race([
   document.fonts.load('1em "Geist Variable"'),
@@ -148,9 +166,9 @@ void fontReady.then(() =>
     <QueryClientProvider client={client}>
       <AccountAppearance>
         {/* Stream updates must not keep declarative route changes in a pending transition. */}
-        <BrowserRouter useTransitions={false}>
+        <HistoryRouter history={routerHistory} useTransitions={false}>
           <App />
-        </BrowserRouter>
+        </HistoryRouter>
         <AppNotifications />
       </AccountAppearance>
     </QueryClientProvider>,

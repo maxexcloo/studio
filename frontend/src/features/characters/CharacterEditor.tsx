@@ -29,7 +29,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { chipProps } from "../generation/chip";
-import { CardDialog, CardFields, CardForm, CardThumbnails } from "./CardImages";
+import { CardDialog, CardFields, CardForm, CardThumbnails, useReferenceAction } from "./CardImages";
 import { type CharacterCard, charactersQuery, useMakeSheet, useSaveCharacter } from "./queries";
 
 /** What a new card starts from, such as Use as Character's image and what its chat called it. */
@@ -103,21 +103,16 @@ function CharacterForm({
   const current = characters.data?.find((card) => card.id === character?.id) || character;
   const making = useMakeSheet();
   const sheet = current?.sheet;
-  const error = save.error;
+  const fields = () => ({
+    name: name.trim(),
+    description: description.trim(),
+    ...story,
+    referenceIds: images.map((asset) => asset.id),
+  });
+  const generate = useReferenceAction("characters", character?.id, fields, onClose);
+  const error = save.error || generate.error;
   return (
-    <CardForm
-      onSubmit={() =>
-        save.mutate(
-          {
-            name: name.trim(),
-            description: description.trim(),
-            ...story,
-            referenceIds: images.map((asset) => asset.id),
-          },
-          { onSuccess: onClose },
-        )
-      }
-    >
+    <CardForm onSubmit={() => save.mutate(fields(), { onSuccess: onClose })}>
       <CardFields
         kind="characters"
         name={name}
@@ -172,8 +167,12 @@ function CharacterForm({
         </EditorSection>
       )}
       {error && <Alert color="red">{error.message}</Alert>}
-      <DialogFooter pending={save.isPending} onCancel={onClose}>
-        <Button type="submit" loading={save.isPending} disabled={!name.trim() || !images.length}>
+      <DialogFooter pending={save.isPending} onCancel={onClose} leading={generate.button}>
+        <Button
+          type="submit"
+          loading={save.isPending}
+          disabled={!name.trim() || !(images.length || current?.candidates)}
+        >
           Save
         </Button>
       </DialogFooter>

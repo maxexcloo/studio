@@ -360,6 +360,10 @@
   min-height: 0;
   overflow: hidden;
 }
+/* Focused only to keep shortcuts while the chrome is hidden. */
+.previewStage:focus {
+  outline: none;
+}
 .card[data-full] {
   max-width: none;
   cursor: auto;

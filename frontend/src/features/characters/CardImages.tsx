@@ -19,8 +19,14 @@ import {
 } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router";
 
-import { type CardKind, maxCardDescription, maxCardName } from "../../../../shared/characters";
+import {
+  type CardKind,
+  cardKinds,
+  maxCardDescription,
+  maxCardName,
+} from "../../../../shared/characters";
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
@@ -43,6 +49,7 @@ import {
 import { ReferenceSlots, referenceCellType } from "../generation/ReferenceSlots";
 import { useReferenceBrowser } from "../generation/useReferenceBrowser";
 import { CardIdeas, useCardIdeas } from "./CardIdeas";
+import { useGenerateReferences } from "./queries";
 
 /**
  * A card's editor: a dialog, full screen on phones, whose body scrolls. Above the desktop
@@ -125,10 +132,6 @@ export function CardFields({
   onImages: (images: ReferenceAsset[]) => void;
 }) {
   const assistant = useCardAssistant();
-  const ideas = (field: "name" | "description", value: string, onChange: (value: string) => void) =>
-    assistant && images.length > 0 ? (
-      <CardIdeas kind={kind} field={field} images={images} value={value} onChange={onChange} />
-    ) : undefined;
   return (
     <>
       <TextInput
@@ -138,35 +141,48 @@ export function CardFields({
         data-autofocus
         value={name}
         onChange={(event) => onName(event.currentTarget.value)}
-        rightSection={ideas("name", name, onName)}
+        rightSection={
+          assistant.vision &&
+          images.length > 0 && (
+            <CardIdeas kind={kind} field="name" images={images} value={name} onChange={onName} />
+          )
+        }
         rightSectionWidth="auto"
         rightSectionPointerEvents="all"
       />
       <CardDescription
         kind={kind}
+        name={name}
         images={images}
         value={description}
         onChange={onDescription}
         hint={hint}
         placeholder={placeholder}
-        assisted={Boolean(assistant && images.length > 0)}
       />
       <CardImages kind={kind} max={max} note={note} value={images} onChange={onImages} />
     </>
   );
 }
 
-function CardDescription({
+/**
+ * A card's Description, whose AI menu improves the typed text and, from `images` the text model
+ * reads, suggests others (useCardIdeas).
+ */
+export function CardDescription({
   hint,
   placeholder,
-  assisted,
+  images,
   ...props
 }: Omit<Parameters<typeof useCardIdeas>[0], "field"> & {
-  hint: string;
-  placeholder: string;
-  assisted: boolean;
+  hint?: string;
+  placeholder?: string;
 }) {
-  const ideas = useCardIdeas({ ...props, field: "description" });
+  const assistant = useCardAssistant();
+  const ideas = useCardIdeas({
+    ...props,
+    images: assistant.vision ? images : [],
+    field: "description",
+  });
   return (
     <>
       <TextBox
@@ -178,11 +194,58 @@ function CardDescription({
         maxLength={maxCardDescription}
         value={props.value}
         onChange={props.onChange}
-        tools={assisted ? [ideas.action] : []}
+        tools={assistant.text ? [ideas.action] : []}
+        busy={ideas.busy}
+        below={ideas.below}
       />
+      {ideas.error && (
+        <Text size="xs" c="red">
+          {ideas.error}
+        </Text>
+      )}
       {ideas.dialog}
     </>
   );
+}
+
+/**
+ * Generate References, a card editor's footer action that adds content: saves the card as typed and
+ * opens Compare on candidates drawn from its description, whose pick joins its images
+ * (useGenerateReferences). `onDone` closes the editor first.
+ */
+export function useReferenceAction(
+  kind: CardKind,
+  id: string | undefined,
+  fields: () => Parameters<ReturnType<typeof useGenerateReferences>["mutate"]>[0],
+  onDone: () => void,
+) {
+  const generate = useGenerateReferences(kind, id);
+  const navigate = useNavigate();
+  const { name, description, referenceIds } = fields();
+  const { max } = cardKinds[kind].images;
+  // A full character has no room for the pick; a one-image card's pick replaces its image.
+  const full = max > 1 && referenceIds.length >= max;
+  return {
+    button: (
+      <Button
+        variant="default"
+        leftSection={<icons.compare size={16} />}
+        loading={generate.isPending}
+        disabled={!name.trim() || !description.trim() || full}
+        onClick={() =>
+          generate.mutate(fields(), {
+            onSuccess: (comparison) => {
+              onDone();
+              void navigate(`/compare/${encodeURIComponent(comparison)}`);
+            },
+          })
+        }
+      >
+        Generate References
+      </Button>
+    ),
+    error: generate.error,
+  };
 }
 
 /** A card's thumbnails, each opening them all full size from itself. */
@@ -243,6 +306,7 @@ export function CardThumbnails({
 export function LibraryCard({
   name,
   images,
+  candidates,
   menu,
   onUse,
   selection,
@@ -250,6 +314,8 @@ export function LibraryCard({
 }: {
   name: string;
   images: ReferenceAsset[];
+  /** The comparison of its Generate References candidates, linked while it has no image. */
+  candidates?: string;
   menu: ReactNode;
   onUse?: () => void;
   selection?: ReactNode;
@@ -318,6 +384,11 @@ export function LibraryCard({
           )}
           {!cover && (selection || menu)}
         </Group>
+        {!cover && candidates && (
+          <Anchor component={Link} to={`/compare/${encodeURIComponent(candidates)}`} size="sm">
+            Pick a Reference
+          </Anchor>
+        )}
         {children}
       </Stack>
       {preview.element}
@@ -325,10 +396,13 @@ export function LibraryCard({
   );
 }
 
-/** Whether the account's text model can read a card's images, for its ideas and Rate Images. */
+/**
+ * Whether the account's text model writes (`text`, for Improve) and reads a card's images
+ * (`vision`, for its ideas and Rate Images).
+ */
 function useCardAssistant() {
-  const assistant = useQuery(assistantQuery);
-  return Boolean(assistant.data?.available && assistant.data.vision);
+  const { data } = useQuery(assistantQuery);
+  return { text: Boolean(data?.available), vision: Boolean(data?.available && data.vision) };
 }
 
 type Rating = { rating: number; note: string };
@@ -451,7 +525,7 @@ function CardImages({
             )
           }
         />
-        {assistant && images.length > 0 && (
+        {assistant.vision && images.length > 0 && (
           <Group gap="xs">
             <Button
               {...chipProps}

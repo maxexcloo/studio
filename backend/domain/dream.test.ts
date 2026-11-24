@@ -26,7 +26,9 @@ import {
   type DreamLoraLibrary,
   type DreamProfile,
   createDream,
+  deckOrder,
   dreamRequest,
+  motionBeat,
   turnShares,
 } from "./dream.ts";
 import { createInbox, ideasFrom } from "./inbox.ts";
@@ -187,6 +189,7 @@ function fixture(t: TestContext, catalogue = profiles) {
           (query.dreamArm === undefined ||
             [query.dreamArm].flat().some((arm) => item.dream?.arm?.startsWith(arm))) &&
           (query.notDreamArm === undefined || item.dream?.arm !== query.notDreamArm) &&
+          (!query.notDream || !item.dream) &&
           (query.dreamPair !== false || !item.dream?.pair) &&
           (!query.dreamPassReason || item.dream?.passReason === query.dreamPassReason) &&
           (!query.dreamDecidedSince || (item.dream?.decidedAt || "") >= query.dreamDecidedSince) &&
@@ -291,7 +294,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       return dreamVideoProfile(catalogue, {
         ...choice,
         localRunning: true,
-        preferred: { local: state.video, cloud: state.video },
+        defaultId: state.video,
       });
     },
     cards: () => state.cards,
@@ -578,10 +581,13 @@ test("Dream fills every free worker in one tick: images beside running work, vid
   const bob = store.enqueue("bob", session.id, { prompt: "mine" }, "image");
   store.save({ ...bob, status: "running" });
   await dream.tick();
-  // The third image of the day is a comparison, two jobs at once.
+  // After two new ideas the deck wants a comparison, two jobs at once.
   assert.deepEqual(
-    live("alice").map((job) => job.input.kind),
-    ["image", "image", "image"],
+    live("alice").map((job) => [job.input.kind, Boolean(job.dream?.pair)]),
+    [
+      ["image", true],
+      ["image", true],
+    ],
   );
   for (const job of live("alice")) finish("alice", job.id);
   store.save({ ...store.job("bob", bob.id)!, status: "completed" });
@@ -647,6 +653,13 @@ test("Dream applies shared delays to the owner's manual and MCP generation reque
   assert.equal(live("alice")[0]?.input.kind, "video");
 });
 
+test("Consecutive Dream clips change their action, camera technique and tone", () => {
+  const beats = Array.from({ length: 12 }, (_, turn) => motionBeat(turn).split(", "));
+  for (let turn = 1; turn < beats.length; turn++)
+    for (let part = 0; part < 3; part++)
+      assert.notEqual(beats[turn].at(-3 + part), beats[turn - 1].at(-3 + part));
+});
+
 test("A finished Dream job starts the next at once, without waiting for the next tick", async (t) => {
   const { dream, live, finish } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -654,7 +667,23 @@ test("A finished Dream job starts the next at once, without waiting for the next
   dream.start();
   t.after(() => dream.stop());
   finish("alice", live("alice")[0].id);
-  dream.finished();
+  dream.wake();
+  for (let turn = 0; turn < 100 && !live("alice").length; turn++)
+    await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(live("alice").length, 1);
+});
+
+test("A verdict that leaves the deck low starts Dream's next work without waiting for the next tick", async (t) => {
+  const fx = fixture(t);
+  const { dream, live, finish } = fx;
+  const request = await serve(t, fx);
+  await dream.save("alice", { enabled: true });
+  await dream.tick();
+  finish("alice", live("alice")[0].id);
+  dream.start();
+  t.after(() => dream.stop());
+  const [card] = dream.unseen("alice");
+  assert.equal((await request(`/${card.id}/keep`, {})).status, 200);
   for (let turn = 0; turn < 100 && !live("alice").length; turn++)
     await new Promise((resolve) => setImmediate(resolve));
   assert.equal(live("alice").length, 1);
@@ -686,11 +715,15 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.deepEqual(video?.input.referenceAssets, [
     { assetId: `asset-${second.id}`, source: "gallery", slot: "start" },
   ]);
-  // Animate's writer sees the frame: Dream asks for one coherent shot of it with natural faces.
+  // Animate's writer sees the frame: Dream asks for one shot with a story beat, its first in the
+  // rotation, knowing what the still was made for, with natural faces.
   const writing = video?.input.writing as Record<string, string>;
   assert.deepEqual([writing.kind, writing.theme, writing.source], ["animate", "custom", "dream 2"]);
-  assert.match(writing.instruction, /One continuous shot of one simple, coherent action/);
+  assert.match(writing.instruction, /tells a small story/);
   assert.match(writing.instruction, /no cuts, scene changes/);
+  assert.ok(writing.instruction.includes(`This clip's beat: ${motionBeat(0)}`));
+  assert.match(writing.instruction, /rather than a slow push-in or zoom/);
+  assert.ok(writing.instruction.includes(`Dream made it for: ${second.dream?.why}`));
   assert.match(writing.instruction, /believable expressions that suit the moment/);
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").status, "capped");
@@ -743,7 +776,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
   assert.equal(explored?.dream?.arm, "explore:profile");
-  assert.match(state.calls.at(-1)!.system, /change at least three/);
+  assert.match(state.calls.at(-1)!.system, /change one or two/);
   assert.equal((explored?.input.writing as { explore?: boolean })?.explore, true);
   assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You like foxes.");
   // The next explores a concept from a Library import, on its profile with its LoRAs, for
@@ -838,6 +871,42 @@ test("Dream draws from the models and tags a person set over those it learnt", a
   assert.doesNotMatch(system, /Possible starting points:.*(?:\bsubject:|medium or style:)/);
 });
 
+test("Each new idea sees a few drawn tastes and liked prompts from outside Dream, and what to change first", async (t) => {
+  const { dream, state, taste, dreamOnce, generated } = fixture(t);
+  taste.edit("alice", {
+    likes: ["harbours", "markets", "rain", "bicycles", "kites"],
+    styles: ["documentary photography", "film grain", "flash"],
+  });
+  generated(
+    {
+      id: "own",
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      rating: "liked",
+      prompt: "a kite",
+    },
+    {
+      id: "dreamt",
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      rating: "liked",
+      prompt: "a dreamt lantern",
+      dream: { prompt: "a dreamt lantern", why: "", at: "", state: "kept" },
+    },
+  );
+  await dream.save("alice", { enabled: true });
+  state.rolls = [99];
+  await dreamOnce();
+  const { user } = state.calls.at(-1)!;
+  assert.match(user, /\nLikes: [^,\n]+, [^,\n]+\n/);
+  assert.match(user, /\nPreferred Styles: [^,\n]+\n/);
+  assert.match(user, /Liked prompts:\n- a kite\n/);
+  assert.doesNotMatch(user, /dreamt lantern/);
+  assert.match(user, /Change first this time: palette: the colors and tones\./);
+});
+
 test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   state.access.alice!.uncensored = true;
@@ -856,7 +925,7 @@ test("Fresh concepts rotate anchors and inspirations without overriding a model 
     assert.equal((job.input.writing as { explore?: boolean }).explore, true);
     seen.push((job.input.writing as { inspiration: string }).inspiration);
     anchors.push(dream.read("alice").anchors!.slice(0, 10));
-    assert.match(state.calls.at(-1)!.system, /change at least three/);
+    assert.match(state.calls.at(-1)!.system, /change one or two/);
     assert.match(
       state.calls.at(-1)!.system,
       /Do not copy its complete concept or merely paraphrase it/,
@@ -1084,7 +1153,25 @@ test("Dream rotates a liked Gallery image through size, model and LoRA recreatio
     settings: { seed: "17" },
   };
   state.items.push({ ...liked, id: "at-native-limit", jobId: fullSize.id }, liked);
-  const nineImages = () => {
+  // Nine of the day's Dream images, as new ideas and comparisons the deck has shown, with `existing`
+  // cards of existing work.
+  let cards = 0;
+  const nineImages = (existing = 0) => {
+    const card = (dream: Partial<NonNullable<DreamItem["dream"]>>) =>
+      state.items.push({
+        id: `card-${cards++}`,
+        ownerId: "alice",
+        type: "image",
+        status: "done",
+        dream: { prompt: "p", why: "", at: "", state: "kept", ...dream },
+      });
+    for (let index = 0; index < 4; index++) card({ arm: "exploit" });
+    for (let index = 0; index < 3; index++)
+      card({
+        arm: "explore:steps",
+        pair: { id: `pair-${cards}`, side: 0, question: "", axis: "steps", label: "", value: 1 },
+      });
+    for (let index = 0; index < existing; index++) card({ arm: "continue:scene" });
     for (let index = 0; index < 9; index++) {
       const image = store.enqueue(
         "alice",
@@ -1142,7 +1229,8 @@ test("Dream rotates a liked Gallery image through size, model and LoRA recreatio
   assert.deepEqual(lora?.input.referenceAssets, input.referenceAssets);
   assert.deepEqual([lora?.input.prompt, lora?.input.seed], [input.prompt, "17"]);
   assert.equal(state.calls.length, 0);
-  nineImages();
+  // With existing work at its share, the next card is a new idea.
+  nineImages(6);
   const next = await dreamOnce();
   assert.ok(next?.dream && next.dream.arm !== "recreate");
   assert.equal(state.calls.length, 1);
@@ -1218,7 +1306,7 @@ test("More Like This permits close iterations while keeping species and source i
   const next = await dreamOnce();
   assert.equal(next?.input.prompt, iteration);
   assert.match(state.calls.at(-1)!.system, /including species and breed/);
-  assert.doesNotMatch(state.calls.at(-1)!.system, /change at least three/);
+  assert.doesNotMatch(state.calls.at(-1)!.system, /change one or two/);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Recent Dream ideas to avoid/);
 });
 
@@ -1453,6 +1541,25 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
+test("The deck converges on 40% new ideas, 30% comparisons and 30% existing work, and recovers from a skew", () => {
+  const deal = (counts: Record<"new" | "comparison" | "existing", number>, cards: number) => {
+    for (let index = 0; index < cards; index++) counts[deckOrder(counts)[0]]++;
+    return counts;
+  };
+  assert.deepEqual(deal({ new: 0, comparison: 0, existing: 0 }, 100), {
+    new: 40,
+    comparison: 30,
+    existing: 30,
+  });
+  // A deck of only new ideas catches up on the others first.
+  assert.deepEqual(deckOrder({ new: 20, comparison: 0, existing: 0 }).at(-1), "new");
+  assert.deepEqual(deal({ new: 60, comparison: 0, existing: 0 }, 90), {
+    new: 60,
+    comparison: 45,
+    existing: 45,
+  });
+});
+
 test("Projects share turns by how their results fare, with a floor for new ones; paused ones take none", () => {
   const stats = new Map([
     ["strong", { kept: 18, liked: 6, discarded: 2, review: 8.5 }],
@@ -1483,6 +1590,12 @@ test("Dream's ideas take the account's active projects, and visits record when t
   });
   const city = projects.create("alice", { name: "City" });
   projects.update("alice", city.id, { paused: true }, "you");
+  // An idea showing none of the brief's subjects is written again.
+  state.replies = [
+    { prompt: "a mountain cabin", title: "Cabin" },
+    { prompt: "the sea at dawn", title: "Dawn Sea" },
+    { prompt: "seas under a storm", title: "Storm Sea" },
+  ];
   for (let index = 0; index < 2; index++) await dreamOnce();
   projects.update("alice", city.id, { paused: false }, "you");
   projects.update("alice", beach.id, { paused: true }, "you");
@@ -1491,13 +1604,17 @@ test("Dream's ideas take the account's active projects, and visits record when t
     state.items.map((item) => item.dream?.projectId),
     [city.id, beach.id, beach.id],
   );
-  // The brief steers the writer; a project without one adds nothing.
+  // The brief steers the writer, and the project's latest ideas move the next one on; a
+  // project without one adds nothing.
   assert.match(
     state.calls[0].user,
     /Project brief \(Beach\):\n- Subjects: the sea\n- Avoid: people/,
   );
-  assert.match(state.calls[0].system, /keep to its brief/);
-  assert.doesNotMatch(state.calls[2].user, /Project brief/);
+  assert.match(state.calls[0].system, /the brief comes first/);
+  assert.doesNotMatch(state.calls[0].system, /Choose a different subject/);
+  assert.match(state.calls[1].user, /Rejected prompt: a mountain cabin\nYour prompt shows none/);
+  assert.match(state.calls[2].user, /The project's recent ideas:\n- the sea at dawn/);
+  assert.doesNotMatch(state.calls.at(-1)!.user, /Project brief/);
 
   const request = await serve(t, fx);
   const shown = (await request("")).body;
@@ -1591,7 +1708,22 @@ test("Three independent likes, in the gallery or Super Likes, seed a concept and
   const fx = fixture(t);
   const { dream, state, store, dreamOnce, taste } = fx;
   state.owners = ["alice"];
-  state.draws[5] = Array(20).fill(1);
+  // The deck has shown its share of comparisons, so new ideas and variations take turns.
+  for (let index = 0; index < 6; index++)
+    state.items.push({
+      id: `compared-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      dream: {
+        state: "discarded",
+        prompt: "p",
+        why: "",
+        at: "",
+        arm: "explore:steps",
+        pair: { id: `pair-${index}`, side: 0, question: "", axis: "steps", label: "", value: 1 },
+      },
+    });
   await dream.save("alice", { enabled: true });
   const prompt = "A fox repairing a clockwork boat in a sunlit workshop";
   const session = store.createSession("alice", "Gallery").id;
@@ -1639,7 +1771,7 @@ test("Three independent likes, in the gallery or Super Likes, seed a concept and
   assert.doesNotMatch(String((await dreamOnce())?.dream?.arm), /^continue:/);
 });
 
-test("Fresh concepts dominate even when verdicts adapt the share", async (t) => {
+test("Verdicts set the share of fresh concepts, down to 45%", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   // A small share remains available for familiar work.
@@ -1683,13 +1815,13 @@ test("Fresh concepts dominate even when verdicts adapt the share", async (t) => 
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
   state.rolls = [1];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  // Poor verdicts still leave a majority of fresh concepts; comparisons do not count.
+  // Poor verdicts lower the fresh share to its floor of 45%; comparisons do not count.
   decided(20, "explore:lora", "discarded");
   decided(60, "continue:pose", "kept");
   decided(30, "explore:steps", "kept", true);
-  state.rolls = [9];
+  state.rolls = [54];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  state.rolls = [10];
+  state.rolls = [55];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
 });
 
@@ -2009,7 +2141,7 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   const tried = (await dreamOnce())!;
   assert.deepEqual(loras(tried), [["ink.safetensors", 1]]);
   assert.equal(tried.dream?.arm, "explore:lora");
-  assert.match(state.calls.at(-1)!.system, /change at least three/);
+  assert.match(state.calls.at(-1)!.system, /change one or two/);
   assert.equal((tried.input.writing as { explore?: boolean }).explore, true);
   assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
@@ -2071,6 +2203,87 @@ test("an exploited idea draws its steps, guidance and aspect ratio by taste", as
   );
 });
 
+test("Krea 2 runs at no fewer than 8 steps, however few its taste scores", async (t) => {
+  const krea = {
+    ...profiles[0],
+    workflow: "family:krea2",
+    capabilities: { steps: true },
+    defaults: { width: 1024, height: 1024, steps: 4 },
+  };
+  const { dream, taste, dreamOnce } = fixture(t, [krea]);
+  taste.record("alice", [tasteSignal("like", "a", { profileId: "flux", steps: 4 })]);
+  await dream.save("alice", { enabled: true });
+  assert.equal((await dreamOnce())?.input.steps, 8);
+  taste.record("alice", [tasteSignal("like", "b", { profileId: "flux", steps: 12 })]);
+  assert.equal((await dreamOnce())?.input.steps, 12);
+});
+
+test("Dream sizes a Qwen or Noct image to fit one card rather than its two-GPU twin", async (t) => {
+  const noct = {
+    ...profiles[0],
+    defaults: { width: 1024, height: 1344, model: "noctq-4-iq8r" },
+  };
+  const { dream, taste, dreamOnce } = fixture(t, [noct]);
+  taste.record("alice", [
+    tasteSignal("like", "a", { profileId: "flux", width: 832, height: 1248 }),
+  ]);
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  assert.deepEqual([job.input.width, job.input.height], [896, 1344]);
+});
+
+test("Dream stops exploring a profile that keeps poorly", async (t) => {
+  const { dream, state, taste, dreamOnce, generated } = fixture(t);
+  taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen" })]);
+  for (let index = 0; index < 20; index++)
+    generated({
+      id: `judged-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `judged ${index}`,
+      settings: { profileId: "flux" },
+      dream: {
+        prompt: `judged ${index}`,
+        why: "",
+        at: "",
+        state: index < 2 ? "kept" : "discarded",
+        passReason: "taste",
+      },
+    });
+  await dream.save("alice", { enabled: true });
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.deepEqual([job?.input.profileId, job?.dream?.arm], ["qwen", "explore:prompt"]);
+});
+
+test("A plain Pass dislikes a result and keeps it for reference, and a full backlog pauses Dream without discarding it", async (t) => {
+  const { dream, state, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const first = (await dreamOnce())!;
+  const id = `${first.id}-0`;
+  const item = state.items.find((entry) => entry.id === id)!;
+  item.status = "done";
+  dream.pass("alice", [id], "skip");
+  assert.deepEqual([item.rating, item.dream?.state], ["disliked", "discarded"]);
+  assert.equal(taste.read("alice").signals[0].kind, "discard");
+  dream.undo("alice", [id]);
+  assert.deepEqual([item.rating, item.dream?.state], [undefined, "unseen"]);
+  assert.equal(taste.read("alice").signals.length, 0);
+  dream.pass("alice", [id], "skip");
+  for (let index = 0; index < 60; index++)
+    state.items.push({
+      id: `waiting-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      dream: { prompt: "p", why: "", at: "", state: "unseen" },
+    });
+  assert.equal(await dreamOnce(), undefined);
+  assert.match(state.logs.at(-1)!, /Dream waits while 60 results are unseen/);
+  assert.equal(dream.unseen("alice").length, 60);
+});
+
 test("Dream mostly compares models and LoRAs, rarely steps or guidance, and steps only with a steps control", async (t) => {
   const asked = async (
     roll: number,
@@ -2103,7 +2316,8 @@ test("Dream mostly compares models and LoRAs, rarely steps or guidance, and step
       ratings: { "film.safetensors": "disliked", "ink.safetensors": "disliked" },
     };
     await dream.save("alice", { enabled: true, dailyImages: 10 });
-    for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+    // After one new idea, the deck wants a comparison.
+    assert.ok(await dreamOnce());
     // The comparison's draw, in millionths of the offered kinds' total weight.
     state.draws[1_000_000] = [roll];
     await dream.tick();
@@ -2151,7 +2365,8 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
     settings: { profileId: "flux" },
   });
   await dream.save("alice", { enabled: true, dailyImages: 6 });
-  for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+  // After one new idea, the deck wants a comparison.
+  assert.ok(await dreamOnce());
   state.draws[4] = [0, 3];
   await dream.tick();
   const jobs = live("alice").sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
@@ -2239,7 +2454,7 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
   assert.equal(items.find(({ id }) => id === surviving[0].id)!.dream?.pair?.size, 3);
 });
 
-test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
+test("A comparison varies one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
   const fx = fixture(t);
   const { dream, state, store, taste, finish, live, dreamOnce } = fx;
   // A kept image alice generated with FLUX: the comparison's starting point.
@@ -2262,7 +2477,8 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
     settings: { profileId: "flux" },
   });
   await dream.save("alice", { enabled: true, dailyImages: 10 });
-  for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+  // After one new idea, the deck wants a comparison.
+  assert.ok(await dreamOnce());
   await dream.tick();
   const [a, b] = live("alice");
   assert.deepEqual(
@@ -2527,6 +2743,10 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     ["1", "2"],
   );
   // Each proposed project gets its samples, written to its brief, before Dream returns to its own work.
+  state.replies = [
+    ...["neon", "rain", "dawn"].map((look) => ({ prompt: `Mara on a rooftop in ${look}` })),
+    ...["fog", "lamps", "tide"].map((look) => ({ prompt: `a harbour at dusk with ${look}` })),
+  ];
   for (let index = 0; index < 6; index++) await dreamOnce();
   const drafts = state.items.filter((item) => item.dream?.state === "draft");
   assert.deepEqual(
@@ -2821,7 +3041,7 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   assert.deepEqual(
     inbox.read("alice").proposals.map(({ kind, title }) => [kind, title]),
     [
-      ["pacing", "Pause Beach"],
+      ["pacing", "Disable Beach"],
       ["rule", "always a narrow waist"],
       ["brief", "Edit Beach's Avoid"],
     ],
@@ -3304,6 +3524,8 @@ test("Dream's content setting limits image and video model choices and waiting w
       rating: "liked",
       prompt: `still ${id}`,
     });
+  // Dream draws its video model by keep rate; this roll lands on the last of the even candidates.
+  state.draws[1_000_000] = [999_999];
   const video = (await dreamOnce())!;
   assert.equal(video.input.profileId, unrestrictedVideo.id);
   assert.equal(await dream.queuedProfileIssue(video), undefined);
@@ -3454,7 +3676,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     status: "done",
     rating: "liked",
   });
-  fx.state.draws[2] = [1];
+  // The model its last video used weighs less, so the next one turns to the other.
   const varied = await fx.dreamOnce();
   assert.equal(varied?.input.profileId, alternate.id);
   assert.equal(varied.parentItemId, "other-still");

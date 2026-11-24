@@ -36,7 +36,8 @@ import { backendLabel, isProfile, profileForBackend } from "../generation/payloa
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
-import { mediaProfileName, mediaTitle } from "./mediaLabels";
+import { enabledLoras } from "./editProfile";
+import { mediaProfileName, mediaTitle, modelSummary } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { galleryItemQuery } from "./queries";
 import { derivations } from "./versions";
@@ -74,6 +75,8 @@ interface RanReference {
 const pendingValue = "…";
 interface Details {
   profile: string;
+  /** Its profile and steps, which Details › Model shows. */
+  model: string;
   loras: { name: string; strength: string }[];
   references: RanReference[];
   /** What was supplied but did not reach the run. */
@@ -82,11 +85,6 @@ interface Details {
   output: Row[];
   timing: Row[];
 }
-
-const enabledLoras = (settings: MediaItem["settings"]) =>
-  Array.isArray(settings?.loras)
-    ? settings.loras.filter((lora) => lora?.name && lora.enabled !== false)
-    : undefined;
 
 function actualSeed(value: unknown) {
   const seed = typeof value === "number" || typeof value === "string" ? String(value).trim() : "";
@@ -221,6 +219,7 @@ function generationDetails(
   });
   return {
     profile: mediaProfileName(item, profiles),
+    model: modelSummary(item, profiles),
     loras: (enabledLoras(settings) || []).map((lora) => ({
       name: loraTitle(String(lora.name)),
       strength: Number(lora.strength ?? 1).toFixed(2),
@@ -943,6 +942,11 @@ export function MediaDetails({
           </Stack>
         </DetailSection>
       )}
+      {details.model && (
+        <DetailSection title="Model">
+          <Text size="sm">{details.model}</Text>
+        </DetailSection>
+      )}
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
@@ -987,7 +991,7 @@ export function MediaDetails({
           <ContextCards item={item} />
         </DetailSection>
       )}
-      {/* The heading above Details (ViewerMetadata) already names the model and its steps. */}
+      {/* Model already names its steps. */}
       <Section title="Settings" rows={details.settings.filter(([label]) => label !== "Steps")} />
       <Section
         title="Output"

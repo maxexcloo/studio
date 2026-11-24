@@ -50,23 +50,28 @@ import {
   runtimeTransaction,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
+import { radianceImageFits } from "../providers/radiance.ts";
 import { validateReferenceSlots } from "../validation.js";
 import { resolveImageMode, runProfile } from "../workflow-modes.js";
 import { promptInstruction } from "./../prompt-instructions.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import {
+  boilerplate,
   clean,
   cooledMotifs,
   direction,
   diversity,
+  fashionableLooks,
   forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
   mentionsMotif,
+  missesSubjects,
   motifWindow,
   namedMotif,
   normalised,
   phraseWords,
+  promptBody,
   recentPromptCharacters,
   repeatedMotif,
   similarPrompt,
@@ -170,6 +175,8 @@ type DreamQuery = {
   dreamArm?: string | string[];
   dreamProject?: string;
   notDreamArm?: string;
+  /** Leaves out every Dream result. */
+  notDream?: true;
   dreamPair?: false;
   dreamPassReason?: DreamPassReason;
   dreamDecidedSince?: string;
@@ -406,7 +413,24 @@ interface DreamRecord {
 type Kind = "image" | "video";
 
 /**
- * Shares of Dream's ideas, in percent. Comparisons (`pairEvery`) and More Like This are separate.
+ * Dream's image deck mix, in percent of its latest `window` cards (a comparison or set is one
+ * card): new ideas (exploring or exploiting by `exploreShare`), comparisons of a liked or kept
+ * image's prompt, and existing work (recreations, variations and series of liked results). The
+ * kind furthest below its share goes next (`deckOrder`), falling back to the next where it can't.
+ */
+const deckMix = { new: 40, comparison: 30, existing: 30, window: 50 };
+type DeckKind = "new" | "comparison" | "existing";
+/** The deck's kinds, furthest below their share (`deckMix`) first, given its latest cards. */
+export function deckOrder(counts: Record<DeckKind, number>): DeckKind[] {
+  const total = counts.new + counts.comparison + counts.existing;
+  const deficit = (kind: DeckKind) => deckMix[kind] / 100 - (total ? counts[kind] / total : 0);
+  return (["new", "comparison", "existing"] as const)
+    .slice()
+    .sort((a, b) => deficit(b) - deficit(a) || deckMix[b] - deckMix[a]);
+}
+
+/**
+ * Shares of Dream's ideas, in percent. The deck mix (`deckMix`) and More Like This are separate.
  * - inspiration: of fresh image concepts, those seeded from a Library import or Inspiration image,
  *   adapted, never copied; prompt-only exploration uses its ready profile and LoRAs, while
  *   equipment experiments retain their chosen profile and LoRAs
@@ -418,20 +442,41 @@ const shares = {
   lora: 40,
   uncensored: 40,
 };
+/**
+ * A profile whose results with a LoRA keep at least `rate` of `least` judged ones loads one for
+ * `share` percent of its exploited ideas instead.
+ */
+const keptLoras = { least: 10, rate: 0.75, share: 70 };
+/**
+ * Explored profiles weigh by their keep rate; one kept less than `rate` of at least `least`
+ * judged results is left alone until those verdicts age out.
+ */
+const exploredProfiles = { least: 20, rate: 0.3 };
+/** Fewest steps Dream runs a family's models at: Krea 2 keeps far more at 8 steps than at 4. */
+const leastSteps: Record<string, number> = { "family:krea2": 8 };
+/** Learnt shapes weigh this much less where they keep poorly: 2:3 keeps about half as often. */
+const shapeWeights: Record<string, number> = { "0.67": 0.5 };
+/**
+ * A plain Pass (`skip`) and Not My Taste dislike a result, which stays in Discards for reference;
+ * Too Similar and Glitch say nothing about taste.
+ */
+const disliking = (reason: DreamPassReason) => reason === "taste" || reason === "skip";
+/** Dream stops making new results while this many wait unseen, until some are judged. */
+const unseenLimit = 60;
 /** Percent of Dream's images that start a series, where the account has a liked or kept image. */
 const seriesShare = 2;
 /** Percent of videos that extend one of the account's videos rather than animate a still. */
 const extendShare = 35;
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
-/** One video in this many runs on another video model than the account's default, so videos vary. */
-const videoExploreDraw = 2;
+/** The weight left to the video model Dream used last, so consecutive videos change model. */
+const lastVideoModelWeight = 0.25;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
  * Verdicts adapt the share of new ground without letting familiar anchors dominate again.
  */
-const exploreShare = { start: 0.95, low: 0.9, high: 0.98, window: 100 };
+const exploreShare = { start: 0.95, low: 0.45, high: 0.98, window: 100 };
 /** A chat keeps its project this long after its latest request, then hands it to Dream. */
 const handOffMs = 3_600_000;
 /** A handed-off project continues from its latest few chat images and its newest few picks. */
@@ -500,15 +545,26 @@ const seriesOutings = [
 const turns = { floor: 0.5, favoured: 2, read: 1000, keptMs: 5 * 60_000, results: 8 };
 /** A proposed project runs this many samples before it is accepted. */
 const draftSamples = 3;
+/** A project's idea sees this many of the project's latest ones. */
+const projectIdeasShown = 6;
 /** Dream remembers this many of the images it animated and videos it extended. */
 const usedLimit = 500;
 /** Dream remembers this many of its latest ideas to avoid repeating them. */
 const recentIdeas = 100;
 /** The writer avoids this many of the latest disliked subjects. */
 const avoidDislikes = 8;
-/** The writer sees this many recent subjects, and this many recent prompts cut to this length. */
+/**
+ * The writer sees this many recent subjects, and this many recent prompts, without their shared
+ * style clause, cut to this length.
+ */
 const writerSubjects = 30;
-const writerPrompts = { count: 10, characters: 200 };
+const writerPrompts = { count: 10, characters: 500 };
+/**
+ * Each new idea sees a few of the taste profile's likes and one of its styles, drawn afresh, so
+ * no idea works through the whole profile as a checklist; and a few of the account's own liked
+ * prompts from outside Dream, cut to this length.
+ */
+const tasteDraw = { likes: [2, 3], styles: 1, prompts: [4, 6], characters: 600 };
 /** Profiles and LoRAs weigh by their keep rate over this many of the latest judged Dream images. */
 const judgedRates = 200;
 /** Dream revisits a concept only once it is liked more than twice. */
@@ -518,7 +574,6 @@ const featuredLikes = 3;
  * sometimes includes Dream's own results and keeps.
  */
 const seedSample = 9;
-const recreateEvery = 10;
 const recreationAxes = ["size", "profile", "lora"] as const;
 const ownSeedEvery = 4;
 /** Recent automatic variants block their source concepts from being picked again. */
@@ -546,14 +601,7 @@ const recentDays = 30;
 const failStreak = 3;
 const failWindowMs = 6 * 3_600_000;
 const judgedLimit = 2000;
-/**
- * Every fourth image of the day is a comparison, when a kept or liked image can start one, and
- * every sixth once the account has judged enough results for comparisons to matter less.
- */
-const pairEvery = 4;
-const pairEveryJudged = 6;
-const pairJudgedAt = 30;
-const pairDraw = 5;
+/** One comparison in this many compares three variants, where the base and quota allow. */
 const tripleEvery = 4;
 /** How often each kind of comparison is drawn, where the base offers it, in percent. */
 const pairWeights: Record<PairAxis, number> = {
@@ -574,14 +622,54 @@ const uncensoredTheme = () => promptInstruction("dream-extended");
 const naturalFaces = () => promptInstruction("dream-expressions");
 /** Added to a recommended negative prompt, where the profile uses one. */
 const faceNegative = () => promptInstruction("dream-negative");
+/** Camera techniques, actions and tones Dream's clips rotate through, so consecutive ones differ. */
+const motionTechniques = [
+  "a tracking shot that moves alongside the subject",
+  "a handheld follow that stays close to the action",
+  "a low-angle hold that lets the action rise into frame",
+  "a rack focus from the foreground to the subject as the action starts",
+  "an arc around the subject as they move",
+  "a quick pan to whatever they react to",
+  "a locked-off frame that the action crosses",
+  "a pull-back that reveals more of the place as the action lands",
+];
+const motionActions = [
+  "a full-body move: they stand, walk, turn or change position",
+  "handling a prop that is in the frame",
+  "an exchange with someone in the frame, or someone stepping in from out of frame",
+  "a playful or surprising moment that ends in a laugh or a reaction",
+  "a reveal: they show, open or uncover something in the scene",
+  "the weather, light or something in the place changes and they respond",
+];
+const motionTones = ["playful", "tender", "confident", "tense", "wistful"];
+/** The `turn`th clip's camera technique, action and tone; consecutive turns differ in each. */
+export function motionBeat(turn: number) {
+  const at = <T>(items: T[]) => items[turn % items.length];
+  return `${at(motionActions)}, filmed as ${at(motionTechniques)}, with a ${at(motionTones)} tone.`;
+}
+/** Dream's recent clip prompts shown to the writer, so a new clip doesn't repeat them. */
+const recentMotionPrompts = 5;
 /**
- * Animate's Custom instruction for Dream's clips (prompt-animate.js): one coherent shot that
- * matches its frame.
+ * Animate's Custom instruction for Dream's clips (prompt-animate.js): one shot that tells a small
+ * story in its `turn`'s beat, knowing what the still was made for and the clips Dream made lately.
  */
-const motionInstruction = (uncensored: boolean) =>
+const motionInstruction = (
+  uncensored: boolean,
+  turn: number,
+  { title = "", why = "", recent = [] as string[] } = {},
+) =>
   promptInstruction("dream-motion", {
+    beat: motionBeat(turn),
     expressions: naturalFaces(),
     extendedThemes: uncensored ? promptInstruction("extended-themes-motion") : "",
+    context: [
+      title && `The still is titled "${title}".`,
+      why && `Dream made it for: ${why}`,
+      recent.length &&
+        `Recent clips, whose action, camera and lines this one should not repeat:\n${recent.map((prompt) => `- ${prompt}`).join("\n")}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
   });
 
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
@@ -775,11 +863,12 @@ export function createDream(options: {
       backend: "local" | "cloud";
       allowUncensored: boolean;
       unavailable: ReadonlySet<string>;
-      alternate?: (profiles: DreamProfile[], chosen: DreamProfile) => DreamProfile | undefined;
+      choose?: (profiles: DreamProfile[]) => DreamProfile | undefined;
     },
   ): Promise<{
     profile: DreamProfile;
     size?: { width: number; height: number };
+    frames?: number;
   }>;
   /** The account's character, outfit and scene cards, or null where it may not use Characters. */
   cards(ownerId: string): Record<CardKind, Character[]> | null;
@@ -950,6 +1039,36 @@ export function createDream(options: {
       return !set || !pendingSets.has(set.id) ? [item] : [];
     });
   }
+  /**
+   * The kinds of Dream's latest image cards (`deckMix`), and how many of the existing ones were
+   * recreations.
+   */
+  function deckCounts(ownerId: string) {
+    const cards = new Map<string, DeckKind>();
+    let recreated = 0;
+    for (const item of options.gallery(ownerId, {
+      dreamState: poolStates,
+      type: "image",
+      limit: deckMix.window * 3,
+    })) {
+      const key = item.dream?.pair?.id ?? dreamSet(item)?.id ?? String(item.id);
+      if (cards.has(key)) continue;
+      if (cards.size === deckMix.window) break;
+      const arm = item.dream?.arm ?? "";
+      cards.set(
+        key,
+        item.dream?.pair
+          ? "comparison"
+          : arm === "recreate" || arm === "series" || arm.startsWith("continue:")
+            ? "existing"
+            : "new",
+      );
+      if (arm === "recreate") recreated++;
+    }
+    const counts = { new: 0, comparison: 0, existing: 0, recreated };
+    for (const kind of cards.values()) counts[kind]++;
+    return counts;
+  }
   /** The series Dream is still adding to, whose results wait until it ends; none once images stop. */
   const openSeries = ({ series, settings }: DreamRecord) =>
     settings.enabled && settings.images && settings.dailyImages > 0 ? series?.id : undefined;
@@ -977,11 +1096,12 @@ export function createDream(options: {
     return (considering.latest ??= read());
   }
   /**
-   * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
-   * latest images within a day (`diversity`), times its keep rate among the latest judged ones: a
-   * pass for any reason but likeness counts weakly against it, as a keep counts for it.
+   * How the latest judged Dream images kept, by profile (`profile:<id>`), LoRA (`lora:<name>`) and
+   * a profile's results with any LoRA (`loras:<id>`): a pass for any reason but likeness counts
+   * against them, as a keep counts for them. Its keep rate follows Laplace's rule, so an untried
+   * profile or LoRA starts at one half.
    */
-  function spread(ownerId: string) {
+  function judgement(ownerId: string) {
     const judged = new Map<string, { kept: number; total: number }>();
     for (const item of options.gallery(ownerId, {
       dreamState: ["kept", "discarded"],
@@ -992,6 +1112,7 @@ export function createDream(options: {
       const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
       for (const key of [
         `profile:${item.settings?.profileId}`,
+        ...(loras.length ? [`loras:${item.settings?.profileId}`] : []),
         ...loras.map((lora) => `lora:${(lora as { name?: string })?.name}`),
       ]) {
         const entry = judged.get(key) ?? { kept: 0, total: 0 };
@@ -1000,11 +1121,21 @@ export function createDream(options: {
         judged.set(key, entry);
       }
     }
-    // Laplace's rule: an untried profile or LoRA starts at one half.
-    const keepRate = (key: string) => {
-      const { kept, total } = judged.get(key) ?? { kept: 0, total: 0 };
-      return (kept + 1) / (total + 2);
+    const counts = (key: string) => judged.get(key) ?? { kept: 0, total: 0 };
+    return {
+      counts,
+      keepRate(key: string) {
+        const { kept, total } = counts(key);
+        return (kept + 1) / (total + 2);
+      },
     };
+  }
+  type Judgement = ReturnType<typeof judgement>;
+  /**
+   * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
+   * latest images within a day (`diversity`), times its keep rate (`judgement`).
+   */
+  function spread(ownerId: string, { keepRate }: Judgement) {
     const jobs = store
       .dreamJobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
       .filter((job) => kindOf(job) === "image")
@@ -1091,10 +1222,22 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
-  /** One of the person's own shapes where they set them, else one drawn by its score. */
+  /**
+   * One of the person's own shapes where they set them, else one drawn by its score, less for
+   * shapes that keep poorly (`shapeWeights`).
+   */
   const favouriteShape = (taste: TasteRecord) => {
     const own = taste.preferences.shapes;
-    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, "aspect:");
+    return own
+      ? drawn(own.map((value) => [value, 1]))
+      : drawn(
+          [...taste.scores]
+            .filter(([attribute]) => attribute.startsWith("aspect:"))
+            .map(([attribute, { score }]) => {
+              const shape = attribute.slice("aspect:".length);
+              return [shape, score * (shapeWeights[shape] ?? 1)];
+            }),
+        );
   };
   /**
    * A tag to feature: one of the person's own where they set them, else one drawn by its score
@@ -1113,16 +1256,17 @@ export function createDream(options: {
     );
   };
   /**
-   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (evenly
-   * among the person's own favourite models where any of them run there; `offSide` says when none
-   * do) less its recent share (`spread`), else the kind's default there: the account's own for
-   * that side, the catalogue's, or the first.
+   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (among the
+   * person's own favourite models where any of them run there, by keep rate; `offSide` says when
+   * none do) less its recent share (`spread`), else the kind's default there: the account's own
+   * for that side, the catalogue's, or the first.
    */
   function exploitProfile(
     kind: Kind,
     catalogue: Awaited<ReturnType<typeof options.catalogue>>,
     taste: TasteRecord,
     weigh: (key: string) => number,
+    { keepRate }: Judgement,
   ) {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
     const own = taste.preferences.models?.filter((id) =>
@@ -1130,7 +1274,7 @@ export function createDream(options: {
     );
     const scores = new Map(
       own?.length
-        ? own.map((id) => [id, 1])
+        ? own.map((id) => [id, keepRate(`profile:${id}`)])
         : [...taste.profiles.image, ...taste.profiles.video].map((entry) => [
             entry.id,
             entry.score,
@@ -1153,16 +1297,25 @@ export function createDream(options: {
     return { profile, offSide: Boolean(taste.preferences.models?.length && !own?.length) };
   }
   /**
-   * Another ready profile of the kind, the one the account ran fewest jobs on lately (unused ones
-   * first), so new and imported models get tried; its note says so. Null where there is none.
+   * Another ready profile of the kind drawn by its keep rate, those the account ran fewest jobs on
+   * lately (unused ones first) weighing double so new and imported models get tried, and none
+   * that keeps poorly (`exploredProfiles`); its note says which. Null where there is none.
    */
   function exploreProfile(
     ownerId: string,
     kind: Kind,
     profiles: DreamProfile[],
     chosen: DreamProfile,
+    judged: Judgement = judgement(ownerId),
   ) {
-    const others = profiles.filter((profile) => kindOf(profile) === kind && profile !== chosen);
+    const others = profiles.filter((profile) => {
+      const { kept, total } = judged.counts(`profile:${profile.id}`);
+      return (
+        kindOf(profile) === kind &&
+        profile !== chosen &&
+        (total < exploredProfiles.least || kept / total >= exploredProfiles.rate)
+      );
+    });
     if (!others.length) return null;
     const runs = store.profileRuns(
       ownerId,
@@ -1170,7 +1323,12 @@ export function createDream(options: {
       others.map((profile) => profile.id),
     );
     const fewest = Math.min(...others.map((profile) => runs.get(profile.id) || 0));
-    const profile = pick(others.filter((entry) => (runs.get(entry.id) || 0) === fewest));
+    const profile = drawn(
+      others.map((entry): [DreamProfile, number] => [
+        entry,
+        judged.keepRate(`profile:${entry.id}`) * ((runs.get(entry.id) || 0) === fewest ? 2 : 1),
+      ]),
+    )!;
     const label = profile.label || profile.id;
     return {
       profile,
@@ -1580,7 +1738,7 @@ export function createDream(options: {
     const rate = (explored: boolean) => {
       const side = decided.filter(
         ({ dream }) =>
-          (!dream!.passReason || dream!.passReason === "taste") &&
+          (!dream!.passReason || disliking(dream!.passReason)) &&
           dream!.arm!.startsWith("explore:") === explored,
       );
       return (side.filter((item) => item.dream!.state === "kept").length + 1) / (side.length + 2);
@@ -1620,16 +1778,21 @@ export function createDream(options: {
    * For a share of exploited ideas, one LoRA the profile can load drawn by its taste score (a
    * a like adds one) less its recent share (`spread`), at the strength that scored best, else
    * its recommended strength; never a disliked one, and none without LoRA access. Where the person
-   * set their favourite LoRAs, it is one of those, drawn evenly.
+   * set their favourite LoRAs, it is one of those, drawn evenly. A profile whose LoRA results keep
+   * well loads one more often (`keptLoras`).
    */
   function exploitLoras(
     ownerId: string,
     profile: DreamProfile,
     taste: TasteRecord,
     weigh: (key: string) => number,
+    judged: Judgement,
   ) {
     const library = options.loraLibrary(ownerId);
-    if (!library || !chance(shares.lora)) return [];
+    const { kept, total } = judged.counts(`loras:${profile.id}`);
+    const share =
+      total >= keptLoras.least && kept / total >= keptLoras.rate ? keptLoras.share : shares.lora;
+    if (!library || !chance(share)) return [];
     const learnt = new Map(taste.loraScores.map((lora) => [lora.name, lora]));
     const candidates = fit(
       profile,
@@ -1650,24 +1813,48 @@ export function createDream(options: {
     return lora ? [lora] : [];
   }
   /**
-   * The steps (where the profile has a steps control) and guidance drawn by their taste scores on
-   * the profile, and for an image a size of the profile's default area in the drawn aspect ratio.
+   * The steps (where the profile has a steps control, at least its family's `leastSteps`) and
+   * guidance drawn by their taste scores on the profile, and for an image a size of the profile's
+   * default area in the drawn aspect ratio, made smaller where one card of the model's worker can't
+   * draw it (`radianceImageFits`), so the run never moves to a lossier two-GPU twin.
    */
   function exploitSettings(kind: Kind, profile: DreamProfile, taste: TasteRecord): GenerationInput {
+    const least = leastSteps[profile.workflow ?? ""] ?? 0;
+    const prefix = `steps:${profile.id}:`;
     const steps = profile.capabilities?.steps
-      ? drawnValue(taste, `steps:${profile.id}:`)
+      ? (drawn(
+          [...taste.scores]
+            .filter(([attribute]) => attribute.startsWith(prefix))
+            .map(([attribute, { score }]): [string, number] => [
+              attribute.slice(prefix.length),
+              score,
+            ])
+            .filter(([value]) => Number(value) >= least),
+        ) ?? (Number(profile.defaults?.steps) < least ? least : undefined))
       : undefined;
     const cfg = drawnValue(taste, `cfg:${profile.id}:`);
     const aspect = Number(kind === "image" && favouriteShape(taste));
     const area = Number(profile.defaults?.width) * Number(profile.defaults?.height);
     // Sizes keep to multiples of 64, as the models' trained buckets do.
     const side = (length: number) => Math.max(64, Math.round(length / 64) * 64);
+    let width = side(Math.sqrt(area * aspect));
+    let height = side(Math.sqrt(area / aspect));
+    const model = String(profile.defaults?.model ?? "");
+    while (
+      aspect &&
+      area &&
+      model &&
+      !radianceImageFits(model, width, height, 0) &&
+      Math.min(width, height) > 64
+    ) {
+      const scale = (Math.max(width, height) - 64) / Math.max(width, height);
+      width = side(width * scale);
+      height = side(height * scale);
+    }
     return {
       ...(steps ? { steps: Number(steps) } : {}),
       ...(cfg ? { cfg: Number(cfg) } : {}),
-      ...(aspect && area
-        ? { width: side(Math.sqrt(area * aspect)), height: side(Math.sqrt(area / aspect)) }
-        : {}),
+      ...(aspect && area ? { width, height } : {}),
     };
   }
   /**
@@ -1687,13 +1874,21 @@ export function createDream(options: {
       .filter(Boolean)
       .slice(0, 6);
   }
-  /** A few liked prompts from the account's whole history, sampled so each idea sees different ones. */
+  /**
+   * A few prompts the account liked outside Dream, from its whole history, sampled so each idea
+   * sees different ones: Dream's own results would only echo its past ideas.
+   */
   async function tastePrompts(ownerId: string) {
-    return (await readyGenerations(ownerId, { rating: "liked", sample: seedSample }))
+    const [least, most] = tasteDraw.prompts;
+    return (
+      await readyGenerations(ownerId, { rating: "liked", notDream: true, sample: seedSample })
+    )
       .filter((item) => item.prompt)
-      .slice(0, 3 + random(3))
-      .map((item) => clean(item.prompt, 300));
+      .slice(0, least + random(most - least + 1))
+      .map((item) => clean(item.prompt, tasteDraw.characters));
   }
+  /** `count` entries drawn at random, or all where there are no more. */
+  const sampled = <T>(entries: T[], count: number) => shuffled(entries).slice(0, count);
   /** Consecutive failed writes per account, and when Dream may try that account again. */
   const failures = new Map<string, { count: number; until: number }>();
   /**
@@ -1811,10 +2006,13 @@ export function createDream(options: {
       [...rules, project?.brief.rules ?? ""],
       true,
     );
+    const [fewest, most] = tasteDraw.likes;
+    const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
+    const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
-      ...(likes.length ? [`Likes: ${likes.join(", ")}`] : []),
-      ...(styles.length ? [`Preferred Styles: ${styles.join(", ")}`] : []),
+      ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
+      ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),
     ];
     const rulesRule = rules.length
       ? [
@@ -1826,10 +2024,25 @@ export function createDream(options: {
     const model = await writer.model("dream", false, text(ownerId));
     const guide = `Prompting guide: ${writerGuide(options.guide(profile)) || "(none)"}`;
     const writingRules = [precedence, keepDescriptions(), standalonePrompt()];
+    // The project's own latest ideas, so the next one moves on within the brief.
+    const projectIdeas = brief.length
+      ? options
+          .gallery(ownerId, {
+            ...(projectId
+              ? { dreamProject: projectId, dreamState: poolStates }
+              : { dreamDraft: draft, dreamState: "draft" as const }),
+            limit: projectIdeasShown,
+          })
+          .map((item) => clean(item.prompt || item.dream?.prompt, writerPrompts.characters))
+          .filter(Boolean)
+      : [];
     const briefLines = brief.length
       ? [
           `Project brief (${project!.name}):`,
           ...brief.map(([label, value]) => `- ${label}: ${value}`),
+          ...(projectIdeas.length
+            ? ["The project's recent ideas:", ...projectIdeas.map((idea) => `- ${idea}`)]
+            : []),
         ]
       : [];
     const collectCards = media === "image" && !reword;
@@ -1847,6 +2060,9 @@ export function createDream(options: {
     const similar = like ? [] : similarPasses(ownerId);
     const paused = pausedMotifs(similar);
     const cooling = newConcept ? cooledMotifs(record, fixed, forbidden, paused) : [];
+    // A project's brief may set its look, so only other ideas cool what is in fashion.
+    const fashionable = newConcept && !brief.length ? fashionableLooks(recent, fixed) : [];
+    const common = boilerplate(recent);
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}. ${language}`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
@@ -1944,19 +2160,21 @@ export function createDream(options: {
           !similar.some((item) => similarPrompt(prompt, item.prompt || item.dream?.prompt)),
       );
       const library = options.cards(ownerId);
-      const openCards = library
-        ? (["outfits", "scenes"] as const).flatMap((kind) =>
-            pins?.[kind]
-              ? []
-              : shuffled(suggestedCards(library[kind]))
-                  .filter((card) => card.description)
-                  .slice(0, 2)
-                  .map(
-                    ({ name, description }) =>
-                      `- ${cardKinds[kind].name}: ${name} · ${clean(description, 160)}`,
-                  ),
-          )
-        : [];
+      // A project draws only on the cards it pins.
+      const openCards =
+        library && !project
+          ? (["outfits", "scenes"] as const).flatMap((kind) =>
+              pins?.[kind]
+                ? []
+                : shuffled(suggestedCards(library[kind]))
+                    .filter((card) => card.description)
+                    .slice(0, 2)
+                    .map(
+                      ({ name, description }) =>
+                        `- ${cardKinds[kind].name}: ${name} · ${clean(description, 160)}`,
+                    ),
+            )
+          : [];
       const concept = like
         ? undefined
         : direction(
@@ -1965,6 +2183,8 @@ export function createDream(options: {
             anchors,
             Boolean(likes.length || styles.length || liked.length),
             random,
+            Boolean(brief.length),
+            [...forbidden, ...forbiddenMotifs(avoid, [], true)],
           );
       drawnAnchors = concept?.anchors || [];
       noveltyPrompts.push(...liked);
@@ -2036,12 +2256,21 @@ export function createDream(options: {
                   "Recent prompts: avoid their underlying concepts, even with different wording:",
                   ...recent
                     .slice(0, writerPrompts.count)
-                    .map((prompt) => `- ${clean(prompt, writerPrompts.characters)}`),
+                    .map(
+                      (prompt) =>
+                        `- ${clean(promptBody(prompt, common), writerPrompts.characters)}`,
+                    ),
                 ]
               : []),
             ...(cooling.length
               ? [`Recently repeated optional motifs to leave out this time: ${cooling.join(", ")}.`]
               : []),
+            ...(fashionable.length
+              ? [
+                  `Colors, garments, light and expressions many recent ideas share; pick others this time: ${fashionable.join(", ")}.`,
+                ]
+              : []),
+            ...(concept?.vary ? [`Change first this time: ${concept.vary}.`] : []),
             ...(passed.length
               ? ["Disliked subjects to avoid:", ...passed.map((subject) => `- ${subject}`)]
               : []),
@@ -2066,12 +2295,18 @@ export function createDream(options: {
         },
       ];
     }
-    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed);
+    const freshProblem = freshConceptProblem(recent, noveltyPrompts, subjects, fixed, fashionable);
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
-    /** Why a reply can't be used, or "" when it can. */
-    const problem = (prompt: string, title: string, motifs: string[], cooling: string[]) => {
+    /** Why a reply can't be used, or "" when it can. A retry may miss the brief's subjects. */
+    const problem = (
+      prompt: string,
+      title: string,
+      motifs: string[],
+      cooling: string[],
+      retry: boolean,
+    ) => {
       if (!prompt) return "Your reply had no usable prompt.";
       const minor = options.minorAge(prompt);
       if (minor)
@@ -2087,6 +2322,8 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
+      if (project && !retry && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
+        return `Your prompt shows none of the brief's subjects (${project.brief.subjects}).`;
       return freshProblem(prompt, title, motifs, cooling);
     };
     for (let attempt = 0; ; attempt++) {
@@ -2126,6 +2363,7 @@ export function createDream(options: {
               title,
               chosenMotifs,
               newConcept && latest ? cooledMotifs(latest, fixed, forbidden, paused) : [],
+              attempt > 0,
             );
       if (!wrong) {
         if (latest) {
@@ -2168,7 +2406,7 @@ export function createDream(options: {
         messages[0],
         {
           role: "user",
-          content: `${messages[1].content}\nRejected prompt: ${idea}\n${wrong} ${like || seed || series || reword ? "Keep the required source identity and iteration constraints." : pinnedPrompt ? "Keep the pinned details and find a substantially different action or composition." : "Choose a different concept, changing subject or subject role, scene, action and composition; do not paraphrase the rejected idea."}`,
+          content: `${messages[1].content}\nRejected prompt: ${idea}\n${wrong} ${like || seed || series || reword ? "Keep the required source identity and iteration constraints." : pinnedPrompt ? "Keep the pinned details and find a substantially different action or composition." : brief.length ? "Keep the brief's subjects and styles and choose a different scene, action and composition; do not paraphrase the rejected idea." : "Choose a different concept, changing subject or subject role, scene, action and composition; do not paraphrase the rejected idea."}`,
         },
       ];
     }
@@ -2186,6 +2424,11 @@ export function createDream(options: {
     const record = read(ownerId);
     const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
+    if (options.count(ownerId, { dreamState: "unseen" }) >= unseenLimit)
+      return {
+        status: "waiting",
+        reason: `Dream waits while ${unseenLimit} results are unseen; judge some to continue.`,
+      };
     const counts = daily(ownerId, record);
     const { due, imagesDone } = kinds(record.settings, counts);
     if (!due.length) return capped;
@@ -2199,8 +2442,6 @@ export function createDream(options: {
     const writer = options.writer;
     if (!writer)
       return { status: "unavailable", reason: "The prompt assistant is not configured." };
-    const judged = options.count(ownerId, { dreamState: ["kept", "discarded"] });
-    const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
     const allowUncensored = record.settings.uncensored && access.uncensored;
     let checkText = !allowUncensored;
     let reason = "";
@@ -2256,8 +2497,7 @@ export function createDream(options: {
           continue;
         }
         videoMisses.delete(ownerId);
-        const alternate = random(videoExploreDraw) === 1;
-        const refused = await video(ownerId, record, access, key, alternate);
+        const refused = await video(ownerId, record, access, key);
         if (!refused) return { status: "generating" };
         reason = refused;
         continue;
@@ -2300,22 +2540,6 @@ export function createDream(options: {
         reason = "The source image's model isn't ready.";
         continue;
       }
-      if (
-        kind === "image" &&
-        !steer &&
-        counts.today.images % every === every - 1 &&
-        counts.usage.images + 2 <= record.settings.dailyImages &&
-        random(pairDraw) === 0
-      ) {
-        const pair = await comparison(
-          ownerId,
-          record,
-          access,
-          catalogue.profiles,
-          counts.usage.images + 3 <= record.settings.dailyImages,
-        );
-        if (pair) return pair;
-      }
       const next = steer ? null : await seriesNext(ownerId, record, catalogue.profiles);
       if (next) {
         const refused = await seriesJob(ownerId, record, access, next);
@@ -2323,27 +2547,42 @@ export function createDream(options: {
         reason = refused;
         continue;
       }
-      const limit = record.settings.dailyImages;
-      const lastSmallSlot = limit < recreateEvery && counts.usage.images === limit - 1;
-      const dayOffset =
-        limit < recreateEvery * recreationAxes.length ? Math.floor(now() / 86_400_000) : 0;
-      if (!steer && (lastSmallSlot || counts.usage.images % recreateEvery === recreateEvery - 1)) {
-        if (
-          await recreate(
+      // The deck mix decides the card; existing work recreates or varies a liked result, taking
+      // turns, and a liked concept or handed-off project to vary is written below.
+      let existing: Awaited<ReturnType<typeof seedPick>> = null;
+      let familiar = false;
+      const deck = steer ? null : deckCounts(ownerId);
+      for (const card of deck ? deckOrder(deck) : []) {
+        if (card === "new") break;
+        if (card === "comparison") {
+          if (counts.usage.images + 2 > record.settings.dailyImages) continue;
+          const pair = await comparison(
             ownerId,
             record,
             access,
             catalogue.profiles,
-            lastSmallSlot ? (limit * 100) / recreateEvery : 100,
-            Math.floor(counts.usage.images / recreateEvery) + dayOffset,
-          )
-        )
-          return { status: "generating" };
+            counts.usage.images + 3 <= record.settings.dailyImages,
+          );
+          if (pair) return pair;
+          continue;
+        }
+        const recreateFirst = deck!.recreated * 2 <= deck!.existing;
+        const recreated = () =>
+          recreate(ownerId, record, access, catalogue.profiles, deck!.recreated);
+        if (recreateFirst && (await recreated())) return { status: "generating" };
+        existing = await seedPick(ownerId, record, catalogue.profiles);
+        const turns = turnProjects(ownerId);
+        familiar =
+          Boolean(existing) ||
+          turns.projects.some((project) => !project.cards && turns.handedOff(project));
+        if (familiar) break;
+        if (!recreateFirst && (await recreated())) return { status: "generating" };
       }
       const taste = options.taste.read(ownerId);
-      const weigh = spread(ownerId);
+      const judged = judgement(ownerId);
+      const weigh = spread(ownerId, judged);
       // More Like This keeps its result's profile where it is still ready.
-      const exploited = exploitProfile(kind, catalogue, taste, weigh);
+      const exploited = exploitProfile(kind, catalogue, taste, weigh, judged);
       let profile =
         catalogue.profiles.find(
           (item) => kindOf(item) === "image" && steer && item.id === steer.profileId,
@@ -2355,12 +2594,13 @@ export function createDream(options: {
       // Equipment exploration accompanies concept exploration; More Like This keeps its source.
       const learnt = new Set(taste.loraScores.map((lora) => lora.name));
       const [fresh] = libraryLoras(ownerId, profile, true).filter((lora) => !learnt.has(lora.name));
-      const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile);
+      const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile, judged);
       const open = [...(otherProfile ? ["profile"] : []), ...(fresh ? ["lora"] : []), "prompt"];
       const made = (arm: string) =>
         options.count(ownerId, { dreamState: poolStates, dreamArm: arm, dreamPair: false });
       const share = Math.round(exploring(ownerId) * 100);
-      let axis = !steer && !chance(100 - share) ? open[made("explore:") % open.length] : "";
+      let axis =
+        !steer && !familiar && !chance(100 - share) ? open[made("explore:") % open.length] : "";
       const { projects, handedOff } = turnProjects(ownerId);
       // A proposed project's sample comes before the projects' turns.
       const draft = !steer ? draftWanted(ownerId, catalogue.profiles) : null;
@@ -2380,13 +2620,12 @@ export function createDream(options: {
       const cards = target && projectCards(ownerId, target.cards);
       // Familiar images continue a handed-off project's chat work, else a drawn liked or kept
       // image, changing one thing in turn.
-      const familiar = !axis && !steer && !draft && kind === "image";
+      familiar &&= !draft;
       const chatSeed =
         familiar && project && !project.cards && handedOff(project)
           ? await seedFor(ownerId, project, record)
           : null;
-      const likedSeed =
-        familiar && !project ? await seedPick(ownerId, record, catalogue.profiles) : null;
+      const likedSeed = familiar && !project ? existing : null;
       const seed = chatSeed ?? likedSeed;
       const varied = Object.keys(continueAxes);
       const vary = seed ? varied[made("continue:") % varied.length] : "";
@@ -2414,6 +2653,8 @@ export function createDream(options: {
       }
       if (
         Boolean(axis) &&
+        // A project's brief sets its subject, so an import's would pull it elsewhere.
+        !target &&
         kind === "image" &&
         // Imports carry no content rating, so only an account with Uncensored Models draws on them.
         access.uncensored &&
@@ -2451,7 +2692,13 @@ export function createDream(options: {
       } else if (inspiration) note = `${note} · Inspired by an import`;
       else if (axis === "prompt") note = "Exploring new ground";
       if (!possible.includes(profile)) {
-        profile = exploitProfile(kind, { ...catalogue, profiles: possible }, taste, weigh).profile!;
+        profile = exploitProfile(
+          kind,
+          { ...catalogue, profiles: possible },
+          taste,
+          weigh,
+          judged,
+        ).profile!;
         loras = undefined;
         references = [];
         // The profile or LoRA selected for general exploration may be outside this project.
@@ -2464,7 +2711,7 @@ export function createDream(options: {
         const offSide = `Your favourite models don't run on ${backend === "cloud" ? "Cloud" : "Local"}`;
         note = note ? `${note} · ${offSide}` : offSide;
       }
-      loras ??= exploitLoras(ownerId, profile, taste, weigh);
+      loras ??= exploitLoras(ownerId, profile, taste, weigh, judged);
       if (target && !target.constraints.loras) loras = [];
       if (cards && cards.character)
         references = [
@@ -2478,7 +2725,7 @@ export function createDream(options: {
       const uncensored = uncensoredShare(record, access);
       const explore = Boolean(axis);
       const feature =
-        steer || seed || axis === "prompt"
+        steer || seed || target || axis === "prompt"
           ? undefined
           : featuredTag(taste, seedMotifs(ownerId, record));
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
@@ -2711,7 +2958,6 @@ export function createDream(options: {
     record: DreamRecord,
     access: DreamAccess,
     profiles: DreamProfile[],
-    probability: number,
     turn: number,
   ) {
     const axisStart = turn % recreationAxes.length;
@@ -2830,8 +3076,6 @@ export function createDream(options: {
           };
         }
         if (!variant) continue;
-        if (probability < 100 && !chance(probability)) return false;
-        probability = 100;
         const result = await options.admit(
           {
             ...variant.input,
@@ -2889,13 +3133,7 @@ export function createDream(options: {
    * Queues a video that animates the account's best still or extends one of its videos
    * (videoSources), on its selected backend; answers why it couldn't, or "".
    */
-  async function video(
-    ownerId: string,
-    record: DreamRecord,
-    access: DreamAccess,
-    key: string,
-    alternate: boolean,
-  ) {
+  async function video(ownerId: string, record: DreamRecord, access: DreamAccess, key: string) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
       try {
         return options.reference(access.account, String(item.id), extend ? "last" : undefined);
@@ -2911,7 +3149,7 @@ export function createDream(options: {
         markUsed(ownerId, source);
         continue;
       }
-      const refused = await animate(ownerId, record, access, source, reference, key, alternate);
+      const refused = await animate(ownerId, record, access, source, reference, key);
       if (refused && referenceOf(source)) {
         if (!source.extend) return refused;
         extensionRefusal = refused;
@@ -2926,6 +3164,33 @@ export function createDream(options: {
     return (
       extensionRefusal || "Dream videos animate a kept or liked image. Keep or like one first."
     );
+  }
+  /**
+   * How much each video profile weighs for the account's next Dream video: its keep rate among
+   * Dream's latest judged videos (Laplace's rule, so an untried one starts at one half), with
+   * `lastVideoModelWeight` left to the one its last video used.
+   */
+  function videoWeights(ownerId: string) {
+    const judged = new Map<string, { kept: number; total: number }>();
+    for (const item of options.gallery(ownerId, {
+      dreamState: ["kept", "discarded"],
+      type: "video",
+      limit: judgedRates,
+    })) {
+      const id = String(item.settings?.profileId || "");
+      const entry = judged.get(id) ?? { kept: 0, total: 0 };
+      entry.total++;
+      if (item.dream?.state === "kept") entry.kept++;
+      judged.set(id, entry);
+    }
+    const last = store
+      .dreamJobsSince(ownerId, new Date(now() - 7 * 86_400_000).toISOString())
+      .filter((job) => kindOf(job) === "video")
+      .at(-1)?.profileId;
+    return (profile: DreamProfile) => {
+      const { kept, total } = judged.get(profile.id) ?? { kept: 0, total: 0 };
+      return ((kept + 1) / (total + 2)) * (profile.id === last ? lastVideoModelWeight : 1);
+    };
   }
   /** Each account's last Dream video that found no model, and the video profiles it saw then. */
   const videoMisses = new Map<string, { reason: string; key: string; until: number }>();
@@ -2943,7 +3208,6 @@ export function createDream(options: {
     { item, extend }: DreamVideoSource,
     reference: { id: string; source?: string },
     key: string,
-    alternate: boolean,
   ) {
     const miss = (reason: string) => {
       if (!extend) videoMisses.set(ownerId, { reason, key, until: now() + videoRecheckMs });
@@ -2958,11 +3222,10 @@ export function createDream(options: {
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
         unavailable: failingProfiles(ownerId, 1),
-        ...(alternate &&
-          !extend && {
-            alternate: (profiles, chosen) =>
-              exploreProfile(ownerId, "video", profiles, chosen)?.profile,
-          }),
+        choose: (profiles) => {
+          const weigh = videoWeights(ownerId);
+          return drawn(profiles.map((profile) => [profile, weigh(profile)]));
+        },
       });
     } catch (error) {
       return miss((error as Error).message);
@@ -2975,12 +3238,22 @@ export function createDream(options: {
     const slot = dreamVideoSlot(profile);
     if (!slot) return miss("No video model is ready for this source frame.");
     const uncensored = uncensoredShare(record, access);
+    const recentClips = store
+      .jobsSince(ownerId, new Date(now() - 7 * 86_400_000).toISOString())
+      .filter((job) => job.dream && kindOf(job.input) === "video");
     // Written as the viewer's Animate writes it (prompt-animate.js): seeing the frame and knowing
     // the clip's length, sound and the profile's prompt format.
     const writing = {
       kind: "animate",
       theme: "custom",
-      instruction: motionInstruction(Boolean(uncensored)),
+      instruction: motionInstruction(Boolean(uncensored), recentClips.length, {
+        title: clean(item.title, 120),
+        why: clean(item.dream?.why, 240),
+        recent: recentClips
+          .slice(-recentMotionPrompts)
+          .map((job) => clean(job.input.prompt, 240))
+          .filter(Boolean),
+      }),
       source: clean(item.prompt || item.dream?.prompt, maxPromptCharacters),
       ...(extend ? { extend: true } : {}),
     };
@@ -2988,6 +3261,7 @@ export function createDream(options: {
       {
         ...profile.defaults,
         ...choice.size,
+        ...(choice.frames ? { frames: choice.frames } : {}),
         autoUpscale: null,
         kind: "video",
         profileId: profile.id,
@@ -3540,8 +3814,8 @@ export function createDream(options: {
     get started() {
       return Boolean(timer);
     },
-    /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
-    finished: wake,
+    /** Ticks now: a Dream job finished, freeing its worker, or the deck runs low (dream-routes.ts). */
+    wake,
     idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
     access: (ownerId: string) => options.access(ownerId),
     status(
@@ -3657,7 +3931,7 @@ export function createDream(options: {
         if (items.length !== ids.length || items.some((item) => !ids.includes(String(item.id))))
           throw failure("That Dream comparison has changed.", 409);
         const decidedAt = stamp();
-        const rating = reason === "taste" ? "disliked" : undefined;
+        const rating = disliking(reason) ? "disliked" : undefined;
         for (const item of items)
           options.mark(
             ownerId,
@@ -3670,7 +3944,7 @@ export function createDream(options: {
             },
             rating,
           );
-        if (reason === "taste")
+        if (rating)
           options.taste.record(ownerId, [
             items.length > 1
               ? pairSignal(

@@ -86,15 +86,6 @@ export function GalleryChoices({
   };
   // Filter ▾ counts what the tab applies.
   const activeFilters = useActiveFilters({ ...filterProps, value: applied }, [
-    ...(applied.rating === "liked"
-      ? [
-          {
-            key: "liked",
-            label: "Liked",
-            remove: () => browse({ filters: { ...filters, rating: "" } }),
-          },
-        ]
-      : []),
     ...(grouped
       ? [
           {

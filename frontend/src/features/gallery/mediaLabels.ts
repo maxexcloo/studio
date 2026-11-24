@@ -67,6 +67,15 @@ export function mediaProfileName(item: MediaItem, profiles: Profile[]) {
   return names.size === 1 ? [...names][0] : "";
 }
 
+/** Its model and steps, as the viewer header and Details › Model name them. */
+export function modelSummary(item: MediaItem, profiles: Profile[]) {
+  const model = mediaProfileName(item, profiles);
+  const steps = Number(item.settings?.steps);
+  // Some profile names already say their steps (Turbo 8 Steps).
+  const stepLabel = steps > 0 && !/\b\d+\s+steps?\b/i.test(model) ? `${steps} Steps` : "";
+  return [model, stepLabel].filter(Boolean).join(" · ");
+}
+
 /** Its profile name and the duration for videos. */
 export function mediaDetail(item: MediaItem, profiles: Profile[]) {
   const settings = item.settings || {};

@@ -150,12 +150,14 @@ function sourceIdentity(filename, subfolder, type, worker = "") {
   return `/view?${new URLSearchParams({ filename, subfolder, type, ...(worker ? { worker } : {}) })}`;
 }
 
+const previewFile = (identity, stat) =>
+  path.join(dir, `${identityKey(identity)}-${digest(`${stat.size}:${stat.mtimeMs}`)}.mp4`);
+
 export async function getFileVideoPreview(file, identity = file) {
   const stat = await fs.promises.stat(file);
   if (stat.size > maxSourceBytes) throw new Error("This video is too large for a grid preview.");
   const key = identityKey(identity);
-  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
-  const output = path.join(dir, `${key}-${revision}.mp4`);
+  const output = previewFile(identity, stat);
   if (fs.existsSync(output)) return output;
   return coalesce(key, async () => {
     await fs.promises.mkdir(dir, { recursive: true });
@@ -579,6 +581,22 @@ export async function getComfyVideoPreview(filename, subfolder, type, worker = "
 }
 
 /**
+ * What a tile plays without waiting: its preview once encoded; until then a local original that
+ * every browser plays as it is, while the preview is built behind it. Null when the tile must wait.
+ */
+export async function getInstantVideoPreview(filename, subfolder, type) {
+  const local = localOutputFile(filename, subfolder, type);
+  if (!local) return null;
+  const stat = await fs.promises.stat(local);
+  const preview = previewFile(sourceIdentity(filename, subfolder, type), stat);
+  if (fs.existsSync(preview)) return { file: preview, original: false };
+  const key = identityKey(sourceIdentity(filename, subfolder, type));
+  if ((await playbackPlan(local, key, stat)) !== "original") return null;
+  void getComfyVideoPreview(filename, subfolder, type).catch(() => {});
+  return { file: local, original: true };
+}
+
+/**
  * Whether iOS Safari plays a video as it is: H.264 at 8-bit 4:2:0 in MP4 or QuickTime, within the
  * 4096 × 2304 an iPhone decodes, with AAC, MP3 or no sound. Read from ffmpeg's report of the file.
  */
@@ -620,8 +638,24 @@ async function indexFirst(file) {
   }
 }
 
-/** The copy the viewer plays, by file and revision: the original, or a cached iOS-safe MP4. */
-const playbackPlans = new Map();
+/**
+ * How the viewer plays a local video (see getComfyVideoPlayback): "original", "remux" or "encode".
+ * Probed once per file revision and kept beside the copies, so a restart doesn't probe again.
+ */
+async function playbackPlan(local, key, stat) {
+  const file = path.join(dir, `${key}-${digest(`${stat.size}:${stat.mtimeMs}`)}.plan`);
+  const known = await fs.promises.readFile(file, "utf8").catch(() => "");
+  if (known) return known;
+  if (stat.size > maxSourceBytes) throw new Error("This video is too large to play here.");
+  const { stderr } = await run(["-i", local], { timeout: 15_000 });
+  const plan = !playsOnIos(stderr) ? "encode" : (await indexFirst(local)) ? "original" : "remux";
+  // A probe that didn't get to read the file decides nothing for next time.
+  if (/Input #0/.test(stderr)) {
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(file, plan);
+  }
+  return plan;
+}
 
 /**
  * What the viewer plays on every browser, since iOS Safari plays only some videos and plays them
@@ -637,14 +671,7 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
   const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const key = identityKey(sourceIdentity(filename, subfolder, type));
   const output = path.join(dir, `${key}-play-${revision}.mp4`);
-  const known = playbackPlans.get(output);
-  if (known === "original") return { file: local, original: true };
-  if (known && fs.existsSync(output)) return { file: output, original: false };
-  if (stat.size > maxSourceBytes) throw new Error("This video is too large to play here.");
-  const { stderr } = await run(["-i", local], { timeout: 15_000 });
-  const plan = !playsOnIos(stderr) ? "encode" : (await indexFirst(local)) ? "original" : "remux";
-  playbackPlans.set(output, plan);
-  if (playbackPlans.size > 1000) playbackPlans.delete(playbackPlans.keys().next().value);
+  const plan = await playbackPlan(local, key, stat);
   if (plan === "original") return { file: local, original: true };
   if (fs.existsSync(output)) return { file: output, original: false };
   const file = await coalesce(

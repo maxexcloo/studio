@@ -5,17 +5,24 @@ export async function request(url: string, options: RequestInit = {}): Promise<R
   headers.set("X-Studio", "1");
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
-  const response = await fetch(url, { ...options, headers, credentials: "same-origin" });
+  const response = await fetch(url, { ...options, headers, credentials: "same-origin" }).catch(
+    (error: unknown) => {
+      if (error instanceof TypeError)
+        throw new Error("Can't reach Studio. Try again in a moment.", { cause: error });
+      throw error;
+    },
+  );
   if (response.status === 401) window.dispatchEvent(new Event("studio:signed-out"));
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     // The body stays as the cause, for refusals that say more than their message.
-    throw Object.assign(
-      new Error(data.error || `Studio returned ${response.status}`, { cause: data }),
-      {
-        status: response.status,
-      },
-    );
+    // Gateway failures come from the proxy while Studio restarts, as during a deploy.
+    const fallback = [502, 503, 504].includes(response.status)
+      ? "Studio is restarting. Try again in a moment."
+      : `Studio returned ${response.status}`;
+    throw Object.assign(new Error(data.error || fallback, { cause: data }), {
+      status: response.status,
+    });
   }
   return response;
 }

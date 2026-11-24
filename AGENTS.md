@@ -167,9 +167,10 @@ recur across features.
   existing results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
   gestures, top chrome, media controls and Details surface. Verdicts in
-  fullscreen use the buttons. Passing moves on without a rating. Holding Pass
-  opens the reason picker.
-  Not My Taste records a dislike. Comparisons in the deck and fullscreen video
+  fullscreen use the buttons. Passing a Dream result dislikes it and keeps it in
+  Discards for reference. Holding Pass
+  opens the reason picker: Too Similar and Glitch pass without a rating.
+  Comparisons in the deck and fullscreen video
   offer Pass, the lettered choices and Accept. Fullscreen image comparisons
   offer the single-image verdicts. Accept keeps the image shown and Super Like
   also rates it.
@@ -182,7 +183,7 @@ recur across features.
 
 ### Layers, Focus & Phones
 
-- Suppress iOS edge history swipes once at the document, preserving native control touches and Back navigation.
+- Suppress iOS edge history swipes once at the document, preserving native control touches and Back navigation. The installed iOS app adds no browser history entries, so its back swipe has nothing to go back to; Studio's own Back still works (`singleEntry.ts`).
 - The phone layout covers screens below Mantine's `sm` breakpoint and phones
   held sideways (short touch screens up to 1000 px wide); iPads in landscape
   keep the tablet layout. `ui/usePhone.ts` owns phone detection: components use
@@ -264,7 +265,9 @@ recur across features.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
   text in place, leaving the box's look unchanged, with Undo first in its AI
   menu, and show the action and changed words below the field. Suggestions
-  never act on their own, and nothing floats over the text.
+  never act on their own, and nothing floats over the text. They load as
+  their menu opens, except an empty composer prompt's ideas, which load once
+  the page is idle and again after one is picked, so its menu opens ready.
 - Report actual endpoint health: configuration alone does not prove readiness.
   A deliberately parked worker reads Stopped, not failing; an unexpectedly
   unavailable one remains a failure. Runtime controls belong in

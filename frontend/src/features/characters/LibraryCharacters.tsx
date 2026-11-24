@@ -73,6 +73,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
               key={card.id}
               name={card.name}
               images={card.references}
+              candidates={card.candidates}
               onUse={
                 !selection.active && card.references.length ? () => use.character(card) : undefined
               }

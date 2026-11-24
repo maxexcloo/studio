@@ -146,10 +146,16 @@ export function dreamVideoSlot(profile) {
   return slot && !inputs.some((input) => input !== slot && input.required) ? slot : undefined;
 }
 
-/** Dream prefers the best available tier on its selected side and extends on the source profile. */
+/**
+ * Dream's video profile on its selected side: an extension stays on its source's model; otherwise
+ * `choose` draws one of the ready profiles that take a still (Dream weighs them by keep rate and
+ * turns away from the last one), or the account's default without it.
+ */
 export function dreamVideoProfile(profiles, options) {
-  const { backend, extend, unavailable, alternate, width, height, allowUncensored, ...placement } =
+  const { backend, extend, unavailable, choose, width, height, allowUncensored, defaultId } =
     options;
+  if (backend !== "cloud" && options.localRunning === false)
+    throw new Error(options.localParked ? "Local video is stopped." : "Local video isn't running.");
   const pool = profiles.filter(
     (profile) =>
       profile.kind === "video" &&
@@ -159,34 +165,39 @@ export function dreamVideoProfile(profiles, options) {
       !["offline", "parked"].includes(profile.availability) &&
       dreamVideoSlot(profile),
   );
+  if (!pool.length)
+    throw new Error(
+      backend === "cloud"
+        ? "Cloud video isn't available to this account."
+        : "No local video model can animate images.",
+    );
   const candidates = extend ? pool.filter((profile) => profile.id === extend) : pool;
   if (extend && !candidates.length) throw new Error("The source video's model isn't ready.");
   const healthy = candidates.filter((profile) => !unavailable.has(profile.id));
-  if (!healthy.length && candidates.length) {
+  if (!healthy.length) {
     const [profile] = candidates;
     throw new Error(
       `Dream's last video on ${profile.label || profile.id} failed; it waits to try again.`,
     );
   }
-  if (extend) return withSize({ profile: healthy[0] }, width, height);
-  const bestTier = tierDistance.quality.find((tier) =>
-    healthy.some((profile) => tierOf(profile) === tier),
-  );
-  const best = healthy.filter((profile) => tierOf(profile) === bestTier);
-  const { profile } = animateProfile(best, { ...placement, where: backend, tier: "quality" });
-  const slower = healthy.filter(
-    (candidate) => candidate !== profile && ["quality", "standard"].includes(tierOf(candidate)),
-  );
-  const otherFamilies = healthy.filter(
-    (candidate) => candidate.family && profile.family && candidate.family !== profile.family,
-  );
-  const slowerFamilies = slower.filter((candidate) => otherFamilies.includes(candidate));
-  const exploration = slowerFamilies.length
-    ? slowerFamilies
-    : otherFamilies.length
-      ? otherFamilies
-      : slower;
-  return withSize({ profile: alternate?.(exploration, profile) ?? profile }, width, height);
+  const profile =
+    (!extend && choose?.(healthy)) || healthy.find((item) => item.id === defaultId) || healthy[0];
+  return withSize({ profile, frames: dreamFrames(profile) }, width, height);
+}
+
+/** Dream's clips run 5 to 8 seconds: the profile's own length when it falls there, else the nearest it allows. */
+export function dreamFrames(profile) {
+  const fps = Number(profile.defaults?.fps);
+  const frames = Number(profile.defaults?.frames);
+  const grid = profile.constraints?.frames;
+  if (!(fps > 0 && frames > 0) || !grid?.step) return undefined;
+  const { min = 1, max = Infinity, step, offset = 0 } = grid;
+  const seconds = frames / fps;
+  if (seconds >= 5 && seconds <= 8) return frames;
+  const target = (seconds < 5 ? 5 : 8) * fps;
+  const steps = (seconds < 5 ? Math.ceil : Math.floor)((target - offset) / step);
+  const fitted = Math.max(min, Math.min(max, offset + steps * step));
+  return (fitted - offset) % step ? frames : fitted;
 }
 const withSize = (choice, width, height) =>
   width > 0 && height > 0 ? { ...choice, size: frameSize(choice.profile, width, height) } : choice;

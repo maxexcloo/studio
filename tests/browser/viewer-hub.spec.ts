@@ -83,7 +83,7 @@ test("The viewer resolves an older result’s checkpoint to its profile name", a
   });
   const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
   await expect(header.getByText("Amber Bird", { exact: true })).toBeVisible();
-  await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
+  await expect(header.getByText(/^Krea 2 Turbo( · |$)/)).toBeVisible();
   const timestamp = header.locator("time");
   await expect(timestamp).toHaveAttribute("datetime", stamp);
   await expect(timestamp).toHaveText(/^(?:[01]\d|2[0-3]):[0-5]\d, Today$/);
@@ -750,6 +750,7 @@ test("Explore Three Directions stages an editable comparison from the viewed ima
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
       const request = route.request().postDataJSON();
+      if (request.surface === "composer") return route.fallback();
       expect(request).toMatchObject({
         itemId: "hub",
         directions: directions.map(({ request }) => request),
@@ -1856,8 +1857,9 @@ test("Details keep the caption, run notes and source ahead of LoRAs and prompts"
   if (testInfo.project.use.isMobile)
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
-  // The title's line holds when and how big; Output carries no result number.
-  await expect(details.getByText(/\d{2}:\d{2}, 23 Oct(?: 2026)? · 1024 × 1024$/)).toBeVisible();
+  // The title carries its time beside it, as the viewer header does; Output carries no result
+  // number.
+  await expect(details.getByText(/^\d{2}:\d{2}, 23 Oct(?: 2026)?$/)).toBeVisible();
   await expect(details.getByRole("cell", { name: "#866", exact: true })).toHaveCount(0);
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
@@ -1868,7 +1870,7 @@ test("Details keep the caption, run notes and source ahead of LoRAs and prompts"
     details.getByRole("heading", {
       name: /^(Caption|Lineage|Model|LoRAs|Prompt|Negative Prompt)$/,
     }),
-  ).toHaveText(["Caption", "Lineage", "LoRAs", "Prompt", "Negative Prompt"]);
+  ).toHaveText(["Caption", "Lineage", "Model", "LoRAs", "Prompt", "Negative Prompt"]);
   await expect(details.getByText(notes, { exact: true })).toBeVisible();
   await expect(details.getByText(runCaption, { exact: true })).toBeVisible();
   await expect(details.getByRole("link", { name: "Original Bird", exact: true })).toHaveAttribute(

@@ -13,6 +13,7 @@ import {
   showOnly,
   showViewerThumbnails,
   stamp,
+  toggleGalleryFilter,
   toolbarSearch,
   touch,
 } from "./fixtures";
@@ -204,9 +205,7 @@ test("Select All takes every match across pages, and the search and Liked stay w
     });
   });
   await page.goto("/images");
-  const liked = page.getByRole("button", { name: "Liked", exact: true });
-  await liked.click();
-  await expect(liked).toHaveAttribute("aria-pressed", "true");
+  await showOnly(page, "Liked");
   await (await toolbarSearch(page)).fill("Browse");
   await expect.poll(() => requests.at(-1)?.get("q")).toBe("Browse");
   const select = page.getByRole("button", { name: "Select Items", exact: true });
@@ -477,6 +476,28 @@ test("Closing a navigated viewer reveals and focuses its current virtualised gal
   const current = page.getByRole("button", { name: "Open image: Browse Result 25", exact: true });
   await expect(current).toBeFocused();
   await expect(current).toBeInViewport();
+});
+
+test("The installed iOS app opens and closes the viewer without adding history entries", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "standalone", { value: true });
+  });
+  await fixtures(page);
+  await page.route("**/api/gallery?**", (route) =>
+    route.fulfill({ json: { items: results(3), nextCursor: "", hasMore: false } }),
+  );
+  await page.goto("/images");
+  const entries = await page.evaluate(() => history.length);
+  await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/images\/.+/);
+  await dialog.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/\/images$/);
+  expect(await page.evaluate(() => history.length)).toBe(entries);
 });
 
 test("Single-item viewer keyboard actions like and request deletion through the existing confirmation", async ({
@@ -1074,6 +1095,35 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await expect(queue.getByText("Empty Queue", { exact: true })).toBeVisible();
 });
 
+test("Retry All retries every failed job in the queue", async ({ page }) => {
+  const state = await fixtures(page);
+  for (const [id, status] of [
+    ["failed-a", "failed"],
+    ["waiting-job", "waiting"],
+    ["failed-b", "failed"],
+  ])
+    state.jobs.push({
+      id,
+      jobId: id,
+      sessionId: "s",
+      operation: "image",
+      status,
+      input: { prompt: id },
+      items: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+  await serveRetries(page, state, (ids) => ids.map((id) => ({ id, replacement: `${id}-again` })));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+  const retried = page.waitForRequest("**/api/queue/retry");
+  await queue.getByRole("button", { name: "Retry All", exact: true }).click();
+  expect((await retried).postDataJSON()).toEqual({ ids: ["failed-a", "failed-b"] });
+  await expect(queue.getByRole("button", { name: "Retry All", exact: true })).toHaveCount(0);
+  await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
+});
+
 test("Gallery selection stars, downloads and deletes only selected finished records", async ({
   page,
 }) => {
@@ -1645,10 +1695,9 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.goto("/images");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
   await expect(filter).toHaveAttribute("aria-expanded", "false");
-  // Disliked is a filter in the panel, while Liked stays in the toolbar.
+  // Liked and Disliked are filters in the panel, not toolbar buttons.
+  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
-  // The toolbar's Liked, not the Filters popup's while it fades out.
-  const liked = page.getByRole("button", { name: "Liked", exact: true }).first();
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
@@ -1661,18 +1710,18 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   await expect(selectionAction(page, "Download")).toBeInViewport({ ratio: 1 });
   await page.keyboard.press("Escape");
-  await expect(liked).toBeInViewport({ ratio: 1 });
   await expect(filter).toBeInViewport({ ratio: 1 });
   await filter.click();
   await expect(page.getByRole("combobox", { name: "Models", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   const search = await toolbarSearch(page);
   await search.fill("Browse");
-  await liked.click();
-  await filter.click();
-  await page.getByRole("button", { name: "Disliked", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(liked).toHaveAttribute("aria-pressed", "false");
+  await toggleGalleryFilter(page, "Liked");
+  const likedChip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
+  await expect(likedChip).toBeVisible();
+  // Disliked takes Liked's place.
+  await toggleGalleryFilter(page, "Disliked");
+  await expect(likedChip).toHaveCount(0);
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));
@@ -1685,10 +1734,10 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
   await page.keyboard.press("Escape");
-  // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
+  // Clear All takes every filter, Disliked included.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
   await expect(dislikedChip).toHaveCount(0);
-  await liked.click();
+  await toggleGalleryFilter(page, "Liked");
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
   await page.keyboard.press("Escape");
@@ -1796,9 +1845,8 @@ test("Incoming results wait behind New Results while scrolled, keeping loaded pa
     .toBeLessThan(2);
   // An arrival during a tap must keep the hit target over the gallery, not a toolbar filter.
   await page.mouse.up();
-  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
+  await expect(page.getByRole("button", { name: "Remove Liked Filter", exact: true })).toHaveCount(
+    0,
   );
   await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
     "Gallery",

@@ -1,6 +1,6 @@
 import { ActionIcon, Image } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { type Ref, memo } from "react";
+import { type ComponentProps, type ReactNode, type Ref, memo } from "react";
 
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
@@ -174,11 +174,6 @@ export function PromptFields({
     disabled: ask?.pending,
     onPick: (request) => ask?.sendRequest(request),
   });
-  const history = usePromptHistory({
-    kind: "positive",
-    value: input.prompt,
-    onPick: (prompt) => onChange({ prompt }),
-  });
   const ideas = usePromptIdeas({
     input,
     references,
@@ -234,64 +229,60 @@ export function PromptFields({
       : undefined);
   return (
     <>
-      <div className={classes.area} data-fill={fill || undefined} data-text-box="prompt">
-        <TextBox
-          ref={textareaRef}
-          tools={[assistantTool, history.action].filter((tool) => !!tool)}
-          busy={assistant.working}
-          popups={history.popup}
-          data-composer-prompt={compact || undefined}
-          data-expanded-prompt={!compact || undefined}
-          classNames={compact ? undefined : { input: classes.input }}
-          variant="unstyled"
-          aria-label="Prompt"
-          data-autofocus={autoFocus || undefined}
-          placeholder="Prompt…"
-          autosize={!fill}
-          minRows={compact ? 1 : negative ? 4 : 3}
-          maxRows={compact ? 1 : negative ? 4 : 10}
-          wrap={compact ? "off" : undefined}
-          rightSection={
-            cover && (
-              <ActionIcon
-                aria-label="Preview References"
-                variant="transparent"
-                size={44}
-                onClick={() => preview.open(pictures)}
-              >
-                <Image
-                  src={cover.thumbnailUrl || cover.url}
-                  alt={cover.prompt || ""}
-                  w={34}
-                  h={34}
-                  radius="md"
-                />
-              </ActionIcon>
-            )
+      <PromptBox
+        name="prompt"
+        label="Prompt"
+        value={input.prompt}
+        onChange={(prompt) => onChange({ prompt })}
+        fill={fill}
+        assistant={assistantTool}
+        after={assistant.dialog}
+        ref={textareaRef}
+        busy={assistant.working}
+        data-composer-prompt={compact || undefined}
+        data-expanded-prompt={!compact || undefined}
+        bare={compact}
+        data-autofocus={autoFocus || undefined}
+        autosize={!fill}
+        minRows={compact ? 1 : negative ? 4 : 3}
+        maxRows={compact ? 1 : negative ? 4 : 10}
+        wrap={compact ? "off" : undefined}
+        rightSection={
+          cover && (
+            <ActionIcon
+              aria-label="Preview References"
+              variant="transparent"
+              size={44}
+              onClick={() => preview.open(pictures)}
+            >
+              <Image
+                src={cover.thumbnailUrl || cover.url}
+                alt={cover.prompt || ""}
+                w={34}
+                h={34}
+                radius="md"
+              />
+            </ActionIcon>
+          )
+        }
+        rightSectionWidth={cover ? 44 : undefined}
+        rightSectionPointerEvents={cover ? "all" : undefined}
+        onClick={compact && phone ? (event) => event.preventDefault() : undefined}
+        onKeyDown={(event) => {
+          // Undoing the proposal comes first; a second Escape closes the composer.
+          if (event.key === "Escape" && proposal && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            ask.undo();
           }
-          rightSectionWidth={cover ? 44 : undefined}
-          rightSectionPointerEvents={cover ? "all" : undefined}
-          onClick={compact && phone ? (event) => event.preventDefault() : undefined}
-          inline={fill}
-          value={input.prompt}
-          onChange={(prompt) => onChange({ prompt })}
-          onKeyDown={(event) => {
-            // Undoing the proposal comes first; a second Escape closes the composer.
-            if (event.key === "Escape" && proposal && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              ask.undo();
-            }
-          }}
-          below={
-            proposal ? (
-              <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
-            ) : (
-              ideas.label
-            )
-          }
-        />
-        {assistant.dialog}
-      </div>
+        }}
+        below={
+          proposal ? (
+            <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
+          ) : (
+            ideas.label
+          )
+        }
+      />
       {preview.element}
       {negative && (
         <NegativePrompt
@@ -316,25 +307,69 @@ const NegativePrompt = memo(function NegativePrompt({
   fill: boolean;
   assistant?: Action;
 }) {
-  const history = usePromptHistory({
-    kind: "negative",
-    value,
-    onPick: (negative) => onChange({ negative }),
-  });
   return (
-    <div className={classes.negative} data-fill={fill || undefined} data-text-box="negative">
-      <TextBox
-        tools={assistant ? [assistant, history.action] : [history.action]}
-        popups={history.popup}
-        classNames={{ input: classes.input }}
-        variant="unstyled"
-        aria-label="Negative Prompt"
-        placeholder="Negative Prompt…"
-        rows={2}
-        inline={fill}
-        value={value}
-        onChange={(negative) => onChange({ negative })}
-      />
-    </div>
+    <PromptBox
+      name="negative"
+      label="Negative Prompt"
+      value={value}
+      onChange={(negative) => onChange({ negative })}
+      fill={fill}
+      assistant={assistant}
+      autosize={!fill}
+      minRows={2}
+      maxRows={4}
+    />
   );
 });
+
+/**
+ * The prompt and negative prompt share one box: its AI tool and Recent Prompts, the borderless
+ * field and, in the phone Generate sheet, editing in place.
+ */
+function PromptBox({
+  name,
+  label,
+  value,
+  onChange,
+  fill,
+  assistant,
+  after,
+  bare = false,
+  ...props
+}: Omit<ComponentProps<typeof TextBox>, "inline" | "popups" | "tools"> & {
+  name: "prompt" | "negative";
+  label: string;
+  fill: boolean;
+  assistant?: Action;
+  /** Content after the box, such as the assistant's dialog. */
+  after?: ReactNode;
+  /** Keeps the field's own text styles (the compact composer). */
+  bare?: boolean;
+}) {
+  const history = usePromptHistory({
+    kind: name === "prompt" ? "positive" : "negative",
+    value,
+    onPick: onChange,
+  });
+  return (
+    <div
+      className={name === "prompt" ? classes.area : classes.negative}
+      data-fill={fill || undefined}
+      data-text-box={name}
+    >
+      <TextBox
+        {...props}
+        tools={assistant ? [assistant, history.action] : [history.action]}
+        popups={history.popup}
+        classNames={bare ? undefined : { input: classes.input }}
+        variant="unstyled"
+        aria-label={label}
+        placeholder={`${label}…`}
+        inline={fill}
+        value={value}
+        onChange={onChange}
+      />
+      {after}
+    </div>
+  );
+}

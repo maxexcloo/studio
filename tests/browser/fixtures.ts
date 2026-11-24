@@ -140,6 +140,7 @@ export async function fixtures(page: Page) {
       ? { prompt: comparison.requests[0].input.prompt }
       : {}),
     ...(comparison.itemIds ? {} : { set: comparison.id }),
+    ...(comparison.card ? { card: comparison.card } : {}),
     variants: comparison.jobIds.map((jobId: string, index: number) => ({
       jobId,
       label: comparison.labels[index],
@@ -442,6 +443,7 @@ export async function fixtures(page: Page) {
             endpoints: [{ id: "text", label: "Text Worker", state: "healthy", reason: "Ready" }],
           },
         },
+        cloud: [{ label: "Grok", used: 40, reason: "Weekly usage." }],
         workers: [
           {
             id: "primary",
@@ -617,6 +619,21 @@ export async function fixtures(page: Page) {
       const winner = gallery.find((item) => item.id === body.itemId);
       comparison.vote = winner?.jobId || null;
       comparison.winnerItemId = winner?.id || null;
+      // Generate References: the winner joins the card's images.
+      const waiting =
+        comparison.card &&
+        cards[comparison.card.kind as "characters"].find(
+          (card: any) => card.id === comparison.card.id,
+        );
+      if (waiting && winner && !waiting.referenceIds.includes(winner.id)) {
+        waiting.referenceIds.push(winner.id);
+        waiting.references.push({
+          id: winner.id,
+          name: "Reference",
+          thumbnailUrl: image,
+          url: image,
+        });
+      }
       return respond(showComparison(comparison));
     }
     if (comparison && method === "GET") return respond(showComparison(comparison));
@@ -742,6 +759,51 @@ export async function fixtures(page: Page) {
       if (path.endsWith("/sheet")) {
         characters[index].sheet = { jobId: "sheet-job", at: stamp, status: "making", panels: [] };
         return respond({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
+      }
+      // Generate References: the card saved waiting on a comparison of its candidates.
+      if (path.endsWith("/references")) {
+        const comparisonId = `compare-${comparisons.length + 1}`;
+        const saved = {
+          ...card(body, body.id || `${noun}-${list.length + 1}`),
+          candidates: comparisonId,
+        };
+        if (body.id) list[list.findIndex((item) => item.id === body.id)] = saved;
+        else list.push(saved);
+        const labels = ["Seed 1", "Seed 2", "Seed 3", "Seed 4"];
+        const requests = labels.map(() => ({
+          input: {
+            kind: "image",
+            profileId: body.profileId,
+            prompt: `A reference of ${body.description}`,
+          },
+        }));
+        const comparison = {
+          id: comparisonId,
+          seed: "",
+          requests,
+          labels,
+          card: { kind: cardKind, id: saved.id, name: saved.name },
+          jobIds: requests.map(
+            ({ input }, index) =>
+              recordGeneration(
+                {
+                  ...input,
+                  resultSet: {
+                    id: comparisonId,
+                    title: "Comparison",
+                    index,
+                    variation: labels[index],
+                  },
+                  seed: String(index + 1),
+                  operation: "image",
+                },
+                "session-references",
+              ).id,
+          ),
+          vote: null,
+        };
+        comparisons.push(comparison);
+        return respond({ ok: true, [noun]: saved, comparison: showComparison(comparison) }, 201);
       }
       if (method === "POST") {
         list.push(card(body, `${noun}-${list.length + 1}`));
@@ -1242,10 +1304,20 @@ export async function showGalleryView(
 /** Shows Liked, Uploads or the unfiltered Gallery. */
 export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") {
   await showGalleryView(page, choice === "Uploads" ? "Uploads" : "Gallery");
-  const liked = page.getByRole("button", { name: "Liked", exact: true });
-  const on = (await liked.getAttribute("aria-pressed")) === "true";
-  if (on !== (choice === "Liked")) await liked.click();
-  await expect(liked).toHaveAttribute("aria-pressed", String(choice === "Liked"));
+  // Liked is a Filters choice, shown as a removable chip while on.
+  const chip = page.getByRole("button", { name: "Remove Liked Filter", exact: true });
+  if ((await chip.count()) > 0 !== (choice === "Liked")) await toggleGalleryFilter(page, "Liked");
+  await expect(chip).toHaveCount(choice === "Liked" ? 1 : 0);
+}
+
+/** Turns one of the gallery's Show filters (Liked, Disliked) on or off in its Filters popup. */
+export async function toggleGalleryFilter(page: Page, name: "Liked" | "Disliked") {
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Show", exact: true })
+    .getByRole("button", { name, exact: true })
+    .click();
+  await page.keyboard.press("Escape");
 }
 
 /** Shows the reference picker's Uploads tab, which lists uploaded images. */

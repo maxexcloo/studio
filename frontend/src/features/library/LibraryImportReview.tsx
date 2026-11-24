@@ -41,6 +41,7 @@ export interface ImportRecord {
   title?: string;
   name?: string;
   state: string;
+  createdAt?: string;
   /** Where it stands in Library › Imports. */
   audit: "busy" | "failed" | "needs-files" | "ready" | "substitute";
   /** Failed, or waiting on a file no provider gives: Clear Stale removes it. */
@@ -116,13 +117,13 @@ export const stateLabel = (state: string) => titleCase(state.replaceAll("-", " "
 /** An import still resolving, downloading or verifying, which polling follows until it settles. */
 export const importBusy = (record: ImportRecord) =>
   ["resolving", "downloading"].includes(record.state) || Boolean(record.verifying);
-/** Where an import stands, in plain words: its row's and review's badge. */
-export function importStatus(record: ImportRecord): { label: string; color: string } {
+/** Where an import stands, in plain words; a status that needs attention has a colour. */
+export function importStatus(record: ImportRecord): { label: string; color?: string } {
   const required = (record.resources || []).filter((resource) => !resource.optional);
   if (record.audit === "failed") return { label: "Failed", color: "red" };
   if (record.audit === "busy") return { label: stateLabel(record.state), color: "blue" };
   if (record.audit === "substitute") return { label: "Substitute", color: "yellow" };
-  if (record.audit === "ready") return { label: "Installed", color: "green" };
+  if (record.audit === "ready") return { label: "Installed" };
   if (required.some((resource) => resource.status === "conflict"))
     return { label: "Conflict", color: "red" };
   if (required.some((resource) => resource.downloadable))
@@ -270,7 +271,9 @@ export function LibraryImportReview({
         ) : record ? (
           <>
             <Group gap="xs">
-              <Badge color={importStatus(record).color}>{importStatus(record).label}</Badge>
+              <Badge color={importStatus(record).color ?? "gray"}>
+                {importStatus(record).label}
+              </Badge>
               {record.grade && (
                 <Badge variant="light" color={gradeColours[record.grade.value] || "gray"}>
                   {stateLabel(record.grade.value)} Match
