@@ -131,6 +131,7 @@ const jobCount = z.number().int().min(1).max(maxJobsPerCall);
  * asked for and its later calls bring new prompts.
  */
 const turnRuns = new Map();
+const turnGenerates = new Map();
 const outputCount = (jobs) => jobs.reduce((total, job) => total + (job.images || 1), 0);
 const setTitle = z.string().trim().min(1).max(80);
 // Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
@@ -473,7 +474,7 @@ export function registerGenerateTools({
         .min(1)
         .max(4000)
         .optional()
-        .describe("The user's words, with anything they refer back to."),
+        .describe("Latest user message and total; required in chat."),
       // Models sometimes send the list as one string; clients reject what the published schema doesn't allow.
       prompts: z
         .union([promptList, promptListText.pipe(promptList)])
@@ -586,25 +587,35 @@ export function registerGenerateTools({
       face_detail: z.boolean().optional(),
     }),
     (input, signal) => {
+      if (turn && !input.request)
+        throw new Error(
+          "Pass the user's latest message as request, including the original total in every batch.",
+        );
       // Identical calls share pending work and its reply for two minutes after it settles.
       // A transport retry cannot queue another set; later or different requests queue anew.
       const now = Date.now();
       for (const [key, entry] of recentGenerates)
         if (entry.at !== null && now - entry.at > generateDedupeMs) recentGenerates.delete(key);
-      const key = `${refs || owner}\n${stableJson(input)}`;
+      const key = `${refs || owner}\n${turn || ""}\n${stableJson(input)}`;
       const earlier = generateDedupeMs > 0 ? recentGenerates.get(key) : null;
       if (earlier) return earlier.reply;
       const accepted = { entries: [], set: 0 };
-      const reply = generateOnce(input, signal, accepted).catch((error) => {
-        if (!accepted.entries.length) throw error;
-        // Delivery can fail after admission (an aborted ETA probe, or a later model's refusal).
-        // Keep the accepted jobs as the deduplicated reply so a retry cannot queue them again.
-        const number = accepted.set || recordSet(accepted.entries);
-        return interrupted(accepted.entries, number, error);
-      });
+      const prior = turn ? turnGenerates.get(turnKey) : undefined;
+      const reply = Promise.resolve(prior)
+        .then(() => {
+          signal?.throwIfAborted();
+          return generateOnce(input, signal, accepted);
+        })
+        .catch((error) => {
+          if (!accepted.entries.length) throw error;
+          // Delivery can fail after admission (an aborted ETA probe, or a later model's refusal).
+          // Keep the accepted jobs as the deduplicated reply so a retry cannot queue them again.
+          const number = accepted.set || recordSet(accepted.entries);
+          return interrupted(accepted.entries, number, error);
+        });
       const entry = { at: null, reply };
       recentGenerates.set(key, entry);
-      reply.then(
+      const settled = reply.then(
         () => {
           entry.at = Date.now();
           const images = outputCount(accepted.entries.flatMap(({ queued }) => queued.jobs));
@@ -643,6 +654,13 @@ export function registerGenerateTools({
           if (recentGenerates.get(key) === entry) recentGenerates.delete(key);
         },
       );
+      if (turn) {
+        turnGenerates.set(turnKey, settled);
+        const release = () => {
+          if (turnGenerates.get(turnKey) === settled) turnGenerates.delete(turnKey);
+        };
+        void settled.then(release, release);
+      }
       return reply;
     },
   );
@@ -744,7 +762,11 @@ export function registerGenerateTools({
       accountExclusions(media, owner, signal),
     ]);
     const choices = chatChoices.read(owner, conversation);
-    const remembered = keptChoices(choices, structuredClone(input));
+    const requested = requestedCount(input.request);
+    const remembered = keptChoices(
+      requested ? { ...choices, count: undefined } : choices,
+      structuredClone(input),
+    );
     const constrained = project
       ? projectArgs(project, remembered.args)
       : { args: remembered.args, note: "" };
@@ -912,8 +934,9 @@ export function registerGenerateTools({
       promptListProblem(args.prompts) ||
       repeatedSetProblem(args.prompts, turnRuns.get(turnKey)?.sets || []);
     if (listProblem) throw new Error(listProblem);
-    // "count: 4" beside four prompts means one image each, not sixteen.
+    // Without a stated total, keep the shorthand of one image per prompt over the batch limit.
     if (
+      !requested &&
       args.count > 1 &&
       args.count === args.prompts?.length &&
       args.count * args.prompts.length > maxJobsPerCall
@@ -1069,18 +1092,35 @@ export function registerGenerateTools({
       throw new Error(
         `${unable.map(({ profile }) => profile.label || profile.id).join(", ")} can't hold ${card.name}'s face: it takes no reference to edit with, so each image would show someone else. Leave the model out (Studio picks ${keeper ? keeper.label || keeper.id : "one that edits with references"}), or pass any_model: true only if the user insists on it.`,
       );
-    // A lone prompt on one image model, for a request that names no number, takes the account's Default Count.
+    const queued = turnRuns.get(turnKey)?.images || 0;
+    const remaining = requested - queued;
+    const outputsPerCount = targets.length * args.prompts.length;
+    // The chat may repeat the total as count beside an already complete list of prompts.
+    if (remaining === outputsPerCount && args.count === args.prompts.length) args.count = 1;
+    const singleImage = outputsPerCount === 1 && targets[0].profile.kind === "image";
+    if (singleImage && args.count === undefined && remaining > maxJobsPerCall)
+      throw new Error(
+        `The user asked for ${remaining} more images. Pass up to ${maxJobsPerCall} repeats per prompt with count, or supply more distinct prompts to batch the images.`,
+      );
     const preferredCount =
-      targets.length === 1 && args.prompts.length === 1 && !requestedCount(request)
-        ? targets[0].profile.imagePreference?.imageCount
-        : undefined;
-    const count = (args.count ??= preferredCount ?? mcpGenerationCount);
-    const jobs = targets.length * (args.prompts?.length || 1) * count;
+      singleImage && !requested ? targets[0].profile.imagePreference?.imageCount : undefined;
+    if (
+      args.count === undefined &&
+      !singleImage &&
+      remaining <= maxSplitJobs &&
+      outputsPerCount < remaining
+    )
+      throw new Error(
+        `The user asked for ${remaining} more images, but these prompts and models give ${outputsPerCount}. Supply the remaining distinct prompts, or set count explicitly to repeat prompts or submit a deliberate batch.`,
+      );
+    const inferredCount = singleImage && remaining > 0 ? remaining : undefined;
+    const count = (args.count ??= inferredCount ?? preferredCount ?? mcpGenerationCount);
+    const jobs = outputsPerCount * count;
     if (jobs > maxSplitJobs)
       throw new Error(
         `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxSplitJobs}. Lower count, pass fewer profile_ids, or name a tier.`,
       );
-    const tooMany = turnCountProblem(request, turnRuns.get(turnKey)?.images || 0, jobs);
+    const tooMany = turnCountProblem(request, queued, jobs);
     if (tooMany) throw new Error(tooMany);
     // A preview's prompts run as shown when the same call follows without preview.
     // Keyed by what the call runs, so references a preview named carry into the call that confirms it.

@@ -3686,6 +3686,26 @@ test("a chat turn stops at the number of images asked for and its later calls br
   assert.equal(f.submitted.length, 3);
 });
 
+test("parallel calls in one chat turn share its total and require the latest request", async (t) => {
+  const f = await fixture(t);
+  const client = await chat(t, f, "alice", "road-chat", "road-turn");
+  const run = (prompts) =>
+    call(client, "generate", { request: "Make three images", prompts, count: 1 });
+  const missing = await call(client, "generate", { prompts: ["A country road"], count: 1 });
+  assert.equal(missing.isError, true);
+  assert.match(texts(missing), /latest message as request/);
+  assert.equal(f.submitted.length, 0);
+  const batches = await Promise.all([
+    run(["A gravel trail", "A city avenue"]),
+    run(["A forest path", "A railway crossing"]),
+  ]);
+  assert.equal(f.submitted.length, 2);
+  assert.equal(batches.filter((reply) => reply.isError).length, 1);
+  assert.match(texts(batches.find((reply) => reply.isError)), /queue at most 1 more/);
+  assert.equal(data(await run(["A beach boardwalk"])).accepted, 1);
+  assert.equal(f.submitted.length, 3);
+});
+
 test("a chat picks a profile that takes its photo when the remembered profile can't", async (t) => {
   const f = await fixture(t);
   const textOnly = { ...imageProfile, id: "text-only", label: "Text Only", mediaInputs: [] };
@@ -5620,6 +5640,41 @@ for (const batch of [true, false])
     assert.equal(new Set(f.submitted.map((job) => job.clientJobId)).size, f.submitted.length);
   });
 
+test("explicit image totals override ambiguous count shorthand and the saved account count", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const onePrompt = await call(client, "generate", {
+    request: "Make five images",
+    prompts: ["A red fox at dawn"],
+  });
+  assert.equal(data(onePrompt).accepted, 5);
+  const large = await call(client, "generate", {
+    request: "Make 20 images",
+    prompts: ["A red fox at dawn"],
+  });
+  assert.equal(large.isError, true);
+  assert.match(texts(large), /asked for 20 more images.*up to 10 repeats per prompt/);
+  const themes = ["A red kite", "A blue barn", "A grey owl", "A black cat", "A white gull"];
+  const repeated = await call(client, "generate", {
+    request: "Make 25 images",
+    prompts: themes,
+    count: 5,
+  });
+  assert.equal(data(repeated).accepted, 25);
+  const complete = await call(client, "generate", {
+    request: "Make two images",
+    prompts: themes.slice(0, 2),
+    count: 2,
+  });
+  assert.equal(data(complete).accepted, 2);
+  const incomplete = await call(client, "generate", {
+    request: "Make six images",
+    prompts: themes,
+  });
+  assert.equal(incomplete.isError, true);
+  assert.match(texts(incomplete), /asked for 6 more images.*give 5/);
+});
+
 test("a Generate count is one batched job where the profile batches, else a job per image", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
@@ -5765,7 +5820,12 @@ test("variants offers lettered options of a result, records the pick and takes l
   const client = await chat(t, f, "alice", "fox-chat", "fox-turn");
   const earlier = await chat(t, f, "alice", "earlier-chat", "earlier-turn");
   const original = data(
-    await call(earlier, "generate", { kind: "image", prompts: ["A fox at noon"], count: 1 }),
+    await call(earlier, "generate", {
+      kind: "image",
+      request: "A fox at noon",
+      prompts: ["A fox at noon"],
+      count: 1,
+    }),
   );
   finish(f);
   const runs = [];
@@ -5850,6 +5910,7 @@ test("variants offers lettered options of a result, records the pick and takes l
   data(
     await call(client, "generate", {
       profile_id: imageProfile.id,
+      request: "The same fox in snow, using option A",
       prompts: ["The same fox in snow"],
       reference_asset_ids: ["A"],
     }),
@@ -6019,6 +6080,7 @@ test("chat links open the exact result, set, turn or cumulative media view", asy
   const client = await chat(t, f, "alice", "plush-chat", "turn-1");
   const queued = await call(client, "generate", {
     kind: "image",
+    request: "Three woodland images",
     prompts: ["A bear", "A fox", "An owl"],
     title: "Woodland",
     titles: ["Bear Hug"],
@@ -6085,7 +6147,11 @@ test("chat links open the exact result, set, turn or cumulative media view", asy
   assert.equal(data(await call(client, "status", { job_id: exact.link })).job_id, second.job_id);
   const secondTurn = await chat(t, f, "alice", "plush-chat", "turn-2");
   const video = data(
-    await call(secondTurn, "generate", { kind: "video", prompts: ["An owl flies"] }),
+    await call(secondTurn, "generate", {
+      kind: "video",
+      request: "An owl flies",
+      prompts: ["An owl flies"],
+    }),
   );
   assert.equal(
     await opened(localLink(f, video.links.turn)),
