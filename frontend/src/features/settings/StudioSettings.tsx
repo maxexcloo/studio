@@ -19,8 +19,6 @@ import {
 import { GalleryPass } from "./GalleryPass";
 
 /** Background features with a catch-up pass over the gallery, each a row in Catch Up. */
-const captionsRoute = "/api/gallery/captions";
-const personalCaptionsRoute = `${captionsRoute}/me`;
 const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> = {
   STUDIO_FACE_CHECK: {
     route: "/api/gallery/faces",
@@ -29,7 +27,7 @@ const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> 
     progressLabel: "Face Check Progress",
   },
   STUDIO_GALLERY_CAPTIONS: {
-    route: captionsRoute,
+    route: "/api/gallery/captions",
     description: "Caption existing gallery images.",
     remaining: "to caption",
     progressLabel: "Caption Progress",
@@ -91,27 +89,9 @@ export function StudioSettings() {
   const passRows = catalogue.flatMap((flag) => {
     const info = passes[flag.key];
     if (!info) return [];
-    if (!multiUser || flag.key !== "STUDIO_GALLERY_CAPTIONS")
-      return [<GalleryPass key={flag.key} {...info} label={flag.label} />];
-    return [
-      <GalleryPass
-        key={personalCaptionsRoute}
-        {...info}
-        route={personalCaptionsRoute}
-        pairedRoute={captionsRoute}
-        label="My Gallery Captions"
-        description="Caption existing images in your gallery."
-        progressLabel="My Caption Progress"
-        scopeLabel="My Images to Caption"
-      />,
-      <GalleryPass
-        key={flag.key}
-        {...info}
-        label={flag.label}
-        pairedRoute={personalCaptionsRoute}
-        description="Caption existing images across all accounts."
-      />,
-    ];
+    const ownRoute =
+      multiUser && flag.key === "STUDIO_GALLERY_CAPTIONS" ? `${info.route}/me` : undefined;
+    return [<GalleryPass key={flag.key} {...info} label={flag.label} ownRoute={ownRoute} />];
   });
   return (
     <Stack gap="lg">

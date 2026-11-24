@@ -29,18 +29,18 @@ test("Settings follow the settled section order and run maintenance and worker r
     if (new URL(request.url()).pathname === "/api/services/status") statusReads++;
   });
   await page.goto("/settings");
-  // Personal, then Administration, each alphabetical, with About last.
+  // Personal, then Administration, each by how often it is used, with About last.
   const order = [
-    "Account",
-    "Dream",
     "Preferences",
-    "Taste",
     "Where Work Runs",
-    "Dream Defaults",
-    "Groups",
-    "Studio",
-    "Users",
+    "Taste",
+    "Dream",
+    "Account",
     "Workers",
+    "Studio",
+    "Dream",
+    "Users",
+    "Groups",
     "About",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -140,27 +140,32 @@ test("Gallery Captions in Settings › Studio catches up, shows its progress and
   });
   await page.goto("/settings#studio");
   const row = page.getByRole("region", { name: "Catch Up", exact: true });
-  const globalStart = row.getByRole("button", { name: "Catch Up Gallery Captions", exact: true });
+  const start = row.getByRole("button", { name: "Catch Up Gallery Captions", exact: true });
+  const whose = row.getByRole("radiogroup", { name: "Whose Images", exact: true });
+  const choose = (name: string) => whose.locator("label").filter({ hasText: name }).click();
+  // One row covers every account's images or only the administrator's own.
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
+  await choose("Mine");
   await expect(row.getByText("Ready · 12 to caption", { exact: true })).toBeVisible();
-  await row.getByRole("button", { name: "Catch Up My Gallery Captions", exact: true }).click();
-  await expect(row.getByRole("progressbar", { name: "My Caption Progress" })).toBeVisible();
-  await expect(globalStart).toBeDisabled();
-  await row.getByRole("button", { name: "Stop My Gallery Captions", exact: true }).click();
+  await start.click();
+  await expect(row.getByRole("progressbar", { name: "Caption Progress" })).toBeVisible();
+  await expect(whose.getByRole("radio", { name: "Everyone", exact: true })).toBeDisabled();
+  await row.getByRole("button", { name: "Stop Gallery Captions", exact: true }).click();
   await expect(row.getByText("Stopped · 3 of 12", { exact: true })).toBeVisible();
-  await expect(globalStart).toBeEnabled();
+  await choose("Everyone");
+  await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
   await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
   await expect(row.getByText("Ready · 7,000 to caption", { exact: true })).toBeVisible();
   // Each feature's catch-up shares its row and name.
-  await globalStart.click();
+  await start.click();
   await expect(
     row.getByText("Running · 120 of 7,000 · 30 a minute · about 3 h 49 min left", { exact: true }),
   ).toBeVisible();
   await expect(row.getByRole("progressbar", { name: "Caption Progress" })).toBeVisible();
   await row.getByRole("button", { name: "Stop Gallery Captions", exact: true }).click();
   await expect(row.getByText("Stopped · 120 of 7,000", { exact: true })).toBeVisible();
-  await expect(globalStart).toBeEnabled();
+  await expect(start).toBeEnabled();
   expect(actions).toEqual([
     ["mine", "start", { scope: "outdated" }],
     ["mine", "stop", {}],
@@ -336,10 +341,10 @@ test("Where Work Runs saves each group’s processing and default models", async
   await section(page, "Settings", "Where Work Runs");
   const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
   const group = (kind: string) => where.getByRole("region", { name: kind, exact: true });
-  const workGroups = where.getByRole("region", { name: /^(Images|Videos|Dream|Text)$/ });
+  const workGroups = where.getByRole("region", { name: /^(Images|Videos|Text|Dream)$/ });
   await expect
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
-    .toEqual(["Images", "Videos", "Dream", "Text"]);
+    .toEqual(["Images", "Videos", "Text", "Dream"]);
   const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
   await expect(textCloud).toHaveText("Studio Default");
   await textCloud.click();
@@ -427,7 +432,7 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
 test("Administrator accounts retain worker visibility and attribution", async ({ page }) => {
   await fixtures(page);
   await signIn(page, { id: "account-a", role: "administrator" });
-  await page.goto("/settings");
+  await page.goto("/settings#account");
   await expect(
     page
       .getByRole("region", { name: "Settings: Account", exact: true })
@@ -1025,7 +1030,7 @@ test("Settings › Studio switches follow at once and settle back after a failed
   await expect(toggle).toBeChecked();
 });
 
-test("Dream Defaults saves shared queue delays and hands an override back to each account", async ({
+test("Administration › Dream saves shared queue delays and hands an override back to each account", async ({
   page,
 }) => {
   await fixtures(page);

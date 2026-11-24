@@ -8,25 +8,19 @@ import {
 } from "../../ui/WorkspaceSections";
 import { useAccount, useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Personal sections, then administration, each alphabetical, with About last.
+// Personal sections, then administration, each by how often it is used, with About last.
 const settingSections = {
-  account: {
-    label: "Account",
-    description: "Manage how you sign in and connect MCP clients to your account.",
-    icon: icons.account,
-    group: "Personal",
-  },
-  dream: {
-    label: "Dream",
-    description: "Choose what Dream makes for you and how much it can make each day.",
-    icon: icons.dream,
-    group: "Personal",
-  },
   preferences: {
     label: "Preferences",
     description:
       "Choose how the gallery looks, which models are offered and whether to keep prompts.",
     icon: icons.settings,
+    group: "Personal",
+  },
+  "where-work-runs": {
+    label: "Where Work Runs",
+    description: "Choose where your work runs and the models and image sizes it starts with.",
+    icon: Route,
     group: "Personal",
   },
   taste: {
@@ -36,23 +30,22 @@ const settingSections = {
     icon: Palette,
     group: "Personal",
   },
-  "where-work-runs": {
-    label: "Where Work Runs",
-    description: "Choose where your work runs and the models and image sizes it starts with.",
-    icon: Route,
+  dream: {
+    label: "Dream",
+    description: "Choose what Dream makes for you and how much it can make each day.",
+    icon: icons.dream,
     group: "Personal",
   },
-  "dream-policy": {
-    label: "Dream Defaults",
-    description: "Set when Dream can start jobs and which of its settings accounts can change.",
-    icon: icons.dream,
-    admin: true,
-    group: "Administration",
+  account: {
+    label: "Account",
+    description: "Manage how you sign in and connect MCP clients to your account.",
+    icon: icons.account,
+    group: "Personal",
   },
-  groups: {
-    label: "Groups",
-    description: "Choose the models and features each access group can use, and the default group.",
-    icon: Shield,
+  workers: {
+    label: "Workers",
+    description: "Manage worker placement, service health and unfinished jobs.",
+    icon: Server,
     admin: true,
     group: "Administration",
   },
@@ -63,6 +56,13 @@ const settingSections = {
     admin: true,
     group: "Administration",
   },
+  "dream-policy": {
+    label: "Dream",
+    description: "Choose which Dream settings accounts can change and when Dream can start jobs.",
+    icon: icons.dream,
+    admin: true,
+    group: "Administration",
+  },
   users: {
     label: "Users",
     description: "Manage accounts and linked chat identities.",
@@ -70,10 +70,10 @@ const settingSections = {
     admin: true,
     group: "Administration",
   },
-  workers: {
-    label: "Workers",
-    description: "Manage worker placement, service health and unfinished jobs.",
-    icon: Server,
+  groups: {
+    label: "Groups",
+    description: "Choose the models and features each access group can use, and the default group.",
+    icon: Shield,
     admin: true,
     group: "Administration",
   },
