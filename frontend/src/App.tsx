@@ -55,13 +55,17 @@ function Workspace() {
     if (overlay && location.hash) setSections((saved) => ({ ...saved, [overlay]: location.hash }));
   }, [overlay, location.hash, setSections]);
   const resumeSection = overlay && !location.hash && sections[overlay];
-  // The other modes, a comparison's page, Library and Settings load once the first mode is up, so
-  // opening them never shows their loader.
+  // The other modes, a comparison's page, Library and Settings load once the first mode is up and
+  // the page is idle, so opening them never shows their loader.
   useEffect(() => {
-    void loadCompare();
-    void loadDream();
-    void loadLibrary();
-    void loadSettings();
+    const preload = () => {
+      void loadCompare();
+      void loadDream();
+      void loadLibrary();
+      void loadSettings();
+    };
+    if (window.requestIdleCallback) window.requestIdleCallback(preload, { timeout: 3000 });
+    else setTimeout(preload, 1000);
   }, []);
   const background = location.state?.backgroundLocation || {
     pathname: "/images",

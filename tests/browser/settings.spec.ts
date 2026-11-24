@@ -20,7 +20,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   let statusReads = 0;
   await page.route("**/api/gallery/errors/clear", (route) => {
     cleared.push(route.request().postDataJSON());
-    return route.fulfill({ json: { ok: true, cleared: 2, outputs: [] } });
+    return route.fulfill({ json: { ok: true, cleared: 2 } });
   });
   await page.route("**/api/diagnostics", (route) =>
     route.fulfill({ json: { ok: true, text: "Studio 0.0.0" } }),

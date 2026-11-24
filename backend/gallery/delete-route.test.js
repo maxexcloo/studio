@@ -47,24 +47,23 @@ function finishedItem(ownerId, name) {
   return { file, item: { id: url, url, jobId: name, status: "done", type: "image", ownerId } };
 }
 
-test("an account deletes its own finished item by its URL ID; another owner's answers as missing", async () => {
+test("an account deletes its own finished item by its URL ID; another owner's stays", async () => {
   const { file, item } = finishedItem("alice", "mvzvoi1l-cb839ee3-image");
   assert.match(item.url, /%2F/);
   setGallery([item]);
-  const remove = (user) =>
-    fetch(`${base}/${encodeURIComponent(item.url)}`, {
-      method: "DELETE",
-      headers: { "x-user": user },
-    });
+  const remove = async (user) =>
+    (
+      await fetch(`${base}/delete`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-user": user },
+        body: JSON.stringify({ ids: [item.id] }),
+      })
+    ).json();
 
-  const other = await remove("bob");
-  assert.equal(other.status, 404);
-  assert.equal((await other.json()).error, "That item was not found.");
+  assert.deepEqual((await remove("bob")).removed, []);
   assert.equal(galleryRows().length, 1);
 
-  const own = await remove("alice");
-  assert.equal(own.status, 200);
-  assert.equal((await own.json()).removed, 1);
+  assert.deepEqual((await remove("alice")).removed, [item.id]);
   assert.equal(galleryRows().length, 0);
   assert.equal(fs.existsSync(file), false);
   // Only the owner's own deletion is heard, for the taste profile.

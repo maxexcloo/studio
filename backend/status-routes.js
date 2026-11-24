@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { upscaleQualities } from "../shared/upscale.ts";
 import { canAdmin } from "./access.js";
-import { ownedQuery, ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
+import { ownedQuery, ownerIdForRequest } from "./account-ownership.js";
 import { readyWorkers } from "./comfy/backends.js";
 import { isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion, dataDir, releaseVersion } from "./data-dir.js";
@@ -11,11 +11,11 @@ import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { earliest } from "./domain/eta.ts";
 import { queuePriority } from "./domain/store.ts";
-import { galleryItems } from "./gallery/store.js";
+import { countGalleryItems } from "./gallery/store.js";
 import { cloudHeld } from "./providers/cloud-usage.ts";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { requireAdmin } from "./route-access.js";
-import { galleryStats, profileStats, recentRuns } from "./stats.js";
+import { profileStats, recentRuns } from "./stats.js";
 import { capabilityForProfile, defaultWorker } from "./workers.js";
 
 // Whether the default worker's ComfyUI runs on this machine, for the bug report.
@@ -151,17 +151,13 @@ export function registerStatusRoutes(app, { cloudUsage, observeServices, queue }
   });
 
   app.get("/api/stats", (req, res) => {
+    const owned = ownedQuery(req.studioAccount);
     res.json({
       ok: true,
       version: appVersion,
       releaseVersion,
       sinceRelease: null,
-      stats: galleryStats(
-        recordsForRequest(
-          galleryItems(ownedQuery(req.studioAccount) || {}, { ordered: false }),
-          req,
-        ),
-      ),
+      stats: { outputs: owned ? countGalleryItems({ ...owned, status: "done" }) : 0 },
     });
   });
 

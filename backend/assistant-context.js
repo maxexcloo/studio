@@ -3,7 +3,7 @@ import { ownedQuery, recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
 import { logWarning } from "./crash-log.js";
 import { families } from "./family-catalogue.js";
-import { galleryItems } from "./gallery/store.js";
+import { eachGalleryItem } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
 import { livePrompting } from "./profile/store.js";
@@ -54,20 +54,15 @@ export function createAssistantContext({ catalogueModels, installedLoras }) {
     const families = new Map((await profiles(req)).map((item) => [item.id, item.family]));
     const same = (item, id = item.settings?.profileId) =>
       id === profile.id || (profile.family && families.get(id) === profile.family);
-    const items = galleryItems({
+    const items = [];
+    for (const item of eachGalleryItem({
       ...ownedQuery(req.studioAccount),
       rating: "liked",
       status: "done",
-    })
-      .filter(
-        (item) =>
-          item.rating === "liked" &&
-          item.status === "done" &&
-          item.prompt &&
-          recordBelongsToRequest(item, req) &&
-          same(item),
-      )
-      .slice(0, 6);
+    })) {
+      if (item.prompt && recordBelongsToRequest(item, req) && same(item)) items.push(item);
+      if (items.length === 6) break;
+    }
     return {
       examples: items.map((item) => item.prompt),
       loras: [

@@ -247,8 +247,9 @@ test(
       );
     }
     // A deleted gallery image drops out of the card rather than breaking it.
-    await call(`/api/gallery/${encodeURIComponent(side.galleryItemId)}`, {
-      method: "DELETE",
+    await call("/api/gallery/delete", {
+      method: "POST",
+      body: { ids: [side.galleryItemId] },
       cookie: cookies.artist,
     });
     const [kept] = (await call("/api/characters", { cookie: cookies.artist })).body.characters;
