@@ -11,7 +11,8 @@ model directories and GPU placement in the deployment.
 
 For model transfers independent of GPU placement, start the same image with
 `--model-library` and mount the workers' shared ComfyUI model folder read-write at
-`STUDIO_MODEL_LIBRARY_DIR`. Set the same nonempty `STUDIO_WORKER_TOKEN` as Studio,
+`STUDIO_MODEL_LIBRARY_DIR`, and the Radiance image model folder read-write at
+`RADIANCE_IMAGE_MODELS` for Library › Convert to Radiance. Set the same nonempty `STUDIO_WORKER_TOKEN` as Studio,
 then set `STUDIO_MODEL_LIBRARY_URL` in Studio to this service's internal HTTP
 address on port 8188. The worker answers the readiness probe at `/studio/worker`.
 
