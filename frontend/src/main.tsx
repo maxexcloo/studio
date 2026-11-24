@@ -150,12 +150,13 @@ document.addEventListener(
 // of the opening position would land afterwards and override it.
 history.scrollRestoration = "manual";
 const routerHistory = UNSAFE_createBrowserHistory({ v5Compat: true });
-// Only iOS's installed app lacks a system Back that closes viewers and dialogs through history.
-if (
+const standalone = matchMedia("(display-mode: standalone)").matches;
+const iosStandalone =
   (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-  (/iPad|iPhone|iPod/.test(navigator.userAgent) && matchMedia("(display-mode: standalone)").matches)
-)
-  singleEntry(routerHistory, sessionStorage);
+  (standalone && /iPad|iPhone|iPod/.test(navigator.userAgent));
+if (standalone || iosStandalone) document.documentElement.dataset.standalone = "";
+// Only iOS's installed app lacks a system Back that closes viewers and dialogs through history.
+if (iosStandalone) singleEntry(routerHistory, sessionStorage);
 // The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.
 const fontReady = Promise.race([
   document.fonts.load('1em "Geist Variable"'),
