@@ -40,3 +40,17 @@
   flex: 1;
   min-width: 0;
 }
+
+/* A box under More fills the sheet as the others do, without the group's heading. */
+.fields[data-typing-field] > section:not(:has([data-text-box]:not([hidden]))),
+.fields[data-typing-field] section h4 {
+  display: none;
+}
+
+.fields[data-typing-field] section :has([data-text-box]:not([hidden])),
+.fields[data-typing-field] section [data-text-box]:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}

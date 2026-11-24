@@ -44,6 +44,8 @@ export interface ProjectChange {
   why: string;
   /** What changed: "name", brief fields, "constraints", "cards", "paused", "favoured", or "created". */
   fields: string[];
+  /** Each changed text field's words before and after: the name, the brief's text and its LoRAs. */
+  text?: Record<string, { before: string; after: string }>;
   /** Undo took it back. */
   undone?: true;
 }

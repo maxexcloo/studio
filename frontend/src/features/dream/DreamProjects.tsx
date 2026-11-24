@@ -1,4 +1,4 @@
-import { Alert, Stack, getDefaultZIndex } from "@mantine/core";
+import { Alert, Button, Stack, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -8,6 +8,7 @@ import { api } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { type SheetTyping, TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
@@ -54,9 +55,11 @@ function ProjectEditor({
  */
 export function DreamProjects({
   creating,
+  onCreate,
   onCloseCreate,
 }: {
   creating: boolean;
+  onCreate: () => void;
   onCloseCreate: () => void;
 }) {
   const client = useQueryClient();
@@ -161,7 +164,15 @@ export function DreamProjects({
               ))}
             </Stack>
           ) : (
-            <EmptyState>No Projects</EmptyState>
+            <EmptyState
+              action={
+                <Button leftSection={<icons.add size={16} />} onClick={onCreate}>
+                  New Project
+                </Button>
+              }
+            >
+              Dream keeps making work to each project's brief.
+            </EmptyState>
           )}
           <ProjectInbox projects={list} />
         </>

@@ -130,20 +130,33 @@ export const dreamWhen = ({ settings, today, usage = today, status }: Dream) => 
     : []),
 ];
 
+/** A chat attached to a project, and when it last asked for something. */
+export interface AttachedChat {
+  chat: string;
+  projectId: string;
+  at: string;
+}
 export const projectsQuery = queryOptions({
   queryKey: ["dream", "projects"],
   queryFn: () =>
-    api<{ projects: Project[]; stats: Record<string, ProjectStats<DreamItem>> }>(
-      "/api/dream/projects",
-    ),
+    api<{
+      projects: Project[];
+      stats: Record<string, ProjectStats<DreamItem>>;
+      chats: AttachedChat[];
+    }>("/api/dream/projects"),
 });
 export const projectPath = (project: { id: string }, action = "") =>
   `/api/dream/projects/${encodeURIComponent(project.id)}${action && `/${action}`}`;
-/** A project's results for its detail view, newest first. */
+/** A project's results for its detail view, newest first, a page at a time. */
 export const projectResultsQuery = (projectId: string) =>
-  queryOptions({
+  infiniteQueryOptions({
     queryKey: ["dream", "projects", projectId, "results"],
-    queryFn: () => api<{ items: DreamItem[] }>(projectPath({ id: projectId }, "results")),
+    queryFn: ({ pageParam }) =>
+      api<{ items: DreamItem[]; nextCursor: string }>(
+        `${projectPath({ id: projectId }, "results")}?cursor=${pageParam}`,
+      ),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor || undefined,
   });
 
 /** The context chats gave Studio, which Dream may draw on (backend/domain/chat-notes.ts). */

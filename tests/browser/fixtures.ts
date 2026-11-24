@@ -1581,8 +1581,10 @@ export async function serveDream(
     keepRates?: KeepRates;
     /** Dream's projects, which create, edit, Pause, Undo and Delete change. */
     projects?: any[];
-    /** Each project's stats, by id. */
+    /** Each project's stats, by id; their results are the project's results too. */
     stats?: Record<string, any>;
+    /** The chats attached to projects, which Detach removes. */
+    chats?: { chat: string; projectId: string; at: string }[];
     /** What the Inbox proposes; Accept applies a rule or brief edit, Dismiss and Clear drop them. */
     proposals?: any[];
     /** When the visit before this one ended. */
@@ -1607,6 +1609,7 @@ export async function serveDream(
     /** Every Dream result served, so Undo can bring one back. */
     known: new Map<string, any>(),
     projects: options.projects ?? [],
+    chats: options.chats ?? [],
     proposals: options.proposals ?? [],
     /** Declined proposals, by id, with their place, so Undo can bring one back. */
     declined: new Map<string, { proposal: any; index: number }>(),
@@ -1802,13 +1805,22 @@ export async function serveDream(
     }
     if (path === "/api/dream/projects") {
       if (method === "GET")
-        return route.fulfill({ json: { projects: state.projects, stats: options.stats ?? {} } });
+        return route.fulfill({
+          json: { projects: state.projects, stats: options.stats ?? {}, chats: state.chats },
+        });
       const project = { ...body, id: `project-${state.projects.length + 1}`, changes: [] };
       state.projects.push(project);
       return route.fulfill({ json: { project } });
     }
-    if (/^\/api\/dream\/projects\/[^/]+\/results$/.test(path))
-      return route.fulfill({ json: { items: [] } });
+    const results = /^\/api\/dream\/projects\/([^/]+)\/results$/.exec(path);
+    if (results)
+      return route.fulfill({
+        json: { items: options.stats?.[results[1]]?.results ?? [], nextCursor: "" },
+      });
+    if (path === "/api/dream/projects/attach") {
+      state.chats = state.chats.filter((entry) => entry.chat !== body.chat);
+      return route.fulfill({ json: { project: null } });
+    }
     // As the backend: each change is listed, and Undo takes back only the latest.
     const projectRoute = /^\/api\/dream\/projects\/([^/]+)(\/undo)?$/.exec(path);
     if (projectRoute) {

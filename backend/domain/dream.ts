@@ -396,9 +396,9 @@ interface DreamRecord {
   limitReset?: Partial<Record<Kind, LimitReset>>;
   /** Dream's hidden session for its jobs. */
   session?: string;
-  /** The latest Dream prompts, newest first and shortened, so new ones don't repeat them. */
+  /** The latest Dream prompts outside projects, newest first and shortened, so new ones don't repeat them. */
   recent: string[];
-  /** The latest Dream ideas' titles (or opening words), newest first, for the writer to avoid. */
+  /** Those ideas' titles (or opening words), newest first, for the writer to avoid. */
   subjects?: string[];
   /** Optional motifs from recent fresh concepts, one entry per concept. */
   motifs?: string[][];
@@ -1995,6 +1995,17 @@ export function createDream(options: {
         prompt: clean(item.prompt, tasteDraw.characters),
       }));
   }
+  /** A project's results liked in it, in random order, as `tastePrompts` gives the account's. */
+  const projectLikes = (items: DreamItem[]) =>
+    shuffled(items.filter((item) => item.rating === "liked")).map((item) => ({
+      link: {
+        id: String(item.id),
+        ...(item.number ? { number: item.number } : {}),
+        type: item.type || "image",
+        title: subjectOf(item.title, item.prompt || item.dream?.prompt),
+      },
+      prompt: clean(item.prompt || item.dream?.prompt, tasteDraw.characters),
+    }));
   /** `count` entries drawn at random, or all where there are no more. */
   const sampled = <T>(entries: T[], count: number) => shuffled(entries).slice(0, count);
   /** Consecutive failed writes per account, and when Dream may try that account again. */
@@ -2106,7 +2117,26 @@ export function createDream(options: {
       (job.input.writing as DreamWriting).uncensored &&
       record.settings.uncensored &&
       access.uncensored;
-    const { recent, subjects = [] } = record;
+    // A project's idea moves on from the project's own latest ideas and draws on the results liked
+    // in it; the account's lists serve ideas outside projects.
+    const projectItems = project
+      ? options
+          .gallery(ownerId, {
+            ...(projectId
+              ? { dreamProject: projectId, dreamState: poolStates }
+              : { dreamDraft: draft, dreamState: "draft" as const }),
+            limit: recentIdeas,
+          })
+          .filter((item) => item.prompt || item.dream?.prompt)
+      : undefined;
+    const recent =
+      projectItems?.map((item) =>
+        clean(item.prompt || item.dream?.prompt, recentPromptCharacters),
+      ) ?? record.recent;
+    const subjects =
+      projectItems?.map((item) => subjectOf(item.title, item.prompt || item.dream?.prompt)) ??
+      record.subjects ??
+      [];
     const learntTaste = options.taste.read(ownerId);
     const taste = options.taste.area(ownerId, "dream", learntTaste);
     const { exclusions } = taste;
@@ -2141,26 +2171,21 @@ export function createDream(options: {
     const model = await writer.model("dream", false, text(ownerId));
     const guide = `Prompting guide: ${writerGuide(options.guide(profile)) || "(none)"}`;
     const writingRules = [precedence, keepDescriptions(), standalonePrompt()];
-    // The project's own latest ideas, so the next one moves on within the brief.
-    const projectIdeas = brief.length
-      ? options
-          .gallery(ownerId, {
-            ...(projectId
-              ? { dreamProject: projectId, dreamState: poolStates }
-              : { dreamDraft: draft, dreamState: "draft" as const }),
-            limit: projectIdeasShown,
-          })
-          .map((item) => clean(item.prompt || item.dream?.prompt, writerPrompts.characters))
-          .filter(Boolean)
-      : [];
     const briefLines = brief.length
       ? [
           `Project brief (${project!.name}):`,
           ...brief.map(([label, value]) => `- ${label}: ${value}`),
-          ...(projectIdeas.length
-            ? ["The project's recent ideas:", ...projectIdeas.map((idea) => `- ${idea}`)]
-            : []),
         ]
+      : [];
+    // A continued idea sees the project's own latest ones, so it moves on within the brief; a new
+    // one sees them among its recent prompts.
+    const projectIdeas = brief.length
+      ? (projectItems || [])
+          .slice(0, projectIdeasShown)
+          .map((item) => `- ${clean(item.prompt || item.dream?.prompt, writerPrompts.characters)}`)
+      : [];
+    const projectIdeaLines = projectIdeas.length
+      ? ["The project's recent ideas:", ...projectIdeas]
       : [];
     const notes = chatNotes(ownerId, projectId, project, pinned);
     const noteLines = notes.length
@@ -2255,6 +2280,7 @@ export function createDream(options: {
           role: "user",
           content: [
             ...briefLines,
+            ...projectIdeaLines,
             ...ruleLines,
             ...noteLines,
             `Seed prompt: ${seed}`,
@@ -2279,7 +2305,9 @@ export function createDream(options: {
     else {
       // Liked prompts that name what is excluded, cooling or passed as too similar would lead back to it.
       const [least, most] = explore ? tasteDraw.explorePrompts : tasteDraw.prompts;
-      const likedPrompts = (taste.on ? await tastePrompts(ownerId) : [])
+      const likedPrompts = (
+        !taste.on ? [] : projectItems ? projectLikes(projectItems) : await tastePrompts(ownerId)
+      )
         .filter(
           ({ prompt }) =>
             !namedMotif(prompt, forbidden) &&
@@ -2498,14 +2526,16 @@ export function createDream(options: {
         if (latest) {
           if (newConcept)
             latest.motifs = [chosenMotifs, ...(latest.motifs || [])].slice(0, motifWindow);
-          latest.recent = [clean(idea, recentPromptCharacters), ...latest.recent].slice(
-            0,
-            recentIdeas,
-          );
-          latest.subjects = [subjectOf(title, prompt), ...(latest.subjects || [])].slice(
-            0,
-            recentIdeas,
-          );
+          if (!project) {
+            latest.recent = [clean(idea, recentPromptCharacters), ...latest.recent].slice(
+              0,
+              recentIdeas,
+            );
+            latest.subjects = [subjectOf(title, prompt), ...(latest.subjects || [])].slice(
+              0,
+              recentIdeas,
+            );
+          }
           write(ownerId, latest);
         }
         // What the idea explores leads its why line, ahead of the writer's note.
