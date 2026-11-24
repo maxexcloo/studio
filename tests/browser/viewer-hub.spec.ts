@@ -1640,7 +1640,6 @@ test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ pa
         "Profile: Image Quality",
         "CFG: 4",
         "Dimensions: 1024 × 1024",
-        "Mode: Generate",
         "Sampler: euler",
         "Seed: 1234567",
         "Steps: 28",

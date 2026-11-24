@@ -35,8 +35,10 @@ import {
   type Dream,
   type DreamItem,
   type DreamMedia,
+  discardedQuery,
   dreamQuery,
-  dreamWhen,
+  dreamQuota,
+  historyQuery,
   libraryReviewQuery,
 } from "./queries";
 
@@ -91,14 +93,16 @@ function Empty({ dream }: { dream: Dream }) {
         Dream Is Paused
       </EmptyState>
     );
+  const quota = dreamQuota(dream);
   return (
     <EmptyState
       fill
-      action={dreamWhen(dream).map((line) => (
-        <Text key={line} size="xs">
-          {line}
-        </Text>
-      ))}
+      action={
+        <Stack gap={4} fz="xs">
+          <span>{dream.reason || "Dream works when the queue is free."}</span>
+          {quota && <span>{quota}</span>}
+        </Stack>
+      }
     >
       Nothing New Yet
     </EmptyState>
@@ -151,8 +155,6 @@ export function DreamPage() {
   if (view !== "projects" && creatingProject) setCreatingProject(false);
   const navigate = useNavigate();
   const reviewing = view === "library";
-  // Counts, pausing and allocation concern the decks, not the views around them.
-  const deck = reviewing || view === "dream";
   const imageReview = useLibraryReview(seed, "image", libraryDecided, reviewing);
   const videoReview = useLibraryReview(seed, "video", libraryDecided, reviewing);
   const reviews = { image: imageReview, video: videoReview };
@@ -173,10 +175,24 @@ export function DreamPage() {
       ].filter((item) => !dreamDecided.has(item.id))
     : [];
   const count = data && dreamCardCounts(deckUnseen, data.settings);
-  const pending = {
-    image: !deck ? undefined : reviewing ? imageReview.remaining : count?.images,
-    video: !deck ? undefined : reviewing ? videoReview.remaining : count?.videos,
+  // The media selector counts what each media holds in this view: waiting cards, History's
+  // entries or Discards.
+  const activity = {
+    image: useQuery({ ...historyQuery("image"), enabled: view === "history" }).data,
+    video: useQuery({ ...historyQuery("video"), enabled: view === "history" }).data,
   };
+  const discards = {
+    image: useInfiniteQuery({ ...discardedQuery("image"), enabled: view === "discarded" }).data,
+    video: useInfiniteQuery({ ...discardedQuery("video"), enabled: view === "discarded" }).data,
+  };
+  const counted = (kind: DreamMedia) =>
+    view === "history"
+      ? activity[kind]?.items.length
+      : view === "discarded"
+        ? discards[kind]?.pages[0]?.total
+        : reviewing
+          ? reviews[kind].remaining
+          : count?.[kind === "image" ? "images" : "videos"];
 
   useEffect(() => {
     if (
@@ -214,14 +230,11 @@ export function DreamPage() {
       data={(["image", "video"] as const).map((kind) => ({
         value: kind,
         label: (
-          <span
-            className={classes.count}
-            data-label={deck ? `${mediaLabels[kind]} (00)` : mediaLabels[kind]}
-          >
+          <span className={classes.count} data-label={`${mediaLabels[kind]} (00)`}>
             <span>
-              {pending[kind] === undefined
+              {counted(kind) === undefined
                 ? mediaLabels[kind]
-                : `${mediaLabels[kind]} (${pending[kind]})`}
+                : `${mediaLabels[kind]} (${counted(kind)})`}
             </span>
           </span>
         ),
@@ -248,40 +261,32 @@ export function DreamPage() {
           />
           {waiting && <VisuallyHidden id={waitingId}>{waiting}</VisuallyHidden>}
           {selector}
-          {view === "projects" ? (
-            <Button
-              size="compact-sm"
-              variant="default"
-              ml="auto"
-              leftSection={<icons.add size={14} />}
-              onClick={() => setCreatingProject(true)}
-            >
-              New Project
-            </Button>
-          ) : (
-            deck && (
-              <Group gap={4} wrap="nowrap" ml="auto">
-                {data?.settings.enabled && (
-                  <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
-                      loading={save.isPending}
-                      onClick={() => save.mutate({ paused: !data.settings.paused })}
-                    >
-                      {data.settings.paused ? (
-                        <icons.resume size={18} />
-                      ) : (
-                        <icons.pause size={18} />
-                      )}
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-                {data && <DreamAllocation dream={data} />}
-              </Group>
-            )
-          )}
+          <Group gap={4} wrap="nowrap" ml="auto">
+            {view === "projects" && (
+              <Button
+                size="compact-sm"
+                variant="default"
+                leftSection={<icons.add size={14} />}
+                onClick={() => setCreatingProject(true)}
+              >
+                New Project
+              </Button>
+            )}
+            {data?.settings.enabled && (
+              <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
+                  loading={save.isPending}
+                  onClick={() => save.mutate({ paused: !data.settings.paused })}
+                >
+                  {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {data && <DreamAllocation dream={data} />}
+          </Group>
         </Group>
       </div>
       {view === "discarded" ? (
@@ -333,7 +338,8 @@ export function DreamPage() {
               library.isError ? (
                 <Alert color="red" title="Couldn't Load the Library">
                   <Button
-                    variant="subtle"
+                    size="compact-sm"
+                    variant="default"
                     onClick={() =>
                       void (library.hasNextPage ? library.fetchNextPage() : library.refetch())
                     }

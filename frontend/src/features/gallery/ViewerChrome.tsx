@@ -87,7 +87,8 @@ export function ViewerChrome({
       onClick={(event) => event.stopPropagation()}
     >
       <Group gap={6} wrap="nowrap" miw={0}>
-        {item && (
+        {/* Docked Details carries the title itself. */}
+        {item && !(details?.opened && !details.phone) && (
           <Paper withBorder radius="md" px="sm" py={4} miw={0}>
             <ViewerTitle item={item} size="sm" fw={500} truncate />
             <ViewerMetadata item={item} />

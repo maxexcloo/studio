@@ -28,7 +28,7 @@ test("A phone tap opens the tile at once", async ({ page, isMobile }) => {
   expect(state.gallery[0].rating).toBeUndefined();
 });
 
-test("Returning to Gallery offers a jump only after an image arrives while away", async ({
+test("Returning to Gallery shows what arrived while away, with no jump when it is in view", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -45,8 +45,6 @@ test("Returning to Gallery offers a jump only after an image arrives while away"
   state.gallery.unshift(result("new", "New Bird", new Date(Date.now() + 1000).toISOString()));
   await expect(jump).toBeHidden();
   await images.click();
-  await expect(jump).toBeVisible();
-  await jump.click();
   await expect(page.getByRole("button", { name: "Open image: New Bird" })).toBeInViewport();
   await expect(jump).toBeHidden();
   await showGalleryView(page, "Review");

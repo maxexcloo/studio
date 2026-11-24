@@ -1761,6 +1761,7 @@ export async function serveDream(
         json: {
           items: filtered.slice(start, start + limit),
           nextCursor: start + limit < filtered.length ? String(start + limit) : "",
+          total: filtered.length,
         },
       });
     }

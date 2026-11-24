@@ -1524,6 +1524,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.deepEqual((await request("/discarded?media=video&limit=1")).body, {
     items: [],
     nextCursor: "",
+    total: 0,
   });
   const discarded = await request("/discarded?media=image&limit=1");
   assert.equal(discarded.body.items[0].prompt, "dream 2");
@@ -1978,6 +1979,7 @@ test("Discard pagination counts only the chosen media and retains owner scope", 
   assert.equal(first.items.length, 1);
   assert.equal(first.items[0].type, "video");
   assert.equal(first.nextCursor, "1");
+  assert.equal(first.total, 2);
   const second = (await request(`/discarded?media=video&limit=1&cursor=${first.nextCursor}`)).body;
   assert.equal(second.items[0].type, "video");
   assert.notEqual(second.items[0].id, first.items[0].id);

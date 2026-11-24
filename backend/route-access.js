@@ -1,4 +1,5 @@
 import { canAdmin, clientOf } from "./access.js";
+import { logger } from "./crash-log.js";
 import { multiUserEnabled } from "./multi-user-auth.js";
 
 /** This computer in single-user mode; an administrator in account mode. */
@@ -70,9 +71,14 @@ export function fromChat(account) {
 /**
  * The app's last handler: a route's error, or a body that is not valid JSON or too big, answers as
  * JSON (400 unless it carries a status), never Express's HTML page with a stack trace and file paths.
+ * A database error is logged and answers with a plain 500, keeping its SQL out of the UI.
  */
-export function routeErrors(error, _req, res, next) {
+export function routeErrors(error, req, res, next) {
   if (res.headersSent) return next(error);
+  if (error.code === "ERR_SQLITE_ERROR") {
+    logger.error(`${req.method} ${req.path} failed in the database`, error);
+    return res.status(500).json({ ok: false, error: "Studio couldn't read or save its data." });
+  }
   res.status(error.status || 400).json({
     ok: false,
     error:

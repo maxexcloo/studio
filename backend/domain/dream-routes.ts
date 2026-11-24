@@ -282,7 +282,11 @@ export function registerDreamRoutes(
     const items = all.slice(start, start + limit);
     return {
       status: 200,
-      payload: { items, nextCursor: start + limit < all.length ? String(start + limit) : "" },
+      payload: {
+        items,
+        nextCursor: start + limit < all.length ? String(start + limit) : "",
+        total: all.length,
+      },
     };
   });
   route("DELETE", "/api/dream/discarded", (account) => ({

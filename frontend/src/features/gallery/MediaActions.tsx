@@ -179,6 +179,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     label: video ? "Use Frame as Reference" : "Use as Reference",
     icon: icons.reference,
     disabled: !(takes || fallback) || reference.isPending,
+    description: takes || fallback ? undefined : "No model takes references",
     keepOpen: true,
     onClick: () => {
       if (fallback) selectProfile(fallback);
@@ -667,6 +668,7 @@ export function useMediaActions(
                     label: "Run Again",
                     icon: icons.shuffle,
                     disabled: changedPrompt === "",
+                    description: changedPrompt === "" ? "Write a prompt first" : undefined,
                     onClick: () =>
                       run({ kind: "regenerate", prompt: changedPrompt, count: recreateCount }),
                   },
@@ -675,6 +677,7 @@ export function useMediaActions(
                     label: "Run Again, Same Seed",
                     icon: icons.sameSeed,
                     disabled: changedPrompt === "",
+                    description: changedPrompt === "" ? "Write a prompt first" : undefined,
                     onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
                 ],

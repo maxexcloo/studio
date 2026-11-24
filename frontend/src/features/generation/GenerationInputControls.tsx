@@ -197,14 +197,16 @@ export const GenerationInputControls = memo(function GenerationInputControls({
         />
       )}
       {seed && profile?.capabilities.seed !== false && (
-        <Button
-          {...chipProps}
-          aria-label={`Clear Seed ${seed}`}
-          rightSection={<icons.clear size={14} />}
-          onClick={() => onChange({ seed: "" })}
-        >
-          Seed {seed}
-        </Button>
+        <Tooltip label={`Seed ${seed}`}>
+          <Button
+            {...chipProps}
+            aria-label={`Clear Seed ${seed}`}
+            rightSection={<icons.clear size={14} />}
+            onClick={() => onChange({ seed: "" })}
+          >
+            Seed
+          </Button>
+        </Tooltip>
       )}
       <GenerationSettings input={input} profile={profile} onChange={onChange} {...settings} />
       {compare}
