@@ -270,7 +270,7 @@ export function registerAssistantRoutes(
             key,
             promptStyleStore()
               .usable(kind)
-              .filter((style) => (uncensored ? !style.censored : !style.uncensored))
+              .filter((style) => uncensored || !style.uncensored)
               // A fixed AI edit runs as its instruction, as a picked suggestion's request does.
               .map(({ id, label, description, instruction, actions, uncensored }) => ({
                 id,

@@ -125,7 +125,6 @@ test("styles need a kind, their own IDs, a name, an instruction and one audience
     [{ ...style, id: "Noir!" }],
     [{ ...style, instruction: " " }],
     [{ ...style, label: "" }],
-    [{ ...style, uncensored: true, censored: true }],
     {},
   ])
     assert.throws(() => styles.save(bad), { status: 400 });
