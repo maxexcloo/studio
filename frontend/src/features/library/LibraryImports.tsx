@@ -27,6 +27,7 @@ import { inspirationQuery } from "../generation/inspiration";
 import {
   type ImportRecord,
   LibraryImportReview,
+  draftable,
   importBusy,
   importStatus,
   stateLabel,
@@ -35,19 +36,29 @@ import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
 type Resource = NonNullable<ImportRecord["resources"]>[number];
 
-/** The toolbar's views: Installed opens, then the rest by name; Needs Action keeps a group per audit. */
+/**
+ * The toolbar's views, by name; Needs Action keeps a group per audit. Finished imports leave the
+ * list: their models and LoRAs change where Library lists them.
+ */
 const views = [
-  { value: "ready", label: "Installed" },
   { value: "busy", label: "In Progress" },
   { value: "action", label: "Needs Action" },
 ];
-const actionGroups: { audit: ImportRecord["audit"]; title: string }[] = [
+const actionGroups: { audit: ImportRecord["audit"] | "profile"; title: string }[] = [
   { audit: "needs-files", title: "Missing Files" },
+  { audit: "profile", title: "Needs a Profile" },
   { audit: "substitute", title: "Substitutes" },
   { audit: "failed", title: "Failed" },
 ];
+/** An installed model import still needs a profile; any other finished import leaves the list. */
+const groupOf = (record: ImportRecord) =>
+  record.audit === "ready" && draftable(record) ? "profile" : record.audit;
 const viewOf = (record: ImportRecord) =>
-  record.audit === "busy" || record.audit === "ready" ? record.audit : "action";
+  record.audit === "busy"
+    ? "busy"
+    : record.audit === "ready" && !draftable(record)
+      ? "ready"
+      : "action";
 
 const typeNames: Record<string, string> = { lora: "LoRA", vae: "VAE" };
 const kindNames: Record<string, string> = {
@@ -261,7 +272,9 @@ export function LibraryImports({
   });
   const records = imports.data?.imports || [];
   const stale = records.filter((record) => record.stale).length;
-  const view = chosenView ?? "ready";
+  // Work in progress opens first, else what needs action.
+  const view =
+    chosenView ?? (records.some((record) => record.audit === "busy") ? "busy" : "action");
   const inView = records.filter((record) => viewOf(record) === view);
   const failed = importing.error || uploading.error;
   const offered = records
@@ -427,7 +440,7 @@ export function LibraryImports({
           <Stack>
             <TextInput
               aria-label="Link"
-              description="A Civitai or Hugging Face model or file, or upload a recipe image instead."
+              description="A Civitai or Hugging Face link to a model, LoRA, file or image, or upload an image to import its recipe."
               placeholder="https://civitai.com/models/…"
               data-autofocus
               value={url}
@@ -476,20 +489,14 @@ export function LibraryImports({
           rowKey={(record) => record.id}
           rowName={nameOf}
           loading={imports.isPending && "Loading Imports"}
-          empty={
-            view === "action"
-              ? "Nothing Needs Action"
-              : view === "busy"
-                ? "Nothing In Progress"
-                : "No Imports Installed"
-          }
+          empty={view === "action" ? "Nothing Needs Action" : "Nothing In Progress"}
           columns={[]}
         />
       ) : view !== "action" ? (
-        importTable(view === "busy" ? "In Progress" : "Installed", inView)
+        importTable("In Progress", inView)
       ) : (
         actionGroups.map(({ audit, title }) => {
-          const rows = inView.filter((record) => record.audit === audit);
+          const rows = inView.filter((record) => groupOf(record) === audit);
           if (!rows.length) return null;
           if (audit === "substitute")
             return (
