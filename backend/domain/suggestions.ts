@@ -18,6 +18,7 @@ import {
 } from "../../shared/suggestions.ts";
 import { shortTitle } from "../../shared/titles.ts";
 import { promptInstruction } from "./../prompt-instructions.js";
+import { explicitExclusions, namedMotif } from "./dream-concepts.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
 import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
@@ -406,7 +407,7 @@ export function createSuggestions({
   fixed = () => [],
   now = Date.now,
 }: {
-  taste: Pick<Taste, "read">;
+  taste: Pick<Taste, "read" | "exclusions">;
   /** Null where the account may not send prompts to the text model. */
   writer: (ownerId: string) => Writer | null;
   online: () => Promise<boolean>;
@@ -502,6 +503,7 @@ export function createSuggestions({
       uncensored = false,
       cardDraft,
       action,
+      exclusions = [],
     }: {
       signal?: AbortSignal;
       images?: ModelImage[];
@@ -510,6 +512,7 @@ export function createSuggestions({
       uncensored?: boolean;
       cardDraft?: string;
       action?: ImageChange;
+      exclusions?: string[];
     } = {},
   ): Promise<Suggestions<PromptIdea | NextStep>> {
     const offered = surface === "composer" ? [] : fixed(fixedKinds[surface]);
@@ -619,6 +622,7 @@ export function createSuggestions({
           const title = sameLabel(label);
           const words = sameLabel(prompt);
           if (!title || !words || labels.has(title) || prompts.has(words)) return false;
+          if (namedMotif(`${label} ${prompt}`, exclusions)) return false;
           if (cardDraft !== undefined && cardDraft.length + 2 + prompt.length > maxPromptCharacters)
             return false;
           labels.add(title);
@@ -628,7 +632,9 @@ export function createSuggestions({
         .slice(0, maxSuggestions) as PromptIdea[];
       return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
-    const steps = readSteps(reply, offered, surface === "animate");
+    const steps = readSteps(reply, offered, surface === "animate").filter(
+      ({ label, request }) => !namedMotif(`${label} ${request}`, exclusions),
+    );
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
@@ -654,6 +660,7 @@ export function createSuggestions({
     const limits = [
       ...(record.rules ?? []).map((rule) => `Rule: ${rule}`),
       ...(record.preferences?.avoid ?? []).map((motif) => `Avoid: ${motif}`),
+      ...(record.exclusions ?? []).map((motif) => `Exclude from new ideas: ${motif}`),
     ];
     return {
       known: Boolean(record.summary || liked.length),
@@ -682,6 +689,7 @@ export function createSuggestions({
       image?: ModelImage | null;
       save?: boolean;
       action?: ImageChange;
+      exclusions?: string[];
     } = {},
   ): Promise<Suggestions<PromptIdea | NextStep>> {
     const kind = source.type === "video" ? "video" : "image";
@@ -710,6 +718,7 @@ export function createSuggestions({
       signal: options.signal,
       uncensored,
       action: options.action,
+      exclusions: options.exclusions,
     });
     if (!answer.reason && !options.signal?.aborted) rememberShown(menu, answer.suggestions);
     if (!answer.reason && !options.signal?.aborted && options.save !== false)
@@ -904,6 +913,7 @@ export function createSuggestions({
       const ownerId = source.ownerId || "";
       const uncensored = explicit(ownerId);
       const offered = fixed(fixedKinds.viewer);
+      const exclusions = explicitExclusions(taste.exclusions(ownerId));
       return {
         instructions: viewerInstruction("image", true, uncensored),
         context: [
@@ -915,7 +925,9 @@ export function createSuggestions({
             : []),
         ].join("\n"),
         keep(reply: unknown) {
-          const steps = readSteps(reply as { steps?: unknown } | null, offered);
+          const steps = readSteps(reply as { steps?: unknown } | null, offered).filter(
+            ({ label, request }) => !namedMotif(`${label} ${request}`, exclusions),
+          );
           return steps.length ? savedSteps(suggestionRevision.image, steps, uncensored) : undefined;
         },
       };
@@ -1155,6 +1167,7 @@ export function createSuggestions({
           ? body.action
           : undefined;
       const saved = edited || action ? undefined : source?.[field];
+      const exclusions = explicitExclusions(taste.exclusions(ownerId));
       if (edited)
         source = { ...source!, prompt: body.prompt as string, suggestedPrompt: undefined };
       if (
@@ -1163,12 +1176,13 @@ export function createSuggestions({
         saved.revision === savedRevision(field, source) &&
         !fresh &&
         Boolean(saved.uncensored) === uncensored
-      )
-        return {
-          suggestions: saved.steps.filter(
-            unlike(fixed(surface === "animate" ? "animate" : "change")),
-          ),
-        };
+      ) {
+        const distinct = unlike(fixed(surface === "animate" ? "animate" : "change"));
+        const suggestions = saved.steps.filter(
+          (step) => distinct(step) && !namedMotif(`${step.label} ${step.request}`, exclusions),
+        );
+        if (suggestions.length) return { suggestions };
+      }
       const { known, lines, motionLines } = tasteContext(ownerId);
       const kind = drafted ? (body.kind as "image" | "video") : "image";
       const prompt = drafted || edited ? promptText(body.prompt) : "";
@@ -1211,6 +1225,7 @@ export function createSuggestions({
         source?.id ?? itemId,
         uncensored,
         action,
+        exclusions,
       ]);
       const cached = cache.get(key);
       if (cached && cached.until > now() && !fresh && !cached.signal?.aborted) {
@@ -1240,6 +1255,7 @@ export function createSuggestions({
             save: !edited && !action,
             signal,
             action,
+            exclusions,
           });
         const context = source
           ? [
@@ -1289,6 +1305,7 @@ export function createSuggestions({
             uncensored,
             cardDraft,
             signal,
+            exclusions,
           },
         );
         if (ideas.reason || signal?.aborted) return ideas;

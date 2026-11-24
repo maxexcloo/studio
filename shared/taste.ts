@@ -15,6 +15,7 @@ export const maxTasteRule = 160;
 export interface TasteFields {
   likes: string[];
   avoid: string[];
+  exclusions: string[];
   styles: string[];
   note: string;
   rules: string[];
@@ -27,6 +28,7 @@ export type TasteWords = Pick<TasteFields, "likes" | "avoid" | "styles" | "note"
 export const tasteLimits = {
   likes: 12,
   avoid: 40,
+  exclusions: 40,
   styles: 8,
   note: 400,
   rules: 12,

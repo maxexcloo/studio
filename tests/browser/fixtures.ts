@@ -1616,6 +1616,7 @@ export async function serveDream(
   const fields = {
     likes: [],
     avoid: [],
+    exclusions: [],
     styles: [],
     note: "",
     rules: [],

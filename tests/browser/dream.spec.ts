@@ -811,6 +811,9 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   } else await summary.fill("Quiet coastal scenes with lighthouses.");
   await editor.getByRole("combobox", { name: "Dislikes", exact: true }).fill("clowns");
   await page.keyboard.press("Enter");
+  const exclusions = editor.getByRole("combobox", { name: "Exclusions", exact: true });
+  await exclusions.fill("laundry rooms");
+  await exclusions.press("Enter");
   await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   expect(dream.requests).not.toContainEqual(
     expect.objectContaining({ path: "/api/taste", method: "PUT" }),
@@ -822,12 +825,14 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       preferences: {
         likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets"],
         avoid: ["crowds", "clowns"],
+        exclusions: ["laundry rooms"],
         note: "Quiet coastal scenes with lighthouses.",
       },
     });
   await expect(editor).toBeHidden();
   await expect(profile.getByText("Summary · Your Edit", { exact: true })).toBeVisible();
   await expect(profile.getByText("clowns", { exact: true })).toBeVisible();
+  await expect(profile.getByText("laundry rooms", { exact: true })).toBeVisible();
   await expect(
     profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
   ).toBeVisible();

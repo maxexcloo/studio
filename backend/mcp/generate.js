@@ -746,7 +746,7 @@ export function registerGenerateTools({
       accountTaste(media, owner, signal),
       converging(media, owner, signal),
     ]);
-    const { rules } = taste;
+    const { rules, exclusions, avoid } = taste;
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -1035,6 +1035,9 @@ export function registerGenerateTools({
     // The rules come back with a chat's first generate, when they change, and again as a guide would.
     if (rules.length && review(`rules:${JSON.stringify(rules)}`))
       projectNote = `${rulesLine(rules)}${projectNote}`;
+    const avoided = [...new Set([...exclusions, ...avoid])];
+    if (avoided.length && review(`exclusions:${JSON.stringify(avoided)}`))
+      projectNote = `The user excludes these subjects, props or settings: ${avoided.join(", ")}. Leave them out of positive prompts. Keep the user's own wording and vary only details they left open. If an explicit request conflicts with an exclusion, tell the user before changing it. ${projectNote}`;
     if (alike && review("converging"))
       projectNote = `Recent results are converging on one look. Vary the open choices in setting, light, framing, action or styling. Keep identities and details fixed by the user's instructions or references. ${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))

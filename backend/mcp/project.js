@@ -3,7 +3,12 @@ import { z } from "zod";
 
 import { briefSummary } from "../../shared/projects.ts";
 import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
-import { forbiddenMotifs, mentionsMotif } from "../domain/dream-concepts.ts";
+import {
+  explicitExclusions,
+  forbiddenMotifs,
+  mentionsMotif,
+  namedMotif,
+} from "../domain/dream-concepts.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -238,13 +243,24 @@ export async function accountTaste(media, owner, signal) {
   const taste = await media
     .request("GET", "/api/taste", undefined, owner, { signal })
     .catch(() => null);
-  return { rules: taste?.rules || [], avoid: taste?.preferences?.avoid || [] };
+  return {
+    rules: taste?.rules || [],
+    avoid: taste?.preferences?.avoid || [],
+    exclusions: taste?.exclusions || [],
+  };
 }
 
-export function assertTasteExclusions({ rules, avoid }, prompts) {
-  const exclusions = [...new Set([...avoid, ...forbiddenMotifs([], rules)])];
-  if (exclusions.length)
-    assertAvoided({ name: "your Taste Profile", brief: { avoid: exclusions.join("\n") } }, prompts);
+export function assertTasteExclusions({ rules, avoid, exclusions }, prompts) {
+  const explicit = exclusions.map((entry) => [entry, explicitExclusions([entry])]);
+  for (const [index, prompt] of prompts.entries())
+    for (const [entry, motifs] of explicit)
+      if (namedMotif(prompt, motifs))
+        throw new Error(
+          `Prompt ${index + 1} conflicts with "${entry}", which your Taste Profile excludes. If you introduced it while writing the prompt, remove only that detail and keep the rest as written. If the user expressly requested it, tell them before changing their prompt. They can edit exclusions in Dream › Taste.`,
+        );
+  const older = [...new Set([...avoid, ...forbiddenMotifs([], rules)])];
+  if (older.length)
+    assertAvoided({ name: "your Taste Profile", brief: { avoid: older.join("\n") } }, prompts);
 }
 
 /** Whether the account's recent results are converging on one look (domain/reflection.ts). */

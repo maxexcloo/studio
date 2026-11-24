@@ -73,6 +73,7 @@ const fieldLabels: Record<keyof TasteFields, string> = {
   note: "Summary",
   likes: "Likes",
   avoid: "Dislikes",
+  exclusions: "Exclusions",
   loras: "LoRAs",
   models: "Models",
   rules: "Rules",
@@ -81,8 +82,8 @@ const fieldLabels: Record<keyof TasteFields, string> = {
   tags: "Tags",
 };
 const fieldKeys = Object.keys(fieldLabels) as (keyof TasteFields)[];
-/** Rules are only ever the person's: Studio learns none, so they have no learnt version. */
-const own = (key: keyof TasteFields) => key === "rules";
+/** Studio learns neither rules nor exclusions. */
+const own = (key: keyof TasteFields) => key === "rules" || key === "exclusions";
 /** How many of the favourites Studio learnt the profile shows; the person's own show whole. */
 const learntShown: Partial<Record<keyof TasteFields, number>> = {
   models: 3,
@@ -233,8 +234,8 @@ function TasteEditor({
       <TagsInput
         label={label}
         description={
-          key === "avoid"
-            ? "Add subjects, props or settings to exclude from Dream and chat prompts. For example, smoking or laundry."
+          key === "exclusions"
+            ? "Add a subject, prop or setting and press Enter. For example, smoking or laundry rooms."
             : undefined
         }
         value={draft[key]}
@@ -288,7 +289,7 @@ function TasteEditor({
 }
 
 /** The fields shown as removable words; models, LoRAs and tags show with their keep rates. */
-const wordKeys = ["likes", "styles", "avoid", "rules", "shapes"] as const;
+const wordKeys = ["likes", "styles", "avoid", "exclusions", "rules", "shapes"] as const;
 const tagGroups: [TagKind | undefined, string][] = [
   ["colour", "Colours"],
   ["outfit", "Outfits"],
@@ -532,6 +533,12 @@ export function TasteProfile({ toolbar }: { toolbar: HTMLElement | null }) {
               <Text size="xs" c="dimmed">
                 {learnt(data) ||
                   "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
+              </Text>
+              <Text size="sm">
+                Dream and suggestion menus use your likes, dislikes and styles to guide new ideas.
+                Your exclusions and rules also guide MCP. MCP uses learnt taste when you ask and
+                runs your prompt as written. If it finds an exclusion, it asks for a revision before
+                queuing.
               </Text>
               <SettingRow
                 label={label("note")}

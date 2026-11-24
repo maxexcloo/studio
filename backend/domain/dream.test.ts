@@ -1061,10 +1061,10 @@ test("Motif cooldowns recognise unlabelled laundry and smoking across different 
   assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
-test("Dream retries explicit avoids, even negated ones, without cooling required motifs", async (t) => {
+test("Dream retries explicit exclusions and project avoids without cooling required motifs", async (t) => {
   const { dataDir, dream, projects, state, taste, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
-  taste.edit("alice", { avoid: ["smoking"] });
+  taste.edit("alice", { exclusions: ["smoking"] });
   projects.create("alice", {
     name: "Evening Light",
     brief: {

@@ -65,6 +65,7 @@ import {
   direction,
   diversity,
   fashionableLooks,
+  explicitExclusions,
   forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
@@ -1710,8 +1711,11 @@ export function createDream(options: {
   const pausedMotifs = (similar: DreamItem[]) =>
     similar.flatMap((item) => item.dream?.motifs ?? []);
   const seedMotifs = (ownerId: string, record: DreamRecord) => {
-    const { preferences, rules } = options.taste.read(ownerId);
-    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules, true);
+    const { preferences, rules, exclusions = [] } = options.taste.read(ownerId);
+    const forbidden = [
+      ...explicitExclusions(exclusions),
+      ...forbiddenMotifs(preferences.avoid ?? [], rules, true),
+    ];
     const paused = pausedMotifs(similarPasses(ownerId));
     return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden, paused)];
   };
@@ -2063,18 +2067,30 @@ export function createDream(options: {
       record.settings.uncensored &&
       access.uncensored;
     const { recent, subjects = [], anchors = [] } = record;
-    const { summary, rules, likes, styles, preferences, learnt } = options.taste.read(ownerId);
+    const {
+      summary,
+      rules,
+      likes,
+      styles,
+      preferences,
+      learnt,
+      exclusions = [],
+    } = options.taste.read(ownerId);
     // Their own avoids and those Studio learnt both steer the idea; only their own are enforced.
     const avoid = [...new Set([...(preferences.avoid ?? []), ...learnt.avoid])];
-    const forbidden = forbiddenMotifs(
-      [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
-      [...rules, project?.brief.rules ?? ""],
-      true,
-    );
+    const forbidden = [
+      ...explicitExclusions(exclusions),
+      ...forbiddenMotifs(
+        [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
+        [...rules, project?.brief.rules ?? ""],
+        true,
+      ),
+    ];
     const [fewest, most] = tasteDraw.likes;
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
     const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
+      ...(exclusions.length ? [`Exclude: ${exclusions.join(", ")}`] : []),
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
       ...(drawnLikes.length ? [`Likes: ${drawnLikes.join(", ")}`] : []),
       ...(drawnStyles.length ? [`Preferred Styles: ${drawnStyles.join(", ")}`] : []),
