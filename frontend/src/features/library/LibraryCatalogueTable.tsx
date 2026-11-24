@@ -1,4 +1,4 @@
-import { Alert, Badge, Menu, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -22,6 +22,8 @@ export interface LibraryItem {
   title?: string;
   name?: string;
   file?: string;
+  /** The file's SHA-256, where its source recorded one. */
+  sha256?: string;
   installed: boolean;
   installable?: boolean;
   install?: { state: string; note?: string };
@@ -364,6 +366,7 @@ export function LibraryCatalogueTable({
                       .join(" · ")
                   }
                 />
+                {item.file && <FileName file={item.file} sha256={item.sha256} />}
                 {(item.description || item.note) && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {item.description || item.note}
@@ -517,5 +520,31 @@ export function LibraryCatalogueTable({
         }}
       />
     </Stack>
+  );
+}
+
+/** A catalogued file's name with its extension, and its hashes on hover where its source recorded them. */
+function FileName({ file, sha256 }: { file: string; sha256?: string }) {
+  const name = (
+    <Text size="xs" c="dimmed" truncate>
+      {file}
+    </Text>
+  );
+  return sha256 ? (
+    <Tooltip
+      multiline
+      w={360}
+      label={
+        <>
+          <div style={{ overflowWrap: "anywhere" }}>SHA256 {sha256}</div>
+          {/* AutoV2 is the SHA-256's first ten hex digits, as Civitai shows it. */}
+          <div>AutoV2 {sha256.slice(0, 10).toUpperCase()}</div>
+        </>
+      }
+    >
+      {name}
+    </Tooltip>
+  ) : (
+    name
   );
 }
