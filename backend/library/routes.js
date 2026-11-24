@@ -718,6 +718,10 @@ export function registerLibraryRoutes(
         .map((download) => [`${download.folder}/${download.file}`, download]),
     );
     const entries = catalogue().entries({ throttleMs: 5000 });
+    // A file the catalogue has no size for takes the size the worker reports for it.
+    const sizes = new Map(workerInventory().files.map((file) => [file.path, file.size || 0]));
+    const sizeOf = ({ folder, file }) =>
+      (subfolders[folder] || [folder]).map((name) => sizes.get(`${name}/${file}`)).find(Boolean);
     const items = libraryItems({
       installed: files,
       entries,
@@ -728,8 +732,10 @@ export function registerLibraryRoutes(
       const applied = state.applied[item.key];
       const installable = !item.installed && Boolean(catalogueInstallSource(entries[item.key]));
       const download = installable && byFile.get(item.key);
+      const bytes = item.bytes || (item.installed && sizeOf(item));
       return {
         ...item,
+        ...(bytes ? { bytes } : {}),
         ...(update ? { update } : {}),
         ...(applied ? { applied } : {}),
         ...(installable ? { installable } : {}),
