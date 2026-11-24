@@ -64,7 +64,7 @@ function profileAbilities(profile: Profile) {
   );
   return [
     references > 0 && plural(references, "Reference"),
-    profile.kind === "image" && references > 0 && (profile.editReferences ? "Edit" : "Img2Img"),
+    profile.kind === "image" && references > 0 && profile.editReferences && "Edit",
     can.inpaint && "Inpaint",
     profile.kind === "image" && can.negativePrompt !== false && "Negative",
     can.lora && "LoRAs",
