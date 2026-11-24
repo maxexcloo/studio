@@ -16,10 +16,12 @@ import {
   useCombobox,
   useComboboxTargetProps,
 } from "@mantine/core";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { type ReactNode, type Ref, useState } from "react";
 
 import { popupMiddlewares } from "../../theme";
+import { NameWithFlags } from "../../ui/NameWithFlags";
+import { ChosenMark } from "../../ui/NameWithFlags";
 import { SearchInput } from "../../ui/SearchInput";
 import { useTouch } from "../../ui/usePhone";
 import { chipProps } from "./chip";
@@ -259,19 +261,21 @@ export function ChipOption({
   return (
     <Group justify="space-between" wrap="nowrap" gap="xs" w="100%">
       <Stack gap={0} miw={0}>
-        <Group gap={4} wrap="nowrap" miw={0}>
-          <Text size="sm" fw={500} truncate title={label}>
-            {label}
-          </Text>
-          {badges}
-        </Group>
+        <NameWithFlags
+          name={
+            <Text size="sm" fw={500} truncate title={label}>
+              {label}
+            </Text>
+          }
+          flags={badges}
+        />
         {description && (
           <Text size="xs" c="dimmed" truncate title={description}>
             {description}
           </Text>
         )}
       </Stack>
-      {checked && <Check size={14} style={{ flexShrink: 0 }} />}
+      <ChosenMark chosen={Boolean(checked)} />
     </Group>
   );
 }

@@ -300,20 +300,13 @@ export function PromptTemplates({
               main: true,
               cell: (style) => (
                 <TableRecord
-                  name={
-                    <>
-                      {style.label}{" "}
-                      {style.uncensored && (
-                        <Badge
-                          component="span"
-                          size="sm"
-                          color="orange"
-                          leftSection={<icons.uncensored size={12} />}
-                        >
-                          Uncensored
-                        </Badge>
-                      )}
-                    </>
+                  name={style.label}
+                  flags={
+                    style.uncensored && (
+                      <Badge size="sm" color="orange" leftSection={<icons.uncensored size={12} />}>
+                        Uncensored
+                      </Badge>
+                    )
                   }
                   detail={style.description}
                   openLabel={`Edit ${style.label}`}

@@ -22,6 +22,7 @@ import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
+import { NameWithFlags } from "../../ui/NameWithFlags";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
@@ -176,7 +177,7 @@ function DefinitionForm({
     },
   });
   const meta = loaded.version || loaded.meta;
-  const noun = kind === "profile" ? "Profile" : "Guide";
+  const noun = kind === "profile" ? "Model" : "Guide";
   const busy = save.isPending || action.isPending;
   const collision = creating && existingIds.includes(form.values.id);
   return (
@@ -225,7 +226,7 @@ function DefinitionForm({
             <Stack gap="md">
               {!metadata ? (
                 <Alert color="yellow">
-                  Repair this file's profile metadata in Advanced JSON to edit it here.
+                  Repair this file's model metadata in Advanced JSON to edit it here.
                 </Alert>
               ) : (
                 <>
@@ -240,7 +241,7 @@ function DefinitionForm({
                       {backends && (
                         <Select
                           label="Backend"
-                          description="Where this profile runs. Details and Connections edit this backend; Advanced JSON holds every backend."
+                          description="Where this model runs. Details and Connections edit this backend; Advanced JSON holds every backend."
                           data={backendIds.map((id) => ({ value: id, label: backendLabel(id) }))}
                           value={backend}
                           allowDeselect={false}
@@ -294,7 +295,7 @@ function DefinitionForm({
                       </SimpleGrid>
                       <TextInput
                         label="Conditioning"
-                        description="The profile's declared workflow conditioning."
+                        description="The model's declared workflow conditioning."
                         value={String(
                           (metadata.recipe as Record<string, unknown>)?.conditioning || "",
                         )}
@@ -395,7 +396,7 @@ function DefinitionForm({
                 />
               ) : (
                 <Alert color="yellow">
-                  Repair the profile metadata in Advanced JSON before editing connections.
+                  Repair the model metadata in Advanced JSON before editing connections.
                 </Alert>
               )}
             </Tabs.Panel>
@@ -426,7 +427,7 @@ function DefinitionForm({
         {check && (
           <Alert
             color={check.ok ? "green" : "red"}
-            title={check.ok ? "Profile Check Passed" : "Profile Needs Changes"}
+            title={check.ok ? "Model Check Passed" : "Model Needs Changes"}
           >
             {[...check.errors, ...check.warnings].map((message) => (
               <Text key={message} size="sm">
@@ -504,7 +505,7 @@ export function DefinitionEditor({
   useEffect(() => {
     if (loaded.error) void client.invalidateQueries({ queryKey: definitionsKey });
   }, [loaded.error, client]);
-  const title = `${creating ? "Create" : "Edit"} ${kind === "profile" ? "Profile" : "Guide"}`;
+  const title = `${creating ? "Create" : "Edit"} ${kind === "profile" ? "Model" : "Guide"}`;
   const meta = data?.version || data?.meta;
   // A guide's many text fields take the Library's room on desktop, its footer pinned below them.
   const roomy = kind === "guide" && !phone;
@@ -517,14 +518,16 @@ export function DefinitionEditor({
         creating ? (
           title
         ) : (
-          <>
-            <VersionTitle title={title} version={meta?.version} />{" "}
-            {meta?.aiDrafted && (
-              <Badge component="span" size="sm" color="orange">
-                AI
-              </Badge>
-            )}
-          </>
+          <NameWithFlags
+            name={<VersionTitle title={title} version={meta?.version} />}
+            flags={
+              meta?.aiDrafted && (
+                <Badge component="span" size="sm" color="orange">
+                  AI
+                </Badge>
+              )
+            }
+          />
         )
       }
       fullScreen={phone}

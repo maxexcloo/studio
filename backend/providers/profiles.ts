@@ -145,11 +145,10 @@ export function studioCloudProfiles(options: ProfileOptions) {
   async function resolve(job: Pick<OwnedJob, "input" | "ownerId">): Promise<CloudRequest> {
     const input = job.input as Value;
     const profile = (await profiles()).find((item) => item.id === modelOf(input));
-    if (!profile)
-      throw new Error("This cloud profile is unavailable from its configured provider.");
+    if (!profile) throw new Error("This cloud model is unavailable from its configured provider.");
     const account = job.ownerId ? options.accountForOwner(job.ownerId) : null;
     if (job.ownerId && (!account || !options.mayUseProfile(account, profile)))
-      throw Object.assign(new Error("This account cannot use the selected cloud profile."), {
+      throw Object.assign(new Error("This account cannot use the selected cloud model."), {
         status: 403,
       });
     const references = (input.referenceAssets || []).filter((item: Value) => item.assetId);
@@ -173,9 +172,9 @@ export function studioCloudProfiles(options: ProfileOptions) {
       throw new Error("This cloud provider accepts one reference image.");
     if (lastFrameId && !takesLastFrame(model))
       throw new Error("Only Grok Imagine Video 1.5 pins a last frame.");
-    if (input.inpaint) throw new Error("This cloud profile does not support masking.");
+    if (input.inpaint) throw new Error("This cloud model does not support masking.");
     if (input.loras?.some((item: Value) => item.enabled !== false))
-      throw new Error("This cloud profile does not support LoRAs.");
+      throw new Error("This cloud model does not support LoRAs.");
     if (input.autoUpscale) throw new Error("Run Upscale after this cloud generation finishes.");
     const prompt = String(input.prompt || "").trim();
     if (!prompt) throw new Error("Enter a prompt.");

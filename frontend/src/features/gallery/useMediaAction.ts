@@ -152,8 +152,7 @@ export async function mediaDraft(
           (profile.backendOptions?.some(({ id }) => id === editBackend) &&
             takesReferences(profile, editBackend))),
     );
-  if (profileId && !selected)
-    throw new Error("The selected profile is unavailable for this action.");
+  if (profileId && !selected) throw new Error("The selected model is unavailable for this action.");
   // A video continues on its own running model unless a profile or the Cloud route was chosen.
   const retained =
     targetKind === "video" && !selected

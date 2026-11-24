@@ -20,15 +20,15 @@ async function updates(page: Page, action: "Check" | "Update All") {
   await page.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
-test("The Library opens on Presets and groups Personal, Models, Prompting and Templates", async ({
+test("The Library opens on Presets and groups Personal, Profiles, Prompting and Templates", async ({
   page,
 }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
     Personal: ["Presets", "Characters", "Outfits", "Scenes"],
-    Models: ["Files", "Imports", "LoRAs", "Profiles"],
-    Prompting: ["Guides", "Instructions"],
+    Profiles: ["Imports", "Files", "LoRAs", "Models"],
+    Prompting: ["Chat", "Compose", "Dream", "Gallery", "Guides", "Library", "Writing Standard"],
     Templates: ["Animate", "Edit & Recreate", "Improve Prompt"],
   };
   const order = Object.values(groups).flat();
@@ -215,7 +215,7 @@ test("The queue lists model downloads to stop, resume, retry or discard one at a
     await expect(notifications).toHaveCount(count - 1);
   }
   await expandComposer(page);
-  const profile = page.getByRole("combobox", { name: "Profile", exact: true });
+  const profile = page.getByRole("combobox", { name: "Model", exact: true });
   await profile.click();
   await page.getByRole("option", { name: /^Downloaded Model\b/ }).click();
   await expect(profile).toHaveText("Downloaded Model");
@@ -480,7 +480,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Actions for Imported Checkpoint", exact: true }).click();
   await page.getByRole("menuitem", { name: "Review", exact: true }).click();
-  const button = page.getByRole("button", { name: "Draft Profile", exact: true });
+  const button = page.getByRole("button", { name: "Draft Model", exact: true });
   await button.click();
   await expect(
     page.getByText("Draft assistant unavailable; existing import retained.", { exact: true }),
@@ -489,7 +489,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   const previousReads = modelReads;
   await button.click();
   await expect(
-    page.getByText("Profile drafted. Review it in Library › Profiles.", { exact: true }).first(),
+    page.getByText("Model drafted. Review it in Library › Models.", { exact: true }).first(),
   ).toBeVisible();
   await expect(button).toBeHidden();
   await expect.poll(() => modelReads).toBeGreaterThan(previousReads);

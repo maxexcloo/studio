@@ -23,6 +23,7 @@ import {
 import { api } from "../../api";
 import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
+import { NameWithFlags } from "../../ui/NameWithFlags";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { Thumbnail } from "./DiscardedDreams";
 import { aspectLabel, briefFields } from "./ProjectForm";
@@ -207,19 +208,27 @@ export function ProjectCard({
     <Paper withBorder p="md" radius="md" component="section" aria-label={project.name}>
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap" gap="xs">
-          <Group gap="xs" wrap="nowrap" miw={0}>
-            <UnstyledButton onClick={open} miw={0} aria-label={`Open ${project.name}`}>
-              <Text size="sm" fw={600} truncate>
-                {project.name}
-              </Text>
-            </UnstyledButton>
-            <ProjectFlags project={project} />
-            {fresh > 0 && (
-              <Badge variant="light" style={{ flexShrink: 0 }}>
-                {fresh} New
-              </Badge>
-            )}
-          </Group>
+          <NameWithFlags
+            name={
+              <UnstyledButton onClick={open} miw={0} aria-label={`Open ${project.name}`}>
+                <Text size="sm" fw={600} truncate>
+                  {project.name}
+                </Text>
+              </UnstyledButton>
+            }
+            flags={
+              (project.paused || project.favoured || fresh > 0) && (
+                <>
+                  <ProjectFlags project={project} />
+                  {fresh > 0 && (
+                    <Badge variant="light" style={{ flexShrink: 0 }}>
+                      {fresh} New
+                    </Badge>
+                  )}
+                </>
+              )
+            }
+          />
           <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
             <ProjectEnabled project={project} label={`Enable ${project.name}`} />
             <Menu position="bottom-end" width={menuWidth}>

@@ -217,7 +217,7 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const editProfile = async (name: string) => {
-    const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
+    const profileMenu = page.getByRole("menuitem", { name: "Model", exact: true });
     await profileMenu.click();
     await expect(
       page.getByRole("menuitemradio", { name: "Image Quality", exact: true }),
@@ -1480,7 +1480,7 @@ test("Animate can pick a compatible profile over the saved default route", async
     });
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
+  const profileMenu = page.getByRole("menuitem", { name: "Model", exact: true });
   await profileMenu.click();
   await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
   const localProfile = page.getByRole("menuitemradio", { name: "Motion Quality", exact: true });
@@ -1581,7 +1581,7 @@ test("With local video stopped, Animate in Composer pre-selects Grok", async ({ 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
   await expect(page).toHaveURL(/\/videos$/);
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
+  await expect(page.getByRole("combobox", { name: "Model", exact: true })).toContainText(
     grok.label,
   );
   expect(state.jobs).toHaveLength(1);

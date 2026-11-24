@@ -144,7 +144,7 @@ function CatalogueForm({
         <TextInput label="Base Model" {...form.getInputProps("baseModel")} />
         <MultiSelect
           label="Families"
-          description="The family identifiers your profiles declare."
+          description="The family identifiers your models declare."
           data={[...new Set([...families, ...form.values.families])].map((family) => ({
             value: family,
             label: `${modelFamilyLabel(family)} (${family})`,

@@ -283,7 +283,7 @@ export function ReferencePicker({
             Not Used
           </Text>
           <Text size="xs" c="dimmed">
-            These images don't fit the selected profile's slots. Remove them here or choose another
+            These images don't fit the selected model's slots. Remove them here or choose another
             profile.
           </Text>
           <PickerGrid label="Unused References">
@@ -418,7 +418,7 @@ export function ReferencePicker({
               <Text size="xs" c="dimmed">
                 {slots.length
                   ? "All slots are filled. Choose a reference to replace it, or a selected image to remove it."
-                  : "This profile doesn't take references."}
+                  : "This model doesn't take references."}
               </Text>
             )
           }

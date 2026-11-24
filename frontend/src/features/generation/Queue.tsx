@@ -38,6 +38,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { NameWithFlags } from "../../ui/NameWithFlags";
 import { plural } from "../../ui/plural";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -475,16 +476,20 @@ function QueueRow({
           onClick={() => setOpened((open) => !open)}
         >
           <Stack gap={2}>
-            <Group gap={6} wrap="nowrap" align="flex-start">
-              <Text size="sm" lineClamp={2}>
-                {String(job.input?.prompt || "Generation")}
-              </Text>
-              {job.dream && (
-                <Badge size="xs" color="gray" miw="max-content">
-                  Dream
-                </Badge>
-              )}
-            </Group>
+            <NameWithFlags
+              name={
+                <Text size="sm" lineClamp={2}>
+                  {String(job.input?.prompt || "Generation")}
+                </Text>
+              }
+              flags={
+                job.dream && (
+                  <Badge size="xs" color="gray" miw="max-content">
+                    Dream
+                  </Badge>
+                )
+              }
+            />
             <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
               {status}
             </Text>

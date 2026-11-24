@@ -372,5 +372,5 @@ test("the import engine drafts a checkpoint on import, records a failure as a wa
   fail = false;
   const drafted = await engine.draft(created.id, { by: "admin-1" });
   assert.deepEqual([drafted.results.profileId, drafted.warnings], ["real-skin-v3", []]);
-  await assert.rejects(engine.draft(created.id), /already drafted a profile/);
+  await assert.rejects(engine.draft(created.id), /already drafted a model/);
 });

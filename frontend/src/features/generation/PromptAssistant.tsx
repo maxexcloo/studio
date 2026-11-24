@@ -224,7 +224,7 @@ export function usePromptAssistant({
       preview?: boolean;
     }) => {
       if (!profile || !input.prompt.trim())
-        throw new Error("Write a prompt and choose a profile first.");
+        throw new Error("Write a prompt and choose a model first.");
       const source = {
         profileId: profile.id,
         prompt: input.prompt,

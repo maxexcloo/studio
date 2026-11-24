@@ -22,7 +22,12 @@ import {
   libraryItemCategory,
 } from "./LibraryCatalogueTable";
 import { LibraryImports } from "./LibraryImports";
-import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
+import {
+  type InstructionSection,
+  instructionAreas,
+  librarySections,
+  useLibraryNavigation,
+} from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
 import { GuideDefinitions, ProfileDefinitions, guidesQuery } from "./ProfileDefinitions";
 import { PromptInstructions } from "./PromptInstructions";
@@ -38,6 +43,15 @@ import {
 
 /** Update All reports the updates that failed to start. */
 type UpdateResult = { failed?: { key: string; error: string }[] };
+
+/** One entry per instruction type's page, as the Library's sections maps take them. */
+const instructionPages = <T,>(make: (section: InstructionSection) => T) =>
+  Object.fromEntries(
+    (Object.keys(instructionAreas) as InstructionSection[]).map((section) => [
+      section,
+      make(section),
+    ]),
+  ) as Record<InstructionSection, T>;
 
 export function LibraryPage() {
   const { admin, options } = useLibraryNavigation();
@@ -170,7 +184,7 @@ export function LibraryPage() {
           animateTemplates: [promptStylesQuery],
           changeTemplates: [promptStylesQuery],
           improveTemplates: [promptStylesQuery],
-          instructions: [promptInstructionsQuery],
+          ...instructionPages(() => [promptInstructionsQuery]),
           scenes: [promptCardsQuery("scenes")],
         }}
         content={{
@@ -184,7 +198,9 @@ export function LibraryPage() {
           loras: catalogueSection("loras"),
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
-          instructions: (heading) => <PromptInstructions heading={heading} />,
+          ...instructionPages((section) => (heading: ReactNode) => (
+            <PromptInstructions section={section} heading={heading} />
+          )),
           animateTemplates: (heading) => (
             <PromptTemplates kind="animate" label="Animate Templates" heading={heading} />
           ),

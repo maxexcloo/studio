@@ -39,6 +39,7 @@ import { ChipPopup } from "../../ui/ChipPopup";
 import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
+import { ChosenMark } from "../../ui/NameWithFlags";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ScrollingSegments } from "../../ui/ScrollingSegments";
 import { SearchInput } from "../../ui/SearchInput";
@@ -723,7 +724,7 @@ export function SavedName<T extends SavedItem>({
                             .join(" · ")}
                         </Text>
                       </Stack>
-                      {record === current && <Check size={14} />}
+                      <ChosenMark chosen={record === current} />
                     </Group>
                   </Combobox.Option>
                 ))}

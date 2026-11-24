@@ -51,14 +51,14 @@ export function StudioSettings() {
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const { defaults, catalogue } = deployment.data;
   const profileSelect = (kind: "image" | "video", setting: Setting) => {
-    const label = kind === "image" ? "Image Profile" : "Video Profile";
+    const label = kind === "image" ? "Image Model" : "Video Model";
     const offered = defaults.profiles.filter((profile) => profile.kind === kind);
     const effective = offered.find((profile) => profile.id === setting.effective);
     return (
       <SettingRow
         wide
         label={label}
-        description={`New drafts start on ${effective?.label || "the first ready profile"}.${lockedNote(setting)}`}
+        description={`New drafts start on ${effective?.label || "the first ready model"}.${lockedNote(setting)}`}
       >
         <ProfileSelect
           field
@@ -102,7 +102,7 @@ export function StudioSettings() {
         {profileSelect("video", defaults.video)}
         <SettingRow
           wide
-          label="Text Profile"
+          label="Text Model"
           description={
             (defaults.text.effective
               ? `Default for prompt writing and other text work. Uses ${textModelName(defaults.text.effective)} when available.`
@@ -110,7 +110,7 @@ export function StudioSettings() {
           }
         >
           <TextModelSelect
-            name="Text Profile"
+            name="Text Model"
             models={defaults.textModels}
             unset="Default (Gateway)"
             value={defaults.text.configured || null}

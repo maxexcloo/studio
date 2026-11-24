@@ -199,7 +199,7 @@ function rowMenu({
       {more}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
-        onClick={() => void copyText(id, kind === "guide" ? "Guide ID" : "Profile ID")}
+        onClick={() => void copyText(id, kind === "guide" ? "Guide ID" : "Model ID")}
       >
         Copy ID
       </Menu.Item>
@@ -248,7 +248,7 @@ function DeleteDefinition({ deleting, close }: { deleting: Deleting | null; clos
   return (
     <ConfirmDialog
       opened={Boolean(deleting)}
-      title={`Delete ${deleting?.kind === "guide" ? "Guide" : "Profile"}`}
+      title={`Delete ${deleting?.kind === "guide" ? "Guide" : "Model"}`}
       action="Delete"
       pending={remove.isPending}
       error={remove.error?.message}
@@ -259,7 +259,7 @@ function DeleteDefinition({ deleting, close }: { deleting: Deleting | null; clos
       }}
     >
       {deleting?.kind === "guide"
-        ? `Delete ${deleting.name}? Its version history keeps it restorable. A guide that profiles still use stays until they use another.`
+        ? `Delete ${deleting.name}? Its version history keeps it restorable. A guide that models still use stays until they use another.`
         : `Delete ${deleting?.name}? Its version history keeps it restorable; gallery items made with it stay.`}
     </ConfirmDialog>
   );
@@ -342,7 +342,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
     <Stack gap="md">
       <SectionHeader heading={heading}>
         <SectionToolbar
-          label="Profiles"
+          label="Models"
           query={profileQuery}
           onQueryChange={setProfileQuery}
           filters={
@@ -380,7 +380,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           <Alert color="red">{profileList.error.message}</Alert>
         ) : (
           <DataTable
-            label="Editable Profiles"
+            label="Editable Models"
             // Sorted by type, family and name first, so the stable Type sort keeps that order within it.
             rows={[...profileRows].sort(
               (a, b) =>
@@ -390,7 +390,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             )}
             rowKey={(entry) => entry.id}
             rowName={(entry) => entry.name || entry.id}
-            loading={profileList.isPending && "Loading Profiles"}
+            loading={profileList.isPending && "Loading Models"}
             query={profileQuery}
             searchText={(entry) => [
               entry.name,
@@ -400,7 +400,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               guideOf(entry),
             ]}
             initialSort={{ key: "kind", descending: false }}
-            empty={profiles.length ? "No Matches" : "No Profiles"}
+            empty={profiles.length ? "No Matches" : "No Models"}
             columns={[
               {
                 key: "kind",
@@ -430,15 +430,18 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 cell: (entry) => (
                   <>
                     <TableRecord
-                      name={
-                        <>
-                          {entry.name || entry.id} {aiBadge(entry.aiDrafted)}{" "}
-                          {statsOf(entry.id)?.failing && (
-                            <Badge component="span" size="sm" color="red">
-                              Failing
-                            </Badge>
-                          )}
-                        </>
+                      name={entry.name || entry.id}
+                      flags={
+                        (entry.aiDrafted || statsOf(entry.id)?.failing) && (
+                          <>
+                            {aiBadge(entry.aiDrafted)}
+                            {statsOf(entry.id)?.failing && (
+                              <Badge size="sm" color="red">
+                                Failing
+                              </Badge>
+                            )}
+                          </>
+                        )
                       }
                       openLabel={`Edit ${entry.name || entry.id}`}
                       onOpen={() => setEditing({ kind: "profile", id: entry.id })}
@@ -534,7 +537,7 @@ function UsedBy({ guide, profiles = [] }: { guide: string; profiles?: string[] }
   if (!profiles.length)
     return (
       <Text size="sm" c="dimmed">
-        No Profiles
+        No Models
       </Text>
     );
   return (
@@ -556,10 +559,10 @@ function UsedBy({ guide, profiles = [] }: { guide: string; profiles?: string[] }
             onMouseLeave: () => setOpened(false),
           })}
         >
-          {plural(profiles.length, "Profile")}
+          {plural(profiles.length, "Model")}
         </Button>
       </Popover.Target>
-      <Popover.Dropdown aria-label={`Profiles Using ${guide}`} aria-labelledby="" p="sm" maw={320}>
+      <Popover.Dropdown aria-label={`Models Using ${guide}`} aria-labelledby="" p="sm" maw={320}>
         <Stack gap={4}>
           {[...profiles].sort().map((name) => (
             <Text key={name} size="sm">
@@ -623,11 +626,8 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               sortValue: (entry) => entry.name,
               cell: (entry) => (
                 <TableRecord
-                  name={
-                    <>
-                      {entry.name} {aiBadge(entry.aiDrafted)}
-                    </>
-                  }
+                  name={entry.name}
+                  flags={aiBadge(entry.aiDrafted)}
                   openLabel={`Edit ${entry.name}`}
                   onOpen={() => setEditing({ kind: "guide", id: entry.packId })}
                 />

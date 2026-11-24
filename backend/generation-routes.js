@@ -114,7 +114,7 @@ export function createGenerationSubmission({
           payload: {
             ok: false,
             permanent: true,
-            error: "The requested model does not match the selected profile.",
+            error: "The requested checkpoint does not match the selected model.",
           },
         };
       // An ordinary account runs the profile's own checkpoint (graphs.js falls back to the selected
@@ -127,7 +127,7 @@ export function createGenerationSubmission({
             payload: {
               ok: false,
               permanent: true,
-              error: "This account cannot use the selected generation profile.",
+              error: "This account cannot use the selected model.",
             },
           };
         if (Array.isArray(input?.loras) && input.loras.length && !mayUseFeature(account, "loras"))
@@ -220,7 +220,7 @@ export function createGenerationSubmission({
     status: 409,
     payload: {
       deferredBeforeSubmission: true,
-      error: "Waiting for the selected profile to be resident again.",
+      error: "Waiting for the selected model to be resident again.",
     },
   });
   async function residentBaseModel(backend, body) {
@@ -581,7 +581,7 @@ export function createGenerationSubmission({
         if (input.kind && input.kind !== routed.profile.kind)
           return {
             status: 400,
-            payload: { ok: false, error: "The selected profile does not support this media kind." },
+            payload: { ok: false, error: "The selected model does not support this media kind." },
           };
         for (const [field, ceiling] of Object.entries({
           count: 4096,
