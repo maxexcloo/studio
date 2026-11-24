@@ -715,7 +715,7 @@ registerPromptHistoryRoutes(app);
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerCardRoutes(app);
 registerVideoEditRoutes(app, { store });
-registerRecreateRoute(app, { store });
+registerRecreateRoute(app, { store, describe: describeNow });
 registerGalleryImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerLinkImportRoute(app, {
   importLink: libraryRoutes.importLink,
@@ -930,9 +930,9 @@ const suggestions = createSuggestions({
   cards: accountCards,
   item: (ownerId, jobId, itemId) =>
     (itemId ? unseenDreamItem(ownerId, itemId, jobId) : undefined) ??
-    filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
-      (item) => !itemId || item.id === itemId,
-    ),
+    filterVisibleGallery(
+      jobId ? galleryJobItems(jobId, ownerId) : [galleryItem(itemId, ownerId)].filter(Boolean),
+    ).find((item) => !itemId || item.id === itemId),
   image: async (item, upscaled) =>
     (await assistantEngine?.supportsVision(textWriter(item.ownerId)))
       ? smallImage(item, upscaled)
@@ -1360,6 +1360,16 @@ const enricher = createEnricher({
   save: (item, enriched) => updateGalleryJob(galleryKey(item), enriched),
   failed: (reason) => logWarning(`Couldn't enrich a new result: ${reason}`),
 });
+/**
+ * What a result without a prompt or caption shows, captioned now (with whatever else its read
+ * still needs), for an action that works from it.
+ */
+async function describeNow(item) {
+  await enricher.caption(item, new AbortController().signal).catch(() => {
+    throw new Error("Studio couldn't describe this image. Write a prompt for it in Generate.");
+  });
+  return galleryItem(item.id, item.ownerId)?.caption?.text || "";
+}
 /** New results' Background AI: one read each, then what it left to each task's own work. */
 async function enrichCompleted(items) {
   const done = await enricher.completed(items);

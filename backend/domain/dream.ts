@@ -4108,7 +4108,11 @@ export function createDream(options: {
         const record = read(ownerId);
         record.steer = {
           itemId,
-          prompt: clean(item.prompt || item.dream?.prompt, maxPromptCharacters),
+          // A result without a prompt follows what it shows.
+          prompt: clean(
+            item.prompt || item.dream?.prompt || item.caption?.text,
+            maxPromptCharacters,
+          ),
           ...(item.settings?.profileId ? { profileId: String(item.settings.profileId) } : {}),
           remaining: steerCount,
         };

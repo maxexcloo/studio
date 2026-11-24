@@ -1314,6 +1314,20 @@ test("More Like This permits close iterations while keeping species and source i
   assert.doesNotMatch(state.calls.at(-1)!.user, /Recent Dream ideas to avoid/);
 });
 
+test("More Like This follows what a result without a prompt shows", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const first = await dreamOnce();
+  const item = state.items.find((item) => item.jobId === first!.id)!;
+  Object.assign(item, {
+    prompt: "",
+    dream: { ...item.dream!, prompt: "" },
+    caption: { text: "A red fox sitting in snow." },
+  });
+  dream.more("alice", String(item.id));
+  assert.equal(dream.read("alice").steer?.prompt, "A red fox sitting in snow.");
+});
+
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
   const { dream, state, dreamJobs } = fixture(t);
   await dream.save("alice", { enabled: true });

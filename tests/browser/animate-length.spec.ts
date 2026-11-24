@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, profiles, serveProfiles, stamp, viewerAction } from "./fixtures";
+import {
+  expandAssistantMenu,
+  fixtures,
+  image,
+  profiles,
+  serveProfiles,
+  stamp,
+  viewerAction,
+} from "./fixtures";
 
 for (const review of [false, true]) {
   test(`Animate Length paces ${review ? "reviewed" : "queued"} motion with the submitted clip`, async ({
@@ -59,6 +67,7 @@ for (const review of [false, true]) {
     await menu.getByText(length, { exact: true }).click();
     await expect(menu.getByRole("radio", { name: length, exact: true })).toBeChecked();
     if (review) await menu.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
+    await expandAssistantMenu(menu, "Templates");
     await menu.getByRole("menuitem", { name: "Action", exact: true }).click();
     if (review) {
       const dialog = page.getByRole("dialog", { name: "Review Prompt", exact: true });

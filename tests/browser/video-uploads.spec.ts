@@ -68,7 +68,14 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   const recreated: unknown[] = [];
   await page.route("**/api/gallery/recreate", (route) => {
     recreated.push(route.request().postDataJSON());
-    return route.fulfill({ json: { ok: true, sessionId: "session-recreate", jobId: "job-clip" } });
+    return route.fulfill({
+      json: {
+        ok: true,
+        sessionId: "session-recreate",
+        jobId: "job-clip",
+        prompt: "A lighthouse at dusk, waves breaking",
+      },
+    });
   });
   await page.goto("/videos");
   await showOnly(page, "Uploads");

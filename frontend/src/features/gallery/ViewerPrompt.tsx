@@ -119,8 +119,8 @@ export function ViewerPrompt({
   const base = queried ? queried.prompt : undefined;
   const pick = (request: string) => state.pick("recreate", request, undefined, true);
   const suggestions = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId ?? "", base, item.id),
-    fresh: () => askNextSteps(item.jobId!, true, base, item.id),
+    query: nextStepsQuery(item, base),
+    fresh: () => askNextSteps(item, true, base),
     enabled: ask.available && Boolean(queried),
     disabled: ask.pending || !queried,
     onPick: pick,

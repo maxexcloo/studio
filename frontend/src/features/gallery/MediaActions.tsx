@@ -285,7 +285,7 @@ export function useMediaActions(
   const recreate = useRecreateAction(item, onApplied);
   const changedPrompt = draft?.changedPrompt;
   const variationPrompt = changedPrompt ?? (typedPrompt(item) || item.prompt || "");
-  // An upload has only its recorded or suggested prompt to recreate.
+  // An upload recreates on the composer's model from its prompt, suggested prompt or caption.
   const recreateAction = item.uploaded
     ? recreate
     : {
@@ -421,8 +421,8 @@ export function useMediaActions(
   // Load the image's saved motions when its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
   const motions = useChangeSuggestions({
-    query: motionIdeasQuery(item.jobId ?? "", item.id),
-    fresh: () => askMotionIdeas(item.jobId!, true, item.id),
+    query: motionIdeasQuery(item),
+    fresh: () => askMotionIdeas(item, true),
     enabled: motionsFor === item.id,
     disabled: animateDisabled,
     onPick: (instruction) =>
@@ -430,7 +430,7 @@ export function useMediaActions(
         ? onAnimate({ theme: "custom", instruction, profileId: animationProfileId })
         : run({ kind: "animate", theme: "custom", instruction, profileId: animationProfileId }),
   });
-  const motionsOffered = image && Boolean(item.jobId && assisted);
+  const motionsOffered = image && assisted;
   // Templates write the prompt into an editable review before anything queues.
   const reviewItems = assisted
     ? [
@@ -469,8 +469,7 @@ export function useMediaActions(
     return draft ? draft.custom(mode, profileId) : openViewer(mode, { custom: true }, profileId);
   };
   const [reviewChanges, setReviewChanges] = useMediaReview();
-  const canChange = ready && !item.uploaded && Boolean(item.jobId);
-  const assistedChanges = canChange && assisted;
+  const assistedChanges = ready && assisted;
   // Capture a viewer's draft only when its menu opens, so typing doesn't ask for new suggestions.
   const [suggestions, setSuggestions] = useState<{
     id: string;
@@ -479,8 +478,8 @@ export function useMediaActions(
   }>();
   const suggestionPrompt = suggestions?.id === item.id ? suggestions.prompt : undefined;
   const steps = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId ?? "", suggestionPrompt, item.id),
-    fresh: () => askNextSteps(item.jobId!, true, suggestionPrompt, item.id),
+    query: nextStepsQuery(item, suggestionPrompt),
+    fresh: () => askNextSteps(item, true, suggestionPrompt),
     enabled: assistedChanges && suggestions?.id === item.id,
     disabled: draft?.pending,
     onPick: (request) => {
@@ -609,7 +608,7 @@ export function useMediaActions(
     ready &&
       itemAction("edit", {
         loading: videoEdit.isPending,
-        onOpen: image && canChange ? openChanges("edit") : undefined,
+        onOpen: image ? openChanges("edit") : undefined,
         menu: image
           ? changeMenu(
               "edit",
@@ -646,7 +645,7 @@ export function useMediaActions(
       onClick: ready
         ? undefined
         : () => action.mutate({ operation: "image", prompt: changedPrompt }),
-      onOpen: canChange ? openChanges("recreate") : undefined,
+      onOpen: ready && !item.uploaded ? openChanges("recreate") : undefined,
       menu: !ready
         ? undefined
         : item.uploaded
@@ -703,8 +702,6 @@ export function useMediaActions(
         onClick: rating.dislike,
       }),
     ready &&
-      !item.uploaded &&
-      item.jobId &&
       assisted &&
       itemAction("report", {
         loading: report.isPending,
