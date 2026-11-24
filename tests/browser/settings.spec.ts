@@ -345,7 +345,9 @@ test("Where Work Runs saves Studio's Video Length and Dream's side for everyone"
     ]);
   // A person's own Settings no longer offer any of these.
   await signIn(page, { id: "member", role: "user" });
+  // Only the hash changes, so reload to read the new account.
   await page.goto("/settings#preferences");
+  await page.reload();
   await expect(page.getByRole("link", { name: "Where Work Runs" })).toHaveCount(0);
 });
 
@@ -962,6 +964,7 @@ test("Settings › Studio switches follow at once and settle back after a failed
           profiles: [],
         },
         dream: dreamPolicyFixture(),
+        work: {},
         catalogue: [
           {
             key: "STUDIO_GALLERY_CAPTIONS",
