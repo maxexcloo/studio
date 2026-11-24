@@ -1,6 +1,7 @@
 import { letter } from "../../../../shared/compare.ts";
+import type { Resolution } from "../../../../shared/resolution.ts";
 import type { GenerationInput } from "../../types";
-import type { Variant } from "../generation/GenerationProvider";
+import type { Draft, Variant } from "../generation/GenerationProvider";
 
 /** Compares candidates one at a time, keeping the rest of the stack and optionally its baseline. */
 export function loraInputs(
@@ -45,14 +46,15 @@ export const strengthInputs = (input: GenerationInput, name: string, strengths: 
       : input.loras.filter((lora) => lora.name !== name),
   }));
 
-const randomSeed = () => String(Math.floor(Math.random() * 2 ** 32));
+export const randomSeed = () => String(Math.floor(Math.random() * 2 ** 32));
 
-/** `input` with `count` seeds: its own where it has one, then random ones. */
-export function seedInputs(input: GenerationInput, count: number) {
-  const own = String(input.seed);
-  const seeds = [/^\d+$/.test(own) ? own : randomSeed()];
-  while (seeds.length < count) seeds.push(randomSeed());
-  return seeds.map((seed) => ({ ...input, seed }));
+export const ownSeed = (seed: unknown) => (/^\d+$/.test(String(seed)) ? String(seed) : "");
+
+/** `seeds` grown with random ones or cut to `count`. */
+export function moreSeeds(seeds: string[], count: number) {
+  const next = seeds.slice(0, count);
+  while (next.length < count) next.push(randomSeed());
+  return next;
 }
 
 export const promptLines = (prompt: string) =>
@@ -65,11 +67,79 @@ export const promptLines = (prompt: string) =>
 export const promptInputs = (input: GenerationInput) =>
   promptLines(input.prompt).map((prompt) => ({ ...input, prompt }));
 
+/**
+ * Each variant `draft` compares as it runs, all on the draft's settings but what is compared; just
+ * the draft outside a comparison. `model` moves an input to a profile, if it is still offered.
+ */
+export function draftVariants(
+  { input, references, compare }: Pick<Draft, "input" | "references" | "compare">,
+  model: (input: GenerationInput, profileId: string) => GenerationInput | undefined,
+): Variant[] {
+  const each = (inputs: GenerationInput[]) => inputs.map((one) => ({ input: one, references }));
+  if (!compare) return [{ input, references }];
+  switch (compare.axis) {
+    case "Seed":
+      return each([input.seed, ...compare.seeds].map((seed) => ({ ...input, seed })));
+    case "Prompt":
+      return each(promptInputs(input));
+    case "Model":
+      return each([
+        input,
+        ...compare.profileIds.flatMap((profileId) => model(input, profileId) ?? []),
+      ]);
+    case "LoRA":
+      return each(loraInputs(input, compare.loras, compare.without));
+    case "LoRA Strength":
+      return each(compare.lora ? strengthInputs(input, compare.lora, compare.strengths) : [input]);
+    case "Resolution":
+      return each(
+        compare.sizes.map((size) =>
+          compare.native
+            ? { ...input, resolution: size }
+            : { ...input, resolutionTier: size as Resolution },
+        ),
+      );
+    default:
+      return compare.variants.map(({ changes, references: own, label }) => ({
+        input: { ...input, ...changes },
+        references: own ?? references,
+        ...(label && { label }),
+      }));
+  }
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const referenceIds = ({ references }: Variant) => references.map((reference) => reference.id);
+
+/**
+ * `draft` comparing `variants` as they are: the first becomes the draft, and each other keeps only
+ * the settings that set the variants apart, so the rest follows the draft. One variant ends it.
+ */
+export function setVariants<T extends Draft>(draft: T, variants: Variant[]): T {
+  const [first] = variants;
+  const base = { ...draft, input: first.input, references: first.references };
+  if (variants.length < 2) return { ...base, compare: undefined };
+  const keys = [...new Set(variants.flatMap(({ input }) => Object.keys(input)))].filter((key) =>
+    variants.some(({ input }) => !same(input[key], first.input[key])),
+  );
+  const ownReferences = variants.some(
+    (variant) => !same(referenceIds(variant), referenceIds(first)),
+  );
+  return {
+    ...base,
+    compare: {
+      variants: variants.map(({ input, references, label }, index) => ({
+        changes: index ? Object.fromEntries(keys.map((key) => [key, input[key]])) : {},
+        ...(index && ownReferences ? { references } : {}),
+        ...(label && { label }),
+      })),
+    },
+  };
+}
+
 /** Each variant's seed as it runs: its own, else the first variant's that has one, else random (""). */
 export function runSeeds(variants: Variant[]) {
-  const own = variants.map(({ input }) =>
-    /^\d+$/.test(String(input.seed)) ? String(input.seed) : "",
-  );
+  const own = variants.map(({ input }) => ownSeed(input.seed));
   const shared = own.find(Boolean) ?? "";
   return own.map((seed) => seed || shared);
 }
@@ -106,7 +176,7 @@ export function variantLabels(
         ({ input }) =>
           typeof input.resolution === "string" && input.resolution
             ? input.resolution.toUpperCase()
-            : `${input.width}×${input.height}`,
+            : input.resolutionTier || `${input.width}×${input.height}`,
       ];
   const facets: Facet[] = [
     profile,

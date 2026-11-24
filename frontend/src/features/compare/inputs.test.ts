@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { GenerationInput } from "../../types";
-import { loraInputs, promptInputs, seedInputs, strengthInputs, variantLabels } from "./inputs.ts";
+import type { Draft } from "../generation/GenerationProvider";
+import { draftVariants, loraInputs, setVariants, strengthInputs, variantLabels } from "./inputs.ts";
 
 const input: GenerationInput = {
   kind: "image",
@@ -67,16 +68,55 @@ test("strength comparisons can choose an unpicked LoRA and keep another LoRA's t
   for (const variant of variants) assert.deepEqual({ ...variant, loras: input.loras }, input);
 });
 
-test("seed and prompt comparisons preserve every setting outside their selected axis", () => {
-  const seeds = seedInputs(input, 3);
-  assert.equal(seeds[0].seed, input.seed);
-  for (const variant of seeds) assert.deepEqual({ ...variant, seed: input.seed }, input);
-  const prompts = promptInputs({ ...input, prompt: "A fox\n\nA bird" });
+test("every variant runs on the draft's settings, changing only what is compared", () => {
+  const model = (from: GenerationInput, profileId: string) => ({ ...from, profileId, steps: 4 });
+  const draft = (changed: Partial<GenerationInput>, compare: object) => ({
+    input: { ...input, ...changed },
+    references: [],
+    compare: compare as never,
+  });
+  const wide = { width: 1216, height: 832 };
+  const seeds = draftVariants(draft(wide, { axis: "Seed", seeds: ["8", "9"] }), model);
   assert.deepEqual(
-    prompts.map((variant) => variant.prompt),
+    seeds.map((variant) => variant.input.seed),
+    ["725", "8", "9"],
+  );
+  for (const variant of seeds)
+    assert.deepEqual({ ...variant.input, seed: input.seed }, { ...input, ...wide });
+  const prompts = draftVariants(draft({ prompt: "A fox\n\nA bird" }, { axis: "Prompt" }), model);
+  assert.deepEqual(
+    prompts.map((variant) => variant.input.prompt),
     ["A fox", "A bird"],
   );
-  for (const variant of prompts) assert.deepEqual({ ...variant, prompt: input.prompt }, input);
+  for (const variant of prompts)
+    assert.deepEqual({ ...variant.input, prompt: input.prompt }, input);
+  const models = draftVariants(draft(wide, { axis: "Model", profileIds: ["other"] }), model);
+  assert.deepEqual(
+    models.map((variant) => [variant.input.profileId, variant.input.width, variant.input.prompt]),
+    [
+      ["custom:exact", 1216, "A fox"],
+      ["other", 1216, "A fox"],
+    ],
+  );
+});
+
+test("set variants keep only what sets them apart, so later edits reach every one", () => {
+  const base: Draft = { input, references: [], sessionId: "", operation: "image" };
+  const set = setVariants(base, [
+    { input, references: [] },
+    { input: { ...input, seed: "9", prompt: "A bird" }, references: [] },
+  ]);
+  const edited = { ...set, input: { ...set.input, width: 640, steps: 30 } };
+  const variants = draftVariants(edited, () => undefined);
+  assert.deepEqual(
+    variants.map((variant) => [variant.input.seed, variant.input.prompt, variant.input.width]),
+    [
+      ["725", "A fox", 640],
+      ["9", "A bird", 640],
+    ],
+  );
+  assert.ok(variants.every((variant) => variant.input.steps === 30));
+  assert.equal(setVariants(base, [{ input, references: [] }]).compare, undefined);
 });
 
 test("variant labels show provider resolution enums and native pixel sizes that differ", () => {

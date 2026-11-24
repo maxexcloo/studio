@@ -91,6 +91,14 @@ export function ComparePage() {
       ),
   });
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
+  const pickProps = (item: MediaItem, label: string, won: boolean) => ({
+    className: classes.winner,
+    variant: won ? "filled" : "default",
+    "aria-label": won ? `Clear Winner ${label}` : `Pick ${label} as Winner`,
+    "aria-pressed": won,
+    loading: choose.isPending && choose.variables?.id === item.id,
+    onClick: () => choose.mutate(item),
+  });
   const compareAgain = useMutation({ mutationFn: () => stage.again(again) });
   // 1–9 pick that variant as the winner and 0 the tenth (again to clear it), unless typing or a
   // layer is above.
@@ -233,11 +241,10 @@ export function ComparePage() {
               gap={6}
               className={classes.variant}
               data-winner={won || undefined}
-              // Scroll fits each variant to the view by its own shape.
               style={
-                item?.width && item.height
-                  ? ({ "--compare-aspect": item.width / item.height } as CSSProperties)
-                  : undefined
+                {
+                  "--variant-aspect": item?.width && item.height ? item.width / item.height : 1,
+                } as CSSProperties
               }
             >
               <Text size="sm" fw={600} truncate title={label}>
@@ -250,7 +257,6 @@ export function ComparePage() {
                   caption="none"
                   label={`Open ${label}`}
                   className={classes.tile}
-                  style={{ aspectRatio: `${item.width || 1} / ${item.height || 1}` }}
                   onOpen={() => item.status === "done" && setOpen(item)}
                   onTryAgain={(failed) => tryAgain([failed.jobId || ""]).then(() => undefined)}
                   actions={
@@ -258,17 +264,22 @@ export function ComparePage() {
                     item.status === "done" &&
                     !dream && (
                       <Tooltip label={won ? "Clear Winner" : "Pick as Winner"}>
-                        <ActionIcon
-                          className={classes.winner}
-                          variant={won ? "filled" : "default"}
-                          size="lg"
-                          aria-label={won ? `Clear Winner ${label}` : `Pick ${label} as Winner`}
-                          aria-pressed={won}
-                          loading={choose.isPending && choose.variables?.id === item.id}
-                          onClick={() => choose.mutate(item)}
-                        >
-                          <icons.winner size={18} fill={won ? "currentColor" : "none"} />
-                        </ActionIcon>
+                        {phone ? (
+                          <ActionIcon {...pickProps(item, label, won)} size="lg">
+                            <icons.winner size={18} fill={won ? "currentColor" : "none"} />
+                          </ActionIcon>
+                        ) : (
+                          <Button
+                            {...pickProps(item, label, won)}
+                            size="compact-sm"
+                            radius="xl"
+                            leftSection={
+                              <icons.winner size={16} fill={won ? "currentColor" : "none"} />
+                            }
+                          >
+                            Pick
+                          </Button>
+                        )}
                       </Tooltip>
                     )
                   }
@@ -327,6 +338,7 @@ function SplitVariants({ images }: { images: SplitImage[] }) {
     <Stack
       gap="xs"
       className={classes.splitColumn}
+      data-choosing={images.length > 2 || undefined}
       style={{ "--split-aspect": (second.width || 1) / (second.height || 1) } as CSSProperties}
     >
       {images.length > 2 && (

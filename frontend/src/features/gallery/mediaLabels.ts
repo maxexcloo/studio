@@ -1,18 +1,24 @@
+import { comparisonSetTitle } from "../../../../shared/compare";
 import { promptWords } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
 import { dateFormat } from "../../ui/dates";
 import { isProfile, profileName, shownProfileName } from "../generation/payload";
 
+/** The label of the compare variant an item is ("Seed 583061750"), which names what sets it apart. */
+export const comparisonVariant = ({ resultSet }: Pick<MediaItem, "resultSet">) =>
+  resultSet?.title === comparisonSetTitle ? resultSet.variation : undefined;
+
 /**
  * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the title
  * a chat gave it in its result set, else the text model's, else the prompt's first clause until
- * that is written; an upload without one shows its file name.
+ * that is written; an upload without one shows its file name. A compare variant's label is not a
+ * title (`comparisonVariant`).
  */
 export function mediaTitle(
   item: Pick<MediaItem, "prompt" | "title" | "resultSet" | "uploaded" | "filename">,
 ) {
   return (
-    item.resultSet?.variation ||
+    (comparisonVariant(item) ? undefined : item.resultSet?.variation) ||
     item.title ||
     promptWords(item.prompt) ||
     (item.uploaded ? item.filename || "Upload" : "Untitled Generation")

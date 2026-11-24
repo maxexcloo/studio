@@ -1,6 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import { type ComparisonRating, compareVariants, letter } from "../../shared/compare.ts";
+import {
+  type ComparisonRating,
+  compareVariants,
+  comparisonSetTitle,
+  letter,
+} from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import { storedChatRecord } from "../gallery/records.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
@@ -58,7 +63,7 @@ interface Router {
 /** The result set a compare run's variant `index` belongs to, named by its label. */
 const comparisonSet = (id: string, index: number, label: string) => ({
   id,
-  title: "Comparison",
+  title: comparisonSetTitle,
   index,
   variation: label,
 });

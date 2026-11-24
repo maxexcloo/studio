@@ -1,4 +1,4 @@
-import { Drawer, type DrawerProps, FocusTrap, Group, VisuallyHidden } from "@mantine/core";
+import { Drawer, type DrawerProps, FocusTrap, VisuallyHidden } from "@mantine/core";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { fullScreenRise, motionTransition } from "../theme";
@@ -28,7 +28,6 @@ type SheetProps = Pick<
 > & {
   id?: string;
   title: string;
-  titleAction?: ReactNode;
   hidden?: boolean;
   fieldTitles?: Record<string, string>;
   children: (typing: SheetTyping) => ReactNode;
@@ -44,7 +43,6 @@ const sheetField = (panel: HTMLElement, target: unknown) =>
 export function TextEntrySheet({
   id,
   title,
-  titleAction,
   hidden,
   fieldTitles,
   onClose,
@@ -108,19 +106,16 @@ export function TextEntrySheet({
       <Drawer.Overlay />
       <Drawer.Content {...swipe}>
         <Drawer.Header>
-          <Group wrap="nowrap" gap="xs" miw={0}>
-            <Drawer.Title>
-              {fieldTitle ? (
-                <>
-                  <VisuallyHidden>{title}</VisuallyHidden>
-                  <span aria-hidden>{fieldTitle}</span>
-                </>
-              ) : (
-                title
-              )}
-            </Drawer.Title>
-            {!fieldTitle && titleAction}
-          </Group>
+          <Drawer.Title>
+            {fieldTitle ? (
+              <>
+                <VisuallyHidden>{title}</VisuallyHidden>
+                <span aria-hidden>{fieldTitle}</span>
+              </>
+            ) : (
+              title
+            )}
+          </Drawer.Title>
           <Drawer.CloseButton aria-label={`Close ${fieldTitle || title}`} />
         </Drawer.Header>
         <Drawer.Body>
