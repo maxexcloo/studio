@@ -1015,25 +1015,23 @@ function Gallery() {
               : []),
           ]}
           toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
-          actions={
-            <>
-              <GalleryImport upload={upload} />
-              {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
-              <Tooltip label="Select Items" disabled={!phone}>
-                <Button
-                  {...(phone ? iconChipProps : chipProps)}
-                  ref={selectionButton}
-                  aria-label="Select Items"
-                  aria-pressed={selection.selecting}
-                  leftSection={phone ? undefined : <icons.select size={15} />}
-                  disabled={!loaded.length && !selection.selecting}
-                  onClick={selection.selecting ? doneSelecting : selection.start}
-                >
-                  {phone ? <icons.select size={16} /> : "Select"}
-                </Button>
-              </Tooltip>
-            </>
+          select={
+            // Select stays in place, pressed while selecting; pressing it again ends selection.
+            <Tooltip label="Select Items" disabled={!phone}>
+              <Button
+                {...(phone ? iconChipProps : chipProps)}
+                ref={selectionButton}
+                aria-label="Select Items"
+                aria-pressed={selection.selecting}
+                leftSection={phone ? undefined : <icons.select size={15} />}
+                disabled={!loaded.length && !selection.selecting}
+                onClick={selection.selecting ? doneSelecting : selection.start}
+              >
+                {phone ? <icons.select size={16} /> : "Select"}
+              </Button>
+            </Tooltip>
           }
+          actions={<GalleryImport upload={upload} />}
         />
         {selectionBar}
       </div>
