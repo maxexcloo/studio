@@ -417,7 +417,7 @@ export function useMediaActions(
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
     label: `${template.label}${template.id === "custom" ? "…" : ""}`,
-    description: template.description,
+    description: template.id === "custom" ? undefined : template.description,
     icon: template.id === "custom" ? icons.custom : undefined,
     marker: template.uncensored ? icons.uncensored : undefined,
     disabled: animateDisabled,

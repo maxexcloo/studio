@@ -430,7 +430,6 @@ export function useAnimateModifiers() {
     settingsAction: (): Action => ({
       id: "animate-modifiers",
       label: "Modifiers",
-      icon: icons.settings,
       menu: [
         options.map((item) => ({
           id: `modifier:${item.id}`,
