@@ -346,7 +346,7 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
     "Custom…",
     "Refresh",
     "Write Negative",
-    "Recent Prompts",
+    "Recent",
   ]);
   await expandAssistantMenu(menu, "Templates");
   const templates = menu.getByRole("group", { name: "Templates", exact: true });
@@ -462,8 +462,8 @@ test("Prompt history reuses positive and negative prompts independently and pers
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
   await negative.fill("Keep these exclusions");
-  await promptTool(page, "Prompt", "Recent Prompts");
-  let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
+  await promptTool(page, "Prompt", "Recent");
+  let panel = page.getByRole("dialog", { name: "Recent", exact: true });
   const like = panel.getByRole("button", { name: "Like Prompt", exact: true });
   await like.click();
   await expect(like).toHaveAttribute("aria-pressed", "true");
@@ -473,8 +473,8 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await historySearch.press("Enter");
   await expect(prompt).toHaveValue("Earlier landscape");
   await expect(negative).toHaveValue("Keep these exclusions");
-  await promptTool(page, "Negative Prompt", "Recent Negative Prompts");
-  panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
+  await promptTool(page, "Negative Prompt", "Recent");
+  panel = page.getByRole("dialog", { name: "Recent", exact: true });
   await panel.getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
   await expect(negative).toHaveValue("Earlier exclusions");
   await expect(prompt).toHaveValue("Earlier landscape");
@@ -511,8 +511,8 @@ test("Recent Prompts likes and switches at once, and a refused change is undone"
     return route.fulfill({ json: history });
   });
   await create(page);
-  await promptTool(page, "Prompt", "Recent Prompts");
-  const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
+  await promptTool(page, "Prompt", "Recent");
+  const panel = page.getByRole("dialog", { name: "Recent", exact: true });
   // The like shows while the server is still answering.
   const like = panel.getByRole("button", { name: "Like Prompt", exact: true });
   await like.click();

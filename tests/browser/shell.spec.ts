@@ -131,8 +131,8 @@ test("Popups anchored to the composer stay put while the gallery scrolls", async
     }),
   );
   await create(page);
-  await promptTool(page, "Prompt", "Recent Prompts");
-  const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
+  await promptTool(page, "Prompt", "Recent");
+  const panel = page.getByRole("dialog", { name: "Recent", exact: true });
   await expect(panel.getByText("Earlier landscape")).toBeVisible();
   // Once its scale-in has finished; measured in one task, before any scroll handler could move it back.
   const moved = await panel.evaluate(async (element) => {
