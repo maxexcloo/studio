@@ -1107,8 +1107,9 @@ const dream = createDream({
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
     return dreamVideoProfile(dreamCatalogue(models).profiles, {
       ...choice,
-      preferred: kindDefaults(accountPreferences(ownerId), "videos"),
-      defaultId: models.defaults?.videoModel,
+      defaultId:
+        kindDefaults(accountPreferences(ownerId), "videos")[choice.backend] ||
+        models.defaults?.videoModel,
       localRunning: models.backends?.video?.available !== false,
       localParked: models.backends?.video?.parked === true,
     });
