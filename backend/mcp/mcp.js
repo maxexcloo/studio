@@ -119,6 +119,8 @@ export function registerMcpRoutes(
     domainRequest,
     // Failed cloud video jobs updated since a time, as { reason, at }, so a provider refusal pauses cloud video.
     cloudVideoFailures,
+    // Whether cloud work holds back near its usage limit, so a cloud default runs locally.
+    cloudHeld,
     gatewayAdminTools = () => false,
   } = {},
 ) {
@@ -159,6 +161,7 @@ export function registerMcpRoutes(
     resolveSignedResult,
     domainRequest,
     cloudVideoFailures,
+    cloudHeld,
   });
 
   // The prompt assistant's tools need its Bifrost gateway; what the chat wrote is remembered for the results' records.

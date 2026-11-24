@@ -61,6 +61,8 @@ export interface ServicesStatus {
   services: Partial<Record<ServiceKind, ServiceStatus>>;
   /** Each configured cloud provider account's usage. */
   cloud?: CloudUsage[];
+  /** Every cloud account is near its limit, so Dream and chats run new work locally. */
+  cloudHeld?: true;
   /** Each media worker, for administrators only. */
   workers?: WorkerStatus[];
   runtime: {

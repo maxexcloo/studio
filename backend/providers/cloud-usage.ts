@@ -106,6 +106,17 @@ export function createCloudUsage({
   };
 }
 
+/**
+ * Whether new cloud work runs locally instead: every account has used at least
+ * STUDIO_CLOUD_USAGE_LIMIT percent (80 unless set) of its window. Unknown usage never holds back.
+ */
+export function cloudHeld(usage: CloudUsage[] | undefined, environment = process.env) {
+  const limit = Number(environment.STUDIO_CLOUD_USAGE_LIMIT || 80);
+  return Boolean(
+    usage?.length && usage.every((account) => account.used !== undefined && account.used >= limit),
+  );
+}
+
 export function configuredCloudUsage(environment = process.env) {
   const base = environment.STUDIO_CLIPROXYAPI_URL;
   if (!base) return;
