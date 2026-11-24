@@ -673,7 +673,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect.poll(() => dream.settings.useLoadedProfile).toBe(false);
   const imagesGroup = settings.getByRole("region", { name: "Images", exact: true });
   const videosGroup = settings.getByRole("region", { name: "Videos", exact: true });
-  const videos = videosGroup.getByRole("switch", { name: "Generate Videos", exact: true });
+  const videos = videosGroup.getByRole("switch", { name: "Enabled", exact: true });
   const videoAmount = videosGroup.getByRole("textbox", { name: "Daily Videos", exact: true });
   await expect(videoAmount).toBeEnabled();
   await videos.click({ force: true });
@@ -694,7 +694,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
       { dailyImages: 200 },
     ]);
   await imagesGroup
-    .getByRole("switch", { name: "Generate Images", exact: true })
+    .getByRole("switch", { name: "Enabled", exact: true })
     .click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
