@@ -430,23 +430,12 @@ function fixture(t: TestContext, catalogue = profiles) {
   };
 }
 
-test("Dream is off until turned on, queues one hidden job per account only while Studio is idle and waits below other work", async (t) => {
+test("Dream waits paused until resumed, queues one hidden job per account only while Studio is idle and waits below other work", async (t) => {
   const { dream, store, admission, dreamJobs, live } = fixture(t);
-  assert.deepEqual(dream.read("alice").settings, {
-    enabled: false,
-    paused: false,
-    dailyImages: 40,
-    dailyVideos: 4,
-    images: true,
-    videos: false,
-    uncensored: false,
-    useLoadedProfile: dreamDefaults.useLoadedProfile,
-    imageBackend: "local",
-    videoBackend: "local",
-  });
+  assert.deepEqual(dream.read("alice").settings, dreamDefaults);
   await dream.tick();
   assert.equal(dreamJobs().length, 0);
-  assert.equal(dream.status("alice").status, "off");
+  assert.equal(dream.status("alice").status, "paused");
   assert.equal(dream.started, false);
 
   await dream.save("alice", { enabled: true });
@@ -705,7 +694,7 @@ test("A verdict that leaves the deck low starts Dream's next work without waitin
 
 test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or liked images", async (t) => {
   const { dream, state, dreamOnce, live } = fixture(t);
-  await dream.save("alice", { enabled: true, dailyImages: 3 });
+  await dream.save("alice", { enabled: true, dailyImages: 3, videos: false });
   assert.ok(await dreamOnce());
   assert.ok(await dreamOnce());
   assert.ok(await dreamOnce());
@@ -1202,7 +1191,7 @@ test("Dream rotates a liked Gallery image through size, model and LoRA recreatio
       store.save({ ...image, status: "completed" });
     }
   };
-  await dream.save("alice", { enabled: true, dailyImages: 40 });
+  await dream.save("alice", { enabled: true, dailyImages: 40, videos: false });
   nineImages();
   const rendered = await dreamOnce();
   assert.equal(rendered?.dream?.arm, "recreate");
@@ -1340,7 +1329,8 @@ test("More Like This follows what a result without a prompt shows", async (t) =>
 
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
   const { dream, state, dreamJobs } = fixture(t);
-  await dream.save("alice", { enabled: true });
+  await dream.save("alice", { enabled: true, videos: false });
+  await dream.save("bob", { enabled: false });
   const alice = state.access.alice;
   state.access.alice = null;
   await dream.tick();
@@ -2183,6 +2173,7 @@ test("Dream counts match the deck while off, paired, and after a verdict or Undo
   const request = await serve(t, fx);
   const count = async () => (await request("/count")).body;
   const deck = async () => (await request("")).body;
+  assert.equal((await request("/settings", { enabled: false }, "PUT")).status, 200);
   const off = await deck();
   assert.equal(off.settings.enabled, false);
   assert.equal(off.unseen.length, 2);
@@ -3552,13 +3543,14 @@ test("A failed Dream video sets its profile aside rather than sending the next o
 
 test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {
   const { dream, projects, inbox, notes, state, dataDir, dreamOnce } = fixture(t);
-  await dream.save("alice", { uncensored: true, dailyImages: 12 });
+  await dream.save("alice", { uncensored: true, dailyImages: 12, paused: false, videos: false });
   state.overrides = { enabled: true, uncensored: false };
   assert.deepEqual(dream.locked(), ["enabled", "uncensored"]);
   assert.deepEqual(dream.read("alice").settings, {
     ...dreamDefaults,
-    enabled: true,
     dailyImages: 12,
+    paused: false,
+    videos: false,
   });
   const forced = await dreamOnce();
   assert.equal(forced?.dream?.uncensored, undefined);
@@ -3568,11 +3560,11 @@ test("administrator overrides win over account choices, which they leave saved, 
   await dream.save("alice", { enabled: true, dailyImages: 18 });
   assert.deepEqual(
     (readRuntimeDocument(dataDir, "dream:alice") as { settings: Partial<DreamSettings> }).settings,
-    { uncensored: true, dailyImages: 18, enabled: true, paused: false },
+    { uncensored: true, dailyImages: 18, enabled: true, paused: false, videos: false },
   );
   state.overrides = {};
   assert.equal(dream.read("alice").settings.uncensored, true);
-  assert.equal(dream.read("bob").settings.enabled, false);
+  assert.deepEqual(dream.read("bob").settings, dreamDefaults);
 
   state.overrides = { imageBackend: "cloud" };
   const request = await serve(t, { dream, projects, inbox, notes });
@@ -3650,7 +3642,7 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   const fx = fixture(t, [...profiles, cloud]);
   // Favourite models that run only locally give way on Cloud, and its note says so.
   fx.taste.edit("alice", { models: ["flux"] });
-  await fx.dream.save("alice", { enabled: true, imageBackend: "cloud" });
+  await fx.dream.save("alice", { enabled: true, imageBackend: "cloud", videos: false });
   fx.state.online.image = "parked";
   const job = await fx.dreamOnce();
   assert.equal(job?.input.profileId, cloud.id);
@@ -3661,7 +3653,7 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   assert.match(fx.dream.status("alice").reason!, /stopped/);
 
   const denied = fixture(t);
-  await denied.dream.save("alice", { enabled: true, imageBackend: "cloud" });
+  await denied.dream.save("alice", { enabled: true, imageBackend: "cloud", videos: false });
   assert.equal(await denied.dreamOnce(), undefined);
   assert.match(
     denied.dream.status("alice").reason!,
@@ -3710,7 +3702,7 @@ test("More Like This waits for its exact source profile when the Dream backend c
     ...profiles,
     { id: "custom:cloud-image", provider: "cliproxyapi", kind: "image" },
   ]);
-  await fx.dream.save("alice", { enabled: true });
+  await fx.dream.save("alice", { enabled: true, videos: false });
   const source = (await fx.dreamOnce())!;
   fx.dream.more("alice", `${source.id}-0`);
   await fx.dream.save("alice", { imageBackend: "cloud" });

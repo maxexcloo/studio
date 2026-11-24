@@ -110,7 +110,7 @@ export const setAnswerPath = (setId: string) =>
 
 /**
  * When Dream works, or why it doesn't, and how much of today's share it has made: one line each,
- * such as "Dream works when the queue is free" and "12 of 40 today".
+ * such as "Dream works when the queue is free" and "12 of 100 today".
  */
 const dailyShare = (today: number, used: number, limit: number, kind: "images" | "videos") =>
   used === today

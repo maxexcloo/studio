@@ -168,7 +168,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_DEFAULT_TEXT_PROFILE`         | Text model for prompt writing and other text work                                           | the gateway's default                        | Studio                 |
 | `STUDIO_DEFAULT_VIDEO_PROFILE`        | Profile ID new video drafts start on                                                        | the first ready profile                      | Studio                 |
 | `STUDIO_DREAM_IMAGE_IDLE_MINUTES`     | Minutes after an account's latest generation request before Dream makes its images          | `0`                                          | Dream (Administration) |
-| `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `2`                                          | Dream (Administration) |
+| `STUDIO_DREAM_IMAGE_SWITCH_MINUTES`   | Minutes the shared queue must be idle before Dream changes local image models or LoRAs      | `5`                                          | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_ENABLED`       | Dream on or off for every account                                                           | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND` | `local` or `cloud` for every account's Dream images                                         | each account's choice                        | Dream (Administration) |
 | `STUDIO_DREAM_OVERRIDE_UNCENSORED`    | Uncensored on or off for every account                                                      | each account's choice                        | Dream (Administration) |
