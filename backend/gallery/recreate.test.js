@@ -97,14 +97,24 @@ test("Recreate works from what an item without a prompt shows, captioning it onl
     ...extra,
   });
   setGallery([
-    item("captioned", { uploaded: true, caption: { text: "Fishing boats in pale fog." } }),
+    item("captioned", {
+      uploaded: true,
+      prompt: "  ",
+      suggestedPrompt: "  ",
+      caption: { text: "Fishing boats in pale fog." },
+    }),
     item("bare", { uploaded: true }),
     item("unread"),
   ]);
   described.length = 0;
-  const captioned = (await call("alice", { galleryItemId: "captioned" })).body;
+  const captioned = (await call("alice", { galleryItemId: "captioned", savedPromptOnly: true }))
+    .body;
   assert.equal(captioned.prompt, "Fishing boats in pale fog.");
   assert.equal(store.job("alice", captioned.jobId).input.prompt, "Fishing boats in pale fog.");
+  assert.deepEqual(described, []);
+  const savedOnly = await call("alice", { galleryItemId: "bare", savedPromptOnly: true });
+  assert.equal(savedOnly.code, 409);
+  assert.equal(savedOnly.body.reason, "no-saved-prompt");
   assert.deepEqual(described, []);
   // Bob can't have Alice's image described.
   assert.equal((await call("bob", { galleryItemId: "bare" })).code, 404);

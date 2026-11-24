@@ -70,7 +70,7 @@ test("Import uploads many files or a folder, lists each failure and shows the ne
   fs.rmSync(folder, { recursive: true, force: true });
 });
 
-test("Recreate › Run Suggested Prompts on several uploads queues each suggested prompt as its version and counts the rest", async ({
+test("Recreate › Run Suggested Prompts on several uploads uses saved prompts and captions for versions and counts the rest", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -90,14 +90,22 @@ test("Recreate › Run Suggested Prompts on several uploads queues each suggeste
   });
   state.gallery.push(
     upload("a", "A red barn at noon"),
-    upload("b", "A lighthouse at dusk"),
+    { ...upload("b", " "), caption: { text: "A lighthouse at dusk" } },
     upload("c"),
   );
   const recreated: string[] = [];
   await page.route("**/api/gallery/recreate", (route) => {
-    const id = route.request().postDataJSON().galleryItemId;
+    const { galleryItemId: id, savedPromptOnly } = route.request().postDataJSON();
+    expect(savedPromptOnly).toBe(true);
     recreated.push(id);
-    return route.fulfill({ json: { ok: true, sessionId: `session-${id}`, jobId: `job-${id}` } });
+    return route.fulfill({
+      json: {
+        ok: true,
+        sessionId: `session-${id}`,
+        jobId: `job-${id}`,
+        prompt: id === "a" ? "A red barn at noon" : "A lighthouse at dusk",
+      },
+    });
   });
   const queued: { path: string; body: Record<string, unknown> }[] = [];
   page.on("request", (request) => {
@@ -112,7 +120,9 @@ test("Recreate › Run Suggested Prompts on several uploads queues each suggeste
     await page.getByRole("button", { name: `Select image: Upload ${id}`, exact: true }).click();
   await (await selectionMenuItem(page, "Recreate", "Run Suggested Prompts")).click();
   await expect(
-    page.getByText("Queued 2 recreations. 1 upload has no suggested prompt yet.", { exact: true }),
+    page.getByText("Queued 2 recreations. 1 upload has no saved prompt or caption yet.", {
+      exact: true,
+    }),
   ).toBeVisible();
   expect(recreated).toEqual(["a", "b"]);
   expect(

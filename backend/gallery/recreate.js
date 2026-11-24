@@ -1,3 +1,4 @@
+import { recreationPrompt } from "../../shared/media.ts";
 import { recordsForRequest } from "../account-ownership.js";
 import { requireLocal } from "../route-access.js";
 import { galleryItem } from "./store.js";
@@ -18,12 +19,19 @@ export function registerRecreateRoute(app, { store, describe }) {
     ).find((entry) => entry.status === "done" && entry.url);
     if (!item)
       return res.status(404).json({ ok: false, error: "That item is no longer in the gallery." });
-    let prompt;
-    try {
-      prompt = item.prompt || item.suggestedPrompt || item.caption?.text || (await describe(item));
-    } catch (error) {
-      return res.status(503).json({ ok: false, error: error.message });
-    }
+    let prompt = recreationPrompt(item);
+    if (!prompt && req.body.savedPromptOnly === true)
+      return res.status(409).json({
+        ok: false,
+        reason: "no-saved-prompt",
+        error: "That item has no saved prompt or caption yet.",
+      });
+    if (!prompt)
+      try {
+        prompt = await describe(item);
+      } catch (error) {
+        return res.status(503).json({ ok: false, error: error.message });
+      }
     const ownerId = item.ownerId || "";
     const upload = store.uploadJob(ownerId, item.id);
     const job =
