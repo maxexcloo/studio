@@ -262,7 +262,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
       <Modal opened={!!renaming} onClose={() => setRenaming(null)} title="Rename Preset">
         <Stack gap="md">
           <TextInput
-            label="Name"
+            aria-label="Name"
             data-autofocus
             value={name}
             error={taken && "A preset has this name"}

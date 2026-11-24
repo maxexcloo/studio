@@ -54,7 +54,6 @@ export function CustomDialog({
     >
       <Stack flex={phone ? 1 : undefined} mih={phone ? 0 : undefined}>
         <TextBox
-          label={label}
           aria-label={label || "Change"}
           placeholder={placeholder}
           autosize={!phone}

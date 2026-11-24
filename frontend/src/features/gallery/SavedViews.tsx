@@ -156,7 +156,7 @@ function NameDialog({
     <Modal id={id} opened={opened} onClose={closeWhenTop(id, onClose)} title={title}>
       <Stack gap="md">
         <TextInput
-          label="Name"
+          aria-label="Name"
           data-autofocus
           maxLength={80}
           value={name}

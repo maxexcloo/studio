@@ -108,6 +108,8 @@ recur across features.
   other action sits beside or below the primary. Consequential actions sit in
   a final Danger Zone or row menu and use `ConfirmDialog`, titled with the
   action and no question mark.
+- A dialog with a single field lets its title name it: the field keeps an
+  accessible name and any description, but no visible label.
 - Choose controls by selection semantics: a SegmentedControl or radio group
   selects exactly one choice, a Switch changes one setting, and toggle chips
   or MultiSelect combine options. All and Any are choices, not deselection.
