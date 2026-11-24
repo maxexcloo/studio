@@ -66,10 +66,14 @@ function profileUse(stats?: ProfileStats) {
     .join(" · ");
 }
 
+/** A saved version, or Default for one never edited; phones fold it under the name. */
 function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean }) {
+  const phone = usePhone();
   return (
     <Group gap="xs" wrap="nowrap">
-      <Text size="sm">v{version}</Text>
+      <Text size={phone ? "xs" : "sm"} c={!version || phone ? "dimmed" : undefined}>
+        {version ? `v${version}` : "Default"}
+      </Text>
       {aiDrafted && <Badge color="orange">AI</Badge>}
     </Group>
   );
@@ -394,14 +398,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                       tooltip={touch ? undefined : profileUse(statsOf(entry.id))}
                       detail={entry.name ? entry.id : undefined}
                     />
-                    {phone && (
-                      <Group gap="xs" wrap="nowrap">
-                        <Text size="xs" c="dimmed">
-                          {`${guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"} · v${entry.version}`}
-                        </Text>
-                        {entry.aiDrafted && <Badge color="orange">AI</Badge>}
-                      </Group>
-                    )}
                     {touch && (
                       <Text size="xs" c="dimmed">
                         {profileUse(statsOf(entry.id))}
@@ -413,18 +409,24 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               {
                 key: "guide",
                 header: "Guide",
-                hideOnPhone: true,
                 sortValue: guideOf,
+                // Folded under the name on phones, where the guide needs its label.
                 cell: (entry) => (
-                  <Text size="sm" c={guideOf(entry) ? undefined : "dimmed"}>
-                    {guideOf(entry) || "None"}
+                  <Text
+                    size={phone ? "xs" : "sm"}
+                    c={guideOf(entry) && !phone ? undefined : "dimmed"}
+                  >
+                    {phone
+                      ? guideOf(entry)
+                        ? `Guide: ${guideOf(entry)}`
+                        : "No Guide"
+                      : guideOf(entry) || "None"}
                   </Text>
                 ),
               },
               {
                 key: "version",
                 header: "Version",
-                hideOnPhone: true,
                 sortValue: (entry) => entry.version,
                 cell: (entry) => <Version {...entry} />,
               },
