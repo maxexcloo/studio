@@ -239,10 +239,14 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
 }) => {
   await fixtures(page);
   const library = [
-    dreamItem("library-old", { dream: undefined, settings: undefined }),
-    dreamItem("library-video", { dream: undefined, type: "video" }),
-    dreamItem("library-image", { dream: undefined }),
-    dreamItem("library-third", { dream: undefined }),
+    dreamItem("library-old", {
+      dream: undefined,
+      settings: undefined,
+      title: "Older Library Image",
+    }),
+    dreamItem("library-video", { dream: undefined, title: "Library Video", type: "video" }),
+    dreamItem("library-image", { dream: undefined, title: "Library Image" }),
+    dreamItem("library-third", { dream: undefined, title: "Third Library Image" }),
   ];
   const dream = await serveDream(page, {
     unseen: [dreamItem("last-image"), dreamItem("last-video", { type: "video" })],
@@ -265,7 +269,7 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await showView(page, "Library");
   await expect(page).toHaveURL(/\/dream\/library$/);
   await expect(page.getByRole("radio", { name: "Videos (1)", exact: true })).toBeChecked();
-  await expect(video).toContainText("library-video");
+  await expect(video.getByText("Library Video", { exact: true })).toBeVisible();
   await expect(undo).toBeDisabled();
   await page.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(page.getByText("Library Review Complete")).toBeVisible();
@@ -273,14 +277,14 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
 
   await showMedia(page, "Images");
   await expect(page.getByRole("radio", { name: "Images (3)", exact: true })).toBeChecked();
-  await expect(image).toContainText("library-old");
+  await expect(image.getByText("Older Library Image", { exact: true })).toBeVisible();
   await expect(undo).toBeDisabled();
 
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(image).toContainText("library-image");
+  await expect(image.getByText("Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(true);
   await page.getByRole("button", { name: "Super Like", exact: true }).click();
-  await expect(image).toContainText("library-third");
+  await expect(image.getByText("Third Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[2].rating).toBe("liked");
   await page.getByRole("button", { name: "Pass", exact: true }).press("Shift+F10");
   await confirmPass(page);
@@ -288,17 +292,17 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await expect.poll(() => dream.library[3].rating).toBe("disliked");
 
   await undo.click();
-  await expect(image).toContainText("library-third");
+  await expect(image.getByText("Third Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[3].rating).toBeUndefined();
   await undo.click();
-  await expect(image).toContainText("library-image");
+  await expect(image.getByText("Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[2].rating).toBeUndefined();
   await undo.click();
-  await expect(image).toContainText("library-old");
+  await expect(image.getByText("Older Library Image", { exact: true })).toBeVisible();
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(false);
   await showMedia(page, "Videos");
   await undo.click();
-  await expect(video).toContainText("library-video");
+  await expect(video.getByText("Library Video", { exact: true })).toBeVisible();
   await expect.poll(() => dream.library[1].rating).toBeUndefined();
 
   await showView(page, "Dream");
@@ -678,14 +682,13 @@ test("Library review stays available while Dream is off", async ({ page }) => {
   await serveDream(page, {
     enabled: false,
     unseen: [dreamItem("fox")],
-    library: [dreamItem("library-image", { dream: undefined })],
+    library: [dreamItem("library-image", { dream: undefined, title: "Library Image" })],
   });
   await page.goto("/dream");
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await showView(page, "Library");
-  await expect(page.getByRole("group", { name: "Current Gallery Image" })).toContainText(
-    "Dream prompt library-image",
-  );
+  const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card.getByText("Library Image", { exact: true })).toBeVisible();
 });
 
 test("Taste displays readable preferences and saves explicit edits separately", async ({
