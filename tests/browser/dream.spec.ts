@@ -1511,7 +1511,7 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   expect(dream.requests[2].body).toEqual({ ids: ["one"], reason: "glitch" });
 });
 
-test("Dream fullscreen closes from the letterbox and taps cycle its chrome, text and media alone", async ({
+test("Dream fullscreen closes from the letterbox and a tap shows or hides all its chrome", async ({
   page,
   isMobile,
 }) => {
@@ -1547,28 +1547,27 @@ test("Dream fullscreen closes from the letterbox and taps cycle its chrome, text
   const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
   const actions = preview.getByRole("group", { name: "Dream Actions", exact: true });
   const why = preview.getByText("Because you like wide.", { exact: true });
-  await expect(why).toBeHidden();
   const tap = () => (isMobile ? picture.tap() : picture.click());
+  // The chrome, the card's text and the verdicts show together, and a tap hides them all.
   await expect(header).toBeVisible();
-  await tap();
   await expect(why).toBeVisible();
-  await expect(header).toBeVisible();
   await expect(actions).toBeVisible();
   await tap();
   await expect(why).toBeHidden();
   await expect(header).toBeHidden();
   await expect(actions).toBeHidden();
-  await page.keyboard.press("c");
+  await tap();
   await expect(header).toBeVisible();
+  await expect(why).toBeVisible();
   await expect(actions).toBeVisible();
   // Hiding the chrome from one of its own controls keeps the shortcut working.
   await header.getByRole("button", { name: "Close Preview", exact: true }).focus();
   await page.keyboard.press("c");
-  await expect(why).toBeVisible();
-  await page.keyboard.press("c");
   await expect(header).toBeHidden();
+  await expect(why).toBeHidden();
   await page.keyboard.press("c");
   await expect(header).toBeVisible();
+  await expect(why).toBeVisible();
   expect(verdicts(dream)).toEqual([]);
 });
 

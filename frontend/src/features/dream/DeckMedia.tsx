@@ -1,12 +1,10 @@
-import { ActionIcon, Tooltip } from "@mantine/core";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
-import { icons } from "../../ui/icons";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { useVideoSound } from "../gallery/useVideoSound";
 import { videoLifecycle } from "../gallery/videoPlayback";
-import { VideoSoundButton } from "../gallery/VideoPlayButton";
+import { VideoControls } from "../gallery/VideoPlayButton";
 import { covers, useBoxShape } from "./mediaFit";
 
 import classes from "./DreamPage.module.css";
@@ -79,6 +77,9 @@ export function useDreamPlayback(
   const [fallback, setFallback] = useState<{ itemId?: string }>();
   const autoplayMuted = fallback !== undefined && fallback.itemId === itemId;
   const [retry, setRetry] = useState<{ itemId?: string; play: () => void }>();
+  // Pause keeps the clip still until Play, through tab switches and the others ending.
+  const [held, setHeld] = useState<{ itemId?: string }>();
+  const control = useRef<{ pause: () => void; resume: () => void }>(undefined);
   useLayoutEffect(() => {
     setFallback(undefined);
   }, [playing, itemId]);
@@ -98,6 +99,7 @@ export function useDreamPlayback(
   useEffect(() => {
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
     setRetry(undefined);
+    setHeld(undefined);
     if (!playing || !videos.length) return;
     const failed = new Set<HTMLVideoElement>();
     const playable = () =>
@@ -106,6 +108,24 @@ export function useDreamPlayback(
     let blocked = false;
     let starting = false;
     let attempt = 0;
+    let paused = false;
+    control.current = {
+      pause() {
+        paused = true;
+        ++attempt;
+        starting = false;
+        for (const video of videos) video.pause();
+        setHeld({ itemId });
+      },
+      resume() {
+        paused = false;
+        setHeld(undefined);
+        start(
+          playable().filter((video) => !video.ended),
+          false,
+        );
+      },
+    };
     function showPlay() {
       blocked = true;
       for (const video of videos) video.pause();
@@ -142,7 +162,7 @@ export function useDreamPlayback(
       );
     }
     const advance = () => {
-      if (document.hidden || blocked || starting) return;
+      if (document.hidden || blocked || starting || paused) return;
       const active = playable();
       if (
         active.length &&
@@ -159,6 +179,7 @@ export function useDreamPlayback(
     const pause = (event: Event) => {
       const video = event.currentTarget as HTMLVideoElement;
       if (
+        !paused &&
         started &&
         !blocked &&
         !document.hidden &&
@@ -178,7 +199,7 @@ export function useDreamPlayback(
         videos.forEach((video) => video.pause());
         return;
       }
-      if (!blocked && started)
+      if (!blocked && !paused && started)
         start(
           playable().filter((video) => !video.ended),
           false,
@@ -195,6 +216,7 @@ export function useDreamPlayback(
     advance();
     return () => {
       ++attempt;
+      control.current = undefined;
       document.removeEventListener("visibilitychange", visibility);
       for (const video of videos) {
         video.removeEventListener("loadedmetadata", advance);
@@ -206,7 +228,6 @@ export function useDreamPlayback(
     };
   }, [root, playing, itemId]);
   const silent = muted || autoplayMuted;
-  const label = silent ? "Unmute" : "Mute";
   const toggle = () => {
     const video = audibleVideo.current;
     if (video) video.muted = !silent;
@@ -215,15 +236,20 @@ export function useDreamPlayback(
     if (silent && retry?.itemId === itemId && retry) retry.play();
     else if (silent && video?.paused) void video.play().catch(() => undefined);
   };
+  const refused = playing && retry?.itemId === itemId ? retry?.play : undefined;
+  const stopped = Boolean(refused) || (held !== undefined && held.itemId === itemId);
+  const playPause = () =>
+    refused ? refused() : stopped ? control.current?.resume() : control.current?.pause();
   return {
-    play: playing && retry?.itemId === itemId ? retry?.play : undefined,
-    sound: playing && (
-      <Tooltip label={label}>
-        <ActionIcon variant="default" aria-label={label} onClick={toggle}>
-          {silent ? <icons.mute size={16} /> : <icons.sound size={16} />}
-        </ActionIcon>
-      </Tooltip>
+    play: refused,
+    controls: playing && (
+      <VideoControls
+        paused={stopped}
+        onPlayPause={playPause}
+        muted={silent}
+        onSound={toggle}
+        inline
+      />
     ),
-    cornerSound: playing && <VideoSoundButton muted={silent} toggle={toggle} />,
   };
 }
