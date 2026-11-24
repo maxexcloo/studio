@@ -26,7 +26,7 @@ import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
 import { GuideDefinitions, ProfileDefinitions, guidesQuery } from "./ProfileDefinitions";
 import { PromptInstructions } from "./PromptInstructions";
-import { PromptStyles } from "./PromptStyles";
+import { PromptTemplates } from "./PromptStyles";
 import {
   catalogueQuery,
   downloadsQuery,
@@ -167,10 +167,11 @@ export function LibraryPage() {
           outfits: [promptCardsQuery("outfits")],
           presets: [presetsQuery],
           profiles: [editableProfilesQuery],
-          promptInstructions: [promptInstructionsQuery],
-          promptStyles: [promptStylesQuery],
+          animateTemplates: [promptStylesQuery],
+          changeTemplates: [promptStylesQuery],
+          improveTemplates: [promptStylesQuery],
+          instructions: [promptInstructionsQuery],
           scenes: [promptCardsQuery("scenes")],
-          suggestionInstructions: [promptInstructionsQuery],
         }}
         content={{
           characters: (heading) => <LibraryCharacters heading={heading} />,
@@ -183,12 +184,15 @@ export function LibraryPage() {
           loras: catalogueSection("loras"),
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
-          promptInstructions: (heading) => (
-            <PromptInstructions section="promptInstructions" heading={heading} />
+          instructions: (heading) => <PromptInstructions heading={heading} />,
+          animateTemplates: (heading) => (
+            <PromptTemplates kind="animate" label="Animate Templates" heading={heading} />
           ),
-          promptStyles: (heading) => <PromptStyles heading={heading} />,
-          suggestionInstructions: (heading) => (
-            <PromptInstructions section="suggestionInstructions" heading={heading} />
+          changeTemplates: (heading) => (
+            <PromptTemplates kind="change" label="Edit & Recreate Templates" heading={heading} />
+          ),
+          improveTemplates: (heading) => (
+            <PromptTemplates kind="improve" label="Improve Prompt Templates" heading={heading} />
           ),
           files: catalogueSection("files"),
         }}

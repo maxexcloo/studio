@@ -386,7 +386,7 @@ export interface AnimateRequest {
   instruction?: string;
   profileId?: string;
 }
-/** Animate's templates for the account (Library › Prompt Styles), Custom last; none without the assistant. */
+/** Animate's templates for the account (Library › Templates), Custom last; none without the assistant. */
 export function useAnimateTemplates() {
   const assistant = useQuery(assistantQuery).data;
   return assistant?.available ? assistant.themes : [];

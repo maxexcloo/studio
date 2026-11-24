@@ -1,5 +1,5 @@
 /**
- * The assistant's fixed options, edited in Library › Prompt Styles: `<data>/prompt-styles.json`
+ * The assistant's fixed options, edited in Library › Templates: `<data>/prompt-styles.json`
  * holds `{styles, meta}`, each style `{id, kind, label, description,
  * instruction, enabled, uncensored?}`. An `uncensored` style is offered only to accounts with
  * Uncensored Models, which also see every other style. `kind` is the menu it belongs to: `improve` (Improve

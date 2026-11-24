@@ -13,7 +13,7 @@ import { assistMenu, suggested } from "./AskChange";
 import { CustomDialog } from "./CustomDialog";
 import { profileForLoras } from "./payload";
 
-/** A fixed assistant option from Library › Prompt Styles, in its menu's order. */
+/** A fixed assistant option from Library › Templates, in its menu's order. */
 export interface AssistantOption {
   id: string;
   label: string;
