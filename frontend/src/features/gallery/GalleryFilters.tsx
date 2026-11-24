@@ -375,7 +375,7 @@ function ChoiceChip({
 }
 
 /** A filter chip that turns on and off with one tap, pressed while on. */
-export function FilterToggle({
+function FilterToggle({
   label,
   on,
   onToggle,

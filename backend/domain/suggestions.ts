@@ -72,7 +72,7 @@ interface SuggestionItem extends IdleItem {
  * edit's prompt is worded there, as an instruction (an edit model such as FLUX.2, Qwen or Grok) or
  * a full description of the result (plain image-to-image at partial denoise, such as Krea 2).
  */
-export interface WritingTarget {
+interface WritingTarget {
   label: string;
   guide: unknown;
   edits?: "instruction" | "description";

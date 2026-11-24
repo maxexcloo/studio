@@ -1,5 +1,5 @@
 /** A run of words both texts share, or that only the old (`removed`) or new (`added`) one has. */
-export interface DiffPart {
+interface DiffPart {
   text: string;
   change?: "removed" | "added";
 }

@@ -42,7 +42,7 @@ export type Preferences = PreferenceValues &
   ImagePreference &
   VideoPreference &
   Partial<Record<DefaultModelKey, string | null>>;
-export interface PreferencesStatus {
+interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
   saved: (keyof Preferences)[];

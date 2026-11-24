@@ -77,7 +77,7 @@ export function ProjectStatsLine({
  * them. A disabled project (`paused`) keeps its brief, results and chats; More Turns (`favoured`)
  * doubles its share of Dream's turns.
  */
-export function useProjectSwitch(project: Project) {
+function useProjectSwitch(project: Project) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (patch: Pick<Project, "paused"> | Pick<Project, "favoured">) =>

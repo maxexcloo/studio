@@ -34,7 +34,7 @@ export interface CharacterCard extends Omit<Character, "sheet" | "portrait"> {
     panels: (ReferenceAsset & { role: SheetRole })[];
   };
 }
-export interface CharacterFields extends Partial<Record<CharacterTrait, string>> {
+interface CharacterFields extends Partial<Record<CharacterTrait, string>> {
   name: string;
   description: string;
   age?: number;

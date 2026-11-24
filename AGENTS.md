@@ -114,6 +114,8 @@ recur across features.
 - Empty views use `EmptyState`: one short, subdued line and at most the action
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
+  Loading greys a control out (`disabled`) rather than spinning or changing its
+  text. Popups and dialogs share a minimum height, with empty text centred.
 
 ### Actions & Menus
 
@@ -269,9 +271,10 @@ recur across features.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
   text in place, leaving the box's look unchanged, with Undo first in its AI
   menu, and show the action and changed words below the field. Suggestions
-  never act on their own, and nothing floats over the text. They load as
-  their menu opens, except an empty composer prompt's ideas, which load once
-  the page is idle and again after one is picked, so its menu opens ready.
+  never act on their own, and nothing floats over the text. They preload for
+  the viewer's and Library review's items and load as other menus open; an
+  empty composer prompt's ideas load once the page is idle and again after one
+  is picked, so its menu opens ready.
 - Report actual endpoint health: configuration alone does not prove readiness.
   A deliberately parked worker reads Stopped, not failing; an unexpectedly
   unavailable one remains a failure. Runtime controls belong in
@@ -320,10 +323,12 @@ recur across features.
   commands retain their identity.
 - Account groups own grants. Runtime definition edits retain administrator
   approval and conflict handling; read back saved changes.
-- Failed forms show their mutation error inline. Other failures use the
-  `MutationCache` default notification; avoid duplicate error surfaces.
+- Failed forms show their mutation error inline. Other failures, including a
+  view's background load (`useFailureBanner`), use the `MutationCache` default
+  notification; avoid duplicate error surfaces. Alerts are quiet and timed.
 - Routine success appears where it happened: a saved row, a copy check or a
-  brief action label (`useFlash`). Notifications serve failures, Undo and
+  brief action label (`useFlash`), never status text after an action.
+  Notifications serve failures, Undo and
   outcomes with nowhere else to show. Action errors and Undo use compact,
   timed banners below the header. Banners can be dismissed with an upward
   swipe. Generation submission

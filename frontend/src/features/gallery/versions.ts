@@ -2,7 +2,7 @@ import { isVersion, resultInput } from "../../../../shared/versions.ts";
 import type { MediaItem, QueueJob } from "../../types";
 
 /** A result and the versions made from it (Edit, Prompt, Animate and so on), in tree order. */
-export type VersionGroup = MediaItem[];
+type VersionGroup = MediaItem[];
 
 const results = (job?: QueueJob) => (job?.items?.length ? job.items : job?.outputs || []);
 
