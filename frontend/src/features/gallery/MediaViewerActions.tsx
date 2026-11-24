@@ -40,20 +40,7 @@ export function ViewerActionGroups({ groups, labelled, equal }: Omit<ViewerActio
   );
 }
 
-/** The viewer's action bar: the prompt field above the shared item actions. */
-export function MediaViewerActions({
-  item,
-  compare,
-  iterate,
-  pending,
-  onApplied,
-  onCompare,
-  onDelete,
-  onReportQueued,
-  onRetried,
-  onVersionChange,
-  shortcuts,
-}: {
+interface ItemActionsProps {
   item: MediaItem;
   compare: boolean;
   iterate: (iteration: Iteration) => void;
@@ -67,7 +54,39 @@ export function MediaViewerActions({
   onVersionChange: (id: string, active: boolean) => void;
   /** Holds the current actions for the viewer's keyboard shortcuts. */
   shortcuts?: RefObject<ActionGroups>;
-}) {
+}
+
+/**
+ * The viewer's action bar: the prompt field above the shared item actions. The bar stays as the
+ * viewer steps; its contents start afresh for each item, so a draft or a pending change stays
+ * with the item it began on.
+ */
+export function MediaViewerActions(props: ItemActionsProps) {
+  return (
+    <ActionBarSurface
+      aria-label="Generation Actions"
+      radius="lg"
+      className={classes.actions}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <ItemActions key={props.item.id} {...props} />
+    </ActionBarSurface>
+  );
+}
+
+function ItemActions({
+  item,
+  compare,
+  iterate,
+  pending,
+  onApplied,
+  onCompare,
+  onDelete,
+  onReportQueued,
+  onRetried,
+  onVersionChange,
+  shortcuts,
+}: ItemActionsProps) {
   const transfer = useMediaTransfer(item, true);
   const { handlers, dialogs } = useMediaDialogs(item, iterate, onReportQueued);
   const prompt = useViewerPrompt(item, iterate);
@@ -86,12 +105,7 @@ export function MediaViewerActions({
   });
   if (shortcuts) shortcuts.current = groups;
   return (
-    <ActionBarSurface
-      aria-label="Generation Actions"
-      radius="lg"
-      className={classes.actions}
-      onClick={(event) => event.stopPropagation()}
-    >
+    <>
       {item.jobId && (
         <Box className={classes.promptRow} miw={0}>
           <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
@@ -99,6 +113,6 @@ export function MediaViewerActions({
       )}
       <ViewerActionGroups groups={groups} labelled={namedItemActions} />
       {dialogs}
-    </ActionBarSurface>
+    </>
   );
 }

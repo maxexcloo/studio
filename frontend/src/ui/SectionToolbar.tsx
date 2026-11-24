@@ -11,7 +11,14 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { ChevronDown, type LucideIcon, Search } from "lucide-react";
-import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type AnimationEvent,
+  type ComponentPropsWithRef,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { menuWidth } from "../theme";
 import { ChipPopup } from "./ChipPopup";
@@ -168,6 +175,16 @@ export function SectionToolbar({
 }) {
   const phone = usePhone();
   const [searching, setSearching] = useState(false);
+  // Only swapping the toolbar and its search fades, not a section's first or later reveal.
+  const [swapped, setSwapped] = useState(false);
+  const swap = (next: boolean) => {
+    setSearching(next);
+    setSwapped(true);
+  };
+  const enter = swapped ? classes.enter : undefined;
+  const entered = (event: AnimationEvent) => {
+    if (event.target === event.currentTarget) setSwapped(false);
+  };
   const [filtering, setFiltering] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -175,7 +192,7 @@ export function SectionToolbar({
     if (searching) input.current?.focus();
   }, [searching]);
   const close = () => {
-    setSearching(false);
+    swap(false);
     requestAnimationFrame(() => trigger.current?.focus());
   };
   const search = (expanded: boolean) =>
@@ -219,13 +236,19 @@ export function SectionToolbar({
   // A phone's open search takes the header's full width, under the description.
   if (searching && phone && onQueryChange)
     return (
-      <Group className={`${classes.enter} ${classes.searching}`} gap="xs" mih={44}>
+      <Group
+        className={`${enter ?? ""} ${classes.searching}`}
+        gap="xs"
+        mih={44}
+        onAnimationEnd={entered}
+      >
         {search(true)}
       </Group>
     );
   return (
     <Group
-      className={classes.enter}
+      className={enter}
+      onAnimationEnd={entered}
       data-adaptive-search={phone && !views && onQueryChange ? "" : undefined}
       gap="xs"
       mih={44}
@@ -243,7 +266,7 @@ export function SectionToolbar({
               aria-label={`Search ${label}`}
               variant={query ? "light" : "subtle"}
               color={query ? undefined : "gray"}
-              onClick={() => setSearching(true)}
+              onClick={() => swap(true)}
             >
               <Search size={18} />
             </ActionIcon>
