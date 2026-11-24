@@ -8,6 +8,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { CopyButton } from "../../ui/CopyButton";
 import { dateFormat } from "../../ui/dates";
 import { LoadingState } from "../../ui/LoadingState";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { usePhone } from "../../ui/usePhone";
 import { accountAdminQuery } from "../settings/AccountAdmin";
 
@@ -118,26 +119,34 @@ export function LogDialog({
 }) {
   const phone = usePhone();
   const [tab, setTab] = useState<string | null>(null);
-  const shown = parts.some((part) => part.value === tab) ? tab : (initial ?? parts[0]?.value);
-  const close = () => {
-    setTab(null);
-    onClose();
-  };
+  // Callers clear the record their parts read as they close.
+  const content = useLastWhileClosing(opened ? { title, parts } : null);
+  const shownParts = content?.parts ?? [];
+  const shown = shownParts.some((part) => part.value === tab)
+    ? tab
+    : (initial ?? shownParts[0]?.value);
   return (
-    <Modal opened={opened} onClose={close} title={title} size="xl" fullScreen={phone}>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      onExitTransitionEnd={() => setTab(null)}
+      title={content?.title}
+      size="xl"
+      fullScreen={phone}
+    >
       <Stack>
-        {parts.length === 1 ? (
-          parts[0].content
+        {shownParts.length === 1 ? (
+          shownParts[0].content
         ) : (
           <Tabs value={shown} onChange={setTab} keepMounted={false}>
             <Tabs.List>
-              {parts.map((part) => (
+              {shownParts.map((part) => (
                 <Tabs.Tab key={part.value} value={part.value}>
                   {part.label}
                 </Tabs.Tab>
               ))}
             </Tabs.List>
-            {parts.map((part) => (
+            {shownParts.map((part) => (
               <Tabs.Panel key={part.value} value={part.value} pt="sm">
                 {part.content}
               </Tabs.Panel>
@@ -145,7 +154,7 @@ export function LogDialog({
           </Tabs>
         )}
         <DialogFooter>
-          <Button onClick={close}>Done</Button>
+          <Button onClick={onClose}>Done</Button>
         </DialogFooter>
       </Stack>
     </Modal>

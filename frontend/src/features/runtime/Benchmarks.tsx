@@ -18,6 +18,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { SelectionList } from "../../ui/SelectionList";
 import { SettingGroup } from "../../ui/SettingRows";
+import { useLastWhileClosing } from "../../ui/useLastWhileClosing";
 import { LogDialog, PodLog, useRequester } from "./RuntimeLogs";
 
 export const benchmarksQuery = queryOptions({
@@ -62,13 +63,14 @@ const canStop = (run: BenchmarkRun) => run.status === "queued" || run.status ===
 
 /** Choose which text models to benchmark on the selected workload. */
 export function BenchmarkDialog({
-  workload,
+  workload: opened,
   onClose,
 }: {
   workload?: { id: string; label: string };
   onClose: () => void;
 }) {
   const id = useId();
+  const workload = useLastWhileClosing(opened);
   const client = useQueryClient();
   const inventory = useQuery(benchmarkModelsQuery(workload?.id ?? ""));
   const [selected, setSelected] = useState<string[]>();
@@ -87,18 +89,19 @@ export function BenchmarkDialog({
   });
   const error = start.error || inventory.error;
   const close = () => {
-    if (start.isPending) return;
-    start.reset();
-    setSelected(undefined);
-    onClose();
+    if (!start.isPending) onClose();
   };
   return (
     <Modal
       id={id}
-      opened={Boolean(workload)}
+      opened={Boolean(opened)}
       title={`Benchmark ${workload?.label ?? ""}`}
       size="md"
       onClose={closeWhenTop(id, close)}
+      onExitTransitionEnd={() => {
+        start.reset();
+        setSelected(undefined);
+      }}
       closeButtonProps={{ "aria-label": "Close", disabled: start.isPending }}
     >
       <FocusTrap.InitialFocus />

@@ -96,16 +96,14 @@ export function MediaTileActions({
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
-            {opened && (
-              <MediaActionMenu
-                item={item}
-                transfer={transfer}
-                onSelect={onSelect}
-                onApplied={() => onOpenedChange(false)}
-                onDelete={() => setDeleting(true)}
-                {...handlers}
-              />
-            )}
+            <MediaActionMenu
+              item={item}
+              transfer={transfer}
+              onSelect={onSelect}
+              onApplied={() => onOpenedChange(false)}
+              onDelete={() => setDeleting(true)}
+              {...handlers}
+            />
           </Menu.Dropdown>
         </Menu>
       </Group>
