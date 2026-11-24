@@ -110,11 +110,11 @@ const views = [
     { value: "dream", label: "Dream" },
     { value: "library", label: "Library" },
     { value: "projects", label: "Projects" },
+    { value: "week", label: "This Week" },
   ],
   [
     { value: "discarded", label: "Discards" },
     { value: "history", label: "History" },
-    { value: "week", label: "This Week" },
   ],
 ] as const;
 const mediaLabels = { image: "Images", video: "Videos" };

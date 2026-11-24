@@ -29,8 +29,9 @@ test("gallery badges use saved provenance and favour comparisons over their sour
     badge({ dream: { ...dream, arm: "extend" }, type: "video" }),
     "From Video Extension",
   );
+  assert.equal(badge({ dream: { ...dream, arm: "recreate" } }), "From Recreate");
   assert.equal(
-    badge({ dream: { ...dream, arm: "recreate" }, type: "video" }),
+    badge({ dream: { ...dream, arm: "remaster" }, type: "video" }),
     "From Video Remaster",
   );
   assert.equal(badge({ dream }, true), "In Comparison");
