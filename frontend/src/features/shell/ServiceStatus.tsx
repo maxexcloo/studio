@@ -65,6 +65,7 @@ export function StatusAction() {
   const jobs = queue.data?.jobs ?? [];
   // Work a paused queue holds is waiting, not generating.
   const unfinished = jobs.filter((job) => !terminalStatuses.has(job.status));
+  const pending = unfinished.length;
   const progress = queueProgress(jobs, unfinished);
   const progressLabel =
     progress &&
@@ -75,7 +76,7 @@ export function StatusAction() {
       .filter(Boolean)
       .join(" · ");
   const generating = unfinished.some((job) => job.reason !== pausedReason);
-  const held = !generating && unfinished.length > 0;
+  const held = !generating && pending > 0;
   // The summary counts running work too, so it reads again as soon as the account's own starts or ends.
   const client = useQueryClient();
   const running = unfinished.filter((job) => activeStatuses.has(job.status));
@@ -111,7 +112,10 @@ export function StatusAction() {
       document.removeEventListener("keydown", escape, true);
     };
   }, [phone, opened]);
-  const tooltip = [generating ? "Generating" : held ? "Queue Paused" : summary.label, progressLabel]
+  const tooltip = [
+    generating ? "Generating" : held ? "Queue Paused" : summary.label,
+    pending && `${pending} Pending`,
+  ]
     .filter(Boolean)
     .join(" · ");
   const overall = progress && (
@@ -136,14 +140,14 @@ export function StatusAction() {
       aria-expanded={opened}
       variant="transparent"
       color={generating || held ? "gray" : summary.colour}
-      className={progress ? classes.counted : undefined}
+      className={pending ? classes.counted : undefined}
       data-queue-count
       onClick={() => setOpened(!opened)}
     >
       <icons.queue size={19} />
-      {progress && (
-        <span aria-hidden className={classes.progress}>
-          {progress.finished}/{progress.total}
+      {pending > 0 && (
+        <span aria-hidden className={classes.count}>
+          {pending}
         </span>
       )}
     </ActionIcon>
