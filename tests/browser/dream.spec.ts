@@ -972,9 +972,9 @@ test("Dream navigation orders its views and History shows retained activity and 
     "Dream",
     "Library",
     "Projects",
+    "This Week",
     "Discards",
     "History",
-    "This Week",
   ]);
   await page.getByRole("menuitem", { name: "History", exact: true }).click();
   await expect(page).toHaveURL(/\/dream\/history$/);
