@@ -1,7 +1,7 @@
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 
 /** What a liked item was drawn for. */
-export type LikePurpose =
+type LikePurpose =
   | "animate"
   | "compare"
   | "extend"
@@ -20,7 +20,7 @@ export interface LikeLedger {
 
 const day = 86_400_000;
 /** Age buckets by creation, newest first: the last week, month and six months, then older. */
-export const ageBuckets = [7 * day, 30 * day, 182 * day, Infinity];
+const ageBuckets = [7 * day, 30 * day, 182 * day, Infinity];
 /** An item used for a purpose within `ms` weighs `factor` as much for it. */
 export const cooldown = { ms: 3 * day, factor: 0.05 };
 

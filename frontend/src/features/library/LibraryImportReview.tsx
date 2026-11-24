@@ -107,7 +107,7 @@ export interface ImportVision {
   available: boolean;
   reason: string;
 }
-export const gradeColours: Record<string, string> = {
+const gradeColours: Record<string, string> = {
   exact: "green",
   close: "yellow",
   partial: "orange",

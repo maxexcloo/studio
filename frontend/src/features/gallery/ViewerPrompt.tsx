@@ -119,7 +119,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
   };
 }
 
-export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
+type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
 
 /** The prompt field, at the top of the viewer's action bar. At rest it is one line; focused, all. */
 export function ViewerPrompt({

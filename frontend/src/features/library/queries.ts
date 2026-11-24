@@ -88,7 +88,7 @@ export interface PromptStyle {
   enabled: boolean;
   uncensored?: boolean;
 }
-export interface PromptStyleVersion {
+interface PromptStyleVersion {
   version: number;
   by?: string;
   origin?: string;
