@@ -46,10 +46,11 @@ import {
 } from "../../shared/resolution.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
-import { dreamVideoSlot, uncensoredDreamProfile } from "../animate-profile.js";
+import { dreamVideoSlot, frameSize, uncensoredDreamProfile } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { profileAspectSize } from "../generation-defaults.js";
+import { tierOf } from "../mcp/tiers.js";
 import {
   readRuntimeDocument,
   runtimeTransaction,
@@ -122,7 +123,8 @@ export interface DreamOrigin {
    * How the idea came about: "exploit", "explore:<axis>" for the first thing it tried,
    * "continue:<axis>" for the one thing it varied of a liked or kept image or of its project's
    * chat work, "series" for a
-   * series' result, "recreate" for a larger re-render, or "animate" and "extend" for videos.
+   * series' result, "recreate" for a larger re-render, or "animate", "extend" and "remaster" (a
+   * kept or liked clip re-rendered at a larger size or on a stronger model) for videos.
    */
   arm?: string;
   /** The project whose brief the idea follows. */
@@ -414,9 +416,10 @@ interface DreamRecord {
   inspirations?: string[];
   /** Each compared image's rating (`elo`), by item id. */
   ratings?: Record<string, number>;
-  /** Images Dream animated and videos it extended, newest first, so each is used once. */
+  /** Images Dream animated and videos it extended or remastered, newest first, so each is used once. */
   animated?: string[];
   extended?: string[];
+  remastered?: string[];
 }
 type Kind = "image" | "video";
 
@@ -445,6 +448,26 @@ export function deckOrder(
       (a, b) =>
         Number(mix[b] > 0) - Number(mix[a] > 0) || deficit(b) - deficit(a) || mix[b] - mix[a],
     );
+}
+
+/**
+ * The video profiles that would remaster a clip made at its size on a model of `sourceLabel`'s tier:
+ * none weaker or framing it smaller, each framing it at `remasterScale` times its pixels or of a
+ * stronger tier.
+ */
+export function remasterTargets(
+  { width, height }: { width: number; height: number },
+  sourceLabel: string,
+  profiles: DreamProfile[],
+) {
+  if (!(width > 0 && height > 0)) return [];
+  const source = tierRanks[tierOf({ label: sourceLabel })];
+  return profiles.filter((profile) => {
+    const rank = tierRanks[tierOf(profile)];
+    const frame = frameSize(profile, width, height);
+    const scale = frame ? (frame.width * frame.height) / (width * height) : 0;
+    return rank >= source && scale >= 1 && (rank > source || scale >= remasterScale);
+  });
 }
 
 /**
@@ -484,6 +507,11 @@ const unseenLimit = 60;
 const seriesShare = 2;
 /** Percent of videos that extend one of the account's videos rather than animate a still. */
 const extendShare = 35;
+/** Percent of videos that remaster a kept or liked clip, drawn only while one qualifies (`remaster`). */
+const remasterShare = 10;
+/** A remaster's frame has at least this many times its source's pixels, unless its model is a stronger tier. */
+const remasterScale = 1.25;
+const tierRanks: Record<string, number> = { turbo: 0, fast: 1, standard: 2, quality: 3 };
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
 /** The weight left to the video model Dream used last, so consecutive videos change model. */
@@ -564,7 +592,7 @@ const turns = { floor: 0.5, favoured: 2, read: 1000, keptMs: 5 * 60_000, results
 const draftSamples = 3;
 /** A project's idea sees this many of the project's latest ones. */
 const projectIdeasShown = 6;
-/** Dream remembers this many of the images it animated and videos it extended. */
+/** Dream remembers this many of the images it animated and videos it extended or remastered. */
 const usedLimit = 500;
 /** Dream remembers this many of its latest ideas to avoid repeating them. */
 const recentIdeas = 100;
@@ -3278,8 +3306,9 @@ export function createDream(options: {
     return dreamProfileIssue(job, profile, allowsUncensored(job.ownerId));
   }
   /**
-   * Queues a video that animates the account's best still or extends one of its videos
-   * (videoSources), on its selected backend; answers why it couldn't, or "".
+   * Queues a video that remasters a kept or liked clip (`remaster`), animates the account's best
+   * still or extends one of its videos (videoSources), on its selected backend; answers why it
+   * couldn't, or "".
    */
   async function video(ownerId: string, record: DreamRecord, access: DreamAccess, key: string) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
@@ -3289,6 +3318,10 @@ export function createDream(options: {
         return null;
       }
     };
+    if (await remaster(ownerId, record, access)) {
+      videoMisses.delete(ownerId);
+      return "";
+    }
     let extensionRefusal = "";
     // A source deleted or hidden since it was chosen counts as used, so the next one is tried.
     for (const source of await videoSources(ownerId, record)) {
@@ -3444,6 +3477,137 @@ export function createDream(options: {
     );
     if (result.status >= 400) return String(result.payload.error || "Studio refused the video.");
     return "";
+  }
+  /**
+   * Queues a remaster of one of the account's kept or liked clips (`remasterShare` of videos, while
+   * one qualifies): its prompt, start frame and fitting LoRAs on a ready video profile that frames
+   * it larger or is of a stronger tier (`remasterTargets`), drawn by keep rate, at the profile's
+   * defaults and Dream's full clip length. Never a remaster, a clip remastered before, one without
+   * a start frame or one whose prompt names an exclusion. Answers whether it queued one.
+   */
+  async function remaster(ownerId: string, record: DreamRecord, access: DreamAccess) {
+    const allowUncensored = record.settings.uncensored && access.uncensored;
+    const used = new Set(record.remastered);
+    const forbidden = explicitExclusions(options.taste.area(ownerId, "dream").exclusions);
+    const hidden = allowUncensored ? new Set<string>() : options.uncensoredLoras();
+    const failing = failingProfiles(ownerId, 1);
+    const { profiles } = await options.catalogue(ownerId, access.account);
+    const ready = profiles.filter(
+      (profile) =>
+        kindOf(profile) === "video" &&
+        isCloudProfile(profile) === (record.settings.videoBackend === "cloud") &&
+        (allowUncensored || !uncensoredDreamProfile(profile)) &&
+        !failing.has(profile.id) &&
+        dreamVideoSlot(profile),
+    );
+    if (!ready.length) return false;
+    const candidates = new Map(
+      (await readyGenerations(ownerId, { liked: true, type: "video", status: "done" }))
+        .filter(
+          (item) =>
+            item.dream?.arm !== "remaster" &&
+            !used.has(String(item.id)) &&
+            (allowUncensored || !item.dream?.uncensored),
+        )
+        .flatMap((item) => {
+          const input = store.jobInput(ownerId, String(item.jobId));
+          const prompt = clean(input?.prompt, maxPromptCharacters);
+          const [frame] = (input?.referenceAssets ?? []) as Record<string, unknown>[];
+          if (!input || !prompt || !frame?.assetId || namedMotif(prompt, forbidden)) return [];
+          const sourceId = String(item.settings?.profileId || input.profileId || "");
+          const sourceLabel =
+            profiles.find((profile) => profile.id === sourceId)?.label ||
+            String(item.settings?.profileName || "");
+          const size = { width: Number(item.width), height: Number(item.height) };
+          const targets = remasterTargets(size, sourceLabel, ready);
+          return targets.length
+            ? [[item, { input, prompt, frame, size, sourceLabel, targets }] as const]
+            : [];
+        }),
+    );
+    if (!candidates.size || !chance(remasterShare)) return false;
+    const clips = [...candidates.keys()];
+    const [item] = [
+      ...likeUses.order(
+        ownerId,
+        "remaster",
+        clips.filter((clip) => clip.rating === "liked"),
+        random,
+      ),
+      ...clips.filter((clip) => clip.rating !== "liked"),
+    ];
+    const { input, prompt, frame, size, sourceLabel, targets } = candidates.get(item)!;
+    const latest = read(ownerId);
+    latest.remastered = [String(item.id), ...(latest.remastered || [])].slice(0, usedLimit);
+    write(ownerId, latest);
+    likeUses.used(ownerId, "remaster", [item.id]);
+    let choice: Awaited<ReturnType<typeof options.videoProfile>>;
+    try {
+      choice = await options.videoProfile(ownerId, access.account, {
+        backend: record.settings.videoBackend,
+        allowUncensored,
+        ...size,
+        unavailable: failing,
+        choose: (pool) => {
+          const weigh = videoWeights(ownerId);
+          return drawn(
+            pool.flatMap((profile): [DreamProfile, number][] =>
+              targets.some((target) => target.id === profile.id) ? [[profile, weigh(profile)]] : [],
+            ),
+          );
+        },
+      });
+    } catch {
+      return false;
+    }
+    const { profile } = choice;
+    const slot = dreamVideoSlot(profile);
+    if (!slot || !targets.some((target) => target.id === profile.id)) return false;
+    const picks = (Array.isArray(input.loras) ? input.loras : []).filter(
+      (lora: { name?: string; enabled?: boolean }) =>
+        lora?.name && lora.enabled !== false && !hidden.has(lora.name),
+    ) as DreamLoraPick[];
+    const label = profile.label || profile.id;
+    const at = choice.size ? `${choice.size.width}×${choice.size.height}` : "";
+    const { slot: _slot, ...reference } = frame;
+    const writing = input.writing as Record<string, unknown> | undefined;
+    const result = await options.admit(
+      {
+        ...profile.defaults,
+        ...choice.size,
+        ...(choice.frames ? { frames: choice.frames } : {}),
+        autoUpscale: null,
+        kind: "video",
+        profileId: profile.id,
+        ...(profile.model ? { model: profile.model } : {}),
+        ...(profile.workflow ? { workflow: profile.workflow } : {}),
+        count: 1,
+        prompt,
+        // Already written: the source's record keeps its title and explains the prompt.
+        ...(writing && typeof writing === "object" ? { writing: { ...writing, prompt } } : {}),
+        loras: picks.length ? fit(profile, picks) : [],
+        referenceAssets: [{ ...reference, slot: slot.id }],
+      },
+      access.account,
+      { sessionId: session(ownerId, record), operation: "animate", parentItemId: String(item.id) },
+      {
+        priority: queuePriority.dream,
+        dream: {
+          prompt,
+          why: ["Remaster", item.title, [label, at].filter(Boolean).join(" at ")]
+            .filter(Boolean)
+            .join(" · "),
+          at: stamp(),
+          ...(item.dream?.uncensored ? { uncensored: true as const } : {}),
+          arm: "remaster",
+          inputs: {
+            choice: `${label}, remastering a clip made on ${sourceLabel || "another model"} at ${size.width}×${size.height}`,
+          },
+          ...(item.dream?.projectId ? { projectId: item.dream.projectId } : {}),
+        },
+      },
+    );
+    return result.status < 400;
   }
   /**
    * Queues a series' next result on its image's profile with its settings, the LoRAs that still

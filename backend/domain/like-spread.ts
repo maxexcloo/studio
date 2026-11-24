@@ -7,6 +7,7 @@ export type LikePurpose =
   | "extend"
   | "prompt"
   | "recreate"
+  | "remaster"
   | "seed"
   | "summary";
 type Use = { uses: number; last: number };
