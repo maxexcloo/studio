@@ -520,7 +520,7 @@ export function useMediaActions(
                 id: "review",
                 label: "Review Prompt",
                 icon: icons.review,
-                checked: reviewChanges,
+                checked: Boolean(reviewChanges),
                 keepOpen: true,
                 onClick: () => setReviewChanges(!reviewChanges),
               },
