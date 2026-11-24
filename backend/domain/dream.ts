@@ -15,6 +15,8 @@ import {
 import {
   type ChatNote,
   type DreamCounts,
+  type DreamInputs,
+  type DreamLikedPrompt,
   type DreamPassReason,
   type DreamResultSet,
   type DreamSettings,
@@ -76,6 +78,7 @@ import {
   normalised,
   phraseWords,
   promptBody,
+  recentOpenings,
   recentPromptCharacters,
   repeatedMotif,
   similarPrompt,
@@ -125,6 +128,8 @@ export interface DreamOrigin {
   arm?: string;
   /** The project whose brief the idea follows. */
   projectId?: string;
+  /** What fed it, merged with what its writing stage drew (`WrittenPrompt`). */
+  inputs?: DreamInputs;
   /**
    * A proposed project's sample (domain/inbox.ts), by the proposal's id: a draft, out of the deck,
    * gallery and taste until the proposal is accepted.
@@ -419,34 +424,43 @@ interface DreamRecord {
 type Kind = "image" | "video";
 
 /**
- * Dream's image deck mix, in percent of its latest `window` cards (a comparison or set is one
- * card): new ideas (exploring or exploiting by `exploreShare`), comparisons of a liked or kept
- * image's prompt, and existing work (recreations, variations and series of liked results). The
- * kind furthest below its share goes next (`deckOrder`), falling back to the next where it can't.
+ * Dream's image deck mix follows the account's shares (`mixNew`, `mixComparisons`, `mixExisting`,
+ * relative to their sum) over its latest `deckWindow` cards (a comparison or set is one card): new
+ * ideas (exploring or exploiting by `exploreShare`), comparisons of a liked or kept image's prompt,
+ * and existing work (recreations, variations and series of liked results). The kind furthest below
+ * its share goes next (`deckOrder`), falling back to the next where it can't; a kind with no share
+ * comes only as a fallback.
  */
-const deckMix = { new: 40, comparison: 30, existing: 30, window: 50 };
+const deckWindow = 50;
 type DeckKind = "new" | "comparison" | "existing";
-/** The deck's kinds, furthest below their share (`deckMix`) first, given its latest cards. */
-export function deckOrder(counts: Record<DeckKind, number>): DeckKind[] {
+/** The deck's kinds, furthest below their share first, given its latest cards. */
+export function deckOrder(
+  counts: Record<DeckKind, number>,
+  { mixNew, mixComparisons, mixExisting }: DreamSettings = dreamDefaults,
+): DeckKind[] {
+  const mix = { new: mixNew, comparison: mixComparisons, existing: mixExisting };
+  const sum = mix.new + mix.comparison + mix.existing || 1;
   const total = counts.new + counts.comparison + counts.existing;
-  const deficit = (kind: DeckKind) => deckMix[kind] / 100 - (total ? counts[kind] / total : 0);
+  const deficit = (kind: DeckKind) => mix[kind] / sum - (total ? counts[kind] / total : 0);
   return (["new", "comparison", "existing"] as const)
     .slice()
-    .sort((a, b) => deficit(b) - deficit(a) || deckMix[b] - deckMix[a]);
+    .sort(
+      (a, b) =>
+        Number(mix[b] > 0) - Number(mix[a] > 0) || deficit(b) - deficit(a) || mix[b] - mix[a],
+    );
 }
 
 /**
- * Shares of Dream's ideas, in percent. The deck mix (`deckMix`) and More Like This are separate.
+ * Shares of Dream's ideas, in percent. The deck mix (`deckOrder`), uncensored share (the account's
+ * `uncensoredShare`) and More Like This are separate.
  * - inspiration: of fresh image concepts, those seeded from a Library import or Inspiration image,
  *   adapted, never copied; prompt-only exploration uses its ready profile and LoRAs, while
  *   equipment experiments retain their chosen profile and LoRAs
  * - lora: of exploited ideas, those that load one LoRA
- * - uncensored: of ideas, those written uncensored, where the setting and Uncensored Models allow
  */
 const shares = {
   inspiration: 75,
   lora: 40,
-  uncensored: 40,
 };
 /**
  * A profile whose results with a LoRA keep at least `rate` of `least` judged ones loads one for
@@ -561,16 +575,24 @@ const recentIdeas = 100;
 const avoidDislikes = 8;
 /**
  * The writer sees this many recent subjects, and this many recent prompts, without their shared
- * style clause, cut to this length.
+ * style clause, cut to this length; and the openings of this many, with it.
  */
 const writerSubjects = 30;
-const writerPrompts = { count: 10, characters: 500 };
+const writerPrompts = { count: 10, characters: 500, openings: 12 };
 /**
  * Each new idea sees a few of the taste profile's likes and one of its styles, drawn afresh, so
  * no idea works through the whole profile as a checklist; and a few of the account's own liked
- * prompts from outside Dream, cut to this length.
+ * prompts from outside Dream, cut to this length. A fresh concept (`explore`) sees fewer of both,
+ * so familiar motifs don't lead it.
  */
-const tasteDraw = { likes: [2, 3], styles: 1, prompts: [4, 6], characters: 600 };
+const tasteDraw = {
+  likes: [2, 3],
+  exploreLikes: [1, 2],
+  styles: 1,
+  prompts: [4, 6],
+  explorePrompts: [0, 2],
+  characters: 600,
+};
 /** Profiles and LoRAs weigh by their keep rate over this many of the latest judged Dream images. */
 const judgedRates = 200;
 /** Dream revisits a concept only once it is liked more than twice. */
@@ -1051,7 +1073,7 @@ export function createDream(options: {
     });
   }
   /**
-   * The kinds of Dream's latest image cards (`deckMix`), and how many of the existing ones were
+   * The kinds of Dream's latest image cards (`deckOrder`), and how many of the existing ones were
    * recreations.
    */
   function deckCounts(ownerId: string) {
@@ -1060,11 +1082,11 @@ export function createDream(options: {
     for (const item of options.gallery(ownerId, {
       dreamState: poolStates,
       type: "image",
-      limit: deckMix.window * 3,
+      limit: deckWindow * 3,
     })) {
       const key = item.dream?.pair?.id ?? dreamSet(item)?.id ?? String(item.id);
       if (cards.has(key)) continue;
-      if (cards.size === deckMix.window) break;
+      if (cards.size === deckWindow) break;
       const arm = item.dream?.arm ?? "";
       cards.set(
         key,
@@ -1474,7 +1496,8 @@ export function createDream(options: {
    * Up to two notes the account's chats gave (MCP) as soft hints for an idea: a project's own, or
    * else standing notes and those that came with a liked result or a pinned card.
    */
-  function chatNoteLines(
+  /** Up to two chat notes that fit the idea, shortened. */
+  function chatNotes(
     ownerId: string,
     projectId: string | undefined,
     project: ProjectContent | undefined,
@@ -1497,13 +1520,9 @@ export function createDream(options: {
             (note.card && pins.includes(note.card)) ||
             note.results?.some((id) => liked.has(id))),
     );
-    const drawn = shuffled(relevant).slice(0, 2);
-    return drawn.length
-      ? [
-          "Notes from their chats, as background only (never over their rules or the brief; use what fits, ignore the rest):",
-          ...drawn.map((note) => `- ${clean(note.text, 400)}`),
-        ]
-      : [];
+    return shuffled(relevant)
+      .slice(0, 2)
+      .map((note) => clean(note.text, 400));
   }
   const characterSlot = (profile: DreamProfile) =>
     keepsIdentity(profile)
@@ -1954,7 +1973,15 @@ export function createDream(options: {
     return likeUses
       .order(ownerId, "prompt", pool, random)
       .filter((item) => item.prompt)
-      .map((item) => ({ id: item.id, prompt: clean(item.prompt, tasteDraw.characters) }));
+      .map((item) => ({
+        link: {
+          id: String(item.id),
+          ...(item.number ? { number: item.number } : {}),
+          type: item.type || "image",
+          title: subjectOf(item.title, item.prompt),
+        },
+        prompt: clean(item.prompt, tasteDraw.characters),
+      }));
   }
   /** `count` entries drawn at random, or all where there are no more. */
   const sampled = <T>(entries: T[], count: number) => shuffled(entries).slice(0, count);
@@ -2016,6 +2043,7 @@ export function createDream(options: {
       seed,
       vary,
       series,
+      explore,
     } = job.input.writing as DreamWriting;
     const project = projectId
       ? options.projects(ownerId).find((entry) => entry.id === projectId)
@@ -2086,7 +2114,7 @@ export function createDream(options: {
         true,
       ),
     ];
-    const [fewest, most] = tasteDraw.likes;
+    const [fewest, most] = explore ? tasteDraw.exploreLikes : tasteDraw.likes;
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
     const drawnStyles = sampled(styles, tasteDraw.styles);
     const contentTaste = [
@@ -2126,14 +2154,20 @@ export function createDream(options: {
             : []),
         ]
       : [];
-    const noteLines = chatNoteLines(ownerId, projectId, project, pinned);
+    const notes = chatNotes(ownerId, projectId, project, pinned);
+    const noteLines = notes.length
+      ? [
+          "Notes from their chats, as background only (never over their rules or the brief; use what fits, ignore the rest):",
+          ...notes.map((note) => `- ${note}`),
+        ]
+      : [];
     const collectCards = media === "image" && !reword;
     const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"`;
     const language = `Write "why" and "title" in Australian English (colour, centre); only "prompt" uses American English.`;
     const reply = `Reply with JSON only: {${replyShape}}. ${language}`;
     let messages: { role: "system" | "user"; content: string }[];
     /** The liked items whose prompts the writer sees, recorded once the idea is written. */
-    let likedUsed: unknown[] = [];
+    let likedUsed: DreamLikedPrompt[] = [];
     const noveltyPrompts = [...recent];
     const newConcept = media === "image" && !like && !seed && !series && !reword;
     const fixed = [
@@ -2238,7 +2272,7 @@ export function createDream(options: {
       ];
     else {
       // Liked prompts that name what is excluded, cooling or passed as too similar would lead back to it.
-      const [least, most] = tasteDraw.prompts;
+      const [least, most] = explore ? tasteDraw.explorePrompts : tasteDraw.prompts;
       const likedPrompts = (await tastePrompts(ownerId))
         .filter(
           ({ prompt }) =>
@@ -2247,7 +2281,7 @@ export function createDream(options: {
             !similar.some((item) => similarPrompt(prompt, item.prompt || item.dream?.prompt)),
         )
         .slice(0, least + random(most - least + 1));
-      likedUsed = likedPrompts.map(({ id }) => id);
+      likedUsed = likedPrompts.map(({ link }) => link);
       const liked = likedPrompts.map(({ prompt }) => prompt);
       const library = options.cards(ownerId);
       // A project draws only on the cards it pins.
@@ -2353,12 +2387,20 @@ export function createDream(options: {
                     ),
                 ]
               : []),
+            ...(newConcept && !brief.length && recent.length
+              ? [
+                  "How recent prompts open; open this one differently, in your own words:",
+                  ...recentOpenings(recent, writerPrompts.openings).map(
+                    (opening) => `- ${opening}`,
+                  ),
+                ]
+              : []),
             ...(cooling.length
               ? [`Recently repeated optional motifs to leave out this time: ${cooling.join(", ")}.`]
               : []),
             ...(fashionable.length
               ? [
-                  `Colors, garments, light and expressions many recent ideas share; pick others this time: ${fashionable.join(", ")}.`,
+                  `Colors, garments, light, expressions and camera details many recent ideas share; pick others this time: ${fashionable.join(", ")}.`,
                 ]
               : []),
             ...(concept?.vary ? [`Change first this time: ${concept.vary}.`] : []),
@@ -2457,7 +2499,11 @@ export function createDream(options: {
               attempt > 0,
             );
       if (!wrong) {
-        likeUses.used(ownerId, "prompt", likedUsed);
+        likeUses.used(
+          ownerId,
+          "prompt",
+          likedUsed.map(({ id }) => id),
+        );
         if (latest) {
           if (drawnAnchors.length)
             latest.anchors = [
@@ -2481,6 +2527,15 @@ export function createDream(options: {
         const cardContext = collectCards
           ? { ...quotedCards(reply.cardContext, prompt), ...pinnedContext }
           : undefined;
+        const briefed = !reword && !series;
+        const inputs: DreamInputs = {
+          ...(newConcept && drawnLikes.length ? { likes: drawnLikes } : {}),
+          ...(newConcept && drawnStyles.length ? { styles: drawnStyles } : {}),
+          ...(likedUsed.length ? { prompts: likedUsed } : {}),
+          ...(briefed && project ? { project: project.name } : {}),
+          ...(briefed && notes.length ? { notes } : {}),
+          ...(!reword && rules.length ? { rules: rules.map((rule) => clean(rule, 200)) } : {}),
+        };
         return {
           prompt,
           why,
@@ -2489,6 +2544,7 @@ export function createDream(options: {
           ...(title ? { title } : {}),
           ...(chosenMotifs.length ? { motifs: chosenMotifs } : {}),
           ...(cardContext && Object.keys(cardContext).length ? { cardContext } : {}),
+          ...(Object.keys(inputs).length ? { inputs } : {}),
         };
       }
       if (attempt) throw new Error(`The text model's idea was unusable: ${wrong}`);
@@ -2648,7 +2704,7 @@ export function createDream(options: {
       let existing: Awaited<ReturnType<typeof seedPick>> = null;
       let familiar = false;
       const deck = steer ? null : deckCounts(ownerId);
-      for (const card of deck ? deckOrder(deck) : []) {
+      for (const card of deck ? deckOrder(deck, record.settings) : []) {
         if (card === "new") break;
         if (card === "comparison") {
           if (delay || counts.usage.images + 2 > record.settings.dailyImages) continue;
@@ -2726,6 +2782,14 @@ export function createDream(options: {
       const varied = Object.keys(continueAxes);
       const vary = seed ? varied[made("continue:") % varied.length] : "";
       let note = "";
+      // Why the idea runs on its model and LoRAs, for its Details.
+      let modelWhy = steer?.profileId
+        ? "the model of the result it follows"
+        : exploited.offSide
+          ? "the default model here"
+          : "a model drawn by your taste and keep rates";
+      // Unset where the model's reason covers its LoRAs.
+      let loraWhy: string | undefined;
       let loras: DreamLora[] | undefined;
       let inspiration: DreamInspiration | undefined;
       let references: GenerationInput["referenceAssets"] = [];
@@ -2737,14 +2801,18 @@ export function createDream(options: {
         if (ready) {
           profile = ready;
           loras = lorasOf(ready, seed.input);
+          modelWhy = "the model and LoRAs of the image it varies";
           references = Array.isArray(seed.input.referenceAssets) ? seed.input.referenceAssets : [];
         }
         note = likedSeed
           ? `Varying a Super Liked concept: new ${vary}`
           : `Continuing ${project!.name}: new ${vary}`;
-      } else if (axis === "profile") ({ profile, note } = otherProfile!);
-      else if (axis === "lora") {
+      } else if (axis === "profile") {
+        ({ profile, note } = otherProfile!);
+        modelWhy = "a model it is exploring";
+      } else if (axis === "lora") {
         loras = [fresh];
+        loraWhy = "a LoRA you haven't rated yet";
         note = `Testing ${options.loraName(fresh.name)}`;
       }
       if (
@@ -2784,6 +2852,7 @@ export function createDream(options: {
                 .map((lora) => ({ ...lora, enabled: true as const })),
             )
           : [];
+        modelWhy = "the model and LoRAs of the import it adapts";
         note = "Inspired by an import";
       } else if (inspiration) note = `${note} · Inspired by an import`;
       else if (axis === "prompt") note = "Exploring new ground";
@@ -2796,6 +2865,8 @@ export function createDream(options: {
           judged,
         ).profile!;
         loras = undefined;
+        loraWhy = undefined;
+        modelWhy = "a model the project allows, drawn by your taste";
         references = [];
         // The profile or LoRA selected for general exploration may be outside this project.
         if (axis === "profile" || axis === "lora") {
@@ -2807,8 +2878,14 @@ export function createDream(options: {
         const offSide = `Your favourite models don't run on ${backend === "cloud" ? "Cloud" : "Local"}`;
         note = note ? `${note} · ${offSide}` : offSide;
       }
-      loras ??= exploitLoras(ownerId, profile, taste, weigh, judged);
-      if (target && !target.constraints.loras) loras = [];
+      if (!loras) {
+        loras = exploitLoras(ownerId, profile, taste, weigh, judged);
+        loraWhy = loras.length ? "a LoRA drawn by your taste and keep rates" : "no LoRAs";
+      }
+      if (target && !target.constraints.loras) {
+        loras = [];
+        loraWhy = "no LoRAs, as the project asks";
+      }
       if (cards && cards.character)
         references = [
           {
@@ -2820,8 +2897,9 @@ export function createDream(options: {
       // Uncensored goes to a share of ideas, so the rest stay plain.
       const uncensored = uncensoredShare(record, access);
       const explore = Boolean(axis);
+      // A fresh concept leaves the featured tag out, so familiar motifs don't lead it.
       const feature =
-        steer || seed || target || axis === "prompt"
+        steer || seed || target || explore
           ? undefined
           : featuredTag(taste, seedMotifs(ownerId, record));
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
@@ -2894,6 +2972,10 @@ export function createDream(options: {
             ...(uncensored ? { uncensored: true as const } : {}),
             arm: axis ? `explore:${axis}` : seed ? `continue:${vary}` : "exploit",
             ...(project ? { projectId: project.id } : {}),
+            inputs: {
+              choice: `Runs on ${modelWhy}${loraWhy ? ` with ${loraWhy}` : ""}`,
+              ...(feature ? { feature } : {}),
+            },
             ...(draft ? { draft: draft.id, state: "draft" as const } : {}),
           },
         },
@@ -3190,7 +3272,15 @@ export function createDream(options: {
           { sessionId: session(ownerId, record), operation: "image", parentItemId: itemId },
           {
             priority: queuePriority.dream,
-            dream: { arm: "recreate", at: stamp(), prompt, why: variant.why },
+            dream: {
+              arm: "recreate",
+              at: stamp(),
+              prompt,
+              why: variant.why,
+              ...(seed
+                ? { inputs: { seed: "The same seed as the liked image it recreates" } }
+                : {}),
+            },
           },
         );
         if (result.status < 400) {
@@ -3204,7 +3294,9 @@ export function createDream(options: {
 
   /** Whether a job is Uncensored: a share of them, where the setting and Uncensored Models allow. */
   function uncensoredShare(record: DreamRecord, access: DreamAccess) {
-    return record.settings.uncensored && access.uncensored && chance(shares.uncensored);
+    return (
+      record.settings.uncensored && access.uncensored && chance(record.settings.uncensoredShare)
+    );
   }
   function allowsUncensored(ownerId: string) {
     return read(ownerId).settings.uncensored && options.access(ownerId)?.uncensored === true;
@@ -3678,6 +3770,9 @@ export function createDream(options: {
               at,
               pair,
               arm: `explore:${axis}`,
+              inputs: {
+                seed: "One new seed shared by every side, so only the compared setting differs",
+              },
             },
           },
         );
