@@ -17,6 +17,7 @@ import {
   radianceImageNode,
   radianceNodeSizeStep,
   radianceVideoLimits,
+  radianceVideoNode,
 } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
@@ -92,6 +93,7 @@ export function buildProfile({
   constraints = {},
   mediaInputs = [],
   aspectPolicy = "manual",
+  videoSizeLimits,
   maxLoras: loras = maxLoras,
   loraAdapter,
   loraBase,
@@ -169,7 +171,8 @@ export function buildProfile({
     constraints,
     ...(Object.keys(imageModes).length ? { imageModes } : {}),
     mediaInputs,
-    aspectPolicy: aspectPolicy === "reference" ? "reference" : "manual",
+    aspectPolicy: ["fixed", "reference"].includes(aspectPolicy) ? aspectPolicy : "manual",
+    ...(videoSizeLimits && { videoSizeLimits }),
     // Whether the model draws 2K/4K itself, per size: "yes" or "maybe" (family catalogue); {} for anything else.
     native:
       kind === "image"
@@ -355,6 +358,12 @@ export function inferModels(
     };
     const widthRange = sizeRange("width");
     const heightRange = sizeRange("height");
+    const videoNode = Object.values(workflow.graph || {}).find(
+      (node) => node.class_type === radianceVideoNode,
+    );
+    const { maxPixels, upscale } = videoNode
+      ? radianceVideoLimits(String(defaults.model || videoNode.inputs?.model || ""))
+      : {};
     const radianceImage = Object.values(workflow.graph || {}).some(
       (node) => node.class_type === radianceImageNode,
     );
@@ -561,6 +570,7 @@ export function inferModels(
       },
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,
+      videoSizeLimits: maxPixels ? { maxPixels, upscale } : undefined,
       maxLoras: workflow.loraStack?.max,
       loraAdapter: workflow.loraStack?.adapter,
       loraBase: workflowLoraBase(workflow),

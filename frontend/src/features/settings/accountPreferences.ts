@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 
 import type { Appearance } from "../../../../shared/appearance";
 import { defaultModelKeys } from "../../../../shared/profiles";
-import type { ImagePreference } from "../../../../shared/resolution";
+import type { ImagePreference, VideoPreference } from "../../../../shared/resolution";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -37,6 +37,7 @@ interface PreferenceValues {
 /** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
 export type Preferences = PreferenceValues &
   ImagePreference &
+  VideoPreference &
   Partial<Record<DefaultModelKey, string | null>>;
 export interface PreferencesStatus {
   preferences: Preferences;
@@ -82,7 +83,9 @@ export function useSavePreferences(previousGalleryViews?: SavedGalleryView[]) {
         changed("videos") ||
         "imageAspect" in patch ||
         "imageCount" in patch ||
-        "imageResolution" in patch
+        "imageResolution" in patch ||
+        "videoAspect" in patch ||
+        "videoResolution" in patch
       )
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
       if (changed("videos")) void client.invalidateQueries({ queryKey: ["animate-profile"] });

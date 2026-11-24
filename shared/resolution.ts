@@ -29,6 +29,8 @@ interface DefaultSizedProfile extends SizedProfile {
   aspectPresets?: { label: string; w: number; h: number }[];
   defaults?: { width?: unknown; height?: unknown; resolution?: unknown; resolutionTier?: unknown };
   imagePreference?: ImagePreference;
+  videoPreference?: VideoPreference;
+  videoSizeLimits?: VideoSizeLimits;
 }
 
 /** The workflow's configured canvas or its family's starting preset. */
@@ -140,9 +142,19 @@ export type ImagePreference = {
   imageCount?: number | null;
   imageResolution?: Resolution | null;
 };
-export const grokVideoAspects = [...imageAspects, "21:9", "5:2"];
-export const grokVideoDefaultResolution = "720p";
-export const grokPinnedResolutions = ["480p", grokVideoDefaultResolution];
+export const grokVideoAspects = [...imageAspects, "21:9", "5:2"] as const;
+export const videoResolutions = ["480p", "720p", "1080p"] as const;
+export const grokVideoDefaultResolution = videoResolutions[1];
+export const grokPinnedResolutions: string[] = [videoResolutions[0], grokVideoDefaultResolution];
+
+export type VideoPreference = {
+  videoAspect?: (typeof grokVideoAspects)[number] | null;
+  videoResolution?: (typeof videoResolutions)[number] | null;
+};
+export type VideoSizeLimits = {
+  maxPixels: number;
+  upscale?: { abovePixels: number; step: number };
+};
 
 export function grokVideoAspect(width: number, height: number) {
   const distance = (aspect: string) => {
@@ -166,7 +178,42 @@ export function orderedAspects<T extends { label: string }>(presets: T[]) {
 export const isResolution = (value: unknown): value is Resolution =>
   resolutions.includes(value as Resolution);
 
-/** A fresh image draft opens on a supported aspect and resolution for its profile. */
+function videoStartingSize(
+  profile: DefaultSizedProfile,
+  canvas: { width: number; height: number },
+) {
+  const { videoAspect, videoResolution } = profile.videoPreference ?? {};
+  if ((!videoAspect && !videoResolution) || profile.aspectPolicy === "fixed") return canvas;
+  const native = profile.options?.resolutions;
+  const width = profile.constraints?.width;
+  const height = profile.constraints?.height;
+  const pixels = adjustable(width) && adjustable(height);
+  const aspect =
+    (native?.length || pixels) && profile.aspectPresets?.find(({ label }) => label === videoAspect);
+  const size = aspect ? { width: aspect.w, height: aspect.h } : canvas;
+  if (native?.length) {
+    const resolution = native.find((option) => option.toLowerCase() === videoResolution);
+    return resolution ? { ...size, resolution } : size;
+  }
+  if (!pixels || !videoResolution) return size;
+
+  const [w, h] =
+    aspect && videoAspect ? videoAspect.split(":").map(Number) : [size.width, size.height];
+  const scale = Number.parseInt(videoResolution, 10) / Math.min(w, h);
+  const { maxPixels, upscale } = profile.videoSizeLimits ?? {};
+  const step = upscale && w * h * scale ** 2 > upscale.abovePixels ? upscale.step : undefined;
+  const wide = snapDimension(w * scale, { step: step ?? width?.step });
+  const tall = snapDimension(h * scale, { step: step ?? height?.step });
+  if (
+    wide !== snapDimension(wide, { ...width, step: step ?? width?.step }) ||
+    tall !== snapDimension(tall, { ...height, step: step ?? height?.step }) ||
+    (maxPixels !== undefined && wide * tall > maxPixels)
+  )
+    return size;
+  return { width: wide, height: tall };
+}
+
+/** A fresh draft opens on a supported aspect and resolution for its profile. */
 export function profileStartingSize(profile: DefaultSizedProfile): {
   width: number;
   height: number;
@@ -174,6 +221,7 @@ export function profileStartingSize(profile: DefaultSizedProfile): {
   resolutionTier?: Resolution;
 } {
   const canvas = profileImageSize(profile);
+  if (profile.kind === "video") return videoStartingSize(profile, canvas);
   const { aspectPresets: presets, imagePreference: preference } = profile;
   if (profile.kind !== "image" || !presets?.length || profile.aspectPolicy === "fixed")
     return canvas;

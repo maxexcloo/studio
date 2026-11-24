@@ -10,6 +10,7 @@ import {
 
 import { isCloudProfile } from "../../../../shared/profiles";
 import type { StudioSession } from "../../../../shared/queue";
+import { profileStartingSize } from "../../../../shared/resolution";
 import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
@@ -286,6 +287,10 @@ export async function mediaDraft(
   const loras = loraInfo
     ? sourceLoras!.filter((lora) => compatibleLoras(loraRun, loraInfo).includes(lora.name))
     : [];
+  const resolution =
+    operation === "animate" && item.type === "image"
+      ? profileStartingSize(editProfile).resolution
+      : undefined;
   return {
     profile,
     choice,
@@ -311,6 +316,7 @@ export async function mediaDraft(
         ...(operation !== "image" && !takesDenoise && { denoise: undefined }),
         ...(operation === "refine" && { loras }),
         ...(timing ? { duration: timing.duration, frames: timing.frames, fps: timing.fps } : {}),
+        ...(resolution && { resolution }),
         kind: targetKind,
         profileId: profile.id,
         model: editProfile.model,
