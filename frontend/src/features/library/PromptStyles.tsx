@@ -34,7 +34,6 @@ const path = "/api/profiles/prompt-styles";
 const audiences = [
   { value: "everyone", label: "Everyone" },
   { value: "uncensored", label: "Uncensored Only" },
-  { value: "censored", label: "Without Uncensored" },
 ];
 
 /** Saves the whole list over the hash it was read at, then refreshes the list and the menus. */
@@ -191,19 +190,14 @@ function StyleEditor({
           />
           <Input.Wrapper
             label="Offered To"
-            description="Accounts with or without Uncensored Models. Uncensored Only styles may write explicit prompts."
+            description="Uncensored Only styles may write explicit prompts and are offered only to accounts with Uncensored Models."
           >
             <SegmentedControl
               aria-label="Offered To"
               fullWidth
               data={audiences}
-              value={draft.uncensored ? "uncensored" : draft.censored ? "censored" : "everyone"}
-              onChange={(value) =>
-                change({
-                  uncensored: value === "uncensored" || undefined,
-                  censored: value === "censored" || undefined,
-                })
-              }
+              value={draft.uncensored ? "uncensored" : "everyone"}
+              onChange={(value) => change({ uncensored: value === "uncensored" || undefined })}
             />
           </Input.Wrapper>
           <DialogFooter pending={mutation.isPending} onCancel={close}>
@@ -360,11 +354,6 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                           leftSection={<icons.uncensored size={12} />}
                         >
                           Uncensored
-                        </Badge>
-                      )}
-                      {style.censored && (
-                        <Badge component="span" size="sm" color="gray">
-                          Without Uncensored
                         </Badge>
                       )}
                     </>
