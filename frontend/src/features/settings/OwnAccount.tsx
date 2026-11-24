@@ -122,43 +122,44 @@ export function OwnAccount() {
   const editable = own.canChangeEmail || own.canChangePassword;
   return (
     <Stack gap="lg">
-      <SettingGroup title="Sign-In">
-        <SettingRow
-          label="Email & Password"
-          description={
-            editable ? own.username : `${own.username} · Managed by your sign-in provider.`
-          }
-        >
-          {editable && (
-            <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
-              Change
-            </Button>
-          )}
-        </SettingRow>
-        <SettingRow
-          label="Access"
-          description={
-            admin
-              ? "Administrators use everything and manage Studio settings and accounts."
-              : "Your access group, set by an administrator, decides the models and features you can use."
-          }
-        >
-          <Badge miw="max-content" color="gray">
-            {admin ? "Administrator" : own.accessProfile?.name || "No Group"}
-          </Badge>
-        </SettingRow>
-        <SettingRow label="Sign-In Method">
-          <Text size="sm">
-            {[
-              own.canChangePassword && "Password",
-              (own.provider === "pocket-id" || own.signInLinked) && "Single Sign-On",
-            ]
-              .filter(Boolean)
-              .join(" & ") || "None"}
-          </Text>
-        </SettingRow>
-      </SettingGroup>
-      <PersonalMcpToken />
+      <PersonalMcpToken>
+        <SettingGroup title="Sign-In">
+          <SettingRow
+            label="Email & Password"
+            description={
+              editable ? own.username : `${own.username} · Managed by your sign-in provider.`
+            }
+          >
+            {editable && (
+              <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
+                Change
+              </Button>
+            )}
+          </SettingRow>
+          <SettingRow
+            label="Access"
+            description={
+              admin
+                ? "Administrators use everything and manage Studio settings and accounts."
+                : "Your access group, set by an administrator, decides the models and features you can use."
+            }
+          >
+            <Badge miw="max-content" color="gray">
+              {admin ? "Administrator" : own.accessProfile?.name || "No Group"}
+            </Badge>
+          </SettingRow>
+          <SettingRow label="Sign-In Method">
+            <Text size="sm">
+              {[
+                own.canChangePassword && "Password",
+                (own.provider === "pocket-id" || own.signInLinked) && "Single Sign-On",
+              ]
+                .filter(Boolean)
+                .join(" & ") || "None"}
+            </Text>
+          </SettingRow>
+        </SettingGroup>
+      </PersonalMcpToken>
       <Modal opened={editing} onClose={() => setEditing(false)} title={credentialsLabel(own)}>
         <FocusTrap.InitialFocus />
         <AccountForm

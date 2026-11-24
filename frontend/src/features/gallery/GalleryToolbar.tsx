@@ -38,7 +38,6 @@ export function GalleryToolbar({
   chipTools,
   toggles,
   view,
-  select,
   count,
   actions,
 }: {
@@ -53,8 +52,6 @@ export function GalleryToolbar({
   chipTools?: ReactNode;
   toggles: ReactNode;
   view: ReactNode;
-  /** The Select toggle, just before the view menu. */
-  select: ReactNode;
   count?: number;
   actions: ReactNode;
 }) {
@@ -121,11 +118,10 @@ export function GalleryToolbar({
   );
   // An empty view says so itself.
   const results = !count ? undefined : plural(count, kind === "video" ? "Video" : "Image");
-  // The open phone search keeps Select and the actions, so selecting doesn't close it.
+  // The open phone search keeps the actions at its end, so selecting doesn't close it.
   if (phone && searching)
     return (
       <Group key="search" ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
-        {select}
         {view}
         {search}
         {actions}
@@ -138,7 +134,6 @@ export function GalleryToolbar({
   );
   const row = (
     <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
-      {select}
       {view}
       {phone ? (
         <Tooltip label="Search Gallery">
@@ -195,6 +190,13 @@ export function GalleryToolbar({
         value={sort}
         onChange={onSortChange}
         withinPortal
+        trigger={
+          phone ? (
+            <Button {...iconChipProps} aria-label="Sort Gallery">
+              <icons.sort size={16} />
+            </Button>
+          ) : undefined
+        }
       />
       {!phone && <ZoomSlider />}
       {actions}

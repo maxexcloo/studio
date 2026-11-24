@@ -25,7 +25,6 @@ import { ratingChoices } from "../gallery/GalleryFilters";
 import { itemAction } from "../gallery/itemActions";
 import { mediaTitle } from "../gallery/mediaLabels";
 import { MediaTile } from "../gallery/MediaTile";
-import type { GalleryReviewRating } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { ComparisonRatingButtons, useRateComparison } from "./ComparisonRatingButtons";
 import { type Comparison, againItems, comparisonTitle, comparisonsQuery } from "./queries";
@@ -36,13 +35,6 @@ import filterClasses from "../gallery/GalleryFilters.module.css";
 import galleryClasses from "../gallery/GalleryPage.module.css";
 import tileClasses from "../gallery/MediaTileActions.module.css";
 
-// Disliked comparisons stay out of the default view.
-type Rating = "kept" | GalleryReviewRating;
-const ratings: { value: Rating; label: string }[] = [
-  { value: "kept", label: "Liked & Unrated" },
-  ...ratingChoices,
-];
-
 /**
  * The gallery's Comparisons view: a card per comparison or kept Dream comparison, newest first,
  * opening all its variants.
@@ -52,14 +44,14 @@ export function ComparisonList({ view }: { view: ReactNode }) {
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const requested = params.get("rating");
-  const rating: Rating =
-    ratings.find(({ value }) => value === requested && value !== "kept")?.value ?? "kept";
+  const rating =
+    ratingChoices.find(({ value }) => value === requested && value !== "all")?.value ?? "all";
   const { columns } = useGalleryColumns();
   const comparisons = useQuery(comparisonsQuery);
   // The winner, else the first variant with media, else the first still in the gallery, is the cover.
   const cards = (comparisons.data?.comparisons || []).flatMap((comparison) => {
     const rated = comparison.rating || "unrated";
-    if (rating === "kept" ? rated === "disliked" : rating !== "all" && rated !== rating) return [];
+    if (rating === "all" ? rated === "disliked" : rated !== rating) return [];
     const items = comparison.variants.flatMap(({ item }) => (item ? [item] : []));
     const cover =
       items.find((item) => item.id === comparison.winnerItemId) ||
@@ -96,9 +88,9 @@ export function ComparisonList({ view }: { view: ReactNode }) {
           <ViewMenu
             label="Rating"
             value={rating}
-            groups={[ratings]}
+            groups={[ratingChoices]}
             onChange={(value) =>
-              setParams(value === "kept" ? {} : { rating: value }, {
+              setParams(value === "all" ? {} : { rating: value }, {
                 replace: true,
                 state: location.state,
               })
@@ -112,7 +104,12 @@ export function ComparisonList({ view }: { view: ReactNode }) {
         <Alert color="red" title="Couldn't Load Comparisons">
           <Stack gap="sm" align="flex-start">
             {comparisons.error.message}
-            <Button size="compact-sm" variant="default" onClick={() => void comparisons.refetch()}>
+            <Button
+              size="compact-sm"
+              variant="default"
+              disabled={comparisons.isFetching}
+              onClick={() => void comparisons.refetch()}
+            >
               Retry
             </Button>
           </Stack>

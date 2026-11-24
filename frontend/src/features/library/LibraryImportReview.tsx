@@ -288,7 +288,7 @@ export function LibraryImportReview({
                 variant="default"
                 size="compact-sm"
                 ml="auto"
-                loading={query.isFetching}
+                disabled={query.isFetching}
                 onClick={() => void query.refetch()}
               >
                 Check Again

@@ -182,20 +182,27 @@ export function dreamVideoProfile(profiles, options) {
   }
   const profile =
     (!extend && choose?.(healthy)) || healthy.find((item) => item.id === defaultId) || healthy[0];
-  return withSize({ profile, frames: dreamFrames(profile) }, width, height);
+  return withSize({ profile, frames: dreamFrames(profile, options.seconds) }, width, height);
 }
 
-/** Dream's clips run 5 to 8 seconds: the profile's own length when it falls there, else the nearest it allows. */
-export function dreamFrames(profile) {
+/**
+ * Dream's clips run `seconds` long, else 5 to 8 seconds: the profile's own length when it falls
+ * there, else the nearest its frame grid allows.
+ */
+export function dreamFrames(profile, seconds = 0) {
   const fps = Number(profile.defaults?.fps);
   const frames = Number(profile.defaults?.frames);
   const grid = profile.constraints?.frames;
   if (!(fps > 0 && frames > 0) || !grid?.step) return undefined;
   const { min = 1, max = Infinity, step, offset = 0 } = grid;
-  const seconds = frames / fps;
-  if (seconds >= 5 && seconds <= 8) return frames;
-  const target = (seconds < 5 ? 5 : 8) * fps;
-  const steps = (seconds < 5 ? Math.ceil : Math.floor)((target - offset) / step);
+  if (seconds > 0) {
+    const nearest = offset + Math.round((seconds * fps - offset) / step) * step;
+    return Math.max(min, Math.min(max, nearest));
+  }
+  const length = frames / fps;
+  if (length >= 5 && length <= 8) return frames;
+  const target = (length < 5 ? 5 : 8) * fps;
+  const steps = (length < 5 ? Math.ceil : Math.floor)((target - offset) / step);
   const fitted = Math.max(min, Math.min(max, offset + steps * step));
   return (fitted - offset) % step ? frames : fitted;
 }

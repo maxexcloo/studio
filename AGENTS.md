@@ -120,7 +120,7 @@ recur across features.
 - Search clears only its query; filters preserve it. Toolbars show search as a
   field when there is room, otherwise open it from an icon. A Library or Settings list's Filter
   popover shows each filter's choices inline as chips (`FilterChoices`), All
-  first, never a dropdown.
+  first, never a dropdown; its sections sort alphabetically.
 - Named controls that open a picker or menu show ▾ (Animate ▾, Copy ▾), small
   beside an action bar's icon; ⋯ already means more, so it never carries one.
   Icon-only controls use accessible names and tooltips.
@@ -133,8 +133,10 @@ recur across features.
 - Media categories use Images, Videos, Text, with Cloud after Videos where it
   is their peer. Other unordered peers sort alphabetically, except settings
   first, Like before Dislike, Name A–Z and Name Z–A last in sort menus,
-  Refresh and Custom… last and Delete last. Settings sections, groups and rows
-  put settings before actions, with the Danger Zone last.
+  Refresh and Custom… last and Delete last. Settings and Library pages and
+  groups sort A–Z (Settings › Where Work Runs keeps Images, Videos, Dream, Text; About is
+  last; Installed leads a view selector it defaults), and rows put settings
+  before actions, with the Danger Zone last.
 - Labels name the verb alone where the menu or box already says what it acts
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps

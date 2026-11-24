@@ -34,7 +34,8 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { useHold } from "../../ui/useHold";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
 import { CardDescription, CardDialog, CardForm, CardThumbnails } from "../characters/CardImages";
 import { useMediaPreview } from "../gallery/MediaPreview";
 import { tasteQuery } from "../taste/TasteProfile";
@@ -339,7 +340,13 @@ function ProposalCard({
   onReason: () => void;
 }) {
   const Icon = kindIcon(proposal);
-  const { consumeClick, ...hold } = useHold(proposal.id, onReason);
+  // Touch screens have no tooltips, so they say once, until the first Decline, that holding asks why.
+  const touch = useTouch();
+  const [declineHinted, setDeclineHinted] = useRemembered("project-decline-hint", false);
+  const { consumeClick, ...hold } = useHold(proposal.id, () => {
+    setDeclineHinted(true);
+    onReason();
+  });
   const { change } = proposal;
   const pictures = (items: DreamItem[]) =>
     items.map((item, index) => ({
@@ -427,7 +434,9 @@ function ProposalCard({
               loading={declining}
               {...hold}
               onClick={(event) => {
-                if (!consumeClick(event)) onDecline();
+                if (consumeClick(event)) return;
+                setDeclineHinted(true);
+                onDecline();
               }}
             >
               Decline
@@ -443,6 +452,11 @@ function ProposalCard({
             Accept
           </Button>
         </Group>
+        {touch && !declineHinted && (
+          <Text size="xs" c="dimmed" ta="right">
+            Hold Decline to add a reason
+          </Text>
+        )}
       </Stack>
     </Paper>
   );

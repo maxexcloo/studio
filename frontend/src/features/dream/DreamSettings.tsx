@@ -1,7 +1,7 @@
-import { Alert, Stack, Switch, Text } from "@mantine/core";
+import { Alert, SegmentedControl, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { dreamSettingMaxima } from "../../../../shared/dream";
+import { dreamSettingMaxima, dreamVideoSeconds } from "../../../../shared/dream";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
@@ -74,14 +74,8 @@ export function DreamPreferences() {
       />
     </SettingRow>
   );
-  const mixTotal = settings.mixNew + settings.mixComparisons + settings.mixExisting;
   const mix = (key: "mixNew" | "mixComparisons" | "mixExisting", label: string, what: string) =>
-    number(
-      key,
-      label,
-      `${what} Relative to the others${mixTotal ? `: ${Math.round((settings[key] / mixTotal) * 100)}% of cards` : ""}.`,
-      !settings.images,
-    );
+    number(key, label, what, !settings.images);
   return (
     <Stack gap="lg">
       <SettingGroup title="General">
@@ -99,12 +93,13 @@ export function DreamPreferences() {
         {dream.data.uncensoredAvailable && (
           <>
             {toggle("uncensored", "Uncensored", "Allow explicit themes.")}
-            {number(
-              "uncensoredShare",
-              "Uncensored Share",
-              "Percent of ideas with explicit themes.",
-              !settings.uncensored,
-            )}
+            {settings.uncensored &&
+              number(
+                "uncensoredShare",
+                "Uncensored Share",
+                "Percent of ideas with explicit themes.",
+                false,
+              )}
           </>
         )}
       </SettingGroup>
@@ -128,6 +123,24 @@ export function DreamPreferences() {
       </SettingGroup>
       <SettingGroup title="Videos">
         {toggle("videos", "Generate Videos", "Animate kept or liked images.")}
+        <SettingRow
+          wide
+          label="Video Length"
+          description="Each model keeps to the lengths it allows."
+        >
+          <SegmentedControl
+            role="radiogroup"
+            aria-label="Video Length"
+            fullWidth
+            disabled={!settings.videos}
+            value={String(settings.videoSeconds)}
+            data={dreamVideoSeconds.map((seconds) => ({
+              value: String(seconds),
+              label: seconds ? `${seconds} s` : "Auto",
+            }))}
+            onChange={(value) => save.mutate({ videoSeconds: Number(value) })}
+          />
+        </SettingRow>
         {number(
           "dailyVideos",
           "Daily Videos",

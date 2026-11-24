@@ -3957,6 +3957,7 @@ test("Dream remasters a kept or liked clip once, larger or on a stronger tier", 
   clip("quick", "ltx-fast", 1024, {
     dream: { prompt: "", why: "", at: "", state: "kept", arm: "animate", projectId: "beach" },
   });
+  await fx.dream.save("alice", { videoSeconds: 8 });
   const remaster = await fx.dreamOnce();
   assert.equal(remaster?.dream?.arm, "remaster");
   assert.equal(remaster.parentItemId, "quick");
@@ -3965,7 +3966,8 @@ test("Dream remasters a kept or liked clip once, larger or on a stronger tier", 
   assert.equal(remaster.input.profileId, "ltx-quality");
   assert.equal(remaster.input.prompt, "the camera follows quick");
   assert.equal((remaster.input.writing as { title?: string }).title, "Clip quick");
-  assert.equal(remaster.input.frames, 121);
+  // The chosen 8 seconds, on the profile's frame grid.
+  assert.equal(remaster.input.frames, 193);
   // Only the LoRAs its new profile can load go with it.
   assert.deepEqual(remaster.input.loras, [
     { name: "film.safetensors", strength: 0.5, enabled: true },

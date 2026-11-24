@@ -6,6 +6,8 @@ export const dreamDefaults = {
   dailyVideos: 50,
   images: true,
   videos: true,
+  /** Seconds per video clip, or 0 for Auto (5 to 8). */
+  videoSeconds: 0,
   uncensored: false,
   useLoadedProfile: true,
   imageBackend: "local" as "local" | "cloud",
@@ -27,6 +29,8 @@ export const dreamSettingMaxima = {
   mixExisting: 100,
   uncensoredShare: 100,
 };
+/** The clip lengths Dream offers; 0 is Auto. Each model clamps to its own frame limits. */
+export const dreamVideoSeconds = [0, 5, 8, 10] as const;
 export const maxDreamIdleMinutes = 120;
 export const dreamTimingSettings = {
   imageIdleMinutes: { key: "STUDIO_DREAM_IMAGE_IDLE_MINUTES", defaultValue: 0 },
@@ -116,6 +120,10 @@ export type DreamOverride = keyof typeof dreamOverrideKeys;
 export function dreamSettingError(key: keyof DreamSettings, value: unknown): string {
   if (key === "imageBackend" || key === "videoBackend")
     return value === "local" || value === "cloud" ? "" : `Choose Local or Cloud for ${key}.`;
+  if (key === "videoSeconds")
+    return (dreamVideoSeconds as readonly unknown[]).includes(value)
+      ? ""
+      : "Choose Auto, 5, 8 or 10 seconds for videoSeconds.";
   if (key in dreamSettingMaxima) {
     const max = dreamSettingMaxima[key as keyof typeof dreamSettingMaxima];
     return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= max

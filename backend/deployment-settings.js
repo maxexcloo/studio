@@ -34,7 +34,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_FACE_CHECK",
     "Face Check",
-    "Each image made with a character is compared by face with the character's image on Studio's CPU, and marked when it shows someone else or the character twice. Downloads the face models (about 260 MB) into the data folder.",
+    "Marks character results that show someone else or the character twice. Downloads about 260 MB.",
   ),
   flag(
     "STUDIO_FACE_REDO",
@@ -54,7 +54,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_IMAGE_SEARCH",
     "Image Search",
-    "Gallery search also finds images that look like the words, read by SigLIP 2 on Studio's CPU while it is idle. Downloads the model (about 690 MB) into the data folder.",
+    "Gallery search also finds images by what they show. Downloads about 690 MB.",
   ),
   flag(
     "STUDIO_NEXT_STEPS",

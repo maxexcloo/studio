@@ -179,6 +179,7 @@ export function GalleryChoices({
         filters={
           <GalleryFilterPanel
             {...filterProps}
+            rating
             toggles={
               !uploads && (
                 <ShowToggles
