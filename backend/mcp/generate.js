@@ -48,11 +48,11 @@ import {
   accountExclusions,
   assertAvoided,
   assertProjectReuse,
-  assertTasteExclusions,
   briefLine,
   keptChoices,
   projectArgs,
   projectTargets,
+  withoutTasteExclusions,
 } from "./project.js";
 import {
   exactPromptInstructions,
@@ -1052,7 +1052,7 @@ export function registerGenerateTools({
     if (remembered.kept.length)
       projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
     if (exclusions.length && review(`exclusions:${JSON.stringify(exclusions)}`))
-      projectNote = `The user excludes these subjects, props or settings: ${exclusions.join(", ")}. Leave them out of positive prompts. Keep the user's own wording and vary only details they left open. If an explicit request conflicts with an exclusion, tell the user before changing it. ${projectNote}`;
+      projectNote = `The user excludes these subjects, props or settings: ${exclusions.join(", ")}. Leave them out of positive prompts; Studio removes any a prompt names and says what it removed. Keep the user's own wording and vary only details they left open. ${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)
@@ -1222,9 +1222,15 @@ export function registerGenerateTools({
               };
             }),
           );
-    for (const { plan } of plans) {
+    for (const entry of plans) {
+      const { plan } = entry;
+      // A confirmed preview's prompts were cleaned when it was shown.
+      if (!entry.excluded) {
+        const cleaned = withoutTasteExclusions(exclusions, plan.prompts);
+        plan.prompts = cleaned.prompts;
+        Object.assign(entry, { excluded: cleaned.excluded, exclusionNote: cleaned.note });
+      }
       if (project) assertAvoided(project, plan.prompts);
-      assertTasteExclusions(exclusions, plan.prompts);
       if (
         !plan.reference_asset_ids?.length &&
         !plan.prompt_references?.some((refs) => refs.length)
@@ -1238,6 +1244,8 @@ export function registerGenerateTools({
           );
       }
     }
+    const excluded = Object.assign({}, ...plans.map((entry) => entry.excluded));
+    projectNote = `${[...new Set(plans.map((entry) => entry.exclusionNote))].join("")}${projectNote}`;
     let strengthOptions;
     if (strengthChoice) {
       const [{ profile, plan }] = plans;
@@ -1320,6 +1328,7 @@ export function registerGenerateTools({
       return {
         ...(request ? { request } : {}),
         ...(assistant ? { assistant } : {}),
+        excluded,
       };
     };
     if (several || axis) {
@@ -1470,8 +1479,9 @@ export function registerGenerateTools({
       attachedProject(signal),
       accountExclusions(media, owner, signal),
     ]);
-    if (project) assertAvoided(project, checked);
-    assertTasteExclusions(exclusions, checked);
+    const cleaned = withoutTasteExclusions(exclusions, checked);
+    const cleanedOf = new Map(checked.map((prompt, index) => [prompt, cleaned.prompts[index]]));
+    if (project) assertAvoided(project, cleaned.prompts);
     // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
     const all = await media.profiles("all", owner);
     const seed = crypto.randomInt(2 ** 31);
@@ -1515,7 +1525,7 @@ export function registerGenerateTools({
           profile,
           plan: {
             ...args,
-            prompts: group.map((item) => changed(plan.prompts[item.prompt])),
+            prompts: group.map((item) => cleanedOf.get(changed(plan.prompts[item.prompt]))),
             count,
             ...(titles ? { titles: group.map((item) => titles[item.prompt]) } : {}),
             ...(captions ? { captions: group.map((item) => captions[item.prompt]) } : {}),
@@ -1537,7 +1547,7 @@ export function registerGenerateTools({
         });
       }
     }
-    const record = { ...(request ? { request } : {}) };
+    const record = { ...(request ? { request } : {}), excluded: cleaned.excluded };
     for (const run of runs) {
       try {
         run.queued = (await submit(run.profile, run.plan, record, { guide: false })).queued;
@@ -1550,7 +1560,7 @@ export function registerGenerateTools({
     }
     const sent = runs.filter((run) => run.queued);
     const fresh = recordSet(sent);
-    const note = `${setNote(fresh, sent)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
+    const note = `${setNote(fresh, sent)}${cleaned.note}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
     try {
       return withSet(
         sent.length === 1
@@ -1821,8 +1831,9 @@ export function registerGenerateTools({
         attachedProject(signal),
         accountExclusions(media, owner, signal),
       ]);
+      const cleaned = withoutTasteExclusions(exclusions, plan.args.prompts);
+      plan.args.prompts = cleaned.prompts;
       if (project) assertAvoided(project, plan.args.prompts);
-      assertTasteExclusions(exclusions, plan.args.prompts);
       const known = project?.constraints.profiles.length
         ? (await media.catalogue(owner)).profiles
         : [];
@@ -1838,6 +1849,7 @@ export function registerGenerateTools({
             ? { request: request || recorded.request }
             : {}),
           ...(carried ? { assistant: carried } : {}),
+          excluded: cleaned.excluded,
         },
         { validate },
       );
@@ -1850,7 +1862,7 @@ export function registerGenerateTools({
         signal,
         submission.guide,
         source,
-        `${plan.tierNote || ""}${dropped}`,
+        `${plan.tierNote || ""}${dropped}${cleaned.note}`,
       );
     },
   );

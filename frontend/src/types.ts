@@ -172,6 +172,8 @@ export interface MediaItem {
   negative?: string;
   /** The prompt a provider's moderation refused; `prompt` is the assistant's softened retry. */
   refusedPrompt?: string;
+  /** What MCP removed from the prompt for the account's Taste exclusions. */
+  excluded?: string[];
   /** How the prompt assistant wrote the prompt in the queue: its text model and thinking. */
   writing?: { kind: string; model?: string; thinking?: string };
   /** A few words the text model summarised from the prompt; show it with mediaTitle. */

@@ -3,11 +3,13 @@ import { z } from "zod";
 
 import { briefSummary } from "../../shared/projects.ts";
 import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
+import { recordBelongsToAccount } from "../account-ownership.js";
+import { directRoute } from "../domain/direct-route.ts";
 import {
   explicitExclusions,
   forbiddenMotifs,
   mentionsMotif,
-  namedMotif,
+  phraseWords,
 } from "../domain/dream-concepts.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
@@ -66,7 +68,58 @@ export function createChatChoices({ dataDir, now = Date.now }) {
       saved[key(owner, chat)] = { ...choices, at: now() };
       writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
     },
+    /** The account's chats with something remembered, newest first, for Taste › Chat Notes. */
+    list(account, at = now()) {
+      return Object.entries(all())
+        .flatMap(([stored, { references, image, video, loras, count, title, at: used }]) => {
+          const [owner, chat] = stored.split("\n");
+          if (!recordBelongsToAccount({ ownerId: owner }, account)) return [];
+          const kept = references && at - references.at < keptReferencesMs;
+          const shown = {
+            ...(image ? { image } : {}),
+            ...(video ? { video } : {}),
+            ...(loras === false ? { loras } : {}),
+            ...(count > 1 ? { count } : {}),
+            ...(title ? { title } : {}),
+            ...(kept
+              ? {
+                  references: {
+                    count: references.ids.length,
+                    until: new Date(references.at + keptReferencesMs).toISOString(),
+                  },
+                }
+              : {}),
+          };
+          return Object.keys(shown).length
+            ? [{ chat, ...shown, at: new Date(used).toISOString() }]
+            : [];
+        })
+        .sort((a, b) => b.at.localeCompare(a.at));
+    },
+    /** Forgets what the account's chat remembered. */
+    forget(account, chat) {
+      const saved = all();
+      for (const stored of Object.keys(saved)) {
+        const [owner, named] = stored.split("\n");
+        if (named === chat && recordBelongsToAccount({ ownerId: owner }, account))
+          delete saved[stored];
+      }
+      writeRuntimeDocument(dataDir, "mcp-chat-choices", saved);
+    },
   };
+}
+
+/** Taste › Chat Notes' list of what each chat remembers, and Clear. */
+export function registerChatChoiceRoutes(app, { dataDir }) {
+  const choices = createChatChoices({ dataDir });
+  directRoute(app, "GET", "/api/chat-choices", (account) => ({
+    status: 200,
+    payload: { chats: choices.list(account) },
+  }));
+  directRoute(app, "DELETE", "/api/chat-choices/:chat", (account, { params }) => {
+    choices.forget(account, params.chat);
+    return { status: 200, payload: { chats: choices.list(account) } };
+  });
 }
 
 /**
@@ -243,14 +296,104 @@ export async function accountExclusions(media, owner, signal) {
   return taste?.exclusions || [];
 }
 
-export function assertTasteExclusions(exclusions, prompts) {
+const exclusionLead = new Set([
+  "a",
+  "an",
+  "any",
+  "avoid",
+  "never",
+  "no",
+  "not",
+  "some",
+  "the",
+  "without",
+]);
+const danglingLink = new Set(["and", "holding", "of", "or", "with"]);
+const wordsIn = (text) => [...text.matchAll(/[\p{L}\p{N}]+/gu)];
+const contentWords = (text) =>
+  wordsIn(text).filter(([word]) => !exclusionLead.has(word.toLowerCase())).length;
+
+/** The shortest run of up to five words in `text` that names `motif`: [start, end, its words]. */
+function motifSpan(text, motif) {
+  const words = wordsIn(text);
+  for (let size = 1; size <= 5; size++)
+    for (let first = 0; first + size <= words.length; first++) {
+      const start = words[first].index;
+      const last = words[first + size - 1];
+      const end = last.index + last[0].length;
+      if (mentionsMotif(text.slice(start, end), motif)) {
+        // A leading "no" or article goes with it, as does a link left dangling before a break.
+        const word = (index) => words[index][0].toLowerCase();
+        const spaced = (index) =>
+          /^\s+$/.test(
+            text.slice(words[index - 1].index + words[index - 1][0].length, words[index].index),
+          );
+        let at = first;
+        while (at > 0 && exclusionLead.has(word(at - 1)) && spaced(at)) at--;
+        if (
+          at > 0 &&
+          danglingLink.has(word(at - 1)) &&
+          spaced(at) &&
+          /^\s*(?:[,.;:!?)]|$)/.test(text.slice(end))
+        )
+          at--;
+        return [words[at].index, end, text.slice(start, end)];
+      }
+    }
+  return null;
+}
+
+const tidied = (text) =>
+  text
+    .replace(/\(\s*\)|\[\s*\]/g, "")
+    .replace(/[ \t]+([,.;:!?)])/g, "$1")
+    .replace(/([,;:])(?:\s*[,;:])+/g, "$1")
+    .replace(/[,;:]+(?=[.!?])/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/(^|\n)[\s,;:.-]+/g, "$1")
+    .replace(/[\s,;:-]+$/, "")
+    .trim();
+
+/**
+ * Prompts without what the account's Taste exclusions name (an image model draws what a prompt
+ * names, even after "no"): each named phrase goes, with its "no" or article, and the reply says
+ * what went. A prompt that would keep fewer than two words is refused, since what would remain
+ * is no longer the request. `excluded` maps each changed prompt to the words removed from it.
+ */
+export function withoutTasteExclusions(exclusions, prompts) {
   const explicit = exclusions.map((entry) => [entry, explicitExclusions([entry])]);
-  for (const [index, prompt] of prompts.entries())
+  const excluded = {};
+  const removed = [];
+  const cleaned = prompts.map((prompt, index) => {
+    if (!prompt) return prompt;
+    let next = prompt;
+    const words = [];
     for (const [entry, motifs] of explicit)
-      if (namedMotif(prompt, motifs))
-        throw new Error(
-          `Prompt ${index + 1} conflicts with "${entry}", which your Taste Profile excludes. If you introduced it while writing the prompt, remove only that detail and keep the rest as written. If the user expressly requested it, tell them before changing their prompt. They can edit exclusions in Dream › Taste.`,
-        );
+      for (const motif of motifs)
+        for (let span = motifSpan(next, motif); span; span = motifSpan(next, motif)) {
+          const [start, end, named] = span;
+          next = `${next.slice(0, start)}${next.slice(end)}`;
+          words.push(named);
+          removed.push({ index, named, entry });
+        }
+    if (!words.length) return prompt;
+    next = tidied(next);
+    if (contentWords(next) < 2)
+      throw new Error(
+        `Prompt ${index + 1} is little more than ${words.map((word) => `"${word}"`).join(", ")}, which your Taste Profile excludes. Tell the user; they can edit exclusions in Dream › Taste.`,
+      );
+    excluded[next] = [...new Set([...(excluded[next] || []), ...words])];
+    return next;
+  });
+  const note = removed.length
+    ? `Removed for the user's Taste exclusions: ${removed
+        .map(
+          ({ index, named, entry }) =>
+            `"${named}"${prompts.length > 1 ? ` from prompt ${index + 1}` : ""}${phraseWords(named) === phraseWords(entry) ? "" : ` (${entry})`}`,
+        )
+        .join(", ")}. Tell the user. `
+    : "";
+  return { prompts: cleaned, excluded, note };
 }
 
 /** Registers project: a chat attaches to one so generate keeps to its brief and constraints. */

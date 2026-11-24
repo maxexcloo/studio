@@ -1489,6 +1489,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         negative: body.negative || "",
         // The prompt a provider's moderation refused before the assistant rewrote it as `prompt`.
         ...(body.refusedPrompt ? { refusedPrompt: body.refusedPrompt } : {}),
+        // What MCP removed from the prompt for the account's Taste exclusions.
+        ...(Array.isArray(body.excluded) ? { excluded: body.excluded.map(String) } : {}),
         filename: title || item.filename,
         createdAt: existing[index]?.createdAt || new Date().toISOString(),
         ...(body.galleryAt ? { galleryAt: body.galleryAt } : {}),

@@ -581,8 +581,8 @@ function ContextCards({ item }: { item: MediaItem }) {
 }
 
 /**
- * Details › Prompt with any Refused Prompt and the prompt's thinking, then any Negative Prompt as its
- * own section.
+ * Details › Prompt with any Refused Prompt, any words removed for Taste and the prompt's thinking,
+ * then any Negative Prompt as its own section.
  */
 function DetailsPrompt({ item }: { item: MediaItem }) {
   // A pending tile has no gallery record to read yet.
@@ -604,6 +604,12 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
             <DetailText>{item.refusedPrompt}</DetailText>
           </Stack>
         )}
+        {item.excluded?.length ? (
+          <Stack gap={2}>
+            <PartLabel>Removed for Taste</PartLabel>
+            <DetailText>{item.excluded.join(", ")}</DetailText>
+          </Stack>
+        ) : null}
       </DetailSection>
       {item.negative && (
         <DetailSection title="Negative Prompt" copy={item.negative}>
