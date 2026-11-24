@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { loadMcpPrompting } from "./mcp/prompting.js";
-import { animateClip, animateInstructions, writeAnimatePrompt } from "./prompt-animate.js";
+import {
+  animateClip,
+  animateInstructions,
+  clipName,
+  writeAnimatePrompt,
+} from "./prompt-animate.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
 
 // The three shapes Animate writes for, each with its mode's format rule from the merged guide.
@@ -365,4 +370,18 @@ test("a queued video uses the recorded backend's reference mode guide, timing an
   assert.match(system.content, /only 4 seconds long at 24 fps/);
   assert.match(request.content[0].text, /The clip so far was made from: A bird takes flight/);
   assert.equal(request.content[1].image_url.url, "data:image/jpeg;base64,AAAA");
+});
+
+test("A Dream clip's reply ends with its card's title and why, kept out of the prompt", () => {
+  assert.deepEqual(
+    clipName(
+      "She turns and waves.\nShe laughs.\n\nTitle: Wave Goodbye\nWhy: A tracked turn into a wave",
+    ),
+    {
+      text: "She turns and waves.\nShe laughs.",
+      title: "Wave Goodbye",
+      why: "A tracked turn into a wave",
+    },
+  );
+  assert.deepEqual(clipName("She turns and waves."), { text: "She turns and waves." });
 });

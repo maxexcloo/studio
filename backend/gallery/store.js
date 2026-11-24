@@ -130,7 +130,7 @@ const list = (values) => JSON.stringify([...values].map(String));
  * single-user owner); `unlisted` keeps (or leaves out) what the gallery doesn't list: disliked items
  * and Dream's pool; `rating` is "liked" or "disliked"; `status`, `notStatus` and `dreamState` take
  * one or several; `dreamArm` keeps Dream results whose arm starts with one of its prefixes,
- * `notDreamArm` leaves out one arm and `dreamPair` keeps (or leaves out) comparison sides; `liked` keeps
+ * `notDreamArm` leaves out one arm, `notDream` every Dream result, and `dreamPair` keeps (or leaves out) comparison sides; `liked` keeps
  * the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
  * items and `turnId` one turn of a chat; `ids` match items' ids, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
@@ -187,6 +187,7 @@ function where(query = {}) {
     );
   }
   if (query.notDreamArm !== undefined) add(`${dreamArm} IS NOT ?`, query.notDreamArm);
+  if (query.notDream) add("json_type(value, '$.dream') IS NOT 'object'");
   if (query.dreamPair !== undefined) add(`${dreamPair} IS ${query.dreamPair ? "NOT " : ""}NULL`);
   // Liked and kept rows are each read through their own index.
   if (query.liked)

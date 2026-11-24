@@ -1,35 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { isCloudProfile } from "../../../../shared/profiles.ts";
-import type { MediaItem, MediaKind, Profile } from "../../types";
+import type { MediaKind } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { useRemembered } from "../auth/useRemembered";
 import { modelsQuery } from "../generation/GenerationProvider";
-import { isProfile, profileForBackend, takesReferences } from "../generation/payload";
+import { profileForBackend, takesReferences } from "../generation/payload";
 import { profileOptions } from "../generation/ProfilePicker";
-
-function referenceProfilePriority(profile: Profile) {
-  const run = profileForBackend(profile, undefined, true)!;
-  if (profile.availability || run.ready === false) return 3;
-  if (isCloudProfile(profile)) return 2;
-  return run.backend === "radiance" ? 0 : 1;
-}
-
-export function automaticEditProfile(profiles: Profile[], item: MediaItem) {
-  const compatible = profiles.filter(
-    (profile) => profile.kind === item.type && takesReferences(profile),
-  );
-  const priorId = item.settings?.profileId;
-  const original = compatible.find((profile) =>
-    priorId ? isProfile(profile, priorId) : profile.model === item.model,
-  );
-  const ready = compatible.filter((profile) => referenceProfilePriority(profile) < 3);
-  if (original && referenceProfilePriority(original) < 3) ready.unshift(original);
-  return ready.sort(
-    (left, right) => referenceProfilePriority(left) - referenceProfilePriority(right),
-  )[0];
-}
+import { referenceProfilePriority } from "./editProfile";
 
 export function useActionProfile(kind: MediaKind) {
   const [saved, select] = useRemembered<string | null>(

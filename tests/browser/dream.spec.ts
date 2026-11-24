@@ -500,11 +500,8 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("Dream works when the queue is free · 12 of 40 today", {
-      exact: true,
-    }),
-  ).toBeVisible();
+  await expect(page.getByText("Dream works when the queue is free", { exact: true })).toBeVisible();
+  await expect(page.getByText("12 of 40 today", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
@@ -1231,7 +1228,7 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   expect(dream.requests[2].body).toEqual({ ids: ["one"], reason: "glitch" });
 });
 
-test("Dream fullscreen closes from the letterbox and leaves the image interactive", async ({
+test("Dream fullscreen closes from the letterbox and taps cycle its chrome, text and media alone", async ({
   page,
   isMobile,
 }) => {
@@ -1264,9 +1261,31 @@ test("Dream fullscreen closes from the letterbox and leaves the image interactiv
   await expect(open).toBeFocused();
 
   await open.click();
-  if (isMobile) await picture.tap();
-  else await picture.click();
-  await expect(preview).toBeVisible();
+  const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
+  const actions = preview.getByRole("group", { name: "Dream Actions", exact: true });
+  const why = preview.getByText("Because you like wide.", { exact: true });
+  await expect(why).toBeHidden();
+  const tap = () => (isMobile ? picture.tap() : picture.click());
+  await expect(header).toBeVisible();
+  await tap();
+  await expect(why).toBeVisible();
+  await expect(header).toBeVisible();
+  await expect(actions).toBeVisible();
+  await tap();
+  await expect(why).toBeHidden();
+  await expect(header).toBeHidden();
+  await expect(actions).toBeHidden();
+  await page.keyboard.press("c");
+  await expect(header).toBeVisible();
+  await expect(actions).toBeVisible();
+  // Hiding the chrome from one of its own controls keeps the shortcut working.
+  await header.getByRole("button", { name: "Close Preview", exact: true }).focus();
+  await page.keyboard.press("c");
+  await expect(why).toBeVisible();
+  await page.keyboard.press("c");
+  await expect(header).toBeHidden();
+  await page.keyboard.press("c");
+  await expect(header).toBeVisible();
   expect(verdicts(dream)).toEqual([]);
 });
 
