@@ -2017,15 +2017,15 @@ test("Returning after more than a page of incoming results leaves no gap before 
   let incoming: typeof original = [];
   const cursors: string[] = [];
   let release!: () => void;
-  const initialRefresh = new Promise<void>((resolve) => {
+  const heldRefresh = new Promise<void>((resolve) => {
     release = resolve;
   });
   await page.route("**/api/gallery?**", async (route) => {
     const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
     cursors.push(cursor);
     const matches = [...incoming, ...original];
-    // Return while the startup head refresh still holds the old results.
-    if (cursors.length === 2) await initialRefresh;
+    // Return again while the first return's head read still holds the old results.
+    if (cursors.length === 2) await heldRefresh;
     const start = Number(cursor);
     return route.fulfill({
       json: {
@@ -2039,7 +2039,6 @@ test("Returning after more than a page of incoming results leaves no gap before 
   await page.goto("/images/browse-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(currentResult(viewer)).toHaveText("1 / 10");
-  await expect.poll(() => cursors.length).toBe(2);
   const visibility = (hidden: boolean) =>
     page.evaluate((hidden) => {
       Object.defineProperty(document, "visibilityState", {
@@ -2049,6 +2048,9 @@ test("Returning after more than a page of incoming results leaves no gap before 
       Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
       document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
     }, hidden);
+  await visibility(true);
+  await visibility(false);
+  await expect.poll(() => cursors.length).toBe(2);
   await visibility(true);
   incoming = results(65).map((item, index) => ({
     ...item,
