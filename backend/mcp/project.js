@@ -293,7 +293,7 @@ export async function accountExclusions(media, owner, signal) {
   const taste = await media
     .request("GET", "/api/taste", undefined, owner, { signal })
     .catch(() => null);
-  return taste?.exclusions || [];
+  return taste?.preferences?.exclusions || [];
 }
 
 const exclusionLead = new Set([
@@ -380,7 +380,7 @@ export function withoutTasteExclusions(exclusions, prompts) {
     next = tidied(next);
     if (contentWords(next) < 2)
       throw new Error(
-        `Prompt ${index + 1} is little more than ${words.map((word) => `"${word}"`).join(", ")}, which your Taste Profile excludes. Tell the user; they can edit exclusions in Dream › Taste.`,
+        `Prompt ${index + 1} is little more than ${words.map((word) => `"${word}"`).join(", ")}, which your Taste Profile excludes. Tell the user; they can edit exclusions in Settings › Taste.`,
       );
     excluded[next] = [...new Set([...(excluded[next] || []), ...words])];
     return next;

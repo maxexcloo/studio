@@ -629,7 +629,7 @@ export function registerGenerateTools({
             if (turnRuns.size >= 1000) turnRuns.delete(turnRuns.keys().next().value);
             turnRuns.set(turnKey, run);
           }
-          // The chat's context, kept for Dream (Dream › Taste › Chat Notes) with the results it came with.
+          // The chat's context, kept for Dream (Settings › Taste › Chat Notes) with the results it came with.
           const text = [input.context?.series, input.context?.notes].filter(Boolean).join(": ");
           const results = accepted.entries.flatMap(({ queued }) =>
             (queued.jobs || []).map((job) => job.job_id),

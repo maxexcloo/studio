@@ -24,7 +24,6 @@ import { usePhone } from "../../ui/usePhone";
 import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
 import { reviewSuggestionCount } from "../gallery/usePrefetchResultSuggestions";
-import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamAllocation } from "./DreamAllocation";
 import { DreamDeck, type Judgement } from "./DreamDeck";
@@ -111,7 +110,6 @@ const views = [
     { value: "dream", label: "Dream" },
     { value: "library", label: "Library" },
     { value: "projects", label: "Projects" },
-    { value: "taste", label: "Taste" },
   ],
   [
     { value: "discarded", label: "Discards" },
@@ -143,7 +141,6 @@ export function DreamPage() {
   const [returned, setReturned] = useState<DreamItem[]>([]);
   const [histories, setHistories] = useState<Partial<Record<string, Judgement[]>>>({});
   const [creatingProject, setCreatingProject] = useState(false);
-  const [tasteActions, setTasteActions] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
@@ -208,7 +205,7 @@ export function DreamPage() {
   const waitingId = useId();
   const waiting =
     count && `${plural(count.images, "image")} and ${plural(count.videos, "video")} waiting`;
-  const selector = view !== "projects" && view !== "taste" && view !== "week" && (
+  const selector = view !== "projects" && view !== "week" && (
     <SegmentedControl
       aria-label="Dream Media"
       size={phone ? "xs" : undefined}
@@ -261,8 +258,6 @@ export function DreamPage() {
             >
               New Project
             </Button>
-          ) : view === "taste" ? (
-            <Group ml="auto" ref={setTasteActions} />
           ) : (
             deck && (
               <Group gap={4} wrap="nowrap" ml="auto">
@@ -297,17 +292,13 @@ export function DreamPage() {
         <ScrollArea flex={1} mih={0} classNames={{ viewport: classes.workspace }}>
           <DreamWeek />
         </ScrollArea>
-      ) : view === "projects" || view === "taste" ? (
+      ) : view === "projects" ? (
         <ScrollArea flex={1} mih={0} classNames={{ viewport: classes.workspace }}>
           <Stack flex={1} gap="lg" pb="md">
-            {view === "projects" ? (
-              <DreamProjects
-                creating={creatingProject}
-                onCloseCreate={() => setCreatingProject(false)}
-              />
-            ) : (
-              <TasteProfile toolbar={tasteActions} />
-            )}
+            <DreamProjects
+              creating={creatingProject}
+              onCloseCreate={() => setCreatingProject(false)}
+            />
           </Stack>
         </ScrollArea>
       ) : !reviewing && dream.isPending ? (

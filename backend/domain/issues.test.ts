@@ -54,7 +54,7 @@ function fixture(t: TestContext, reply: unknown) {
   return { issues, taste, asked };
 }
 
-test("issues group recurring complaints, suggest a rule and drop out once it is a rule", async (t) => {
+test("issues group recurring complaints, suggest a rule and drop out once it is adopted", async (t) => {
   const { issues, taste, asked } = fixture(t, {
     issues: [
       { issue: "Waist too wide", entries: [1, 2, 3], rule: "always a clearly narrow waist" },
@@ -88,8 +88,8 @@ test("issues group recurring complaints, suggest a rule and drop out once it is 
     ["a", "b", "c"],
   );
   // Nothing is a rule until the person accepts one (domain/inbox.ts); then its issue drops out.
-  assert.deepEqual(taste.read("alice").rules, []);
-  taste.edit("alice", { rules: ["Always a clearly narrow waist"] });
+  assert.deepEqual(taste.read("alice").preferences, {});
+  taste.adopt("alice", "Always a clearly narrow waist");
   assert.deepEqual(
     issues.read("alice").issues.map((issue) => issue.issue),
     ["Extra fingers"],

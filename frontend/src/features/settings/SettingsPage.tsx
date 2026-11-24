@@ -12,6 +12,7 @@ import { dreamQuery } from "../dream/queries";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { runtimeQueueQuery, runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
+import { TasteProfile, tasteQuery } from "../taste/TasteProfile";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin, accountAdminQuery } from "./AccountAdmin";
 import { preferencesQuery } from "./accountPreferences";
@@ -86,6 +87,7 @@ export function SettingsPage() {
           groups: [accountAdminQuery],
           preferences: [preferencesQuery],
           studio: [deploymentQuery],
+          taste: [tasteQuery, preferencesQuery],
           users: [accountAdminQuery],
           "where-work-runs": [assistantQuery, dreamQuery, preferencesQuery],
         }}
@@ -94,6 +96,7 @@ export function SettingsPage() {
           preferences: <Preferences />,
           "where-work-runs": <WhereWorkRuns />,
           dream: <DreamPreferences />,
+          taste: (heading) => <TasteProfile heading={heading} />,
           "dream-policy": <DreamAdministration />,
           groups: (heading) => <GroupsAdmin heading={heading} />,
           studio: <StudioSettings />,

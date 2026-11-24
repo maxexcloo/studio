@@ -57,6 +57,18 @@ const profiles: DreamProfile[] = [
 const everything: DreamAccess = { uncensored: false };
 
 /** Dream with fakes for every service; nothing generates and nothing starts on its own. */
+/** Writes the words Studio learnt of an account's taste, as its summariser would. */
+function learn(dataDir: string, ownerId: string, words: Record<string, string[] | string>) {
+  const name = `taste:${ownerId}`;
+  writeRuntimeDocument(dataDir, name, {
+    preferences: {},
+    signals: [],
+    since: 0,
+    ...(readRuntimeDocument(dataDir, name) as object),
+    ...words,
+  });
+}
+
 function fixture(t: TestContext, catalogue = profiles) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-"));
   const store = new Store(openDatabase(":memory:"));
@@ -827,7 +839,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
 
 test("Dream favours the set model they keep over one they pass", async (t) => {
   const { dream, taste, dreamOnce, generated } = fixture(t);
-  taste.edit("alice", { models: ["flux", "qwen"] });
+  taste.edit("alice", { favourites: { models: ["flux", "qwen"] } });
   for (const [index, profileId, state] of [
     [0, "flux", "discarded"],
     [1, "flux", "discarded"],
@@ -847,12 +859,11 @@ test("Dream favours the set model they keep over one they pass", async (t) => {
   assert.equal((await dreamOnce())?.input.profileId, "qwen");
 });
 
-test("Dream draws from the models and tags a person set over those it learnt", async (t) => {
-  const { dream, state, taste, dreamOnce } = fixture(t);
+test("Dream draws from the models and tags a person favours over those it learnt", async (t) => {
+  const { dataDir, dream, state, taste, dreamOnce } = fixture(t);
   taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen", tags: ["fox"] })]);
-  taste.edit("alice", {
-    models: ["flux"],
-    tags: ["harbour"],
+  taste.edit("alice", { favourites: { models: ["flux"], tags: ["harbour"] } });
+  learn(dataDir, "alice", {
     likes: ["quiet candid portraits"],
     styles: ["documentary photography"],
     avoid: ["surreal props"],
@@ -881,8 +892,8 @@ test("Dream draws from the models and tags a person set over those it learnt", a
 });
 
 test("Each new idea sees a few drawn tastes and liked prompts from outside Dream, and what to change first", async (t) => {
-  const { dream, state, taste, dreamOnce, generated } = fixture(t);
-  taste.edit("alice", {
+  const { dataDir, dream, state, dreamOnce, generated } = fixture(t);
+  learn(dataDir, "alice", {
     likes: ["harbours", "markets", "rain", "bicycles", "kites"],
     styles: ["documentary photography", "film grain", "flash"],
   });
@@ -1113,9 +1124,9 @@ test("Dream retries explicit exclusions and project avoids without cooling requi
     state.calls[0].user,
     /Recently repeated optional motifs to leave out this time: laundry/,
   );
-  assert.match(state.calls[1].user, /"laundry", which their rules or brief say to avoid/);
-  assert.match(state.calls[3].user, /"smoking", which their rules or brief say to avoid/);
-  assert.match(state.calls[5].user, /"neon signs", which their rules or brief say to avoid/);
+  assert.match(state.calls[1].user, /"laundry", which their exclusions or brief say to avoid/);
+  assert.match(state.calls[3].user, /"smoking", which their exclusions or brief say to avoid/);
+  assert.match(state.calls[5].user, /"neon signs", which their exclusions or brief say to avoid/);
   assert.deepEqual(dream.read("alice").motifs?.[2], ["paper lantern"]);
 });
 
@@ -2565,7 +2576,7 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
 
 test("A comparison varies one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
   const fx = fixture(t);
-  const { dream, state, store, taste, finish, live, dreamOnce } = fx;
+  const { dataDir, dream, state, store, taste, finish, live, dreamOnce } = fx;
   // A kept image alice generated with FLUX: the comparison's starting point.
   const session = store.createSession("alice", "Gallery").id;
   const base = store.enqueue(
@@ -2690,7 +2701,8 @@ test("A comparison varies one thing on a kept image's prompt; answers keep, disc
   assert.deepEqual(dream.read("alice").compared, ["base"]);
 
   // More Like This keeps the result and steers the next ideas toward its specific prompt.
-  taste.edit("alice", { likes: ["lighthouses"], rules: ["no visible text"] });
+  learn(dataDir, "alice", { likes: ["lighthouses"] });
+  taste.edit("alice", { prefer: "no visible text" });
   await dreamOnce();
   const [next] = dream.unseen("alice");
   assert.equal((await request(`/${next.id}/more`, {})).status, 200);
@@ -2699,17 +2711,17 @@ test("A comparison varies one thing on a kept image's prompt; answers keep, disc
   assert.match(state.calls.at(-1)!.user, new RegExp(`More like this one: ${next.prompt}`));
   assert.match(
     state.calls.at(-1)!.user,
-    /Taste profile: Likes lighthouses[\s\S]*Their rules:\n- no visible text/,
+    /Taste profile: Likes lighthouses[\s\S]*Their preferences: no visible text/,
   );
   assert.equal(dream.read("alice").steer?.remaining, 1);
-  // After the steer expires, new concepts still use taste and rules without the specific prompt.
+  // After the steer expires, new concepts still use taste and preferences without the specific prompt.
   const before = state.calls.length;
   for (let run = 0; run < 4; run++) await dreamOnce();
   const later = state.calls
     .slice(before)
     .filter((call) => !call.user.includes("More like this one"));
   assert.ok(later.some((call) => /Taste profile:\nLikes: lighthouses/.test(call.user)));
-  for (const call of later) assert.match(call.user, /Their rules:\n- no visible text/);
+  for (const call of later) assert.match(call.user, /Their preferences: no visible text/);
 });
 
 test("A Dream job's writing request keeps its own fields through admission", () => {
@@ -3185,9 +3197,9 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   assert.equal(project.brief.avoid, "people, crowds, boats");
   const rule = byKind("rule");
   await request(`/inbox/${rule.id}/accept`, {});
-  assert.deepEqual(taste.read("alice").rules, ["always a narrow waist"]);
+  assert.equal(taste.read("alice").preferences.prefer, "always a narrow waist");
   await request(`/inbox/${rule.id}/undo`, {});
-  assert.deepEqual(taste.read("alice").rules, []);
+  assert.equal(taste.read("alice").preferences.prefer, "");
   // A comparison's pick proposes the project's styles, a later pick on that axis replacing it.
   inbox.picked("alice", beach.id, "Lighting", "warm dusk", "you");
   inbox.picked("alice", beach.id, "Lighting", "cold dawn", "chat");
@@ -3663,7 +3675,7 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   };
   const fx = fixture(t, [...profiles, cloud]);
   // Favourite models that run only locally give way on Cloud, and its note says so.
-  fx.taste.edit("alice", { models: ["flux"] });
+  fx.taste.edit("alice", { favourites: { models: ["flux"] } });
   await fx.dream.save("alice", { enabled: true, imageBackend: "cloud", videos: false });
   fx.state.online.image = "parked";
   const job = await fx.dreamOnce();

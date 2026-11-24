@@ -7775,18 +7775,15 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
 
   // Taste: the profile and a LoRA's rating.
   f.app.get("/api/taste", (_req, res) =>
-    res.json({ summary: "Moody light", likes: ["fog"], exclusions: ["clowns"], signals: 3 }),
+    res.json({
+      learnt: { likes: ["fog"] },
+      preferences: { prefer: "Moody light", exclusions: ["clowns"] },
+      signals: 3,
+    }),
   );
   f.app.put(
     "/api/taste",
-    record("taste", (req) => ({
-      summary: "Moody light",
-      preferences: req.body.preferences,
-      avoid: req.body.preferences.avoid,
-      models: [],
-      loras: [],
-      signals: 3,
-    })),
+    record("taste", (req) => ({ preferences: req.body.preferences, signals: 3 })),
   );
   f.app.post(
     "/api/loras/library/ops",
@@ -8437,10 +8434,11 @@ test("MCP preserves supplied prompts and removes what explicit exclusions name",
   const f = await fixture(t);
   const client = await f.client();
   const taste = {
-    avoid: ["buttons"],
-    models: [imageProfile.id],
-    loras: ["film"],
-    exclusions: ["smoking", "laundry rooms"],
+    preferences: {
+      prefer: "No buttons.",
+      favourites: { models: [imageProfile.id], loras: ["film"] },
+      exclusions: ["smoking", "laundry rooms"],
+    },
   };
   f.app.get("/api/taste", (_req, res) => res.json(taste));
   await call(client, "models", { profile_id: imageProfile.id });
@@ -8456,7 +8454,7 @@ test("MCP preserves supplied prompts and removes what explicit exclusions name",
   assert.deepEqual(f.submitted.at(-1).excluded, ["ashtray"]);
   const beforeRefusals = f.submitted.length;
   for (const [prompt, expected] of [
-    ["A washing machine", /"washing machine", which your Taste Profile excludes/],
+    ["Laundry rooms", /"Laundry rooms", which your Taste Profile excludes/],
     ["Same as above, but switch to silk", /depends on an earlier prompt or image/],
   ]) {
     const refused = await call(client, "generate", { prompts: [prompt] });
@@ -8472,8 +8470,7 @@ test("MCP preserves supplied prompts and removes what explicit exclusions name",
     texts(await call(await f.client(), "generate", { prompts: ["A cotton coat"] })),
     /The user's brief/,
   );
-  taste.rules = ["always photographic", "no visible text"];
-  taste.preferences = { avoid: ["wool", "buttons"] };
+  taste.preferences.prefer = "Always photographic. No visible text, wool or buttons.";
   let reflectionRequests = 0;
   f.app.get("/api/taste/reflection", (_req, res) => {
     reflectionRequests++;

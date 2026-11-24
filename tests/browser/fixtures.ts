@@ -1576,7 +1576,7 @@ export async function serveDream(
     library?: any[];
     /** Why Dream can't run, which makes it unavailable. */
     reason?: string;
-    /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
+    /** What `/api/taste` serves as learnt (likes, models…), with `preferences`, `loraScores` and `signals`. */
     taste?: Record<string, unknown>;
     keepRates?: KeepRates;
     /** Dream's projects, which create, edit, Pause, Undo and Delete change. */
@@ -1630,24 +1630,19 @@ export async function serveDream(
   const fields = {
     likes: [],
     avoid: [],
-    exclusions: [],
     styles: [],
     note: "",
-    rules: [],
     models: [],
     loras: [],
     shapes: [],
     tags: [],
   };
   const taste = {
-    summary: "",
-    ...fields,
-    loraScores: [],
+    loraScores: options.taste?.loraScores ?? [],
     updatedAt: "",
-    signals: 0,
+    signals: options.taste?.signals ?? 0,
     writer: false,
-    ...options.taste,
-    preferences: {},
+    preferences: (options.taste?.preferences ?? {}) as Record<string, any>,
     learnt: Object.fromEntries(
       Object.entries(fields).map(([key, none]) => [key, options.taste?.[key] ?? none]),
     ),
@@ -1662,11 +1657,8 @@ export async function serveDream(
       state.requests.push({ method: "PUT", path: "/api/taste", body: request.postDataJSON() });
       const body = request.postDataJSON();
       for (const [key, value] of Object.entries(body.preferences || {})) {
-        if (value === null) delete (taste.preferences as Record<string, unknown>)[key];
-        else (taste.preferences as Record<string, unknown>)[key] = value;
-        Object.assign(taste, {
-          [key]: value === null ? (taste.learnt as Record<string, unknown>)[key] : value,
-        });
+        if (value === null) delete taste.preferences[key];
+        else taste.preferences[key] = value;
       }
     }
     return route.fulfill({ json: taste });
@@ -1785,7 +1777,10 @@ export async function serveDream(
       state.proposals = state.proposals.filter((entry) => entry !== proposal);
       if (proposalRoute[2] === "dismiss") return route.fulfill({ json: inbox() });
       const change = body.change ?? proposal.change;
-      if (change.rule) Object.assign(taste, { rules: [...(taste.rules as string[]), change.rule] });
+      if (change.rule)
+        taste.preferences.prefer = [taste.preferences.prefer, change.rule]
+          .filter(Boolean)
+          .join("\n");
       const project = state.projects.find((entry) => entry.id === proposal.projectId);
       if (project && change.brief) project.brief = { ...project.brief, ...change.brief };
       return route.fulfill({

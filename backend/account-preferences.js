@@ -8,6 +8,7 @@ import {
   resolutions,
   videoResolutions,
 } from "../shared/resolution.ts";
+import { maxTasteGuidance, tasteAreas } from "../shared/taste.ts";
 import { dataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
@@ -28,7 +29,9 @@ import {
  * `videoAspect` and `videoResolution`. `galleryWork` is which unfinished
  * work the gallery shows: none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts). `galleryViews` are the gallery's saved views, each a name with
- * the search, filters and sort it restores (frontend gallery/savedViews.ts). Keys Studio no longer knows are dropped as the document is read.
+ * the search, filters and sort it restores (frontend gallery/savedViews.ts). `tasteAreas` says, per
+ * area of Settings › Taste › Where Taste Applies, whether it uses the account's taste and the
+ * guidance sent with its work (shared/taste.ts). Keys Studio no longer knows are dropped as the document is read.
  */
 const preferenceDefaults = Object.freeze({
   loras: true,
@@ -56,7 +59,8 @@ const known = (key) =>
   key === "imageCount" ||
   modelKeys.has(key) ||
   key === "appearance" ||
-  key === "galleryViews";
+  key === "galleryViews" ||
+  key === "tasteAreas";
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
 
@@ -151,6 +155,28 @@ export function saveAccountPreferences(ownerId, patch) {
         new Set(value.map((view) => view.id)).size !== value.length
       )
         throw new Error(`Save up to ${maxGalleryViews} named gallery views.`);
+      continue;
+    }
+    if (key === "tasteAreas") {
+      const areas = Object.entries(value && typeof value === "object" ? value : { value });
+      if (
+        !areas.every(
+          ([area, setting]) =>
+            tasteAreas.includes(area) &&
+            setting &&
+            typeof setting === "object" &&
+            Object.entries(setting).every(([field, choice]) =>
+              field === "taste"
+                ? typeof choice === "boolean"
+                : field === "guidance" &&
+                  typeof choice === "string" &&
+                  choice.length <= maxTasteGuidance,
+            ),
+        )
+      )
+        throw new Error(
+          `Set tasteAreas to each area's taste switch and guidance of up to ${maxTasteGuidance} characters.`,
+        );
       continue;
     }
     if (modelKeys.has(key)) {

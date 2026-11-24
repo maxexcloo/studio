@@ -392,8 +392,9 @@ function motifClauses(text: string) {
         ? {
             shown: part.slice(0, negative.index),
             excluded: part.slice(negative.index + negative[0].length),
+            negation: negative[0],
           }
-        : { shown: part, excluded: "" };
+        : { shown: part, excluded: "", negation: "" };
     });
 }
 
@@ -442,19 +443,37 @@ export function forbiddenMotifs(avoids: string[], rules: string[], unasked = fal
   ];
 }
 
-/** Literal user exclusions and their known equivalent motifs. */
-export function explicitExclusions(entries: string[]) {
-  const terms = entries.map(phraseWords).filter(Boolean);
-  return [
-    ...new Set([
-      ...terms,
-      ...terms.flatMap((term) => {
-        if (/^laundry(?: rooms?)?$/.test(term)) return ["laundry"];
-        if (/^(?:smoking|cigarettes?|tobacco smoking)$/.test(term)) return ["smoking"];
-        return [];
-      }),
-    ]),
-  ];
+/** Literal user exclusions as motifs. */
+export const explicitExclusions = (entries: string[]) => [
+  ...new Set(entries.map(phraseWords).filter(Boolean)),
+];
+
+/** Negations that take a thing ("no CGI"), where "never" and "don't" usually take an action. */
+const thingNegation = /^(?:avoid(?:ing)?|omit|exclude|no|without|free of)$/i;
+/**
+ * A rule's bans where it does nothing but ban things ("no smoking or tattoos", "without CGI"), else
+ * null: a rule that also asks for something, makes an exception or bans an action ("never show
+ * feet") is a preference.
+ */
+export function ruleBans(rule: string) {
+  const clauses = motifClauses(rule).filter(
+    ({ shown, excluded }) => phraseWords(shown) || phraseWords(excluded),
+  );
+  if (
+    !clauses.length ||
+    clauses.some(
+      ({ shown, excluded, negation }) =>
+        phraseWords(shown) || !thingNegation.test(negation) || conditionalMotif.test(excluded),
+    )
+  )
+    return null;
+  const bans = clauses.flatMap(({ excluded }) =>
+    excluded
+      .split(/[,;]+|\b(?:or|nor)\b/gi)
+      .map((part) => phraseWords(part).replace(/^(?:any|an?|the) /, ""))
+      .filter(Boolean),
+  );
+  return bans.length && bans.every((ban) => ban.split(" ").length <= 4) ? [...new Set(bans)] : null;
 }
 
 export function ideaMotifs(value: unknown, prompt = "") {

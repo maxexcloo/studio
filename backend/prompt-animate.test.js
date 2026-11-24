@@ -206,6 +206,14 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     profiles: async () => [video],
     guide: () => null,
     frame: async () => assert.fail("a text-only model is never shown the frame"),
+    dream: () => ({ text: () => undefined, allowsUncensored: () => false }),
+    taste: () => ({
+      on: true,
+      guidance: "Keep the camera calm.",
+      prefer: "",
+      learnt: "",
+      exclusions: ["smoking"],
+    }),
   });
   const written = await stage(
     {
@@ -240,11 +248,25 @@ test("the writing stage streams the motion prompt and its thinking with room to 
   assert.match(calls[0].messages[0].content, /Motivated Camera Move/);
   assert.match(calls[0].messages[0].content, /only 5 seconds long at 24 fps/);
   assert.match(calls[0].messages[1].content, /An amber bird/);
-  // The story an MCP chat gave its set reaches the writer.
+  // The story an MCP chat gave its set reaches the writer, then Prompt Writing's taste.
   assert.match(
     calls[0].messages[1].content,
-    /Story context.*series Aviary; notes: The bird was rescued from a storm\./,
+    /Story context.*series Aviary; notes: The bird was rescued from a storm\.[\s\S]*Their guidance: Keep the camera calm\.\nNever include: smoking/,
   );
+  // Dream's own clips keep only the Exclusions, which apply everywhere.
+  await stage(
+    {
+      ownerId: "",
+      dream: { uncensored: false },
+      input: {
+        profileId: video.id,
+        writing: { kind: "animate", theme: "cinematic", source: "An amber bird" },
+      },
+    },
+    { signal: new AbortController().signal, onThinking() {}, onDelta() {} },
+  );
+  assert.match(calls.at(-1).messages[1].content, /\nNever include: smoking$/);
+  assert.doesNotMatch(calls.at(-1).messages[1].content, /Their guidance/);
   const uncensored = await writeAnimatePrompt({
     engine,
     profile: video,

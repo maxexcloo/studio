@@ -34,6 +34,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Account",
     "Dream",
     "Preferences",
+    "Taste",
     "Where Work Runs",
     "Dream Defaults",
     "Groups",
@@ -53,7 +54,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(4, -1));
+    ).toHaveText(order.slice(5, -1));
   await section(page, "Settings", "Studio");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();

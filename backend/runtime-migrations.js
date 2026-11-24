@@ -3,6 +3,7 @@ import { cloudModelsPreference } from "./cloud-models-preference.js";
 import { logger } from "./crash-log.js";
 import { reloadDeploymentSettings } from "./deployment-settings.js";
 import { directRoute } from "./domain/direct-route.ts";
+import { tasteSimplify } from "./taste-simplify.js";
 import { uncensoredNames } from "./uncensored-names.js";
 
 /**
@@ -29,6 +30,12 @@ const steps = [
       Object.values(plan.rows).reduce((total, count) => total + count, plan.styleFiles),
     online: true,
     reload: reloadDeploymentSettings,
+  },
+  {
+    name: "tasteSimplify",
+    run: tasteSimplify,
+    changes: (plan) => plan.accounts.length,
+    online: true,
   },
 ];
 

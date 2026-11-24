@@ -503,7 +503,7 @@ export function registerManageTools({
           : action === "refresh"
             ? await api("POST", "/api/taste/refresh", {}, signal)
             : await api("DELETE", "/api/taste", undefined, signal);
-      return mcpJson({ exclusions: answer.exclusions });
+      return mcpJson({ exclusions: answer.preferences?.exclusions ?? [] });
     },
   );
 }

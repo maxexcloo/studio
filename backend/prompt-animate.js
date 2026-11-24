@@ -177,7 +177,8 @@ export function clipName(reply) {
  * `onThinking` and `onDelta`. `frame()` loads the frame the clip starts from ({ mime, data },
  * downscaled) and is asked only when the text model reads images; otherwise `caption()` says what
  * it shows in words. `explicit`: the account holds Uncensored Models. `story`: the chat's story
- * (writing-standard.ts storyContext), if any. `writer`: its prompt writer
+ * (writing-standard.ts storyContext), if any. `taste`: what Prompt Writing receives of the account's
+ * taste (domain/taste.ts `tasteLines`). `writer`: its prompt writer
  * (assistant.js `writerModel`). `named` also asks for the clip's title and why (Dream's cards).
  */
 export async function writeAnimatePrompt({
@@ -188,6 +189,7 @@ export async function writeAnimatePrompt({
   clip = {},
   explicit = false,
   story = "",
+  taste = [],
   writer,
   frame = async () => null,
   caption = () => "",
@@ -218,6 +220,7 @@ export async function writeAnimatePrompt({
             description ? `What the frame shows: ${description}` : "",
             writing.instruction ? `Instruction: ${writing.instruction}` : "",
             story,
+            ...taste,
           ]
             .filter(Boolean)
             .join("\n"),
