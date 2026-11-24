@@ -104,9 +104,14 @@ export function createGenerationAdmission(options: AdmissionOptions) {
               : options.store.createSession(ownerId, title))
           ).id;
         // A profile that can't batch makes Count separate runs of one request: seed, seed+1, …
-        // or fresh random seeds, queued together as one set.
+        // or fresh random seeds, queued together as one set. Dream's own work is always one set.
         const copies = splitRuns(input, options.separateRuns?.(input));
-        const queueSet = copies.length > 1 ? origin?.queueSet || crypto.randomUUID() : undefined;
+        const queueSet =
+          copies.length > 1
+            ? origin?.queueSet || crypto.randomUUID()
+            : origin?.priority === queuePriority.dream
+              ? origin?.queueSet || "dream"
+              : undefined;
         const firstId = clientId || crypto.randomUUID();
         const queueBatch = origin?.queueBatch || (copies.length > 1 ? firstId : undefined);
         const first = queueBatch ? options.store.job(ownerId, queueBatch) : undefined;

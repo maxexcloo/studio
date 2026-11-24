@@ -275,6 +275,36 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await expect(stopAll).toBeVisible();
 });
 
+test("Dream's work lists as one row", async ({ page }) => {
+  const state = await fixtures(page);
+  const job = (id: string, prompt: string) => ({
+    id,
+    jobId: id,
+    sessionId: "s",
+    operation: "image",
+    status: "queued",
+    reason: "",
+    input: { prompt, kind: "image" },
+    dream: true,
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  state.jobs.push(job("dream-a", "A lantern in fog"), job("dream-b", "A tin roof in rain"));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+  await expect(queue.getByText("Queue (1)", { exact: true })).toBeVisible();
+  // One Dream row for both, whatever their prompts, with its own Stop Set.
+  const set = queue.getByRole("button", { name: /^Dream/ });
+  await expect(set).toContainText("0 of 2 Done");
+  await expect(queue.getByRole("button", { name: "Stop Set", exact: true })).toHaveCount(1);
+  await set.click();
+  await expect(queue.getByText("A lantern in fog", { exact: true })).toBeVisible();
+  await expect(queue.getByText("A tin roof in rain", { exact: true })).toBeVisible();
+});
+
 test("a video stays visible as stopping while its provider confirms", async ({ page }) => {
   const state = await fixtures(page);
   const video = {
