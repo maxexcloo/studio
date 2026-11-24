@@ -52,6 +52,34 @@ const axes: Record<string, string[]> = {
     "sheltering from the weather",
     "transforming or unfolding",
   ],
+  genre: [
+    "a documentary moment",
+    "a fashion editorial",
+    "film noir",
+    "a heist",
+    "a road trip",
+    "a romantic comedy",
+    "science fiction",
+    "a sports story",
+    "a thriller",
+    "travel photography",
+    "a western",
+    "wildlife photography",
+  ],
+  interaction: [
+    "a game or contest",
+    "a performer and their audience",
+    "a reunion",
+    "a rivalry",
+    "a shared secret",
+    "making up after an argument",
+    "helping a stranger",
+    "sharing a meal",
+    "strangers meeting by chance",
+    "teaching someone a skill",
+    "a quiet moment alone",
+    "working side by side",
+  ],
   subject: [
     "an animal",
     "a lone figure",
@@ -79,6 +107,12 @@ const axes: Record<string, string[]> = {
     "a market",
     "a ruin",
     "a snowfield",
+    "a train carriage",
+    "a ferry deck",
+    "a greenhouse",
+    "a stadium",
+    "a library",
+    "a workshop or garage",
   ],
   outfit: [
     "everyday casualwear",
@@ -168,6 +202,12 @@ const axes: Record<string, string[]> = {
     "a long-lens street candid",
     "an instant photo",
     "a crisp digital editorial shot",
+    "a high-speed sports frame",
+    "a medium-format studio portrait",
+    "a security or webcam still",
+    "a tilt-shift miniature look",
+    "infrared film",
+    "a wet-plate or tintype portrait",
   ],
   "camera or composition": [
     "extreme close-up",
@@ -183,8 +223,8 @@ const axes: Record<string, string[]> = {
   ],
 };
 /**
- * The looks Dream drifts towards: colors, garments, light and expressions. Plain black, white,
- * grey and brown describe hair and everyday things too often to tell a look.
+ * The looks Dream drifts towards: colors, garments, light, expressions and camera quirks. Plain
+ * black, white, grey and brown describe hair and everyday things too often to tell a look.
  */
 const lookTerms: Record<string, string[]> = {
   color:
@@ -223,6 +263,14 @@ const lookTerms: Record<string, string[]> = {
     "closed-lip smile",
     "knowing look",
     "soft smile",
+  ],
+  camera: [
+    ..."grain grainy halation off-level overexposed underexposed vignette".split(" "),
+    "lens flare",
+    "light leak",
+    "motion blur",
+    "soft focus",
+    "tilted horizon",
   ],
 };
 const lookPatterns = Object.values(lookTerms)
@@ -302,6 +350,18 @@ export function missesSubjects(prompt: string, subjects: string) {
   const wanted = new Set([...contentWords(subjects)].map(stem));
   return wanted.size > 0 && ![...contentWords(prompt)].some((word) => wanted.has(stem(word)));
 }
+/**
+ * How the latest `count` prompts open: each one's first eight words, which the shared style
+ * clause leaves out of the recent prompts the writer sees, so a stock opening would go unseen.
+ */
+export const recentOpenings = (prompts: string[], count: number) => [
+  ...new Set(
+    prompts
+      .slice(0, count)
+      .map((prompt) => clean(prompt, 200).split(" ").slice(0, 8).join(" "))
+      .filter(Boolean),
+  ),
+];
 /** A short subject for an idea: its title, else its opening words. */
 export const subjectOf = (title: unknown, prompt: unknown) =>
   clean(title, 80) || clean(prompt, 400).split(" ").slice(0, 6).join(" ");
@@ -477,8 +537,9 @@ const varied = [
 /**
  * Draw away from recently used anchors as well as asking for a different concept, never towards
  * what is excluded (`forbidden`). With a taste profile, the photographic capture stands in for
- * subject and medium, and `vary` is the dimension the idea changes first. A project's idea
- * (`briefed`) keeps the brief's subjects and styles, so it varies only what the brief leaves open.
+ * medium, and for subject too unless the idea explores fresh ground; `vary` is the dimension the
+ * idea changes first. A project's idea (`briefed`) keeps the brief's subjects and styles, so it
+ * varies only what the brief leaves open.
  */
 export function direction(
   { explore, feature }: { explore?: boolean; feature?: string },
@@ -495,7 +556,7 @@ export function direction(
       briefed
         ? !["capture", "medium or style", "subject"].includes(axis)
         : hasTaste
-          ? axis !== "subject" && axis !== "medium or style"
+          ? axis !== "medium or style" && (explore || axis !== "subject")
           : axis !== "capture",
   );
   const draws = available.flatMap(([axis, all]) => {
@@ -559,7 +620,7 @@ export function freshConceptProblem(
     if (repeat) return `The optional motif "${repeat}" has appeared in several recent ideas.`;
     const reused = lookTermsIn(prompt).filter((term) => fashionable.includes(term));
     if (reused.length > looks.reuse)
-      return `It reuses ${reused.join(", ")}, as many recent ideas do; choose other colors, garments, light and expressions.`;
+      return `It reuses ${reused.join(", ")}, as many recent ideas do; choose other colors, garments, light, expressions and camera details.`;
     // Compared as remembered: shortened, as each recent prompt is.
     const head = clean(prompt, recentPromptCharacters);
     const words = varying(head);

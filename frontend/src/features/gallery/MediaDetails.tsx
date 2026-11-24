@@ -41,7 +41,7 @@ import { mediaProfileName, mediaTitle, modelSummary } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { galleryItemQuery } from "./queries";
 import { derivations } from "./versions";
-import { type GalleryState, galleryPath, viewerPath } from "./viewerLink";
+import { type GalleryState, followed, galleryPath, viewerPath } from "./viewerLink";
 
 import classes from "./MediaDetails.module.css";
 
@@ -664,12 +664,6 @@ function galleryReference(id: string, items: MediaItem[]) {
   const key = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
   return items.find((candidate) => candidate.url === key || candidate.id === key);
 }
-
-/**
- * A followed result opens in the gallery's viewer as a step of its own, so closing it returns to
- * the result it was followed from, here or on another page.
- */
-const followed = { viewer: true };
 
 /** A link's click that `open` shows in this viewer instead, leaving other clicks to the link. */
 const openHere =
