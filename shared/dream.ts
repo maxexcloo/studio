@@ -1,25 +1,17 @@
-/** Dream settings for existing accounts without a saved value and single-user mode. */
+/** Each account's Dream settings until it saves its own choice. */
 export const dreamDefaults = {
-  enabled: false,
-  paused: false,
-  dailyImages: 40,
-  dailyVideos: 4,
+  enabled: true,
+  paused: true,
+  dailyImages: 100,
+  dailyVideos: 50,
   images: true,
-  videos: false,
+  videos: true,
   uncensored: false,
   useLoadedProfile: true,
   imageBackend: "local" as "local" | "cloud",
   videoBackend: "local" as "local" | "cloud",
 };
 export type DreamSettings = typeof dreamDefaults;
-export const newAccountDreamDefaults: DreamSettings = {
-  ...dreamDefaults,
-  dailyImages: 100,
-  dailyVideos: 50,
-  enabled: true,
-  paused: true,
-  videos: true,
-};
 export const maxDreamIdleMinutes = 120;
 export const dreamTimingSettings = {
   imageIdleMinutes: { key: "STUDIO_DREAM_IMAGE_IDLE_MINUTES", defaultValue: 0 },
