@@ -272,6 +272,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/accounts/admin") return respond(administration);
     if (path === "/api/runtime/benchmarks") return respond({ configured: false, runs: [] });
     if (path === "/api/runtime/queue") return respond({ workloads: {} });
+    if (path === "/api/chat-choices") return respond({ chats: [] });
     if (path === "/api/gallery/owners") return respond({ ok: true, owners: galleryOwners });
     if (path.startsWith("/api/gallery/owners/") && method === "DELETE") {
       delete galleryOwners[decodeURIComponent(path.split("/")[4])];
@@ -1770,7 +1771,6 @@ export async function serveDream(
       });
     }
     if (path === "/api/dream/notes") return route.fulfill({ json: { notes: [] } });
-    if (path === "/api/chat-choices") return route.fulfill({ json: { chats: [] } });
     // As the backend: Accept applies a rule or a brief edit (as edited), Dismiss and Clear drop.
     const inbox = () => ({ proposals: state.proposals });
     if (path === "/api/dream/inbox") return route.fulfill({ json: inbox() });
