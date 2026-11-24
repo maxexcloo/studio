@@ -626,6 +626,10 @@ test("Dream explains itself while off and saves its settings in Settings", async
 
   await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
+  const reuse = settings.getByRole("switch", { name: "Run on Loaded Profile", exact: true });
+  await expect(reuse).toBeChecked();
+  await reuse.click({ force: true });
+  await expect.poll(() => dream.settings.useLoadedProfile).toBe(false);
   const videos = settings.getByRole("switch", { name: "Videos", exact: true });
   const videoAmount = settings.getByRole("textbox", { name: "Daily Videos", exact: true });
   await expect(videoAmount).toBeDisabled();
@@ -639,7 +643,13 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(settings.getByRole("switch", { name: "Uncensored", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
-    .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
+    .toEqual([
+      { enabled: true },
+      { paused: true },
+      { useLoadedProfile: false },
+      { videos: true },
+      { dailyImages: 200 },
+    ]);
   await settings.getByRole("switch", { name: "Images", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);

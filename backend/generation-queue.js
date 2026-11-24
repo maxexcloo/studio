@@ -88,6 +88,27 @@ export function createGenerationQueue({
     });
     return `worker:${worker?.id || defaultWorkerId() || ""}`;
   }
+  async function dreamResource(input, ownerId, account) {
+    const delay = dream().idleWait(ownerId, input.kind === "video" ? "video" : "image");
+    const waiting = delay ? { wait: delay } : undefined;
+    if (!dream().useLoadedProfile(ownerId) || directCloud?.isProfile(input)) return waiting;
+    const capability = input.kind === "video" ? "video" : "image";
+    for (const worker of moveTargets(
+      capability,
+      input.profileId,
+      input.profileBackend,
+      () => true,
+    )) {
+      const resource = `worker:${worker.id}`;
+      if (!generationQueue.usedProfile(input, resource)) continue;
+      const match = await generationRoutes
+        .residentProfileModel(input, worker.id, account)
+        .catch(() => undefined);
+      if (match) return { resource };
+    }
+    return waiting;
+  }
+
   /** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
   function managedWorkloads(job) {
     if (job.resource.startsWith("provider:cliproxyapi")) return [];
@@ -95,9 +116,13 @@ export function createGenerationQueue({
   }
   const queueAdapter = createGenerationQueueAdapter({
     // Radiance gives a run both cards only while nothing else runs or waits there (generation-routes.js).
-    submitGeneration: (job, account) =>
+    submitGeneration: (job, account, residentModel) =>
       generationRoutes.submitGeneration(job, account, {
+        residentModel,
+        residentPermitted: () =>
+          dream().useLoadedProfile(job.ownerId) && !store.job(job.ownerId, job.id)?.cancelRequested,
         alone:
+          !residentModel &&
           isRadianceWorker(workerById(job.backend)) &&
           !store.openJobs().some((other) => other.id !== job.id && other.resource === job.resource),
       }),
@@ -155,7 +180,7 @@ export function createGenerationQueue({
         });
       await recoverRunningJobs();
     },
-    eligible: async (job) => {
+    eligible: async (job, residentOnly) => {
       if (!job.backend || !workerById(job.backend))
         return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
@@ -168,7 +193,11 @@ export function createGenerationQueue({
         if (workloads.length && !mediaLeases.has(job.id))
           mediaLeases.set(
             job.id,
-            await runtime.controller.acquire(workloads, job.priority ?? queuePriority.manual),
+            await runtime.controller.acquire(
+              workloads,
+              job.priority ?? queuePriority.manual,
+              residentOnly,
+            ),
           );
         started = true;
         await loadComfyContext(job.backend);
@@ -283,18 +312,32 @@ export function createGenerationQueue({
       ...generationAdapter,
       dreamImageSwitchMinutes,
       dreamIdleWait: (job) => dream().idleWaitForJob(job),
+      dreamResidentModel: (job) => {
+        if (
+          !dream().useLoadedProfile(job.ownerId) ||
+          !generationQueue.usedProfile(job.input, job.resource)
+        )
+          return;
+        const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
+        if (job.ownerId && !account?.authenticated) return;
+        return generationRoutes
+          .residentProfileModel(job.input, job.backend, account)
+          .catch(() => undefined);
+      },
       releaseAdmission: (job) => releaseLease(job.id),
       // Retries, recovered work and anything queued before the check tightened meet it here too.
-      submit: async (job) => {
+      submit: async (job, residentModel) => {
         const refusal =
           minorAgeRefusal(job.input.prompt) ||
           (job.dream && (await dream().queuedProfileIssue(job)));
         return refusal
           ? { status: "failed", reason: refusal, permanent: true }
-          : generationAdapter.submit(job);
+          : generationAdapter.submit(job, residentModel);
       },
       // A local generation may move to another idle worker that runs it until it starts.
       alternatives: (job) => {
+        if (job.dream && dream().useLoadedProfile(job.ownerId) && dream().idleWaitForJob(job))
+          return [job.resource];
         const capability = job.input.kind === "video" ? "video" : "image";
         return job.resource.startsWith("worker:") && job.operation !== "upscale"
           ? moveTargets(
@@ -458,5 +501,5 @@ export function createGenerationQueue({
     }
     return generationRoutes.validateInput(input, account);
   }
-  return { generationQueue, queueResourceFor, validateGenerationInput };
+  return { dreamResource, generationQueue, queueResourceFor, validateGenerationInput };
 }

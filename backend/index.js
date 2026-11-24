@@ -28,6 +28,7 @@ import {
 import { accountPreferences, kindDefaults } from "./account-preferences.js";
 import {
   accountAccessForId,
+  accountDreamDefaults,
   gatewayAccountAccess,
   gatewayAdminTools,
   listAccounts,
@@ -753,7 +754,7 @@ const promptStage = createPromptStage({
   setPrompts: (job) => setPrompts(store, job, resultItem),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
-const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
+const queueRuntime = createGenerationQueue({
   assistantEngine,
   catalogue,
   cloudProvider,
@@ -773,6 +774,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   runtime,
   store,
 });
+const { dreamResource, generationQueue, queueResourceFor, validateGenerationInput } = queueRuntime;
 registerStatusRoutes(app, {
   cloudUsage,
   observeServices,
@@ -782,6 +784,7 @@ const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
   resourceFor: queueResourceFor,
+  dreamResource,
   // Numbered as queued, so a chat names a result before it starts.
   pendingItems: (id, input) => resultNumbers.numbered(makePendingItems(id, input)),
   revision: galleryRevisionValue,
@@ -977,6 +980,7 @@ registerSuggestionRoutes(app, {
 const projects = createProjects({ cards: accountCards, dataDir });
 const chatNotes = createChatNotes({ dataDir });
 const dream = createDream({
+  accountDefaults: accountDreamDefaults,
   dataDir,
   idleMinutes: (kind) =>
     dreamTimingMinutes(kind === "image" ? "imageIdleMinutes" : "videoIdleMinutes"),

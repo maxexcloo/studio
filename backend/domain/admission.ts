@@ -25,6 +25,11 @@ interface AdmissionOptions {
   queue: GenerationQueue;
   validate(input: GenerationInput, account?: GenerationAccount): Promise<DomainResponse>;
   resourceFor(input: GenerationInput, priority?: number): Promise<string>;
+  dreamResource?(
+    input: GenerationInput,
+    ownerId: string,
+    account?: GenerationAccount,
+  ): Promise<{ resource?: string; wait?: string } | undefined>;
   pendingItems(id: string, input: GenerationInput): QueueMedia[];
   revision(): number;
   /** Whether a request's profile can't batch images, so its Count becomes separate runs. */
@@ -105,8 +110,14 @@ export function createGenerationAdmission(options: AdmissionOptions) {
         const firstId = clientId || crypto.randomUUID();
         const queueBatch = origin?.queueBatch || (copies.length > 1 ? firstId : undefined);
         const first = queueBatch ? options.store.job(ownerId, queueBatch) : undefined;
+        const ready =
+          origin?.priority === queuePriority.dream
+            ? await options.dreamResource?.(input, ownerId, account)
+            : undefined;
+        if (ready?.wait) return { status: 409, payload: { error: ready.wait } };
         const resource =
           first?.resource ||
+          ready?.resource ||
           (await step("resource", () => options.resourceFor(input, origin?.priority)));
         const queued: QueuedCopy[] = [];
         for (const [index, copy] of copies.entries())
