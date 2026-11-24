@@ -299,11 +299,8 @@ export function registerAssistantRoutes(
   const rewrite = async (account, body, context, { signal, begin, onDelta } = {}) => {
     const references = await downscaleReferences(body?.references);
     const { stack } = await stackFrom(account, body?.loras);
-    const area = taste({ studioAccount: account });
-    // While Prompt Writing uses their taste: the account's liked prompts on this family.
-    const examples = area.on
-      ? (await liked({ studioAccount: account }, context.profile)).examples || []
-      : [];
+    // Learning from likes: the account's liked prompts on this family, computed per request.
+    const examples = (await liked({ studioAccount: account }, context.profile)).examples || [];
     begin?.();
     return engine.rewrite({
       profile: context.profile,
@@ -316,7 +313,7 @@ export function registerAssistantRoutes(
       references,
       stack,
       examples,
-      taste: tasteLines(area),
+      taste: tasteLines(taste({ studioAccount: account })),
       negative: context.profile.capabilities?.negativePrompt !== false,
       writer: writerOf(account),
       signal,

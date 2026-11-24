@@ -888,9 +888,7 @@ test("Where Taste Applies switches an area at once and says what it receives", a
   await writing.dispatchEvent("click");
   expect((await saved).postDataJSON().tasteAreas.writing).toEqual({ taste: true, guidance: "" });
   await expect(writing).toBeChecked();
-  await expect(
-    areas.getByText(/^Receives: Learnt · Liked Examples · My Preferences · Exclusions\./),
-  ).toBeVisible();
+  await expect(areas.getByText(/^Receives: Learnt · My Preferences · Exclusions\./)).toBeVisible();
 });
 
 test("Taste shows keep rates by model and tag kind, and marks values from their rows", async ({

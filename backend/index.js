@@ -763,7 +763,7 @@ const promptStage = createPromptStage({
   frame: assistant.image,
   caption: assistant.caption,
   setPrompts: (job) => setPrompts(store, job, resultItem),
-  taste: (ownerId) => tasteLines(taste.area(ownerId, "writing")),
+  taste: (ownerId) => taste.area(ownerId, "writing"),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const queueRuntime = createGenerationQueue({

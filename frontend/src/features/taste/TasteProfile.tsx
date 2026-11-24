@@ -84,7 +84,9 @@ const areaExtras: Record<TasteArea, { taste?: string; note: string }> = {
     taste: "Liked & Disliked Prompts",
     note: "Ideas in the composer and the viewer's menus.",
   },
-  writing: { taste: "Liked Examples", note: "Improve Prompt and Animate." },
+  writing: {
+    note: "Improve Prompt and Animate. Improve Prompt learns from your liked prompts either way.",
+  },
   chats: { note: "Excluded words are removed from chat prompts, with a note." },
 };
 const receives = (area: TasteArea, { taste, guidance }: TasteAreaSetting) =>

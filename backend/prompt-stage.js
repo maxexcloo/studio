@@ -16,11 +16,14 @@ import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
 import { promptAssistantOff } from "./assistant-routes.js";
 import { dreamRequest } from "./domain/dream.ts";
+import { tasteLines } from "./domain/taste.ts";
 import { storyContext } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { writeSetPrompt } from "./prompt-set.js";
 import { sheetRequest, writeSheetPrompt } from "./prompt-sheet.js";
 import { resolveImageMode, runProfile } from "./workflow-modes.js";
+
+const noTaste = { on: false, guidance: "", prefer: "", learnt: "", exclusions: [] };
 
 /** The admitted writing request: only its kind's request fields, never a written result; or null. */
 export function writingRequest(value) {
@@ -53,7 +56,7 @@ export function writingIssue(writing, { engine, account }) {
  * prompting guide, `dream()` Dream, `frame(account, assetId)` a reference image as the text model
  * reads it, `caption(account, assetId)` what it shows in words, `setPrompts(job)` the selected
  * source and the prompts the job's result set holds so far and `taste(ownerId)` what Prompt Writing
- * receives of the owner's taste, as lines.
+ * receives of the owner's taste (domain/taste.ts `area`).
  */
 export function createPromptStage({
   engine,
@@ -64,7 +67,7 @@ export function createPromptStage({
   frame,
   caption = () => "",
   setPrompts,
-  taste = () => [],
+  taste = () => noTaste,
 }) {
   return async (job, stream) => {
     const { signal, onThinking, onDelta } = stream;
@@ -112,6 +115,7 @@ export function createPromptStage({
         onDelta,
       });
     }
+    const writingTaste = taste(job.ownerId || "");
     const video = { ...profile, ...resolveImageMode(profile, job.input) };
     const startSlot = video.mediaInputs?.find((slot) => slot.role === "start");
     const start = (
@@ -127,8 +131,10 @@ export function createPromptStage({
         ? Boolean(job.dream.uncensored) && dream().allowsUncensored(job.ownerId)
         : !access || mayUseFeature(access, "uncensoredModels"),
       story,
-      // Dream's clips follow Dream's own taste; the person's follow Prompt Writing's.
-      taste: job.dream ? [] : taste(job.ownerId || ""),
+      // The person's clips follow Prompt Writing's taste; Dream's keep only the Exclusions.
+      taste: tasteLines(
+        job.dream ? { ...noTaste, exclusions: writingTaste.exclusions } : writingTaste,
+      ),
       writer,
       frame: () => frame(access, start),
       caption: () => caption(access, start),
