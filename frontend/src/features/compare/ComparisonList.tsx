@@ -17,11 +17,15 @@ import toolbarClasses from "../../ui/PageToolbar.module.css";
 import filterClasses from "../gallery/GalleryFilters.module.css";
 import galleryClasses from "../gallery/GalleryPage.module.css";
 
+// Disliked comparisons stay out of the default view.
 const ratings = [
-  { value: "all", label: "All Ratings" },
+  { value: "kept", label: "Liked & Unrated" },
   { value: "liked", label: "Liked" },
+  { value: "unrated", label: "Unrated" },
   { value: "disliked", label: "Disliked" },
+  { value: "all", label: "All" },
 ] as const;
+type Rating = (typeof ratings)[number]["value"];
 
 /**
  * The gallery's Comparisons view: a card per comparison or kept Dream comparison, newest first,
@@ -32,12 +36,14 @@ export function ComparisonList({ view }: { view: ReactNode }) {
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const requested = params.get("rating");
-  const rating = requested === "liked" || requested === "disliked" ? requested : "all";
+  const rating: Rating =
+    ratings.find(({ value }) => value === requested && value !== "kept")?.value ?? "kept";
   const { columns } = useGalleryColumns();
   const comparisons = useQuery(comparisonsQuery);
   // The winner, else the first variant with media, else the first still in the gallery, is the cover.
   const cards = (comparisons.data?.comparisons || []).flatMap((comparison) => {
-    if (rating !== "all" && comparison.rating !== rating) return [];
+    const rated = comparison.rating || "unrated";
+    if (rating === "kept" ? rated === "disliked" : rating !== "all" && rated !== rating) return [];
     const items = comparison.variants.flatMap(({ item }) => (item ? [item] : []));
     const cover =
       items.find((item) => item.id === comparison.winnerItemId) ||
@@ -69,7 +75,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
             value={rating}
             groups={[ratings]}
             onChange={(value) =>
-              setParams(value === "all" ? {} : { rating: value }, {
+              setParams(value === "kept" ? {} : { rating: value }, {
                 replace: true,
                 state: location.state,
               })
@@ -105,15 +111,17 @@ export function ComparisonList({ view }: { view: ReactNode }) {
                 }
               />
               <Group justify="space-between" gap="xs" wrap="nowrap">
-                <Text size="sm" fw={500} truncate title={title}>
-                  {title}
-                </Text>
+                <Stack gap={0} miw={0}>
+                  <Text size="sm" fw={500} truncate title={title}>
+                    {title}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {plural(comparison.variants.length, "Variant")}
+                    {comparison.winnerItemId && " · Winner Picked"}
+                  </Text>
+                </Stack>
                 <ComparisonRatingButtons comparison={comparison} />
               </Group>
-              <Text size="xs" c="dimmed">
-                {plural(comparison.variants.length, "Variant")}
-                {comparison.winnerItemId && " · Winner Picked"}
-              </Text>
             </Stack>
           ))}
         </SimpleGrid>
@@ -123,7 +131,9 @@ export function ComparisonList({ view }: { view: ReactNode }) {
             ? "No Liked Comparisons"
             : rating === "disliked"
               ? "No Disliked Comparisons"
-              : "No Comparisons"}
+              : rating === "unrated"
+                ? "No Unrated Comparisons"
+                : "No Comparisons"}
         </EmptyState>
       )}
     </Stack>
