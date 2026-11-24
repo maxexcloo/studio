@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { promisify } from "node:util";
 
-import { newAccountDreamDefaults } from "../shared/dream.ts";
 import {
   accountRoles,
   builtInAccessProfile,
@@ -111,14 +110,6 @@ export function accountStoreSnapshot() {
 
 export function listAccounts() {
   return accountStoreSnapshot().accounts;
-}
-
-function addAccount(store, account) {
-  store.accounts.push({ ...account, initialDreamSettings: newAccountDreamDefaults });
-}
-
-export function accountDreamDefaults(accountId) {
-  return readStore().accounts.find((account) => account.id === accountId)?.initialDreamSettings;
 }
 
 export function accountAccessForId(accountId) {
@@ -309,7 +300,7 @@ export async function createLocalAccount({
     throw new Error("Recovery administrator setup is already complete.");
   if (store.accounts.some((item) => usernameKey(item.username) === key))
     throw new Error("An account with that email already exists.");
-  addAccount(store, account);
+  store.accounts.push(account);
   // Adding the person again lets their single sign-on and chat gateway identities back in.
   store.deletedIdentities = store.deletedIdentities.filter((item) => item.email !== key);
   saveStore();
@@ -678,7 +669,7 @@ function linkGatewayEmail(store, identity, email) {
       disabled: false,
       createdAt: new Date().toISOString(),
     };
-    addAccount(store, account);
+    store.accounts.push(account);
   }
   if (account?.disabled) return null;
   const access = account ? accessFor(account, store.profiles) : null;
@@ -817,7 +808,7 @@ export function signInWithOidcIdentity({
       disabled: false,
       createdAt: new Date().toISOString(),
     };
-    addAccount(store, account);
+    store.accounts.push(account);
     saveStore();
   }
   const access = accessFor(account, store.profiles);

@@ -28,7 +28,6 @@ import {
 import { accountPreferences, kindDefaults } from "./account-preferences.js";
 import {
   accountAccessForId,
-  accountDreamDefaults,
   gatewayAccountAccess,
   gatewayAdminTools,
   listAccounts,
@@ -1007,7 +1006,6 @@ registerSuggestionRoutes(app, {
 const projects = createProjects({ cards: accountCards, dataDir });
 const chatNotes = createChatNotes({ dataDir });
 const dream = createDream({
-  accountDefaults: accountDreamDefaults,
   dataDir,
   idleMinutes: (kind) =>
     dreamTimingMinutes(kind === "image" ? "imageIdleMinutes" : "videoIdleMinutes"),

@@ -1023,7 +1023,7 @@ export async function fixtures(page: Page) {
         perMinute: 0,
         etaSeconds: null,
       });
-    // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
+    // Dream paused, as a new account sees it; serveDream replaces this for Dream's own specs.
     if (path === "/api/dream/history") return respond({ items: [] });
     if (path === "/api/dream/keep-rates") return respond(noKeepRates);
     if (path === "/api/gallery/library-review")
@@ -1036,7 +1036,7 @@ export async function fixtures(page: Page) {
         locked: [],
         today: { images: 0, videos: 0 },
         unseen: [],
-        status: "off",
+        status: "paused",
       });
     return respond({ ok: true });
   });
@@ -1594,6 +1594,7 @@ export async function serveDream(
     settings: {
       ...dreamDefaults,
       enabled: options.enabled ?? true,
+      paused: false,
     },
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],

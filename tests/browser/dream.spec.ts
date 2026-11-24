@@ -641,7 +641,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   await expect(page.getByText("Dream works when the queue is free", { exact: true })).toBeVisible();
-  await expect(page.getByText("12 of 40 today", { exact: true })).toBeVisible();
+  await expect(page.getByText("12 of 100 today", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
@@ -656,10 +656,10 @@ test("Dream explains itself while off and saves its settings in Settings", async
   const videosGroup = settings.getByRole("region", { name: "Videos", exact: true });
   const videos = videosGroup.getByRole("switch", { name: "Generate Videos", exact: true });
   const videoAmount = videosGroup.getByRole("textbox", { name: "Daily Videos", exact: true });
-  await expect(videoAmount).toBeDisabled();
-  await videos.click({ force: true });
-  await expect(videos).toBeChecked();
   await expect(videoAmount).toBeEnabled();
+  await videos.click({ force: true });
+  await expect(videos).not.toBeChecked();
+  await expect(videoAmount).toBeDisabled();
   const images = imagesGroup.getByRole("textbox", { name: "Daily Images", exact: true });
   await images.fill("200");
   await images.press("Enter");
@@ -671,7 +671,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
       { enabled: true },
       { paused: true },
       { useLoadedProfile: false },
-      { videos: true },
+      { videos: false },
       { dailyImages: 200 },
     ]);
   await imagesGroup
@@ -686,7 +686,7 @@ test("Dream displays allocations and resets the exhausted kind from its toolbar"
 }) => {
   await fixtures(page);
   const dream = await serveDream(page);
-  Object.assign(dream.settings, { dailyImages: 12, videos: true });
+  Object.assign(dream.settings, { dailyImages: 12, dailyVideos: 4 });
   await page.goto("/dream");
   const status = page.getByRole("button", { name: "Dream Allocation", exact: true });
   await status.click();
