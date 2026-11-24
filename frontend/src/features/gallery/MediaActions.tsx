@@ -74,8 +74,7 @@ import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt
  */
 function withoutLoneOption(action: Action): Action {
   const options = action.menu?.flat() ?? [];
-  if (options.length !== 1 || action.note || ["animate", "discover", "upscale"].includes(action.id))
-    return action;
+  if (options.length !== 1 || ["animate", "discover", "upscale"].includes(action.id)) return action;
   const [option] = options;
   return {
     ...action,
@@ -179,7 +178,6 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     label: video ? "Use Frame as Reference" : "Use as Reference",
     icon: icons.reference,
     disabled: !(takes || fallback) || reference.isPending,
-    description: takes || fallback ? undefined : "No model takes references",
     keepOpen: true,
     onClick: () => {
       if (fallback) selectProfile(fallback);
@@ -404,8 +402,8 @@ export function useMediaActions(
     enabled: image || video,
     placeholderData: keepPreviousData,
   });
-  // Nothing can animate: say why.
-  const refusal = animation.error?.message;
+  // Nothing can animate: the whole Animate greys out.
+  const unanimatable = Boolean(animation.error);
   // A video's templates continue the clip from its last frame at once; it keeps the clip's own
   // model unless videos run on Cloud.
   const animateDisabled =
@@ -496,6 +494,8 @@ export function useMediaActions(
   });
   const openChanges = (mode: ViewerChange) => () =>
     setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
+  // With no model that edits images, Edit's changes grey out rather than failing when picked.
+  const noEdits = image && !automaticEdit;
   const changeMenu = (mode: ViewerChange, others: ActionGroups, last: Action[]) =>
     assistMenu({
       settings: [
@@ -529,13 +529,13 @@ export function useMediaActions(
             ]
           : []),
       ],
-      suggestions: assistedChanges ? steps : undefined,
+      suggestions: assistedChanges && !(mode === "edit" && noEdits) ? steps : undefined,
       ...(assistedChanges
         ? changeTemplates(
             assistant.data?.changes ?? [],
             (request) => pick(mode, request),
             () => custom(mode),
-            draft?.pending,
+            draft?.pending || (mode === "edit" && noEdits),
             mode,
           )
         : { templates: [] }),
@@ -582,8 +582,7 @@ export function useMediaActions(
     (image || video) &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
-        // When nothing can animate, the options stay disabled and the note says why.
-        note: refusal,
+        disabled: unanimatable,
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: assistant.isPending,

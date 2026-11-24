@@ -9,7 +9,7 @@ import {
 } from "../../../../shared/profiles";
 import { selectedResolution } from "../../../../shared/resolution";
 import { post } from "../../api";
-import type { GenerationInput, MediaItem, Profile } from "../../types";
+import type { GenerationInput, MediaItem, Models, Profile } from "../../types";
 import { useRemembered } from "../auth/useRemembered";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
@@ -74,6 +74,26 @@ export const removeVariant = (draft: Draft, profiles: Profile[], index: number) 
     draft,
     variantsOf(draft, profiles).filter((_, each) => each !== index),
   );
+
+/** The local image model a LoRA's test runs on: the default where it fits, else the first that does. */
+export function loraTestProfile(
+  models: Models | undefined,
+  loras: Parameters<typeof compatibleLoras>[1] | undefined,
+  name: string,
+) {
+  const suits = (profile?: Profile) =>
+    Boolean(
+      profile &&
+      loras &&
+      profile.kind === "image" &&
+      profile.ready !== false &&
+      !isCloudProfile(profile) &&
+      profile.capabilities.lora &&
+      compatibleLoras(profile, loras).includes(name),
+    );
+  const preferred = defaultProfile(models, "image");
+  return suits(preferred) ? preferred : models?.profiles.find(suits);
+}
 
 /** The composer's comparison: its variants, their labels and why it can't run yet, if it can't. */
 export function useDraftComparison() {
@@ -168,7 +188,7 @@ async function exactDraft(item: MediaItem, client: ReturnType<typeof useQueryCli
  * This), and Library › Test LoRA's strength sweep.
  */
 export function useStageComparison() {
-  const { profiles, setDraft } = useGenerationActions();
+  const { setDraft } = useGenerationActions();
   const client = useQueryClient();
   const openComposer = useOpenComposer();
   const open = (draft: Draft) => {
@@ -197,18 +217,9 @@ export function useStageComparison() {
         client.fetchQuery(modelsQuery),
         client.fetchQuery(loraInfoQuery),
       ]);
-      const suits = (profile?: Profile) =>
-        Boolean(
-          profile &&
-          profile.kind === "image" &&
-          profile.ready !== false &&
-          !isCloudProfile(profile) &&
-          profile.capabilities.lora &&
-          compatibleLoras(profile, info.loras).includes(name),
-        );
-      const preferred = defaultProfile(models, "image");
-      const profile = suits(preferred) ? preferred : profiles.find(suits);
-      if (!profile) throw new Error("No ready image model can run this LoRA.");
+      // Library greys Test out where no model can run the LoRA (loraTestProfile).
+      const profile = loraTestProfile(models, info.loras, name);
+      if (!profile) return;
       // Without the LoRA, then its default and the strengths beside it.
       open({
         sessionId: "",
