@@ -45,7 +45,6 @@
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-behavior: var(--studio-scroll-behavior);
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
@@ -58,4 +57,14 @@
     0px,
     (100% - max(var(--compare-min-height), 100dvh - 17rem) * var(--compare-aspect)) / 2
   );
+}
+
+.splitChoices {
+  width: min(100%, 40rem);
+  margin-inline: auto;
+}
+
+.split {
+  position: relative;
+  height: max(16rem, 100dvh - 17rem);
 }

@@ -137,7 +137,10 @@ function cleanLocation(location: Location) {
 
 export function GalleryPage() {
   const location = useLocation();
-  if (location.search || location.pathname === "/video") {
+  const comparisonRating =
+    galleryRouteView(location.pathname) === "comparisons" &&
+    ["?rating=liked", "?rating=disliked"].includes(location.search);
+  if ((location.search && !comparisonRating) || location.pathname === "/video") {
     const { pathname, state } = cleanLocation(location);
     return <Navigate to={pathname} state={state} replace />;
   }
