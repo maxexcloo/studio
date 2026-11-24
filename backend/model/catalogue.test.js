@@ -102,12 +102,7 @@ test("Dream offers ready local and cloud profiles the composer offers, unless th
 });
 
 test("default profiles sit on their default model's side while it can run, otherwise the other with a note", (t) => {
-  const keys = [
-    "STUDIO_DEFAULT_IMAGE_PROFILE",
-    "STUDIO_VIDEO_ASPECT",
-    "STUDIO_VIDEO_RESOLUTION",
-    "STUDIO_VIDEO_SECONDS",
-  ];
+  const keys = ["STUDIO_DEFAULT_IMAGE_PROFILE", "STUDIO_VIDEO_SECONDS"];
   t.after(() => {
     for (const key of keys) delete process.env[key];
   });
@@ -134,13 +129,9 @@ test("default profiles sit on their default model's side while it can run, other
     imageModel: "grok-image",
     videoModel: "grok-video",
   });
-  Object.assign(process.env, {
-    STUDIO_VIDEO_ASPECT: "9:16",
-    STUDIO_VIDEO_RESOLUTION: "720p",
-    STUDIO_VIDEO_SECONDS: "8",
-  });
+  process.env.STUDIO_VIDEO_SECONDS = "8";
   const sized = withPreferredDefaults(models);
-  const videoDefaults = { videoAspect: "9:16", videoResolution: "720p", videoSeconds: 8 };
+  const videoDefaults = { videoSeconds: 8 };
   assert.deepEqual(
     sized.profiles
       .filter(({ kind }) => kind === "video")

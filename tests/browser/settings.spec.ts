@@ -309,7 +309,7 @@ test("An administrator turns LoRAs and Uncensored off for itself in Preferences"
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
-test("Where Work Runs saves Studio's starting sizes, Video Length and Dream's side for everyone", async ({
+test("Where Work Runs saves Studio's Video Length and Dream's side for everyone", async ({
   page,
 }) => {
   await fixtures(page);
@@ -329,12 +329,6 @@ test("Where Work Runs saves Studio's starting sizes, Video Length and Dream's si
   await expect
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
     .toEqual(["Images", "Videos", "Dream", "Text"]);
-  await group("Images").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
-  await page.getByRole("option", { name: "16:9", exact: true }).click();
-  await group("Videos").getByRole("combobox", { name: "Default Aspect", exact: true }).click();
-  await page.getByRole("option", { name: "9:16", exact: true }).click();
-  await group("Videos").getByRole("combobox", { name: "Default Resolution", exact: true }).click();
-  await page.getByRole("option", { name: "720p", exact: true }).click();
   await group("Videos")
     .getByRole("radiogroup", { name: "Video Length", exact: true })
     .getByText("8 s", { exact: true })
@@ -346,9 +340,6 @@ test("Where Work Runs saves Studio's starting sizes, Video Length and Dream's si
   await expect
     .poll(() => saved)
     .toEqual([
-      { key: "STUDIO_IMAGE_ASPECT", value: "16:9" },
-      { key: "STUDIO_VIDEO_ASPECT", value: "9:16" },
-      { key: "STUDIO_VIDEO_RESOLUTION", value: "720p" },
       { key: "STUDIO_VIDEO_SECONDS", value: 8 },
       { key: "STUDIO_DREAM_IMAGE_BACKEND", value: "cloud" },
     ]);

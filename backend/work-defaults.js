@@ -6,30 +6,19 @@ import { mediaDefaultProfileKeys } from "./generation-defaults.js";
 // (deployment-settings.js). Each kind's default model (`mediaDefaultProfileKeys` and the text
 // profile) says where it runs; `workSettings` (shared/work-defaults.ts) holds the rest.
 
-const numeric = (name) => name === "imageCount" || name === "videoSeconds";
-
 /** Why `value` can't be saved for `name`; "" when it can. */
 export function workSettingError(name, value) {
-  const { choices, range } = workSettings[name];
-  if (range)
-    return Number.isInteger(value) && value >= range[0] && value <= range[1]
-      ? ""
-      : `Set ${name} to a whole number from ${range[0]} to ${range[1]}.`;
+  const { choices } = workSettings[name];
   return choices.includes(value) ? "" : `Set ${name} to ${choices.join(", ")}.`;
 }
 
-/** Each setting's value now, or null where unset (Dream's backends are Local until set). */
+/** Each setting's value now: Video Length null for Auto, Dream's backends Local until set. */
 export function workDefaults() {
-  const values = Object.fromEntries(
-    Object.entries(workSettings).map(([name, { key }]) => {
-      const raw = process.env[key];
-      return [name, raw ? (numeric(name) ? Number(raw) : raw) : null];
-    }),
-  );
+  const { videoSeconds, dreamImageBackend, dreamVideoBackend } = workSettings;
   return {
-    ...values,
-    dreamImageBackend: values.dreamImageBackend ?? "local",
-    dreamVideoBackend: values.dreamVideoBackend ?? "local",
+    videoSeconds: Number(process.env[videoSeconds.key]) || null,
+    dreamImageBackend: process.env[dreamImageBackend.key] || "local",
+    dreamVideoBackend: process.env[dreamVideoBackend.key] || "local",
   };
 }
 

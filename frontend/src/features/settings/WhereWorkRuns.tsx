@@ -1,17 +1,9 @@
-import { SegmentedControl, Select, Stack } from "@mantine/core";
+import { SegmentedControl, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { dreamVideoSeconds } from "../../../../shared/dream";
-import {
-  grokVideoAspects,
-  imageAspects,
-  maxImageCount,
-  resolutions,
-  videoResolutions,
-} from "../../../../shared/resolution";
 import { LoadFailed } from "../../ui/LoadFailed";
 import { LoadingState } from "../../ui/LoadingState";
-import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
@@ -24,8 +16,6 @@ import {
   useDeploymentSetting,
 } from "./deployment";
 
-/** The choice of none, listed first: each model keeps its own default. */
-const profileDefault = { value: "", label: "Default (Model)" };
 const sides = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
@@ -70,24 +60,6 @@ export function WhereWorkRuns() {
       </SettingRow>
     );
   };
-  /** A choice from `choices`, or the profile's own default. */
-  const choiceRow = (
-    name: "imageAspect" | "imageResolution" | "videoAspect" | "videoResolution",
-    label: string,
-    description: string,
-    choices: readonly string[],
-  ) => (
-    <SettingRow wide label={label} description={description + lockedNote(work[name])}>
-      <Select
-        aria-label={label}
-        data={[profileDefault, ...choices]}
-        value={work[name].value ?? ""}
-        allowDeselect={false}
-        disabled={work[name].locked}
-        onChange={(choice) => set(name, choice || null)}
-      />
-    </SettingRow>
-  );
   const dreamRow = (name: "dreamImageBackend" | "dreamVideoBackend", label: string) => (
     <SettingRow
       wide
@@ -107,41 +79,7 @@ export function WhereWorkRuns() {
   );
   return (
     <Stack gap="lg">
-      <SettingGroup title="Images">
-        {modelRow("image", defaults.image)}
-        {choiceRow(
-          "imageAspect",
-          "Default Aspect",
-          "The starting shape for new image drafts and chat runs, where the model supports it.",
-          imageAspects,
-        )}
-        <SettingRow
-          wide
-          label="Default Count"
-          description={`How many images new drafts and chat runs make, where the model can.${lockedNote(work.imageCount)}`}
-        >
-          <Select
-            aria-label="Default Count"
-            data={[
-              profileDefault,
-              ...Array.from({ length: maxImageCount }, (_, index) => ({
-                value: String(index + 1),
-                label: plural(index + 1, "Image"),
-              })),
-            ]}
-            value={work.imageCount.value ? String(work.imageCount.value) : ""}
-            allowDeselect={false}
-            disabled={work.imageCount.locked}
-            onChange={(choice) => set("imageCount", choice ? Number(choice) : null)}
-          />
-        </SettingRow>
-        {choiceRow(
-          "imageResolution",
-          "Default Resolution",
-          "The starting resolution for new image drafts and chat runs, where the model supports it.",
-          resolutions,
-        )}
-      </SettingGroup>
+      <SettingGroup title="Images">{modelRow("image", defaults.image)}</SettingGroup>
       <SettingGroup title="Videos">
         {modelRow("video", defaults.video)}
         <SettingRow
@@ -162,18 +100,6 @@ export function WhereWorkRuns() {
             onChange={(value) => set("videoSeconds", Number(value) || null)}
           />
         </SettingRow>
-        {choiceRow(
-          "videoAspect",
-          "Default Aspect",
-          "The starting shape for new video drafts. A start frame can override it.",
-          grokVideoAspects,
-        )}
-        {choiceRow(
-          "videoResolution",
-          "Default Resolution",
-          "The starting resolution for new video drafts and Animate.",
-          videoResolutions,
-        )}
       </SettingGroup>
       <SettingGroup title="Dream">
         {dreamRow("dreamImageBackend", "Images")}

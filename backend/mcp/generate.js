@@ -26,7 +26,7 @@ import {
 import { compareVariants, letter } from "../../shared/compare.ts";
 import { isCloudProfile, loraStrengthSweep, profileBackendLabels } from "../../shared/profiles.ts";
 import { projectRangeInputs } from "../../shared/projects.ts";
-import { availableResolutions, profileStartingSize, resolutions } from "../../shared/resolution.ts";
+import { resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 import { maxResultCaption } from "../gallery/records.js";
@@ -106,26 +106,8 @@ const theme = z
       context.addIssue({ code: "custom", message: `Use one of ${themeIds().join(", ")}` });
   })
   .describe(`One of ${themeIds().join(", ")}.`);
-/**
- * A run's size: the shape the chat named as the profile's preset, else the account's Settings
- * aspect as the composer starts (profileStartingSize), else the profile's own canvas. The account's
- * resolution applies where the chat named none and the profile draws it.
- */
-function runSize(profile, aspect, resolution) {
-  const { width, height } =
-    aspect || !profile.imagePreference?.imageAspect
-      ? profileAspectSize(profile, aspect ? { aspect } : {})
-      : profileStartingSize(profile);
-  const preferred = profile.imagePreference?.imageResolution;
-  const native = profile.options?.resolutions;
-  const takes =
-    preferred &&
-    !resolution &&
-    (native?.length
-      ? native.some((value) => value.toUpperCase() === preferred)
-      : availableResolutions(profile, { kind: profile.kind, width, height }).includes(preferred));
-  return { width, height, ...(takes ? { resolution: preferred } : {}) };
-}
+/** A run's size: the shape the chat named as the profile's preset, else the profile's own canvas. */
+const runSize = (profile, aspect) => profileAspectSize(profile, aspect ? { aspect } : {});
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 /**
  * What each chat turn has queued, `{ images, sets }`, so the turn stops at the number its request
@@ -1103,8 +1085,6 @@ export function registerGenerateTools({
       throw new Error(
         `The user asked for ${remaining} more images. Pass up to ${maxJobsPerCall} repeats per prompt with count, or supply more distinct prompts to batch the images.`,
       );
-    const preferredCount =
-      singleImage && !requested ? targets[0].profile.imagePreference?.imageCount : undefined;
     if (
       args.count === undefined &&
       !singleImage &&
@@ -1115,7 +1095,7 @@ export function registerGenerateTools({
         `The user asked for ${remaining} more images, but these prompts and models give ${outputsPerCount}. Supply the remaining distinct prompts, or set count explicitly to repeat prompts or submit a deliberate batch.`,
       );
     const inferredCount = singleImage && remaining > 0 ? remaining : undefined;
-    const count = (args.count ??= inferredCount ?? preferredCount ?? mcpGenerationCount);
+    const count = (args.count ??= inferredCount ?? mcpGenerationCount);
     const jobs = outputsPerCount * count;
     if (jobs > maxSplitJobs)
       throw new Error(
@@ -1133,7 +1113,7 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              const sized = runSize(profile, aspect, args.resolution);
+              const sized = runSize(profile, aspect);
               // A character sends its first image (characterImages; the run adds its others where
               // there is room) only to a model that keeps its face: into its Identity slot, the
               // named references filling the others in order, or after them on a model that edits

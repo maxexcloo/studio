@@ -60,8 +60,6 @@ test("whereWorkRunsServerWide moves the administrator's choices to Studio's and 
   assert.deepEqual(plan.settings, {
     // The override applied to everyone, so it wins over the administrator's own Dream choice.
     STUDIO_DREAM_VIDEO_BACKEND: "cloud",
-    STUDIO_IMAGE_ASPECT: "16:9",
-    STUDIO_IMAGE_COUNT: "2",
     STUDIO_DEFAULT_IMAGE_PROFILE: "grok-image",
     STUDIO_DREAM_IMAGE_BACKEND: "local",
     STUDIO_VIDEO_SECONDS: "8",
@@ -96,10 +94,10 @@ test("whereWorkRunsServerWide applies nothing when administrators chose differen
       { id: "second", role: "administrator" },
     ],
   });
-  writeRuntimeDocument(dataDir, "preferences:admin", { imageAspect: "16:9" });
-  writeRuntimeDocument(dataDir, "preferences:second", { imageAspect: "1:1" });
+  writeRuntimeDocument(dataDir, "preferences:admin", { imageLocal: "flux" });
+  writeRuntimeDocument(dataDir, "preferences:second", { imageLocal: "sdxl" });
   const result = whereWorkRunsServerWide(dataDir, { apply: true });
   assert.equal(result.applied, false);
   assert.equal(result.conflicts.length, 1);
-  assert.deepEqual(readRuntimeDocument(dataDir, "preferences:second"), { imageAspect: "1:1" });
+  assert.deepEqual(readRuntimeDocument(dataDir, "preferences:second"), { imageLocal: "sdxl" });
 });

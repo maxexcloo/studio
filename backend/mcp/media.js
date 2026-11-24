@@ -410,13 +410,11 @@ export class McpMedia {
   profileForBackend(profile, backend) {
     const option = profile.backendOptions?.find((option) => option.id === backend);
     if (!option?.profile) return profile;
-    const { backendOptions, failing, imagePreference, workerIds, availability, readiness } =
-      profile;
+    const { backendOptions, failing, workerIds, availability, readiness } = profile;
     return this.profileWithPrompting({
       ...option.profile,
       backendOptions,
       failing,
-      imagePreference,
       workerIds,
       availability,
       readiness,

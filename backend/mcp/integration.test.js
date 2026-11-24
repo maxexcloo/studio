@@ -5956,14 +5956,6 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
-  // The account's Settings size starts a run the chat sized no further, as in the composer.
-  await f.profiles(
-    [{ ...native, imagePreference: { imageAspect: "16:9", imageResolution: "2K" } }],
-    { defaults: { image: "native", video: videoProfile.id } },
-  );
-  assert.deepEqual(await size({}), [2048, 1152]);
-  assert.deepEqual(await size({ aspect: "square" }), [2048, 2048]);
-  assert.deepEqual(await size({ resolution: "1K" }), [1360, 768]);
   await f.profiles([native, { ...structuredClone(imageProfile), label: "Plain · Quality" }], {
     defaults: { image: "native", video: videoProfile.id },
   });

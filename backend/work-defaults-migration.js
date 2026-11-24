@@ -7,7 +7,7 @@ import {
 } from "./generation-defaults.js";
 import { ownerDocuments, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
-/** Each retired account preference that Where Work Runs now holds, by its setting's name. */
+/** The retired account size preferences, which go without a Studio-wide replacement. */
 const sizes = ["imageAspect", "imageCount", "imageResolution", "videoAspect", "videoResolution"];
 /** Each kind's retired side preference and per-side models, and the setting its model moves to. */
 const kinds = [
@@ -29,10 +29,10 @@ const dreamMoves = [
 /**
  * The migrate-runtime step that makes Where Work Runs Studio's rather than each account's. The
  * administrator's choices become the saved settings (deployment-settings.js) where none is saved:
- * their sizes, count and Video Length, the model for each kind's chosen side as its default model,
- * and their Dream image and video side (an administrator override of those wins). Then every
- * account's copies go: the side, per-side model and size preferences, and Dream's backends and
- * length. Administrators who chose differently are a conflict, and a conflict applies nothing.
+ * the model for each kind's chosen side as its default model, and their Dream image and video side
+ * and video length (an administrator override of the sides wins). Then every account's copies go:
+ * the side, per-side model and size preferences (drafts start from each model's own size again),
+ * and Dream's backends and length. Administrators who chose differently are a conflict, and a conflict applies nothing.
  * Safe while Studio runs; settings and preferences reload after it. Plans by default; `apply`
  * writes. A second run finds nothing.
  */
@@ -66,7 +66,6 @@ export function whereWorkRunsServerWide(dataDir, { apply = false } = {}) {
   for (const { name, value } of preferences) {
     const owner = name.slice("preferences:".length);
     if (!value || !isAdmin(owner)) continue;
-    for (const size of sizes) take(workSettings[size].key, value[size], owner);
     for (const [kind, cloud, local, key] of kinds) {
       const side =
         value[kind] ??

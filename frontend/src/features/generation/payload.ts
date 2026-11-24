@@ -50,7 +50,6 @@ export function profileForBackend(
   return profile && option?.profile
     ? {
         ...option.profile,
-        imagePreference: profile.imagePreference,
         videoPreference: profile.videoPreference,
         backendOptions: profile.backendOptions,
         failing: profile.failing,

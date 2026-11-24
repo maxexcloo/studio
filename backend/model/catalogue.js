@@ -412,8 +412,8 @@ export function dreamCatalogue(models) {
  * that side's first on Radiance, else its first that can. A side with none that can run (no cloud
  * profile for the account, or local ones not installed or their workers Offline or Stopped) gives
  * way to the other, and `defaultNotes` says so; with neither, the deployment's default stays and
- * its jobs wait. A profile the person picks always wins over these. Image and video profiles carry
- * Studio's starting size, count and length (`imagePreference`, `videoPreference`).
+ * its jobs wait. A profile the person picks always wins over these. Video profiles carry Studio's
+ * Video Length (`videoPreference`).
  */
 export function withPreferredDefaults(models) {
   const defaults = { ...models.defaults };
@@ -446,23 +446,12 @@ export function withPreferredDefaults(models) {
         ? `No cloud ${kind} model is available, so this runs locally.`
         : `No local ${kind} model is running, so this runs in the cloud.`;
   }
-  const { imageAspect, imageCount, imageResolution, videoAspect, videoResolution, videoSeconds } =
-    workDefaults();
-  const image = imageAspect || imageCount || imageResolution;
-  const video = videoAspect || videoResolution || videoSeconds;
-  const profiles =
-    image || video
-      ? models.profiles?.map((profile) => {
-          if (profile.kind === "image" && image)
-            return { ...profile, imagePreference: { imageAspect, imageCount, imageResolution } };
-          if (profile.kind === "video" && video)
-            return {
-              ...profile,
-              videoPreference: { videoAspect, videoResolution, videoSeconds },
-            };
-          return profile;
-        })
-      : models.profiles;
+  const { videoSeconds } = workDefaults();
+  const profiles = videoSeconds
+    ? models.profiles?.map((profile) =>
+        profile.kind === "video" ? { ...profile, videoPreference: { videoSeconds } } : profile,
+      )
+    : models.profiles;
   return { ...models, ...(profiles && { profiles }), defaults, defaultNotes };
 }
 
