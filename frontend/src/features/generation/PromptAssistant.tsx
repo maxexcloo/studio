@@ -426,7 +426,7 @@ export function usePromptAssistant({
   const templates: ToolAction[] = styles.map((item) => ({
     id: `style:${item.id}`,
     label: styles.length === 1 ? "Improve Prompt" : item.label,
-    icon: item.uncensored ? icons.uncensored : undefined,
+    marker: item.uncensored ? icons.uncensored : undefined,
     checked: styles.length > 1 ? item.id === preset?.id : undefined,
     disabled,
     onClick: () => run("rewrite", item.id),
