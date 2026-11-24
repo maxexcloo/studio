@@ -1,8 +1,8 @@
 import { type LucideIcon, X } from "lucide-react";
 
+import { letter } from "../../../../shared/compare";
 import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { letter } from "../compare/inputs";
 import type { ViewerActions } from "../gallery/MediaViewerActions";
 import type { DeckCard } from "./deck";
 import { type PairAnswer, comparisonVotes } from "./queries";

@@ -58,7 +58,7 @@ const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["←"], ["→"]], action: "Pass or Like in Dream, or Choose A or B" },
   { keys: [["↑"]], action: "Variations in Dream, or Both in a Comparison" },
   { keys: [["↓"]], action: "Neither in a Dream Comparison" },
-  { keys: [["1"], ["2"], ["3"], ["4"]], action: "Pick a Compare Winner" },
+  { keys: [["1–9"], ["0"]], action: "Pick a Compare Winner" },
 ];
 const link = (href: string, label: string) => (
   <Anchor href={href} target="_blank" rel="noopener noreferrer" size="sm">

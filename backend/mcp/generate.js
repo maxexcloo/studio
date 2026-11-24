@@ -23,7 +23,7 @@ import {
   startImageSlot,
   withCharacter,
 } from "../../shared/characters.ts";
-import { compareVariants } from "../../shared/compare.ts";
+import { compareVariants, letter } from "../../shared/compare.ts";
 import { isCloudProfile, loraStrengthSweep, profileBackendLabels } from "../../shared/profiles.ts";
 import { availableResolutions, profileStartingSize, resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
@@ -75,7 +75,6 @@ import {
   workerState,
 } from "./tiers.js";
 
-const letter = (index) => String.fromCharCode(65 + index);
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
 /** JSON with sorted keys and undefined left out, so equal arguments give equal text. */

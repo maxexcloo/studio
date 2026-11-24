@@ -61,6 +61,9 @@ interface SuggestionItem extends IdleItem {
   caption?: { text?: string };
   /** The last next steps written for it, shown at once when the viewer opens. */
   nextSteps?: SavedSteps;
+  /** An image's next steps for the viewer's Edit and Recreate menus. */
+  editSteps?: SavedSteps;
+  recreateSteps?: SavedSteps;
   /** Saved image-to-video instructions for Animate, separate from rewrites. */
   motionIdeas?: SavedSteps;
 }
@@ -99,7 +102,8 @@ const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
 const suggestionRevision = { image: 5, video: 3 } as const;
 const motionRevision = 5;
-const savedRevision = (field: "nextSteps" | "motionIdeas", item?: SuggestionItem) =>
+type SavedField = "nextSteps" | "editSteps" | "recreateSteps" | "motionIdeas";
+const savedRevision = (field: SavedField, item?: SuggestionItem) =>
   field === "motionIdeas"
     ? motionRevision
     : suggestionRevision[item?.type === "video" ? "video" : "image"];
@@ -420,7 +424,7 @@ export function createSuggestions({
   /** A small (≤512 px) copy of the image where the running text model reads images, else null. */
   image: (item: SuggestionItem, upscaled?: boolean) => Promise<ModelImage | null>;
   /** Keeps the suggestions for this exact result and menu. */
-  save: (item: SuggestionItem, field: "nextSteps" | "motionIdeas", steps: SavedSteps) => void;
+  save: (item: SuggestionItem, field: SavedField, steps: SavedSteps) => void;
   /** The Settings › Studio switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
   ideas: () => boolean;
   /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
@@ -482,7 +486,7 @@ export function createSuggestions({
   });
   function saveSteps(
     source: SuggestionItem,
-    field: "nextSteps" | "motionIdeas",
+    field: SavedField,
     steps: (PromptIdea | NextStep)[],
     uncensored: boolean,
   ) {
@@ -703,7 +707,8 @@ export function createSuggestions({
       uncensored,
       options.action,
     ]);
-    const latest = shown.get(menu) ?? source.nextSteps?.steps.map(describeIdea) ?? [];
+    const field = options.action ? (`${options.action}Steps` as const) : "nextSteps";
+    const latest = shown.get(menu) ?? source[field]?.steps.map(describeIdea) ?? [];
     const context = [
       ...tasteContext(ownerId).lines,
       "",
@@ -722,7 +727,7 @@ export function createSuggestions({
     });
     if (!answer.reason && !options.signal?.aborted) rememberShown(menu, answer.suggestions);
     if (!answer.reason && !options.signal?.aborted && options.save !== false)
-      saveSteps(source, "nextSteps", answer.suggestions, uncensored);
+      saveSteps(source, field, answer.suggestions, uncensored);
     return answer;
   }
 
@@ -1159,14 +1164,15 @@ export function createSuggestions({
         body.prompt.trim() !== "" &&
         body.prompt !== source?.settings?.typedPrompt &&
         body.prompt !== (source?.prompt || source?.suggestedPrompt || "");
-      const field = surface === "animate" ? "motionIdeas" : "nextSteps";
       const action =
         surface === "viewer" &&
         source?.type === "image" &&
         (body.action === "edit" || body.action === "recreate")
           ? body.action
           : undefined;
-      const saved = edited || action ? undefined : source?.[field];
+      const field =
+        surface === "animate" ? "motionIdeas" : action ? (`${action}Steps` as const) : "nextSteps";
+      const saved = edited ? undefined : source?.[field];
       const exclusions = explicitExclusions(taste.exclusions(ownerId));
       if (edited)
         source = { ...source!, prompt: body.prompt as string, suggestedPrompt: undefined };
@@ -1252,7 +1258,7 @@ export function createSuggestions({
         if (source && surface === "viewer")
           return stepsFor(model, ownerId, source, {
             image: picture,
-            save: !edited && !action,
+            save: !edited,
             signal,
             action,
             exclusions,

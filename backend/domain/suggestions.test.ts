@@ -593,6 +593,10 @@ test("viewer generates mode-specific options without replacing a result's saved 
   assert.equal(edit.suggestions[0].label, "Brass Cleat");
   assert.equal(recreate.suggestions[0].label, "From the Breakwater");
   assert.equal(items["alice:job-a"].nextSteps, saved);
+  // Each action's menu is saved apart, so the viewer shows the set it last wrote.
+  const steps = (field: string) => (items["alice:job-a"][field] as { steps: unknown[] }).steps;
+  assert.deepEqual(steps("editSteps"), edit.suggestions);
+  assert.deepEqual(steps("recreateSteps"), recreate.suggestions);
   assert.deepEqual(await ask(), mixed);
   assert.deepEqual(await ask("edit"), edit);
   assert.deepEqual(await ask("recreate"), recreate);

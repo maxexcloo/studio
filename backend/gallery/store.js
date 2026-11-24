@@ -90,9 +90,11 @@ const listVersionFor = (query) =>
     : listVersion;
 const enrichment = new Set([
   "caption",
+  "editSteps",
   "identity",
   "motionIdeas",
   "nextSteps",
+  "recreateSteps",
   "review",
   "suggestedPrompt",
   "title",

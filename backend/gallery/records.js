@@ -130,7 +130,13 @@ function storedContext(value) {
  * prompt's thinking (up to 20,000 characters) in Details (`/api/gallery/items/:id`), not carried
  * in every list.
  */
-export function listedRecord({ motionIdeas: _motions, nextSteps: _steps, ...item }) {
+export function listedRecord({
+  editSteps: _edit,
+  motionIdeas: _motions,
+  nextSteps: _steps,
+  recreateSteps: _recreate,
+  ...item
+}) {
   if (item.type === "video" && !item.thumbnailUrl) item.thumbnailUrl = videoPosterUrl(item.url);
   if (!item.writing?.thinking) return item;
   const { thinking: _thinking, ...writing } = item.writing;
