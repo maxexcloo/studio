@@ -14,12 +14,12 @@ test("queue polling follows the nearest finish across jobs", () => {
     queuePollInterval([{ ...running, progress: { phase: "Upscaling", value: 9, max: 10 } }]),
     1500,
   );
-  assert.equal(queuePollInterval([queued, { ...running, progress: { ...steps, value: 9 } }]), 350);
+  assert.equal(queuePollInterval([queued, { ...running, progress: { ...steps, value: 9 } }]), 750);
   assert.equal(
     queuePollInterval([{ ...running, progress: { ...steps, value: 9, estimated: true } }]),
     1500,
   );
-  assert.equal(queuePollInterval([{ ...running, progress: { phase: "Decoding" } }]), 350);
-  assert.equal(queuePollInterval([{ ...running, progress: { phase: "Saving" } }]), 350);
-  assert.equal(queuePollInterval([{ status: "saving" }]), 350);
+  assert.equal(queuePollInterval([{ ...running, progress: { phase: "Decoding" } }]), 750);
+  assert.equal(queuePollInterval([{ ...running, progress: { phase: "Saving" } }]), 750);
+  assert.equal(queuePollInterval([{ status: "saving" }]), 750);
 });
