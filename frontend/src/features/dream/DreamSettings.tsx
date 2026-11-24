@@ -123,7 +123,7 @@ export function DreamPreferences() {
         {mix("mixExisting", "Existing Work", "Recreations, variations and series of liked images.")}
       </SettingGroup>
       <SettingGroup title="Images">
-        {toggle("images", "Generate Images")}
+        {toggle("images", "Enabled")}
         {number(
           "dailyImages",
           "Daily Images",
@@ -132,7 +132,7 @@ export function DreamPreferences() {
         )}
       </SettingGroup>
       <SettingGroup title="Videos">
-        {toggle("videos", "Generate Videos", "Animate kept or liked images.")}
+        {toggle("videos", "Enabled", "Animate kept or liked images.")}
         {number(
           "dailyVideos",
           "Daily Videos",

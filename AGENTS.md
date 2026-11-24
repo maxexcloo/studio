@@ -85,7 +85,9 @@ recur across features.
   Phone tables fold secondary information into the main cell. A record's flags
   (AI, Failing, Default, Disabled) sit right after its name, outside the name's
   link, through `NameWithFlags` (`TableRecord`'s `flags`), never in their own
-  column or line; status columns hold values, not flags. Use headings
+  column or line; status columns hold values, not flags. A list's filter options are
+  columns, never flags, and a filter shows only where its choices would narrow
+  the list. Use headings
   rather than accordions, and popups to create or configure records.
 - Settings use `SettingGroup` and `SettingRow`. Switches apply on/off settings
   immediately and optimistically, rolling back or refetching after failure;

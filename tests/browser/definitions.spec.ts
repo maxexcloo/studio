@@ -515,7 +515,7 @@ test("Each Templates page lists its menu's templates by enabled and name, and ed
   await section(page, "Library", "Improve Prompt");
   const table = page.getByRole("table", { name: "Improve Prompt Templates", exact: true });
   const names = table.getByRole("button", { name: /^Edit / });
-  await expect(names).toHaveText(["Bold Uncensored", "Candid"]);
+  await expect(names).toHaveText(["Bold", "Candid"]);
   await expect(table.getByText("Cinematic Camera", { exact: true })).toBeHidden();
   // A switch applies at once, over the list's hash. Its track takes the pointer, as it has no
   // visible label, so the click goes to the switch directly.

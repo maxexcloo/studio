@@ -1635,7 +1635,7 @@ test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ pa
         "An amber bird",
         "Negative Prompt: blurry",
         `Created: ${formatDateTime(stamp)}`,
-        "Profile: Image Quality",
+        "Model: Image Quality",
         "CFG: 4",
         "Dimensions: 1024 × 1024",
         "Sampler: euler",
