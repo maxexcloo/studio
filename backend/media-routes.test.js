@@ -169,7 +169,7 @@ test("the viewer's display copy is a WebP of the whole picture, cached like a th
     [900, 900],
     "under its cap, the original's own size",
   );
-  assert.deepEqual([thumbnail.width, thumbnail.height], [768, 768]);
+  assert.deepEqual([thumbnail.width, thumbnail.height], [512, 512]);
   assert.equal(
     await revalidate(
       address("thumb", "still.png", "&size=display&v=abc"),

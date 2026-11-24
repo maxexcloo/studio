@@ -7576,7 +7576,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     "/api/gallery/delete",
     record("delete", (req) => ({ ok: true, removed: req.body.ids })),
   );
-  f.app.post("/api/gallery/errors/clear", record("clear", { ok: true, cleared: 2, outputs: [] }));
+  f.app.post("/api/gallery/errors/clear", record("clear", { ok: true, cleared: 2 }));
   f.app.post("/api/upscale", record("upscale", { ok: true, jobId: "upscale-1", plan: {} }));
   const mine = await f.client("", userToken);
   const other = await f.client("", otherToken);

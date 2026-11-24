@@ -448,6 +448,8 @@ const GridCell = memo(function GridCell({
       {...tile}
       item={item}
       galleryTile
+      // Past what the 512 px thumbnail covers, a tile shows the display copy instead.
+      large={width * window.devicePixelRatio > 640}
       detail={detail(item)}
       style={{
         position: "absolute",

@@ -26,8 +26,8 @@ const thumbnailDir = path.join(dataDir, ".thumbnails");
  * the original PNG's bytes. The viewer asks for the original only past it.
  */
 const RENDITIONS = {
-  thumb: { longestEdge: 768, quality: 72 },
-  display: { longestEdge: displayEdge, quality: 90 },
+  thumb: { longestEdge: 512, quality: 72 },
+  display: { longestEdge: displayEdge, quality: 80 },
 };
 const renditionOf = (size) => RENDITIONS[size] || RENDITIONS.thumb;
 const pending = new Map();
@@ -210,6 +210,9 @@ function cachePath(key, sourceHash) {
   return path.join(thumbnailDir, `${key}-${sourceHash}.webp`);
 }
 
+// The ETag names the rendition as well as the source, so a browser holding another size refetches.
+const cached = (file) => ({ file, etag: `"${path.basename(file, ".webp")}"` });
+
 /** The newest thumbnail already made for this output, whatever its source hash. */
 function cachedThumbnail(key) {
   let found = null;
@@ -225,9 +228,7 @@ function cachedThumbnail(key) {
     }
     if (!found || time > found.time) found = { file, time };
   }
-  return found
-    ? { file: found.file, etag: `"${path.basename(found.file, ".webp").slice(key.length + 1)}"` }
-    : null;
+  return found ? cached(found.file) : null;
 }
 
 /** The original's bytes: Studio media from its folder, anything else from `worker`'s ComfyUI. */
@@ -273,9 +274,9 @@ async function build(filename, subfolder, type, size, worker) {
   const local = await localSource(filename, subfolder, type);
   if (local) {
     const file = cachePath(key, local.sourceHash);
-    if (fs.existsSync(file)) return { file, etag: `"${local.sourceHash}"` };
+    if (fs.existsSync(file)) return cached(file);
     const made = await inSlot(async () => {
-      if (fs.existsSync(file)) return { file, etag: `"${local.sourceHash}"` };
+      if (fs.existsSync(file)) return cached(file);
       // sharp reads the file itself, off the main thread, instead of it being
       // read here into a buffer first. Unreadable: try ComfyUI below.
       try {
@@ -296,7 +297,7 @@ async function build(filename, subfolder, type, size, worker) {
     if (!source) return null;
     const sourceHash = digest(source);
     const file = cachePath(key, sourceHash);
-    if (fs.existsSync(file)) return { file, etag: `"${sourceHash}"` };
+    if (fs.existsSync(file)) return cached(file);
     return writeThumbnail(key, sourceHash, source, size);
   });
 }
@@ -329,7 +330,7 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
   indexAdd(name);
   lastUsed.set(file, Date.now());
   maybeSweep();
-  return { file, etag: `"${sourceHash}"` };
+  return cached(file);
 }
 
 // Concurrent requests for the same not-yet-cached image share one build instead of

@@ -45,7 +45,6 @@ const ordinaryRoutes = [
     "POST",
     /^\/api\/gallery\/(delete|export|favorite|frame|import\/link|errors\/clear|library-review\/[^/]+|recreate|video-edit)$/,
   ],
-  ["DELETE", /^\/api\/gallery\/[^/]+$/],
   ["GET", /^\/api\/prompts$/],
   ["GET", /^\/api\/preferences$/],
   ["PATCH", /^\/api\/preferences$/],
