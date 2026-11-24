@@ -38,6 +38,7 @@ import { usePhone } from "../../ui/usePhone";
 import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { chipProps } from "../generation/chip";
 import { GalleryChoices } from "../generation/GalleryChoices";
+import { defaultProfile, modelsQuery } from "../generation/GenerationProvider";
 import { UploadTile } from "../generation/Picker";
 import { assistantQuery } from "../generation/PromptAssistant";
 import {
@@ -223,6 +224,8 @@ export function useReferenceAction(
   onDone: () => void,
 ) {
   const generate = useGenerateReferences(kind, id);
+  // Without an image model to draw them, Generate References greys out.
+  const drawable = Boolean(defaultProfile(useQuery(modelsQuery).data, "image"));
   const navigate = useNavigate();
   const { name, description, referenceIds } = fields();
   const { max } = cardKinds[kind].images;
@@ -234,7 +237,7 @@ export function useReferenceAction(
         variant="default"
         leftSection={<icons.compare size={16} />}
         loading={generate.isPending}
-        disabled={!name.trim() || !description.trim() || full}
+        disabled={!drawable || !name.trim() || !description.trim() || full}
         onClick={() =>
           generate.mutate(fields(), {
             onSuccess: (comparison) => {

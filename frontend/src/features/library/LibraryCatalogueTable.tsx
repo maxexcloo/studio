@@ -146,6 +146,7 @@ export function LibraryCatalogueTable({
   installingKey,
   onCheckUpdates,
   onTest,
+  canTest,
   onUpdateAll,
   inventoryError,
   onEdit,
@@ -163,8 +164,9 @@ export function LibraryCatalogueTable({
   onInstall?: (item: LibraryItem) => void;
   installingKey?: string;
   onCheckUpdates?: () => void;
-  /** Test LoRA: a strength sweep in Compare. */
+  /** Test LoRA: a strength sweep in Compare; greyed out where `canTest` finds no model to run it. */
   onTest?: (item: LibraryItem) => void;
+  canTest?: (item: LibraryItem) => boolean;
   /** Applies every free update, models and LoRAs alike; absent when there are none. */
   onUpdateAll?: () => void;
   onEdit?: (item: LibraryItem) => void;
@@ -464,7 +466,11 @@ export function LibraryCatalogueTable({
                 </Menu.Item>
               )}
               {onTest && item.installed && item.folder === "loras" && (
-                <Menu.Item leftSection={<icons.compare size={16} />} onClick={() => onTest(item)}>
+                <Menu.Item
+                  leftSection={<icons.compare size={16} />}
+                  disabled={canTest && !canTest(item)}
+                  onClick={() => onTest(item)}
+                >
                   Test
                 </Menu.Item>
               )}

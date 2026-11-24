@@ -74,8 +74,6 @@ export interface Action {
     options: { value: string; label: string }[];
     onChange: (value: string) => void;
   };
-  /** Why nothing in its options can run, above them. */
-  note?: string;
   /** Names its group in menus (Templates, Suggestions) rather than acting. */
   heading?: boolean;
   /** Runs as its options show, so they load only when wanted (an item's suggestions). */
@@ -111,16 +109,8 @@ const isSetting = (action: Action) =>
 export const usualAction = (action: Action): Action | undefined =>
   action.menu ? action.menu.flat().find((option) => !isSetting(option) && !option.heading) : action;
 
-const note = (action: Action) => (
-  <>
-    {action.onOpen && <Opened onOpen={action.onOpen} />}
-    {action.note && (
-      <Menu.Label fw={400} maw={menuWidth}>
-        {action.note}
-      </Menu.Label>
-    )}
-  </>
-);
+/** Tells an opened action its options are showing. */
+const opened = (action: Action) => action.onOpen && <Opened onOpen={action.onOpen} />;
 
 /** Tells an action its options are showing; they mount only while open. */
 function Opened({ onOpen }: { onOpen: () => void }) {
@@ -227,7 +217,7 @@ export function ActionMenuItems({
       </Menu.Item>
       <Menu.Divider />
       <div role="group" aria-label={level.label} className={classes.menuOptions} key={level.id}>
-        {note(level)}
+        {opened(level)}
         {rows}
       </div>
     </div>
@@ -336,7 +326,7 @@ function MenuRows({
                   style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
                 >
                   <div role="group" aria-label={label}>
-                    {note(action)}
+                    {opened(action)}
                     <MenuRows
                       groups={action.menu}
                       uid={`${childUid}-${id}`}
@@ -485,17 +475,7 @@ function OptionsMenu({
     >
       {target}
       <Menu.Dropdown ref={dropdown}>
-        <ActionMenuItems
-          key={opening}
-          groups={action.menu!}
-          leading={
-            action.note && (
-              <Menu.Label fw={400} maw={menuWidth}>
-                {action.note}
-              </Menu.Label>
-            )
-          }
-        />
+        <ActionMenuItems key={opening} groups={action.menu!} />
       </Menu.Dropdown>
     </Menu>
   );

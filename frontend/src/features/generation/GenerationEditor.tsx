@@ -223,7 +223,7 @@ export function GenerationEditor({
     () => profileForBackend(listedProfile, input.profileBackend, anyReferences),
     [listedProfile, input.profileBackend, anyReferences],
   );
-  const { models, profiles } = useGeneration();
+  const { models } = useGeneration();
   useFailureBanner(models.error);
   // The chips take the draft as typing leaves it, so they keep still while the prompt changes.
   const settled = useDraft().input;
@@ -348,13 +348,6 @@ export function GenerationEditor({
         }}
       >
         <div className={classes.fields} data-generation-fields aria-label="Generation Fields">
-          {!profile && (
-            <Alert color="yellow">
-              {input.profileId && profiles.length
-                ? "The selected model is unavailable. Choose another."
-                : "No models are available. Check the workers."}
-            </Alert>
-          )}
           <TextToolsBar.Provider value={fill ? toolsBar : null}>
             <PromptFields
               textareaRef={prompt}
