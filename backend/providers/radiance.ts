@@ -8,7 +8,7 @@ import { Agent, FormData, fetch as undiciFetch } from "undici";
  */
 
 type Values = Record<string, any>;
-export interface RadianceModel {
+interface RadianceModel {
   id: string;
   /** cold, loading, resident, closing, parked or failed. */
   state: string;
@@ -21,7 +21,7 @@ interface RadianceVideo {
   steps_total?: number;
   error?: { message?: string } | string;
 }
-export interface RadianceFile {
+interface RadianceFile {
   field: string;
   bytes: Uint8Array;
 }
@@ -263,7 +263,7 @@ function videoSize(width: number, height: number, maxPixels: number) {
 }
 
 /** A reference picture and the role its slot gives it: start, end or (otherwise) reference. */
-export interface RadianceReference {
+interface RadianceReference {
   bytes: Uint8Array;
   role?: string;
 }

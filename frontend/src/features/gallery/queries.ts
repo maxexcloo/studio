@@ -12,7 +12,7 @@ import { isResultNumber } from "./viewerLink";
 
 /** Every gallery listing's key starts with this, so invalidating it refreshes them all. */
 export const galleryKey = ["gallery"] as const;
-export interface GalleryChatSet {
+interface GalleryChatSet {
   id: string;
   title: string | null;
   series: string | null;

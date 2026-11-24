@@ -58,14 +58,14 @@ export function moreSeeds(seeds: string[], count: number) {
   return next;
 }
 
-export const promptLines = (prompt: string) =>
+const promptLines = (prompt: string) =>
   prompt
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
 
 /** `input` once per line of its prompt. */
-export const promptInputs = (input: GenerationInput) =>
+const promptInputs = (input: GenerationInput) =>
   promptLines(input.prompt).map((prompt) => ({ ...input, prompt }));
 
 /**

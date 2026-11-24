@@ -125,7 +125,7 @@ export const dreamQuota = ({ settings, today, usage = today }: Dream) => {
 };
 
 /** A chat attached to a project, and when it last asked for something. */
-export interface AttachedChat {
+interface AttachedChat {
   chat: string;
   projectId: string;
   at: string;

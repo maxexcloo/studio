@@ -60,7 +60,7 @@ import type { Preset } from "./presets";
 import { StrengthControl } from "./StrengthControl";
 
 import classes from "./LoraPicker.module.css";
-export interface LoraInfo {
+interface LoraInfo {
   title?: string;
   unavailableReason?: string;
   sourceUrl?: string;

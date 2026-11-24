@@ -57,7 +57,7 @@ function modelInput(input: GenerationInput, profile: Profile): GenerationInput {
 }
 
 /** Each variant the composer's draft compares as it runs, its models looked up in `profiles`. */
-export const variantsOf = (draft: Draft, profiles: Profile[]) =>
+const variantsOf = (draft: Draft, profiles: Profile[]) =>
   draftVariants(draft, (input, profileId) => {
     const profile = profiles.find((each) => isProfile(each, profileId));
     return profile && modelInput(input, profile);

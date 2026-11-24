@@ -467,7 +467,7 @@ export interface Adoption {
   preferred?: string;
 }
 /** A person's view of an area of taste (Settings › Taste › Where Taste Applies). */
-export interface AreaTaste {
+interface AreaTaste {
   /** Whether the area uses what Studio learnt and My Preferences. */
   on: boolean;
   guidance: string;
