@@ -30,7 +30,14 @@ import {
   dreamSet,
 } from "../../shared/dream.ts";
 import { isCloudProfile } from "../../shared/profiles.ts";
-import type { Project, ProjectContent, ProjectStats, Review } from "../../shared/projects.ts";
+import {
+  type Project,
+  type ProjectConstraints,
+  type ProjectContent,
+  type ProjectStats,
+  type Review,
+  fitProjectInput,
+} from "../../shared/projects.ts";
 import {
   type GenerationInput,
   type QueueMedia,
@@ -38,6 +45,7 @@ import {
   maxPromptCharacters,
 } from "../../shared/queue.ts";
 import {
+  type Resolution,
   availableResolutions,
   isResolution,
   resolutionSize,
@@ -72,7 +80,6 @@ import {
   freshConceptProblem,
   ideaMotifs,
   mentionsMotif,
-  missesSubjects,
   motifWindow,
   namedMotif,
   normalised,
@@ -250,7 +257,13 @@ export interface DreamProfile extends NonNullable<Parameters<typeof availableRes
   model?: string;
   workflow?: string;
   defaults?: GenerationInput;
-  capabilities?: { startImage?: boolean; steps?: boolean; defaultLoras?: boolean };
+  capabilities?: {
+    startImage?: boolean;
+    steps?: boolean;
+    defaultLoras?: boolean;
+    sound?: boolean;
+    transparent?: boolean;
+  };
   mediaInputs?: { id: string; required?: boolean; role?: string }[];
   /** Whether it edits with its references, keeping a character's identity in new scenes. */
   editReferences?: boolean;
@@ -1547,23 +1560,40 @@ export function createDream(options: {
       ? identitySlot(profile) ||
         profile.mediaInputs?.find((slot) => !slot.role || slot.role === "reference")?.id
       : undefined;
+  /**
+   * The sizes a profile can draw within the project's aspects and resolutions: each allowed
+   * aspect's size (the profile's own without any) with each allowed resolution it reaches.
+   */
+  function projectSizes(profile: DreamProfile, { aspects, resolutions }: ProjectConstraints) {
+    type Size = { size?: { width: number; height: number }; resolution?: Resolution };
+    const sizes = aspects.length
+      ? aspects.map((aspect) => profileAspectSize(profile, { aspect }))
+      : [undefined];
+    return sizes.flatMap((size): Size[] =>
+      resolutions.length
+        ? resolutions
+            .filter(
+              (resolution) =>
+                profile.options?.resolutions?.includes(resolution) ||
+                availableResolutions(profile, {
+                  kind: "image",
+                  ...(size ?? profile.defaults),
+                }).includes(resolution),
+            )
+            .map((resolution) => ({ size, resolution }))
+        : [{ size }],
+    );
+  }
   function projectProfiles(ownerId: string, project: ProjectContent, profiles: DreamProfile[]) {
     const cards = projectCards(ownerId, project.cards);
     if (!cards) return [];
-    const { profiles: allowed, resolution } = project.constraints;
+    const allowed = project.constraints.profiles;
     return profiles.filter(
       (profile) =>
         kindOf(profile) === "image" &&
         (!allowed.length || allowed.includes(profile.id)) &&
         (!cards.character || characterSlot(profile)) &&
-        (!resolution ||
-          profile.options?.resolutions?.includes(resolution) ||
-          availableResolutions(profile, {
-            kind: "image",
-            ...(project.constraints.aspect
-              ? profileAspectSize(profile, { aspect: project.constraints.aspect })
-              : profile.defaults),
-          }).includes(resolution)),
+        projectSizes(profile, project.constraints).length > 0,
     );
   }
   const statsRead = new Map<string, { at: number; stats: Map<string, ProjectStats<DreamItem>> }>();
@@ -2103,12 +2133,8 @@ export function createDream(options: {
       throw new Error("A pinned card describes someone under 18.");
     const brief = project
       ? [
-          ["Subjects", project.brief.subjects],
-          ["Ethnicity", project.brief.ethnicity],
-          ["Age", project.brief.age],
-          ["Body", project.brief.body],
+          ["Brief", project.brief.description],
           ["Styles", project.brief.styles],
-          ["Rules", project.brief.rules],
           ["Favourite LoRAs", project.brief.loras?.join(", ")],
           ["Avoid", project.brief.avoid],
           ["Pinned Character", character && `${character.name}: ${character.description}`],
@@ -2149,7 +2175,7 @@ export function createDream(options: {
       : { likes: [], styles: [], avoid: [] };
     const forbidden = [
       ...explicitExclusions(exclusions),
-      ...forbiddenMotifs([project?.brief.avoid ?? ""], [project?.brief.rules ?? ""], true),
+      ...forbiddenMotifs([project?.brief.avoid ?? ""], [project?.brief.description ?? ""], true),
     ];
     const [fewest, most] = explore ? tasteDraw.exploreLikes : tasteDraw.likes;
     const drawnLikes = sampled(likes, fewest + random(most - fewest + 1));
@@ -2455,14 +2481,8 @@ export function createDream(options: {
     if (collectCards)
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
-    /** Why a reply can't be used, or "" when it can. A retry may miss the brief's subjects. */
-    const problem = (
-      prompt: string,
-      title: string,
-      motifs: string[],
-      cooling: string[],
-      retry: boolean,
-    ) => {
+    /** Why a reply can't be used, or "" when it can. */
+    const problem = (prompt: string, title: string, motifs: string[], cooling: string[]) => {
       if (!prompt) return "Your reply had no usable prompt.";
       const minor = options.minorAge(prompt);
       if (minor)
@@ -2478,8 +2498,6 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
-      if (project && !retry && missesSubjects(`${pinnedPrompt} ${prompt}`, project.brief.subjects))
-        return `Your prompt shows none of the brief's subjects (${project.brief.subjects}).`;
       return freshProblem(prompt, title, motifs, cooling);
     };
     for (let attempt = 0; ; attempt++) {
@@ -2519,7 +2537,6 @@ export function createDream(options: {
               title,
               chosenMotifs,
               newConcept && latest ? cooledMotifs(latest, fixed, forbidden, paused) : [],
-              attempt > 0,
             );
       if (!wrong) {
         likeUses.used(
@@ -2575,7 +2592,7 @@ export function createDream(options: {
         messages[0],
         {
           role: "user",
-          content: `${messages[1].content}\nRejected prompt: ${idea}\n${wrong} ${like || seed || series || reword ? "Keep the required source identity and iteration constraints." : pinnedPrompt ? "Keep the pinned details and find a substantially different action or composition." : brief.length ? "Keep the brief's subjects and styles and choose a different scene, action and composition; do not paraphrase the rejected idea." : "Choose a different concept, changing subject or subject role, scene, action and composition; do not paraphrase the rejected idea."}`,
+          content: `${messages[1].content}\nRejected prompt: ${idea}\n${wrong} ${like || seed || series || reword ? "Keep the required source identity and iteration constraints." : pinnedPrompt ? "Keep the pinned details and find a substantially different action or composition." : brief.length ? "Keep what the brief describes and its styles and choose a different scene, action and composition; do not paraphrase the rejected idea." : "Choose a different concept, changing subject or subject role, scene, action and composition; do not paraphrase the rejected idea."}`,
         },
       ];
     }
@@ -2897,10 +2914,16 @@ export function createDream(options: {
         loras = exploitLoras(ownerId, profile, taste, weigh, judged);
         loraWhy = loras.length ? "a LoRA drawn by your taste and keep rates" : "no LoRAs";
       }
-      if (target && !target.constraints.loras) {
+      const allowedLoras = target?.constraints.loras;
+      if (allowedLoras === "none") {
         loras = [];
         loraWhy = "no LoRAs, as the project asks";
+      } else if (allowedLoras?.length && loras.some((lora) => !allowedLoras.includes(lora.name))) {
+        loras = loras.filter((lora) => allowedLoras.includes(lora.name));
+        loraWhy = loras.length ? "a LoRA the project allows" : "no LoRAs the project allows";
       }
+      // One of the sizes the project allows, at random.
+      const allowedSize = target && shuffled(projectSizes(profile, target.constraints))[0];
       if (cards && cards.character)
         references = [
           {
@@ -2948,23 +2971,22 @@ export function createDream(options: {
         loras,
         referenceAssets: references,
         ...(cards && cards.character ? { referenceRole: "reference" } : {}),
-        ...(target?.constraints.aspect
-          ? profileAspectSize(profile, { aspect: target.constraints.aspect })
-          : {}),
-        ...(target?.constraints.resolution
-          ? profile.options?.resolutions?.includes(target.constraints.resolution)
-            ? { resolution: target.constraints.resolution }
-            : { resolutionTier: target.constraints.resolution }
+        ...allowedSize?.size,
+        ...(allowedSize?.resolution
+          ? profile.options?.resolutions?.includes(allowedSize.resolution)
+            ? { resolution: allowedSize.resolution }
+            : { resolutionTier: allowedSize.resolution }
           : {}),
       };
       if (
         input.resolutionTier &&
-        target?.constraints.resolution &&
-        !availableResolutions(profile, input).includes(target.constraints.resolution)
+        allowedSize?.resolution &&
+        !availableResolutions(profile, input).includes(allowedSize.resolution)
       ) {
         reason = "The project resolution isn't available for this image size.";
         continue;
       }
+      if (target) fitProjectInput(target.constraints, profile.capabilities, input);
       // Where the profile uses a negative and the seed set none, it also steers away from overdone faces.
       const negative = !input.negative && options.negative(profile, input);
       if (negative) input.negative = `${negative}, ${faceNegative()}`;

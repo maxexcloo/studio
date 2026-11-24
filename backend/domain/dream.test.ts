@@ -949,7 +949,7 @@ test("A project's idea avoids its own recent ideas and sees its own likes; other
   await dream.save("alice", { enabled: true });
   state.replies = [{ prompt: "a fox in snow", title: "Snow Fox" }];
   await dreamOnce();
-  const beach = projects.create("alice", { name: "Beach", brief: { subjects: "the sea" } });
+  const beach = projects.create("alice", { name: "Beach", brief: { description: "the sea" } });
   generated({
     id: "pools",
     ownerId: "alice",
@@ -1079,7 +1079,7 @@ test("Dream retries explicit exclusions and project avoids without cooling requi
   projects.create("alice", {
     name: "Evening Light",
     brief: {
-      rules: "No laundry. Include a paper lantern. Avoid lightning while indoors.",
+      description: "No laundry. Include a paper lantern. Avoid lightning while indoors.",
       avoid: "neon signs",
     },
   });
@@ -1633,13 +1633,11 @@ test("Dream's ideas take the account's active projects, and visits record when t
   await dream.save("alice", { enabled: true });
   const beach = projects.create("alice", {
     name: "Beach",
-    brief: { subjects: "the sea", avoid: "people" },
+    brief: { description: "the sea", avoid: "people" },
   });
   const city = projects.create("alice", { name: "City" });
   projects.update("alice", city.id, { paused: true }, "you");
-  // An idea showing none of the brief's subjects is written again.
   state.replies = [
-    { prompt: "a mountain cabin", title: "Cabin" },
     { prompt: "the sea at dawn", title: "Dawn Sea" },
     { prompt: "seas under a storm", title: "Storm Sea" },
   ];
@@ -1653,14 +1651,10 @@ test("Dream's ideas take the account's active projects, and visits record when t
   );
   // The brief steers the writer, and the project's latest ideas move the next one on; a
   // project without one adds nothing.
-  assert.match(
-    state.calls[0].user,
-    /Project brief \(Beach\):\n- Subjects: the sea\n- Avoid: people/,
-  );
+  assert.match(state.calls[0].user, /Project brief \(Beach\):\n- Brief: the sea\n- Avoid: people/);
   assert.match(state.calls[0].system, /the brief comes first/);
   assert.doesNotMatch(state.calls[0].system, /Choose a different subject/);
-  assert.match(state.calls[1].user, /Rejected prompt: a mountain cabin\nYour prompt shows none/);
-  assert.match(state.calls[2].user, /Recent Dream ideas to avoid:\n- the sea at dawn\n/);
+  assert.match(state.calls[1].user, /Recent Dream ideas to avoid:\n- the sea at dawn\n/);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Project brief/);
 
   const request = await serve(t, fx);
@@ -1685,7 +1679,7 @@ test("Dream's ideas draw on chat notes: a project's own, else standing ones", as
   const { dream, state, projects, dreamOnce } = fx;
   await dream.save("alice", { enabled: true });
   const request = await serve(t, fx);
-  const noir = projects.create("alice", { name: "Noir", brief: { subjects: "a detective" } });
+  const noir = projects.create("alice", { name: "Noir", brief: { description: "a detective" } });
   projects.attach("alice", "chat-1", noir.id);
   // As MCP saves them: a note from the attached chat joins its project.
   await request("/notes", { text: "Rain-soaked 1940s Los Angeles", chat: "chat-1" });
@@ -2032,7 +2026,7 @@ test("Dream pins account-owned cards and uses the project's model, size and LoRA
       id: "identity",
       kind: "image",
       mediaInputs: [{ id: "face", role: "identity" }],
-      defaults: { width: 1024, height: 1024 },
+      defaults: { width: 1024, height: 1024, steps: 30 },
       constraints: { width: { max: 2048 }, height: { max: 2048 } },
     },
   ]);
@@ -2055,7 +2049,13 @@ test("Dream pins account-owned cards and uses the project's model, size and LoRA
   const project = projects.create("alice", {
     name: "Station",
     cards: pins,
-    constraints: { profiles: ["identity"], loras: false, aspect: "portrait", resolution: "1K" },
+    constraints: {
+      profiles: ["identity"],
+      loras: "none",
+      aspects: ["portrait"],
+      resolutions: ["1K"],
+      ranges: { steps: { max: 8 } },
+    },
   });
   await dream.save("alice", { enabled: true });
   state.replies = [{ prompt: "She looks for the timetable from a low camera angle." }];
@@ -2065,6 +2065,7 @@ test("Dream pins account-owned cards and uses the project's model, size and LoRA
   assert.equal(job.input.resolutionTier, "1K");
   assert.ok(Number(job.input.width) < Number(job.input.height));
   assert.deepEqual(job.input.loras, []);
+  assert.equal(job.input.steps, 8);
   assert.deepEqual(job.input.referenceAssets, [
     { assetId: "ivy-reference", slot: "face", source: "character" },
   ]);
@@ -2809,10 +2810,15 @@ test("Ideas recur in liked results, cards in two and projects in three, within l
   const found = ideasFrom(
     {
       projects: [
-        { name: "Neon Rooftops", subjects: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
-        { name: "Diners", subjects: "all-night diners", styles: "", results: [1, 2] },
-        { name: "Teens", subjects: "a 16 year old", styles: "", results: [1, 2, 3] },
-        { name: "Beach", subjects: "the sea", styles: "", results: [1, 2, 3] },
+        {
+          name: "Neon Rooftops",
+          description: "Mara on rooftops",
+          styles: "neon",
+          results: [1, 2, 3],
+        },
+        { name: "Diners", description: "all-night diners", styles: "", results: [1, 2] },
+        { name: "Teens", description: "a 16 year old", styles: "", results: [1, 2, 3] },
+        { name: "Beach", description: "the sea", styles: "", results: [1, 2, 3] },
       ],
       cards: [
         { kind: "Character", name: "Mara", description: "red hair, freckles", results: [1, 3, 3] },
@@ -2875,8 +2881,8 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
   await dream.save("alice", { enabled: true, dailyImages: 10 });
   state.ideas = {
     projects: [
-      { name: "Rooftops", subjects: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
-      { name: "Harbours", subjects: "harbours at dusk", styles: "film", results: [4, 5, 6] },
+      { name: "Rooftops", description: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
+      { name: "Harbours", description: "harbours at dusk", styles: "film", results: [4, 5, 6] },
     ],
     cards: [{ kind: "character", name: "Mara", description: "red hair", results: [1, 2] }],
   };
@@ -2912,7 +2918,7 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     drafts.map((item) => item.dream?.draft),
     [harbours.id, harbours.id, harbours.id, rooftops.id, rooftops.id, rooftops.id],
   );
-  assert.match(state.calls.at(-1)!.user, /Project brief \(Harbours\):\n- Subjects: harbours/);
+  assert.match(state.calls.at(-1)!.user, /Project brief \(Harbours\):\n- Brief: harbours/);
   await dreamOnce();
   assert.equal(state.items[0].dream?.state, "unseen");
   // Samples stay out of the deck until their project is accepted.
@@ -2924,7 +2930,7 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
   assert.deepEqual(accepted.body.accepted, { id: rooftops.id, title: "Rooftops" });
   const [made] = projects.list("alice");
   assert.deepEqual(
-    [made.name, made.brief.subjects, made.changes?.[0].by],
+    [made.name, made.brief.description, made.changes?.[0].by],
     ["Rooftops", "Mara on rooftops", "dream"],
   );
   assert.equal(dream.unseen("alice").filter((item) => item.dream?.projectId === made.id).length, 3);
@@ -3161,7 +3167,7 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   const { dream, state, inbox, projects, taste } = fx;
   const beach = projects.create("alice", {
     name: "Beach",
-    brief: { subjects: "the sea", avoid: "people" },
+    brief: { description: "the sea", avoid: "people" },
   });
   // Twelve discards and a keep, three of them missing the brief for crowds.
   for (let index = 0; index < 13; index++)
@@ -3203,7 +3209,7 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   await dream.save("alice", { enabled: true, dailyImages: 0 });
   await dream.tick();
   const edits = state.calls.filter((call) => call.system.startsWith("You improve the briefs"));
-  assert.match(edits[0].user, /Project 1: Beach\n {2}subjects: the sea/);
+  assert.match(edits[0].user, /Project 1: Beach\n {2}description: the sea/);
   assert.match(edits[0].user, /Misses the brief:\n {2}\[1\] crowds/);
   const byKind = (kind: string) =>
     inbox.read("alice").proposals.find((proposal) => proposal.kind === kind)!;

@@ -18,11 +18,14 @@ import {
 } from "../../shared/inbox.ts";
 import {
   type Project,
-  type ProjectBrief,
+  type ProjectBriefTextField,
   type ProjectStats,
+  anyConstraints,
+  briefLabels,
   briefSummary,
   maxProjectBrief,
   maxProjectName,
+  projectBriefTextFields,
 } from "../../shared/projects.ts";
 import { maxTasteRule } from "../../shared/taste.ts";
 import {
@@ -35,7 +38,7 @@ import type { GenerationAccount } from "./admission.ts";
 import type { ChatNotes } from "./chat-notes.ts";
 import type { DreamItem } from "./dream.ts";
 import type { Issue } from "./issues.ts";
-import { type Projects, projectPatch, stylesWithChoice } from "./projects.ts";
+import { type Projects, mergedConstraints, projectPatch, stylesWithChoice } from "./projects.ts";
 import { type ReflectionItem, samenessOf } from "./reflection.ts";
 import type { Adoption, PromptWriter, Taste } from "./taste.ts";
 import { americanEnglish } from "./writing-standard.ts";
@@ -118,7 +121,7 @@ const likes = { from: 40, after: 6 };
  * proposes a pause, `high` or more more turns. Brief edits need `misses` misses or `keeps` keeps.
  */
 const pacing = { judged: 12, low: 0.2, high: 0.6, read: 80 };
-const edits = { misses: 3, keeps: 4, read: 60, fields: ["subjects", "styles", "avoid", "rules"] };
+const edits = { misses: 3, keeps: 4, read: 60, fields: projectBriefTextFields };
 const variety = "vary the setting, pose, framing and lighting from one result to the next";
 const evidenceShown = 6;
 const namedCardsPerBatch = 3;
@@ -133,7 +136,6 @@ const lower = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const revisionOf = (record: object) =>
   createHash("sha256").update(JSON.stringify(record)).digest("hex");
-const titled = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const parsed = (text: string): Record<string, unknown> | null => {
   try {
     return JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] || "");
@@ -301,18 +303,18 @@ export function ideasFrom(
   });
   const projects = list("projects").flatMap((entry): Stored[] => {
     const name = clean(entry?.name, maxProjectName + 1);
-    const subjects = clean(entry?.subjects, maxProjectBrief + 1);
+    const description = clean(entry?.description, maxProjectBrief + 1);
     const styles = clean(entry?.styles, maxProjectBrief + 1);
     const evidence = numbered(entry?.results, liked);
     const key = `project:${lower(name)}`;
     if (
       !name ||
       name.length > maxProjectName ||
-      !subjects ||
-      subjects.length > maxProjectBrief ||
+      !description ||
+      description.length > maxProjectBrief ||
       styles.length > maxProjectBrief ||
       evidence.length < 3 ||
-      minorAge(`${name} ${subjects} ${styles}`) ||
+      minorAge(`${name} ${description} ${styles}`) ||
       seen.has(key)
     )
       return [];
@@ -328,8 +330,8 @@ export function ideasFrom(
         change: {
           project: {
             name,
-            brief: { subjects, styles, avoid: "" },
-            constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+            brief: { description, styles, avoid: "" },
+            constraints: anyConstraints(),
           },
         },
         evidence,
@@ -360,7 +362,7 @@ function editsFrom(
   const seen = new Set<string>();
   return (Array.isArray(reply?.edits) ? (reply!.edits as any[]) : []).flatMap((entry): Stored[] => {
     const project = Number.isInteger(entry?.project) ? projects[entry.project - 1] : undefined;
-    const field = String(entry?.field || "") as keyof ProjectBrief;
+    const field = String(entry?.field || "") as ProjectBriefTextField;
     const text = clean(entry?.text, maxProjectBrief + 1);
     if (
       !project ||
@@ -377,7 +379,7 @@ function editsFrom(
         id: randomUUID(),
         key: `brief:${project.id}:${field}`,
         kind: "brief",
-        title: `Edit ${project.name}'s ${titled(field)}`,
+        title: `Edit ${project.name}'s ${briefLabels[field]}`,
         why: clean(entry?.why, whyCharacters) || "From its recent results",
         at,
         projectId: project.id,
@@ -605,7 +607,7 @@ export function createInbox(options: {
         options.dream.projectResults(ownerId, project.id, pacing.read) as ReflectionItem[],
         (a, b) => options.likeness(a as DreamItem, b as DreamItem),
       );
-      if (sameness.converging && !lower(project.brief.rules || "").includes(variety))
+      if (sameness.converging && !lower(project.brief.description).includes(variety))
         found.push({
           ...base,
           id: randomUUID(),
@@ -614,9 +616,9 @@ export function createInbox(options: {
           why: "Its recent results look alike",
           change: {
             brief: {
-              rules: [project.brief.rules, variety]
+              description: [project.brief.description, variety]
                 .filter(Boolean)
-                .join("; ")
+                .join("\n")
                 .slice(0, maxProjectBrief),
             },
           },
@@ -679,8 +681,8 @@ export function createInbox(options: {
         change: {
           project: {
             name: title,
-            brief: { subjects: clean(subject, maxProjectBrief), styles: "", avoid: "" },
-            constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+            brief: { description: clean(subject, maxProjectBrief), styles: "", avoid: "" },
+            constraints: anyConstraints(),
           },
         },
         evidence: evidence.slice(0, evidenceShown).map((item) => String(item.id)),
@@ -785,9 +787,7 @@ export function createInbox(options: {
       };
       sections.push(
         `Project ${weighed.length}: ${project.name}`,
-        ...edits.fields.map(
-          (field) => `  ${field}: ${project.brief[field as "styles"] || "(empty)"}`,
-        ),
+        ...edits.fields.map((field) => `  ${field}: ${project.brief[field] || "(empty)"}`),
         ...(misses.length ? ["Misses the brief:"] : []),
         ...misses.slice(0, 8).map((item) => line(item, clean(item.review!.miss, 200))),
         ...(keeps.length ? ["Kept:"] : []),
@@ -837,7 +837,7 @@ export function createInbox(options: {
         project: {
           name: patch.name,
           brief: { ...proposed.brief, ...patch.brief },
-          constraints: { ...proposed.constraints, ...patch.constraints },
+          constraints: mergedConstraints(proposed.constraints, patch.constraints),
         },
       };
     }

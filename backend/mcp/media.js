@@ -786,7 +786,8 @@ export class McpMedia {
     const family = families[profile.family];
     if (reference_asset_ids.length && family?.img2img && !family.references)
       changes.push(`Its reference sets the size, so it won't draw ${body.width}×${body.height}.`);
-    validate?.(profile, body);
+    // A project's check may refuse, or keep the body to its constraints and say what changed.
+    changes.push(validate?.(profile, body));
     const ignored = changes.filter(Boolean).join(" ");
     // Large draws decode in tiles, matching the browser's generation path.
     if (

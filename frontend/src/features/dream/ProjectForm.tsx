@@ -1,8 +1,9 @@
 import {
   Alert,
   Button,
-  Group,
   MultiSelect,
+  NumberInput,
+  SegmentedControl,
   Select,
   Stack,
   Switch,
@@ -10,112 +11,100 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, type LucideIcon } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { type CardKind, cardKinds } from "../../../../shared/characters";
 import { loraName } from "../../../../shared/profiles";
 import {
   type Project,
+  type ProjectBriefTextField,
   type ProjectContent,
+  type ProjectRange,
+  anyConstraints,
+  briefLabels,
   maxProjectLoras,
   maxProjectName,
   maxProjectProfiles,
   projectAspects,
+  projectBriefTextFields,
+  projectRangeInputs,
+  rangeLabels,
 } from "../../../../shared/projects";
-import { resolutions } from "../../../../shared/resolution";
+import { type Resolution, resolutions } from "../../../../shared/resolution";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
-import { ChipPopup } from "../../ui/ChipPopup";
 import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextToolsBar } from "../../ui/TextBox";
 import type { SheetTyping } from "../../ui/TextEntrySheet";
 import { useGroupFeature } from "../auth/AccountGate";
 import { CardForm } from "../characters/CardImages";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
-import { chipProps } from "../generation/chip";
-import { ChipSelect } from "../generation/ChipSelect";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
-import { profileName } from "../generation/payload";
 import { profileOptions } from "../generation/ProfilePicker";
 import { ProjectBriefField } from "./ProjectBriefField";
 import { projectPath, projectsQuery } from "./queries";
 
-import controls from "../generation/GenerationInputControls.module.css";
 import classes from "./ProjectForm.module.css";
 
-// "Any" as a choice's value, as the stored "" names no choice.
+// "Any" as a switch's value, as an unset switch allows either.
 const any = "any";
-
-/** A project field as one of the composer's chips, naming its choice and opening its popup. */
-function FieldChip({
-  title,
-  icon: Icon,
-  value,
-  onClear,
-  clearDisabled,
-  children,
-}: {
-  title: string;
-  icon?: LucideIcon;
-  value: string;
-  onClear: () => void;
-  clearDisabled: boolean;
-  children: ReactNode;
-}) {
-  const [opened, setOpened] = useState(false);
-  return (
-    <ChipPopup
-      title={title}
-      floating
-      // The project dialog stacks above popovers.
-      withinPortal={false}
-      position="bottom-start"
-      opened={opened}
-      onOpenedChange={setOpened}
-      onClear={onClear}
-      clearDisabled={clearDisabled}
-      target={
-        <Button
-          {...chipProps}
-          aria-label={title}
-          aria-expanded={opened}
-          leftSection={Icon && <Icon size={16} />}
-          rightSection={<ChevronDown size={14} />}
-          onClick={() => setOpened(!opened)}
-        >
-          <span className={controls.label}>{value}</span>
-        </Button>
-      }
-    >
-      {children}
-    </ChipPopup>
-  );
-}
 
 export const blankProject: ProjectContent = {
   name: "",
-  brief: { subjects: "", styles: "", avoid: "" },
-  constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+  brief: { description: "", styles: "", avoid: "" },
+  constraints: anyConstraints(),
+};
+const briefHints: Record<ProjectBriefTextField, string> = {
+  description: "What the work shows, the people's looks and any standing rules.",
+  styles: "How it looks: medium, light, mood.",
+  avoid: "What prompts must never name, separated by commas.",
 };
 /** The brief's text fields: key, label and what it holds. */
-export const briefFields = [
-  ["subjects", "Subjects", "Who or what the work shows."],
-  ["styles", "Styles", "How it looks: medium, light, mood."],
-  ["avoid", "Avoid", "What prompts must never name, separated by commas."],
-  ["ethnicity", "Ethnicity", "The person's ethnicity."],
-  ["age", "Age", "The person's age range."],
-  ["body", "Body", "The person's build and proportions."],
-  ["rules", "Banned Changes & Rules", "Standing rules every prompt keeps to."],
-] as const;
-export type BriefText = (typeof briefFields)[number][0];
-/** The fields most briefs leave open, which the form groups under More. */
-const moreFields = new Set<BriefText>(["ethnicity", "age", "body", "rules"]);
+export const briefFields = projectBriefTextFields.map(
+  (key) => [key, briefLabels[key], briefHints[key]] as const,
+);
+export type BriefText = ProjectBriefTextField;
 export const aspectLabel = (aspect: string) => (aspect.includes(":") ? aspect : titleCase(aspect));
+/** "Any" for an unset switch, as a segmented choice's value. */
+const switchValue = (value?: boolean) => (value === undefined ? any : value ? "on" : "off");
+
+/** A number input's bounds as a pair of fields, either left open as Any. */
+function RangeRow({
+  label,
+  range = {},
+  onChange,
+}: {
+  label: string;
+  range?: ProjectRange;
+  onChange: (range: ProjectRange) => void;
+}) {
+  const bound = (key: keyof ProjectRange) => (
+    <NumberInput
+      aria-label={`${label} ${key === "min" ? "Minimum" : "Maximum"}`}
+      placeholder={key === "min" ? "Min" : "Max"}
+      w={88}
+      size="xs"
+      min={0}
+      decimalScale={2}
+      value={range[key] ?? ""}
+      onChange={(value) => {
+        const next = { ...range };
+        if (typeof value === "number") next[key] = value;
+        else delete next[key];
+        onChange(next);
+      }}
+    />
+  );
+  return (
+    <SettingRow label={label}>
+      {bound("min")}
+      {bound("max")}
+    </SettingRow>
+  );
+}
 
 export function ProjectPins({
   cards,
@@ -238,10 +227,6 @@ export function ProjectForm({
     setDraft((previous) => ({ ...previous, brief: { ...previous.brief, [key]: value } }));
   const constraint = (patch: Partial<ProjectContent["constraints"]>) =>
     setDraft({ ...draft, constraints: { ...draft.constraints, ...patch } });
-  const profileLabel = (id: string) => {
-    const profile = models.data?.profiles.find((profile) => profile.id === id);
-    return profile ? profileName(profile) : id;
-  };
   const name = (
     <TextInput
       label="Name"
@@ -273,101 +258,119 @@ export function ProjectForm({
       box
     );
   };
-  const fields = (
-    <>
-      {briefFields.filter(([key]) => !moreFields.has(key)).map(briefBox)}
-      <SettingGroup title="More">
-        <Stack>{briefFields.filter(([key]) => moreFields.has(key)).map(briefBox)}</Stack>
-      </SettingGroup>
-    </>
+  const fields = briefFields.map(briefBox);
+  const { constraints } = draft;
+  const loraChoices = [
+    ...new Set([
+      ...Object.keys(loras.data?.loras || {}),
+      ...(draft.brief.loras || []),
+      ...(constraints.loras === "none" ? [] : constraints.loras),
+    ]),
+  ].map((name) => ({ value: name, label: loraName(name, loras.data?.loras?.[name]) }));
+  const pick = (
+    label: string,
+    value: string[],
+    data: (
+      | string
+      | { value: string; label: string }
+      | { group: string; items: { value: string; label: string }[] }
+    )[],
+    onChange: (value: string[]) => void,
+    max?: number,
+  ) => (
+    <SettingRow label={label} wide>
+      <MultiSelect
+        aria-label={label}
+        placeholder={value.length ? undefined : "Any"}
+        searchable
+        nothingFoundMessage="No Matches"
+        maxValues={max}
+        comboboxProps={{ withinPortal: false }}
+        data={data}
+        value={value}
+        onChange={onChange}
+        flex={1}
+      />
+    </SettingRow>
   );
-  const chips = (
-    <Group gap="xs">
-      <FieldChip
-        title="Profiles"
-        value={
-          draft.constraints.profiles.length
-            ? draft.constraints.profiles.map(profileLabel).join(", ")
-            : "Any Profile"
-        }
-        onClear={() => constraint({ profiles: [] })}
-        clearDisabled={!draft.constraints.profiles.length}
-      >
-        <MultiSelect
-          label="Profiles"
-          description="Chats and Dream use only these; none for any."
-          placeholder={draft.constraints.profiles.length ? undefined : "Any"}
-          searchable
-          nothingFoundMessage="No Matches"
-          maxValues={maxProjectProfiles}
-          comboboxProps={{ withinPortal: false }}
-          data={profileOptions(models.data?.profiles || [])}
-          value={draft.constraints.profiles}
-          onChange={(profiles) => constraint({ profiles })}
-        />
-      </FieldChip>
-      <FieldChip
-        title="LoRAs"
-        icon={icons.loras}
-        value={
-          !draft.constraints.loras
-            ? "No LoRAs"
-            : draft.brief.loras?.length
-              ? draft.brief.loras
-                  .map((name) => loraName(name, loras.data?.loras?.[name]))
-                  .join(", ")
-              : "LoRAs"
-        }
-        onClear={() => setDraft({ ...draft, brief: { ...draft.brief, loras: [] } })}
-        clearDisabled={!draft.brief.loras?.length}
-      >
-        <Switch
-          label="Use LoRAs"
-          checked={draft.constraints.loras}
-          onChange={(event) => constraint({ loras: event.currentTarget.checked })}
-        />
-        <MultiSelect
-          label="Favourite LoRAs"
-          searchable
-          disabled={!draft.constraints.loras}
-          maxValues={maxProjectLoras}
-          comboboxProps={{ withinPortal: false }}
-          data={[
-            ...new Set([...Object.keys(loras.data?.loras || {}), ...(draft.brief.loras || [])]),
-          ].map((name) => ({
-            value: name,
-            label: loraName(name, loras.data?.loras?.[name]),
-          }))}
-          value={draft.brief.loras || []}
-          onChange={(loras) => setDraft({ ...draft, brief: { ...draft.brief, loras } })}
-        />
-      </FieldChip>
-      <ChipSelect
-        name="Aspect"
-        withinPortal={false}
-        label={draft.constraints.aspect ? aspectLabel(draft.constraints.aspect) : "Any Aspect"}
+  const toggle = (label: string, key: "sound" | "transparent") => (
+    <SettingRow label={label} wide>
+      <SegmentedControl
+        aria-label={label}
+        fullWidth
         data={[
           { value: any, label: "Any" },
-          ...projectAspects.map((aspect) => ({ value: aspect, label: aspectLabel(aspect) })),
+          { value: "off", label: "Off" },
+          { value: "on", label: "On" },
         ]}
-        value={draft.constraints.aspect || any}
-        onChange={(aspect) => constraint({ aspect: aspect === any ? "" : (aspect ?? "") })}
+        value={switchValue(constraints[key])}
+        onChange={(value) => {
+          const next = { ...constraints };
+          if (value === any) delete next[key];
+          else next[key] = value === "on";
+          setDraft({ ...draft, constraints: next });
+        }}
       />
-      <ChipSelect
-        name="Resolution"
-        withinPortal={false}
-        label={draft.constraints.resolution || "Any Resolution"}
-        data={[{ value: any, label: "Any" }, ...resolutions]}
-        value={draft.constraints.resolution || any}
-        onChange={(resolution) =>
-          constraint({
-            resolution: (resolution === any
-              ? ""
-              : resolution) as ProjectContent["constraints"]["resolution"],
-          })
-        }
-      />
-    </Group>
+    </SettingRow>
+  );
+  const allowed = (
+    <SettingGroup title="Allowed Inputs">
+      <Text size="sm" c="dimmed">
+        Chats and Dream keep to these; Any leaves an input open.
+      </Text>
+      {pick(
+        "Aspects",
+        constraints.aspects,
+        projectAspects.map((aspect) => ({ value: aspect, label: aspectLabel(aspect) })),
+        (aspects) => constraint({ aspects }),
+      )}
+      {pick(
+        "Favourite LoRAs",
+        draft.brief.loras || [],
+        loraChoices,
+        (favourites) => setDraft({ ...draft, brief: { ...draft.brief, loras: favourites } }),
+        maxProjectLoras,
+      )}
+      <SettingRow label="LoRAs" description="Off runs none.">
+        <Switch
+          aria-label="Use LoRAs"
+          checked={constraints.loras !== "none"}
+          onChange={(event) => constraint({ loras: event.currentTarget.checked ? [] : "none" })}
+        />
+      </SettingRow>
+      {constraints.loras !== "none" &&
+        pick(
+          "Allowed LoRAs",
+          constraints.loras,
+          loraChoices,
+          (names) => constraint({ loras: names }),
+          maxProjectLoras,
+        )}
+      {pick(
+        "Models",
+        constraints.profiles,
+        profileOptions(models.data?.profiles || []),
+        (profiles) => constraint({ profiles }),
+        maxProjectProfiles,
+      )}
+      {pick("Resolutions", constraints.resolutions, [...resolutions], (sizes) =>
+        constraint({ resolutions: sizes as Resolution[] }),
+      )}
+      {toggle("Sound", "sound")}
+      {toggle("Transparency", "transparent")}
+      {projectRangeInputs.map((key) => (
+        <RangeRow
+          key={key}
+          label={rangeLabels[key]}
+          range={constraints.ranges[key]}
+          onChange={(range) => {
+            const ranges = { ...constraints.ranges, [key]: range };
+            if (range.min === undefined && range.max === undefined) delete ranges[key];
+            constraint({ ranges });
+          }}
+        />
+      ))}
+    </SettingGroup>
   );
   const footer = (
     <DialogFooter pending={pending} onCancel={onClose}>
@@ -406,6 +409,7 @@ export function ProjectForm({
             </div>
             <TextToolsBar.Provider value={toolsBar}>{fields}</TextToolsBar.Provider>
             {!field && pins}
+            {!field && allowed}
             {!field && alert}
           </Stack>
           <div className={classes.footer}>
@@ -417,10 +421,7 @@ export function ProjectForm({
                 </Button>
               </DialogFooter>
             ) : (
-              <>
-                {chips}
-                {footer}
-              </>
+              footer
             )}
           </div>
         </>
@@ -429,7 +430,7 @@ export function ProjectForm({
           {name}
           {fields}
           {pins}
-          {chips}
+          {allowed}
           {alert}
           {footer}
         </>

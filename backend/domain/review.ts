@@ -37,9 +37,9 @@ export const reviewInstructions = () =>
   });
 
 /** A project's brief as the reviewer reads it, or "" when it asks for nothing. */
-function briefText({ subjects, styles, avoid }: Partial<ProjectBrief>) {
+function briefText({ description, styles, avoid }: Partial<ProjectBrief>) {
   return [
-    subjects && `Subjects: ${subjects}`,
+    description && `Brief: ${description}`,
     styles && `Styles: ${styles}`,
     avoid && `Avoid: ${avoid}`,
   ]
