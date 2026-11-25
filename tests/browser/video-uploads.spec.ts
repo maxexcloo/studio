@@ -5,6 +5,7 @@ import {
   create,
   fixtures,
   image,
+  openNav,
   openReferenceChoices,
   pressGenerate,
   showOnly,
@@ -78,7 +79,11 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
       },
     });
   });
-  await page.goto("/videos");
+  await closeReferences(page);
+  const closeGenerate = page.getByRole("button", { name: "Close Generate", exact: true });
+  if (await closeGenerate.isVisible()) await closeGenerate.click();
+  await openNav(page, "Videos");
+  await expect(page).toHaveURL(/\/videos/);
   await showOnly(page, "Uploads");
   await page.locator('[data-media-id="clip"]').click();
   // An upload video's Recreate, its only option, opens its suggested prompt.
