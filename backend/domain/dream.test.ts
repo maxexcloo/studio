@@ -1515,6 +1515,44 @@ test("Dream history exposes only the owner's retained Dream activity and availab
   assert.equal((await request("/history")).status, 403);
 });
 
+test("Dream Mix caps the combined share and keeps older weights editable", async (t) => {
+  const fx = fixture(t);
+  const request = await serve(t, fx);
+  const oldSettings = { mixComparisons: 90, mixExisting: 30, mixNew: 60, dailyImages: 25 };
+  writeRuntimeDocument(fx.dataDir, "dream:alice", { settings: oldSettings });
+  const mix = ({ mixComparisons, mixExisting, mixNew }: DreamSettings) => [
+    mixComparisons,
+    mixExisting,
+    mixNew,
+  ];
+
+  const shown = await request("");
+  assert.deepEqual(mix(shown.body.settings), [50, 17, 33]);
+  assert.equal(shown.body.settings.dailyImages, 25);
+  const rejected = await request("/settings", { mixNew: 34, dailyImages: 24 }, "PUT");
+  assert.equal(rejected.status, 400);
+  assert.match(rejected.body.error, /cannot exceed 100%/);
+  assert.deepEqual(readRuntimeDocument(fx.dataDir, "dream:alice"), { settings: oldSettings });
+
+  const lowered = await request("/settings", { mixComparisons: 10 }, "PUT");
+  assert.equal(lowered.status, 200);
+  assert.deepEqual(mix(lowered.body.settings), [10, 17, 33]);
+  const filled = await request("/settings", { mixExisting: 40, mixNew: 50 }, "PUT");
+  assert.equal(filled.status, 200);
+  assert.deepEqual(mix(filled.body.settings), [10, 40, 50]);
+  assert.equal(filled.body.settings.dailyImages, 25);
+
+  writeRuntimeDocument(fx.dataDir, "dream:bob", {
+    settings: { mixComparisons: 100, mixExisting: 100, mixNew: 1 },
+  });
+  const bob = await request("", undefined, "GET", "bob");
+  assert.equal(bob.body.settings.mixNew, 1);
+  assert.equal(
+    mix(bob.body.settings).reduce((sum, value) => sum + value, 0),
+    100,
+  );
+});
+
 test("Dream routes are owner-scoped: keep, discard and variations move results and teach the taste profile", async (t) => {
   const fx = fixture(t);
   const { dream, store, state, taste, dreamOnce } = fx;

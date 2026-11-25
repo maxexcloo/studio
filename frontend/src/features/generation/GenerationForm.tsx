@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StudioSession } from "../../../../shared/queue";
 import { post } from "../../api";
 import type { MediaKind, Profile, QueueJob, ReferenceAsset } from "../../types";
+import { ClearButton } from "../../ui/ClearButton";
 import { CompareMenu } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
@@ -22,6 +23,8 @@ import {
 import { generationInput, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
 import { CompactPromptFields, useDraftChange } from "./PromptFields";
+import { usePromptHistory } from "./PromptHistory";
+import { usePromptIdeas } from "./PromptIdeas";
 import { queueQuery } from "./Queue";
 
 import classes from "./ComposerDock.module.css";
@@ -141,6 +144,23 @@ export function GenerationForm({
     onChange: update,
     onOperationChange: (operation) => setDraft((value) => ({ ...value, operation })),
   });
+  const ideas = usePromptIdeas({
+    input,
+    references: draft.references,
+    enabled: !ask.proposal && !ask.pending,
+    onChange: (prompt) => update({ prompt }),
+  });
+  const recent = usePromptHistory({
+    kind: "positive",
+    value: input.prompt,
+    button: true,
+    onPick: (prompt) => {
+      ideas.clear();
+      ask.done();
+      update({ prompt, originalPrompt: undefined });
+    },
+  }).popup;
+  const undo = ask.proposal ? ask.undo : (ideas.undo ?? undefined);
   const assistantScope = JSON.stringify([
     input.kind,
     draft.sessionId,
@@ -206,7 +226,7 @@ export function GenerationForm({
         <Group wrap="nowrap" gap="xs" align="center">
           <div className={classes.compactPrompt}>
             <CompactPromptFields
-              ideas
+              ideas={ideas}
               input={input}
               profile={profile}
               references={draft.references}
@@ -215,6 +235,8 @@ export function GenerationForm({
               ask={ask}
             />
           </div>
+          {undo && <ClearButton onClear={undo} onUndo={undo} />}
+          {recent}
           <Tooltip label={blockedReason || label}>
             <ActionIcon
               type="submit"
@@ -244,7 +266,8 @@ export function GenerationForm({
       onReferencesChange={setReferences}
       onCharacterProfile={characterProfile}
       onKindChange={onKindChange}
-      onUndoClear={cleared ? () => setDraft(cleared) : undefined}
+      onUndoClear={cleared ? () => setDraft(cleared) : undo}
+      recent={recent}
       onClear={() => {
         clearing.current = true;
         setCleared(draft);
@@ -277,7 +300,7 @@ export function GenerationForm({
       fill={fill}
       onDone={onDone}
       onNegativeWritten={onNegativeWritten}
-      ideas
+      ideas={ideas}
     />
   );
 }

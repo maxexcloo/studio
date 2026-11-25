@@ -37,7 +37,7 @@ export function ChatChoices() {
   return (
     <SettingGroup title="Chat Choices">
       {chats.isPending && <LoadingState label="Loading Chat Choices" />}
-      {chats.data && !chats.data.chats.length && <EmptyState fill>No Chat Choices</EmptyState>}
+      {chats.data && !chats.data.chats.length && <EmptyState inline>No Chat Choices</EmptyState>}
       {items.length ? (
         <PreviewList items={items}>
           {(shown) => (

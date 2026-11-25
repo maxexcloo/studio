@@ -201,7 +201,7 @@ function AppearanceControls() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(5, max-content)",
-              justifyContent: "space-between",
+              justifyContent: "space-around",
               rowGap: "var(--mantine-spacing-xs)",
             }}
           >

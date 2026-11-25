@@ -6,11 +6,11 @@ import {
   create,
   expandAssistantMenu,
   expandComposer,
+  finishTyping,
   fixtures,
   image,
   promptMenu,
   stamp,
-  undoProposal,
   viewerAction,
   viewerChangeButton,
   viewerChangeMenu,
@@ -119,6 +119,11 @@ test("The composer groups ideas and draft suggestions in its compact and expande
 }) => {
   const state = await fixtures(page);
   const asked = await suggest(page);
+  await page.route("**/api/prompts?kind=positive", (route) =>
+    route.fulfill({
+      json: { prompts: [{ text: ideas[1].prompt, at: stamp, uses: 1 }], enabled: true },
+    }),
+  );
   await page.goto("/images");
   const first = { surface: "composer", kind: "image", profileId: "image:test", fresh: false };
   const fresh = { ...first, fresh: true };
@@ -159,7 +164,8 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(prompt).toHaveValue(ideas[1].prompt);
   // Picking an idea fetches the next set in the background.
   await expect.poll(() => asked).toEqual([first, fresh, fresh]);
-  await undoProposal(page, "Prompt");
+  await finishTyping(page);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("");
   await prompt.fill("A fox");
   menu = await promptMenu(page, "Prompt");
@@ -179,8 +185,20 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(prompt).toHaveValue(steps[0].prompt);
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
   expect(state.jobs).toHaveLength(0);
-  await undoProposal(page, "Prompt");
+  await finishTyping(page);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A fox");
+
+  await prompt.fill("");
+  menu = await promptMenu(page, "Prompt");
+  await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
+  await expect(page.getByText(ideas[1].label, { exact: true })).toBeVisible();
+  await finishTyping(page);
+  await page.getByRole("button", { name: "Recent", exact: true }).click();
+  const recent = page.getByRole("dialog", { name: "Recent", exact: true });
+  await recent.getByRole("option", { name: `Use Prompt: ${ideas[1].prompt}`, exact: true }).click();
+  await expect(prompt).toHaveValue(ideas[1].prompt);
+  await expect(page.getByText(ideas[1].label, { exact: true })).toBeHidden();
 });
 
 test("The viewer groups Suggestions and Templates with their briefs", async ({
@@ -189,7 +207,14 @@ test("The viewer groups Suggestions and Templates with their briefs", async ({
   await openViewer(page);
   await serveTemplates(page);
   const asked: any[] = [];
-  const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
+  const others = [
+    {
+      label: "Snowfall",
+      brief: "Flakes drift past the bird",
+      request: "add snow",
+      prompt: "An amber bird in snow",
+    },
+  ];
   // The first answer and the refreshed one each wait to be released, so loading shows.
   const release: (() => void)[] = [];
   const held = [0, 1].map(() => new Promise<void>((resolve) => release.push(resolve)));
@@ -251,15 +276,25 @@ test("The viewer groups Suggestions and Templates with their briefs", async ({
   await backToActionMenu(menu);
   await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
+  const custom = page.getByRole("dialog", { name: "Custom Edit", exact: true });
   const change = custom.getByRole("textbox", { name: "Change", exact: true });
   const send = custom.getByRole("button", { name: "Run", exact: true });
   await expect(send).toBeDisabled();
+  const customMenu = await promptMenu(custom.locator('[data-position="right"]'), "Change");
+  await expandAssistantMenu(customMenu, "Templates");
+  await customMenu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
+  await expect(change).toHaveValue("soften the shadows");
+  await promptMenu(custom.locator('[data-position="right"]'), "Change");
+  await expandAssistantMenu(customMenu, "Suggestions");
+  const snowfall = customMenu.getByRole("menuitem", { name: "Snowfall", exact: true });
+  await expect(snowfall).toHaveAccessibleDescription(others[0].brief);
+  await snowfall.click();
+  await expect(change).toHaveValue("add snow");
   await change.fill("make it night");
   await expect(send).toBeEnabled();
   await custom
     .getByRole("button", {
-      name: testInfo.project.use.isMobile ? "Close Custom Change" : "Cancel",
+      name: testInfo.project.use.isMobile ? "Close Custom Edit" : "Cancel",
       exact: true,
     })
     .click();
@@ -576,8 +611,10 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const ideas = await promptMenu(page, "Prompt");
-  await expect(ideas.getByRole("menuitem", { name: "Recent", exact: true })).toBeVisible();
   await expect(ideas.getByRole("menuitem", { name: reason, exact: true })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await finishTyping(page);
+  await expect(page.getByRole("button", { name: "Recent", exact: true })).toBeVisible();
 });
 
 test("Review stays off after editing and Reset, while an explicit opt-in preserves the current prompt for Undo", async ({

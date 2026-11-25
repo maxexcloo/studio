@@ -29,7 +29,7 @@ export function ChatNotes() {
   return (
     <SettingGroup title="Chat Notes">
       {notes.isPending && <LoadingState label="Loading Chat Notes" />}
-      {notes.data && !notes.data.notes.length && <EmptyState fill>No Chat Notes</EmptyState>}
+      {notes.data && !notes.data.notes.length && <EmptyState inline>No Chat Notes</EmptyState>}
       {notes.data?.notes.length ? (
         <PreviewList items={notes.data.notes}>
           {(items) => (

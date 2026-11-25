@@ -1,0 +1,7 @@
+.editDialog:not([data-full-screen]) {
+  min-height: min(calc(16rem * var(--mantine-scale)), 100%);
+}
+
+.editField {
+  min-height: calc(5.5rem * var(--mantine-scale));
+}

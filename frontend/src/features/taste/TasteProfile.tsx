@@ -5,6 +5,7 @@ import {
   Menu,
   Modal,
   Pill,
+  SimpleGrid,
   Stack,
   Switch,
   TagsInput,
@@ -56,6 +57,8 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { isProfile, profileName } from "../generation/payload";
 import { preferencesQuery, useSavePreferences } from "../settings/accountPreferences";
 import { TasteHistory, TasteVariety } from "./TasteReflection";
+
+import classes from "./TasteProfile.module.css";
 
 /** What Studio learnt and the person's own taste (backend/domain/taste.ts). */
 export interface Taste {
@@ -136,6 +139,35 @@ function useValueNames() {
   };
 }
 
+function TasteEditDialog({
+  id,
+  title,
+  opened,
+  onClose,
+  children,
+}: {
+  id: string;
+  title: string;
+  opened: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const phone = usePhone();
+  return (
+    <Modal
+      id={id}
+      opened={opened}
+      onClose={closeWhenTop(id, onClose)}
+      title={title}
+      size="lg"
+      fullScreen={phone}
+      classNames={{ content: classes.editDialog }}
+    >
+      {opened && children}
+    </Modal>
+  );
+}
+
 /** A free-text dialog with Save for guidance and preferences. */
 function TextDialog({
   id,
@@ -156,16 +188,8 @@ function TextDialog({
   onClose: () => void;
   save: (text: string) => Promise<unknown>;
 }) {
-  const phone = usePhone();
   return (
-    <Modal
-      id={id}
-      opened={initial !== null}
-      onClose={closeWhenTop(id, onClose)}
-      title={title}
-      size="lg"
-      fullScreen={phone}
-    >
+    <TasteEditDialog id={id} title={title} opened={initial !== null} onClose={onClose}>
       {initial !== null && (
         <TextForm
           label={label}
@@ -176,7 +200,7 @@ function TextDialog({
           save={save}
         />
       )}
-    </Modal>
+    </TasteEditDialog>
   );
 }
 function TextForm({
@@ -209,6 +233,7 @@ function TextForm({
         onChange={setText}
         autosize
         minRows={3}
+        classNames={{ input: classes.editField }}
         maxLength={maxLength}
       />
       {saving.error && <Alert color="red">{saving.error.message}</Alert>}
@@ -248,7 +273,7 @@ function TasteEnabled() {
               aria-label={`Edit ${areaLabels[area]} Guidance`}
               onClick={() => setEditing(area)}
             >
-              Edit
+              Edit Guidance
             </Button>
             <Switch
               aria-label={`Use My Taste in ${areaLabels[area]}`}
@@ -386,39 +411,33 @@ function LearntValues({
   name?: (value: string) => string;
 } & Omit<Parameters<typeof MarkItems>[0], "kind" | "value">) {
   return (
-    <SettingRow
-      label={label}
-      description={
-        values.length ? (
-          <PreviewList items={[...values].sort((a, b) => compareNames(name(a), name(b)))} inline>
-            {(shown) => (
-              <Group component="span" gap={4} mt={4}>
-                {shown.map((value) => (
-                  <Menu key={value} position="bottom-start" width={menuWidth}>
-                    <Menu.Target>
-                      <Button
-                        size="compact-xs"
-                        variant="default"
-                        rightSection={<ChevronDown size={12} />}
-                      >
-                        {name(value)}
-                      </Button>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <MarkItems {...marks} kind={kind} value={value} />
-                    </Menu.Dropdown>
-                  </Menu>
-                ))}
-              </Group>
-            )}
-          </PreviewList>
-        ) : (
-          <Text span size="sm" c="text">
-            None
-          </Text>
-        )
-      }
-    />
+    <Stack gap={4}>
+      <Text size="xs" fw={600} c="dimmed">
+        {label}
+      </Text>
+      <PreviewList items={[...values].sort((a, b) => compareNames(name(a), name(b)))}>
+        {(shown) => (
+          <Group gap={4}>
+            {shown.map((value) => (
+              <Menu key={value} position="bottom-start" width={menuWidth}>
+                <Menu.Target>
+                  <Button
+                    size="compact-xs"
+                    variant="default"
+                    rightSection={<ChevronDown size={12} />}
+                  >
+                    {name(value)}
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <MarkItems {...marks} kind={kind} value={value} />
+                </Menu.Dropdown>
+              </Menu>
+            ))}
+          </Group>
+        )}
+      </PreviewList>
+    </Stack>
   );
 }
 
@@ -431,35 +450,13 @@ interface RatedRow {
 function KeepRateTable({
   title,
   kind,
-  learnt,
-  counts,
-  name,
-  include = () => true,
-  marked,
+  rows,
   ...marks
 }: {
   title: string;
   kind: "models" | "loras" | "tags";
-  learnt: string[];
-  counts: Record<string, KeepCount>;
-  name: (value: string) => string | undefined;
-  include?: (value: string) => boolean;
-  marked: (value: string) => boolean;
+  rows: RatedRow[];
 } & Omit<Parameters<typeof MarkItems>[0], "kind" | "value">) {
-  const rows = [
-    ...new Set([
-      ...learnt.filter(include),
-      ...Object.keys(counts).filter(
-        (value) => include(value) && !marked(value) && keepRate(counts[value]) !== undefined,
-      ),
-    ]),
-  ]
-    .flatMap((value): RatedRow[] => {
-      const shown = name(value);
-      return shown ? [{ value, name: shown, count: counts[value] }] : [];
-    })
-    .sort((a, b) => compareNames(a.name, b.name));
-  if (!rows.length) return null;
   return (
     <SettingGroup title={title}>
       <HistoryTable
@@ -578,12 +575,18 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
     const strength = data?.loraScores.find((lora) => lora.name === name)?.strength;
     return `${nameOf("loras", name)}${strength === undefined ? "" : ` ${strength}`}`;
   };
-  const ratedTables = (data: Taste, rates: KeepRates) => {
-    const categories = [
-      { title: "LoRAs", kind: "loras" as const, counts: rates.loras, name: loraLabel },
+  const ratingGroups = (data: Taste, rates: KeepRates) => {
+    const categories: {
+      title: string;
+      kind: "models" | "loras" | "tags";
+      counts: Record<string, KeepCount>;
+      name: (value: string) => string | undefined;
+      include?: (value: string) => boolean;
+    }[] = [
+      { title: "LoRAs", kind: "loras", counts: rates.loras, name: loraLabel },
       {
         title: "Models",
-        kind: "models" as const,
+        kind: "models",
         counts: rates.profiles,
         name: (id: string) => nameOf("models", id),
       },
@@ -597,18 +600,35 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
     ];
     return categories
       .sort((a, b) => compareNames(a.title, b.title))
-      .map(({ title, kind, ...options }) => (
-        <KeepRateTable
-          {...shared!}
-          {...options}
-          key={title}
-          title={title}
-          kind={kind}
-          learnt={data.learnt[kind]}
-          marked={marked(kind)}
-        />
-      ));
+      .flatMap(({ title, kind, counts, name, include = () => true }) => {
+        const alreadyMarked = marked(kind);
+        const values = new Set([
+          ...data.learnt[kind].filter(include),
+          ...Object.keys(counts).filter(
+            (value) =>
+              include(value) && !alreadyMarked(value) && keepRate(counts[value]) !== undefined,
+          ),
+        ]);
+        const rows = [...values]
+          .flatMap((value): RatedRow[] => {
+            const shown = name(value);
+            return shown ? [{ value, name: shown, count: counts[value] }] : [];
+          })
+          .sort((a, b) => compareNames(a.name, b.name));
+        return rows.length ? [{ title, kind, rows }] : [];
+      });
   };
+  const ratings = data && rates ? ratingGroups(data, rates) : [];
+  const learntPatterns = data
+    ? [
+        { label: "Leans Away From", values: data.learnt.avoid },
+        { label: "Likes", values: data.learnt.likes },
+        { label: "Shapes", values: data.learnt.shapes, kind: "shapes" as const, name: shapeName },
+        { label: "Styles", values: data.learnt.styles },
+      ].filter(({ values }) => values.length)
+    : [];
+  const hasLearntTaste = data && (data.learnt.note || learntPatterns.length || ratings.length);
+  const phone = usePhone();
   const learntLine =
     data &&
     [
@@ -637,6 +657,10 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
         />
       </SectionHeader>
       {error && <Alert color="red">{error.message}</Alert>}
+      <Text size="sm" c="dimmed">
+        Studio learns your taste from ratings, comparisons and iterations. Set where it applies and
+        add preferences to steer it yourself.
+      </Text>
       <TasteEnabled />
       {taste.isPending && <LoadingState label="Loading Taste" />}
       {data && (
@@ -646,7 +670,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               label="Exclusions"
               description={
                 <OwnPills
-                  hint="Left out everywhere, whatever the switches above say; chats remove them with a note."
+                  hint="Leave these out everywhere, even where taste is off."
                   values={exclusions.map((value) => ({ key: value, label: value }))}
                   name="Exclusions"
                   pending={change.isPending}
@@ -668,26 +692,15 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               </Button>
             </SettingRow>
             <SettingRow
-              label="Favourites"
-              description={
-                <OwnPills
-                  hint="Added from a learnt value below."
-                  values={favourites}
-                  name="Favourites"
-                  pending={change.isPending}
-                  remove={(key) => {
-                    const { kind, value } = favourites.find((entry) => entry.key === key)!;
-                    change.mutate({ favourites: without(own.favourites, kind, value) });
-                  }}
-                />
-              }
-            />
-            <SettingRow
               label="In My Words"
               description={
-                <Text span size="sm" c="text" style={{ whiteSpace: "pre-wrap" }}>
-                  {own.prefer || "None"}
-                </Text>
+                own.prefer ? (
+                  <Text span size="sm" c="text" style={{ whiteSpace: "pre-wrap" }}>
+                    {own.prefer}
+                  </Text>
+                ) : (
+                  "Tell Studio what you want wherever taste is enabled."
+                )
               }
             >
               <Button
@@ -700,10 +713,25 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               </Button>
             </SettingRow>
             <SettingRow
+              label="Favourites"
+              description={
+                <OwnPills
+                  hint="Add items from the ratings below to see them more often."
+                  values={favourites}
+                  name="Favourites"
+                  pending={change.isPending}
+                  remove={(key) => {
+                    const { kind, value } = favourites.find((entry) => entry.key === key)!;
+                    change.mutate({ favourites: without(own.favourites, kind, value) });
+                  }}
+                />
+              }
+            />
+            <SettingRow
               label="Less Of"
               description={
                 <OwnPills
-                  hint="Added from a learnt value below."
+                  hint="Add items from the ratings below to see them less often."
                   values={less}
                   name="Less Of"
                   pending={change.isPending}
@@ -717,59 +745,61 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
           </SettingGroup>
         </>
       )}
-      <ChatChoices />
-      <ChatNotes />
-      <TasteHistory />
       {data && (
         <SettingGroup title="Learnt From Your Ratings">
-          <Text size="xs" c="dimmed">
-            {learntLine ||
-              "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
-          </Text>
-          <LearntValues {...shared!} label="Leans Away From" values={data.learnt.avoid} />
-          <LearntValues {...shared!} label="Likes" values={data.learnt.likes} />
-          <SettingRow
-            label="Note"
-            description={
-              <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
-                {data.learnt.note || "None"}
-              </Text>
-            }
-          />
-          <LearntValues
-            {...shared!}
-            label="Shapes"
-            values={data.learnt.shapes}
-            kind="shapes"
-            name={shapeName}
-          />
-          <LearntValues {...shared!} label="Styles" values={data.learnt.styles} />
-          {rates && (
-            <Stack gap="md" mt="md">
-              {ratedTables(data, rates)}
+          {hasLearntTaste ? (
+            <Stack gap="md">
+              {Boolean(learntPatterns.length || ratings.length) && (
+                <Text size="sm" c="dimmed">
+                  Open an item's menu to add it to Favourites, Less Of or Exclusions where
+                  available.
+                </Text>
+              )}
+              {data.learnt.note && (
+                <Text size="sm" style={{ overflowWrap: "anywhere" }}>
+                  {data.learnt.note}
+                </Text>
+              )}
+              {learntPatterns.length > 0 && (
+                <SimpleGrid cols={phone ? 1 : 2} spacing="sm">
+                  {learntPatterns.map((pattern) => (
+                    <LearntValues {...shared!} {...pattern} key={pattern.label} />
+                  ))}
+                </SimpleGrid>
+              )}
+              {ratings.length > 0 && (
+                <SettingGroup title="Keep Rates">
+                  <Stack gap="sm">
+                    <Text size="xs" c="dimmed">
+                      How often you kept results with each model, LoRA or tag.
+                    </Text>
+                    {ratings.map((category) => (
+                      <KeepRateTable {...shared!} {...category} key={category.title} />
+                    ))}
+                  </Stack>
+                </SettingGroup>
+              )}
+              {learntLine && (
+                <Text size="xs" c="dimmed">
+                  {learntLine}
+                </Text>
+              )}
             </Stack>
+          ) : (
+            <Text size="sm" c="dimmed">
+              Nothing learnt yet. Like, compare or iterate on results to teach Studio your taste.
+            </Text>
           )}
         </SettingGroup>
       )}
+      <ChatChoices />
+      <ChatNotes />
+      <TasteHistory />
       <TasteVariety />
       <SettingGroup danger>
         <SettingRow
-          label="Clear Taste Profile"
-          description="Forget what Studio learnt and your own preferences and exclusions."
-        >
-          <Button
-            size="compact-sm"
-            color="red"
-            variant="light"
-            disabled={!data || (!data.signals && !Object.keys(data.preferences).length)}
-            onClick={() => setClearing(true)}
-          >
-            Clear
-          </Button>
-        </SettingRow>
-        <SettingRow
           label="Reset Learnt Taste"
-          description="Forget the learnt note, likes, styles and leanings and learn them again from your ratings. Your preferences, favourites and exclusions stay."
+          description="Rebuild what Studio learnt from your ratings and keep your preferences."
         >
           <Button
             size="compact-sm"
@@ -779,6 +809,20 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
             onClick={() => setResetting(true)}
           >
             Reset
+          </Button>
+        </SettingRow>
+        <SettingRow
+          label="Clear Taste Profile"
+          description="Clear what Studio learnt and all your Taste preferences."
+        >
+          <Button
+            size="compact-sm"
+            color="red"
+            variant="light"
+            disabled={!data || (!data.signals && !Object.keys(data.preferences).length)}
+            onClick={() => setClearing(true)}
+          >
+            Clear
           </Button>
         </SettingRow>
       </SettingGroup>
@@ -792,12 +836,18 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
         onClose={() => setEditingPrefer(false)}
         save={(prefer) => dialogChange.mutateAsync({ prefer: prefer || null })}
       />
-      <ExclusionsDialog
+      <TasteEditDialog
+        id="taste-exclusions"
         opened={editingExclusions}
-        exclusions={exclusions}
+        title="Exclusions"
         onClose={() => setEditingExclusions(false)}
-        save={(next) => dialogChange.mutateAsync({ exclusions: next })}
-      />
+      >
+        <ExclusionsForm
+          initial={exclusions}
+          onClose={() => setEditingExclusions(false)}
+          save={(next) => dialogChange.mutateAsync({ exclusions: next })}
+        />
+      </TasteEditDialog>
       <ConfirmDialog
         opened={clearing}
         title="Clear Taste Profile"
@@ -832,32 +882,6 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
   );
 }
 
-/** Edits the Exclusions, which apply everywhere. */
-function ExclusionsDialog({
-  opened,
-  exclusions,
-  onClose,
-  save,
-}: {
-  opened: boolean;
-  exclusions: string[];
-  onClose: () => void;
-  save: (exclusions: string[]) => Promise<unknown>;
-}) {
-  const phone = usePhone();
-  return (
-    <Modal
-      id="taste-exclusions"
-      opened={opened}
-      onClose={closeWhenTop("taste-exclusions", onClose)}
-      title="Exclusions"
-      size="lg"
-      fullScreen={phone}
-    >
-      {opened && <ExclusionsForm initial={exclusions} onClose={onClose} save={save} />}
-    </Modal>
-  );
-}
 function ExclusionsForm({
   initial,
   onClose,
@@ -876,8 +900,9 @@ function ExclusionsForm({
   return (
     <Stack>
       <TagsInput
-        label="Exclusions"
+        aria-label="Exclusions"
         description="Add a subject, prop or setting and press Enter. For example, smoking or laundry rooms."
+        classNames={{ input: classes.editField }}
         value={draft}
         onChange={setDraft}
         maxTags={tasteLimits.exclusions}

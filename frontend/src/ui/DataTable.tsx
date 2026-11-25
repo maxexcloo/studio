@@ -170,7 +170,7 @@ export function DataTable<T>({
   searchText?: SearchText<T>;
   initialSort?: Sort;
   /** Shown when there are no rows; a query that hides every row shows No Matches. */
-  empty: string;
+  empty: ReactNode;
   /** Keeps the empty line to its own height, for a section that holds several lists. */
   compact?: boolean;
   /** The loading label while the rows are fetched. */
@@ -191,7 +191,7 @@ export function DataTable<T>({
   const matching = filterTableRows(rows, query, searchText);
   if (!matching.length) {
     const line = rows.length ? "No Matches" : empty;
-    return <EmptyState fill={compact}>{line}</EmptyState>;
+    return typeof line === "string" ? <EmptyState fill={compact}>{line}</EmptyState> : line;
   }
   const sortValue = columns.find((column) => column.key === sort?.key)?.sortValue;
   const sorted =

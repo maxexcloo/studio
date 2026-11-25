@@ -28,6 +28,9 @@ import {
   dreamCardCounts,
   dreamDefaults,
   dreamLimitReached,
+  dreamMixBudget,
+  dreamMixKeys,
+  dreamMixTotal,
   dreamSeriesLength,
   dreamSet,
   withinDreamLimits,
@@ -4610,8 +4613,14 @@ export function createDream(options: {
         );
       const record = read(ownerId);
       // Turning Dream on resumes it too.
-      record.settings = { ...record.settings, ...(patch.enabled && { paused: false }), ...patch };
-      write(ownerId, record, { ...(patch.enabled && { paused: false }), ...patch });
+      const saved = { ...(patch.enabled && { paused: false }), ...patch };
+      record.settings = { ...record.settings, ...saved };
+      if (dreamMixKeys.some((key) => key in patch)) {
+        if (dreamMixTotal(record.settings) > dreamMixBudget)
+          throw failure(`Dream Mix cannot exceed ${dreamMixBudget}% in total.`, 400);
+        for (const key of dreamMixKeys) saved[key] = record.settings[key];
+      }
+      write(ownerId, record, saved);
       if (!record.settings.enabled || record.settings.paused) {
         states.delete(ownerId);
         await stopWaiting(ownerId);

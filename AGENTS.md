@@ -291,8 +291,9 @@ recur across features.
   itself; there is no worker choice. Trigger words apply when submitting,
   without altering the typed prompt.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
-  text in place, leaving the box's look unchanged, with Undo first in its AI
-  menu, and show the action and changed words below the field. Suggestions
+  text in place, leaving the box's look unchanged, and show the action and
+  changed words below the field. The composer puts Clear/Undo and Recent
+  before Generate. The viewer puts proposal Undo first in its AI menu. Suggestions
   never act on their own, and nothing floats over the text. They preload for
   the viewer's and Library review's items and load as other menus open; an
   empty composer prompt's ideas load once the page is idle and again after one

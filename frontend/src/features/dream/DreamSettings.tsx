@@ -1,7 +1,12 @@
 import { Alert, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { type DreamLimit, dreamSettingMaxima } from "../../../../shared/dream";
+import {
+  type DreamLimit,
+  type DreamMixKey,
+  dreamMixBudget,
+  dreamMixTotal,
+} from "../../../../shared/dream";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
@@ -57,10 +62,11 @@ export function DreamPreferences() {
     </SettingRow>
   );
   const number = (
-    key: keyof typeof dreamSettingMaxima | DreamLimit,
+    key: DreamMixKey | DreamLimit,
     label: string,
     description: string,
     disabled: boolean,
+    max: number,
   ) => (
     <SettingRow label={label} description={description}>
       <NumberSetting
@@ -68,18 +74,15 @@ export function DreamPreferences() {
         label={label}
         value={settings[key]}
         min={key === "pauseAfterUnseen" && !limits.unseenOff ? 1 : 0}
-        max={
-          key in limits
-            ? limits[key as DreamLimit]
-            : dreamSettingMaxima[key as keyof typeof dreamSettingMaxima]
-        }
+        max={max}
         disabled={disabled}
         onSave={(value) => save.mutate({ [key]: value })}
       />
     </SettingRow>
   );
-  const mix = (key: "mixNew" | "mixComparisons" | "mixExisting", label: string, what: string) =>
-    number(key, label, what, !settings.images);
+  const remaining = dreamMixBudget - dreamMixTotal(settings);
+  const mix = (key: DreamMixKey, label: string, description: string) =>
+    number(key, label, description, !settings.images, settings[key] + remaining);
   return (
     <Stack gap="lg">
       <SettingGroup title="General">
@@ -94,6 +97,7 @@ export function DreamPreferences() {
           "Pause After Unseen",
           `Dream waits while this many results are unseen, up to ${limits.pauseAfterUnseen}.${limits.unseenOff ? " 0 never waits." : ""}`,
           !settings.enabled,
+          limits.pauseAfterUnseen,
         )}
         {toggle(
           "useLoadedProfile",
@@ -119,6 +123,7 @@ export function DreamPreferences() {
           "Daily Images",
           `The most images Dream makes a day, up to ${limits.dailyImages}.`,
           !settings.images,
+          limits.dailyImages,
         )}
       </SettingGroup>
       <SettingGroup title="Videos">
@@ -128,6 +133,7 @@ export function DreamPreferences() {
           "Daily Videos",
           `The most videos Dream makes a day, up to ${limits.dailyVideos}.`,
           !settings.videos,
+          limits.dailyVideos,
         )}
       </SettingGroup>
       {save.error && (

@@ -22,7 +22,11 @@ import { type Action, type ActionGroups } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { changeSummary } from "./changeSummary";
-import { type AssistantChangeOption, assistantQuery } from "./PromptAssistant";
+import {
+  type AssistantChangeOption,
+  type AssistantOption,
+  assistantQuery,
+} from "./PromptAssistant";
 
 import classes from "./AskChange.module.css";
 
@@ -242,24 +246,37 @@ export function suggestionItems(action: Action): Action[] {
   return action.disabled ? ideas.map((idea) => ({ ...idea, disabled: true })) : ideas;
 }
 
+export function instructionTemplates(
+  options: (AssistantOption & Partial<Pick<AssistantChangeOption, "instruction" | "actions">>)[],
+  pick: (request: string) => void,
+  disabled?: boolean,
+  action?: ImageChangeAction,
+) {
+  return options.flatMap(({ id, label, description, uncensored, instruction, actions }): Action[] =>
+    id !== "custom" && instruction && (!action || !actions || actions.includes(action))
+      ? [
+          {
+            id: `change:${id}`,
+            label,
+            description,
+            marker: uncensored ? icons.uncensored : undefined,
+            disabled,
+            onClick: () => pick(instruction),
+          },
+        ]
+      : [],
+  );
+}
+
 export function changeTemplates(
-  options: AssistantChangeOption[],
+  options: Parameters<typeof instructionTemplates>[0],
   pick: (request: string) => void,
   openCustom: () => void,
   disabled?: boolean,
   action?: ImageChangeAction,
 ) {
   return {
-    templates: options
-      .filter(({ actions }) => !action || !actions || actions.includes(action))
-      .map((change): Action => ({
-        id: `change:${change.id}`,
-        label: change.label,
-        description: change.description,
-        marker: change.uncensored ? icons.uncensored : undefined,
-        disabled,
-        onClick: () => pick(change.instruction),
-      })),
+    templates: instructionTemplates(options, pick, disabled, action),
     custom: [
       {
         id: "custom",
@@ -272,17 +289,16 @@ export function changeTemplates(
   };
 }
 
-/** A text box's AI menu holding only Suggestions and Refresh. */
-export const suggestionsTool = (
-  suggestions: { action: Action; refresh: Action },
-  onOpen?: () => void,
+/** A request box's AI menu fills the request with its selected instruction. */
+export const requestTool = (
+  templates: Action[],
+  suggestions?: { action: Action; refresh: Action },
 ): Action => ({
   id: "assistant",
-  label: "Suggestions",
+  label: "AI",
   icon: icons.assistant,
   heading: false,
-  menu: assistMenu({ suggestions, templates: [], last: [] }),
-  onOpen,
+  menu: assistMenu({ suggestions, templates, last: [] }),
 });
 
 /**

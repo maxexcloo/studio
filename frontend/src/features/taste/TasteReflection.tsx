@@ -3,6 +3,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import { api } from "../../api";
 import { HistoryTable } from "../../ui/DataTable";
+import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 
@@ -101,7 +102,7 @@ export function TasteHistory() {
         rowKey={(row) => `${row.day} ${row.profileId} ${row.model}`}
         rowName={(row) => `${row.day} ${row.profileName || row.profileId}`}
         loading={reflection.isPending && "Loading Results"}
-        empty="No Results in the Last 30 Days"
+        empty={<EmptyState inline>No Results in the Last 30 Days</EmptyState>}
         columns={[
           {
             key: "day",

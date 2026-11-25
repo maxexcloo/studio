@@ -17,7 +17,6 @@ import {
   saveCurrent,
   showLoraStack,
   stamp,
-  undoProposal,
   withSettings,
 } from "./fixtures";
 // A single style is named Improve Prompt too.
@@ -346,7 +345,6 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
     /^Custom…/,
     "Refresh",
     "Write Negative",
-    "Recent",
   ]);
   await expandAssistantMenu(menu, "Templates");
   const templates = menu.getByRole("group", { name: "Templates", exact: true });
@@ -424,7 +422,8 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   };
   expect(asked).toEqual([suggestionsAsked, night]);
   // Undo restores the draft; Custom… keeps the request for the next time.
-  await undoProposal(page, "Prompt");
+  await finishTyping(page);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A castle at noon");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toBeHidden();
   await assist(page, "Custom…");
@@ -463,7 +462,8 @@ test("Prompt history reuses positive and negative prompts independently and pers
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
   await negative.fill("Keep these exclusions");
-  await promptTool(page, "Prompt", "Recent");
+  await finishTyping(page);
+  await page.getByRole("button", { name: "Recent", exact: true }).click();
   let panel = page.getByRole("dialog", { name: "Recent", exact: true });
   const like = panel.getByRole("button", { name: "Like Prompt", exact: true });
   await like.click();
@@ -512,7 +512,8 @@ test("Recent Prompts likes and switches at once, and a refused change is undone"
     return route.fulfill({ json: history });
   });
   await create(page);
-  await promptTool(page, "Prompt", "Recent");
+  await finishTyping(page);
+  await page.getByRole("button", { name: "Recent", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Recent", exact: true });
   // The like shows while the server is still answering.
   const like = panel.getByRole("button", { name: "Like Prompt", exact: true });
