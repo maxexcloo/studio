@@ -244,7 +244,7 @@ export function PromptFields({
           proposal ? (
             <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
           ) : (
-            ideas.label
+            ideas.label && <span>{ideas.label}</span>
           )
         }
       />
