@@ -18,6 +18,7 @@ interface RuntimeWorkload {
   phase: WorkloadPhase;
   replicas: number;
   ready: number;
+  dashboardUrl?: string;
   reason?: string;
   acceptedOperations: number;
   /** It runs Radiance, which an administrator can restart without waiting for its work. */

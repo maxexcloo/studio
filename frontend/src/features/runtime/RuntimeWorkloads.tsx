@@ -1,5 +1,6 @@
 import {
   Alert,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -492,9 +493,21 @@ export function RuntimeWorkloads({
                 (item.phase !== "parked" && reasons[item.id]);
               return (
                 <>
-                  <Text size="sm" fw={500}>
-                    {item.label}
-                  </Text>
+                  {item.dashboardUrl ? (
+                    <Anchor
+                      href={item.dashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      size="sm"
+                      fw={500}
+                    >
+                      {item.label}
+                    </Anchor>
+                  ) : (
+                    <Text size="sm" fw={500}>
+                      {item.label}
+                    </Text>
+                  )}
                   {note && (
                     <Text
                       size="xs"

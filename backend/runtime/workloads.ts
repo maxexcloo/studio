@@ -124,6 +124,7 @@ function workload(
     ?.split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+  const dashboardHost = annotation("dashboard-host");
   return {
     id,
     label: annotation("label") || id,
@@ -133,6 +134,7 @@ function workload(
     pool,
     gpus,
     url: `http://${service.metadata.name}.${namespace}.svc.cluster.local:${service.spec.ports[0].port}`,
+    ...(dashboardHost ? { dashboardUrl: `https://${dashboardHost}` } : {}),
     ...(capabilities?.includes("text")
       ? {
           model: required(environment, "STUDIO_LOCAL_TEXT_MODEL"),
