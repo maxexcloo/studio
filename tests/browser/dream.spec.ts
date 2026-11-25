@@ -313,6 +313,58 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await expect(current(page)).toContainText("last-image");
 });
 
+test("Library Review sends each template with its declared action", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, { library: [dreamItem("bird", { dream: undefined })] });
+  const choices = [
+    {
+      id: "edit-light",
+      label: "Edit the Light",
+      instruction: "soften the light",
+      actions: ["edit"],
+    },
+    {
+      id: "recreate-scene",
+      label: "Recreate the Scene",
+      instruction: "move the scene indoors",
+      actions: ["recreate"],
+    },
+  ];
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({ json: { available: true, changes: choices, themes: [] } }),
+  );
+  await page.route("**/api/suggestions", (route) => {
+    const { surface } = route.request().postDataJSON();
+    if (surface === "viewer")
+      return route.fulfill({
+        json: { suggestions: [{ label: "Closer Crop", request: "crop closer" }] },
+      });
+    if (surface === "change")
+      return route.fulfill({ json: { suggestions: [], reason: "No matching change" } });
+    return route.fallback();
+  });
+  await page.goto("/dream/library");
+  const suggest = page
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "Suggestions", exact: true });
+  for (const choice of choices) {
+    await suggest.click();
+    const menu = page.getByRole("menu").first();
+    await expandAssistantMenu(menu, "Templates");
+    const sent = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/api/suggestions") && request.postDataJSON().surface === "change",
+    );
+    await menu.getByRole("menuitem", { name: choice.label, exact: true }).click();
+    expect((await sent).postDataJSON()).toMatchObject({
+      itemId: "bird",
+      request: choice.instruction,
+      actions: choice.actions,
+    });
+    await expect(menu).toBeHidden();
+  }
+});
+
 test("Suggest can queue a variation of a library import without a job or prompt", async ({
   page,
 }) => {
