@@ -65,3 +65,26 @@
     display: none;
   }
 }
+.header.singleLine {
+  container-type: inline-size;
+}
+.header.singleLine:not(:has(.searching)) {
+  flex-wrap: nowrap;
+}
+.header.singleLine:not(:has(.searching)) > :first-child:not(:last-child) {
+  flex: 1 1 auto;
+}
+.header.singleLine > :last-child:has([data-adaptive-search]) {
+  flex: 0 0 auto;
+}
+.singleLine [data-adaptive-search] {
+  container-type: normal;
+}
+@container (width < 34rem) {
+  .singleLine [data-adaptive-search] .inlineSearch {
+    display: none;
+  }
+  .singleLine [data-adaptive-search] .searchTrigger {
+    display: inline-flex;
+  }
+}

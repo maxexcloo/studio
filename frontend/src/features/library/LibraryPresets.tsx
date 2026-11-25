@@ -106,7 +106,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
   const secondary = { size: phone ? "xs" : "sm", c: phone ? "dimmed" : undefined } as const;
   return (
     <Stack gap="md">
-      <SectionHeader heading={heading}>
+      <SectionHeader heading={heading} singleLine>
         <SectionToolbar
           label="Presets"
           query={query}

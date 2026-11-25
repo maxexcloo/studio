@@ -38,7 +38,7 @@ export function LibraryPromptCards({
   const selection = useCardSelection(kind, listing.data, cards);
   return (
     <>
-      <SectionHeader heading={heading}>
+      <SectionHeader heading={heading} singleLine>
         <SectionToolbar
           label={label}
           query={query}

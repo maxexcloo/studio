@@ -34,7 +34,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
   const selection = useCardSelection("characters", characters.data, cards);
   return (
     <>
-      <SectionHeader heading={heading}>
+      <SectionHeader heading={heading} singleLine>
         <SectionToolbar
           label="Characters"
           query={query}

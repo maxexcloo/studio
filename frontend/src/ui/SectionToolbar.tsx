@@ -19,9 +19,17 @@ import { ViewMenu } from "./ViewMenu";
 import classes from "./SectionToolbar.module.css";
 
 /** A section's heading (from `WorkspaceSections`) with its toolbar beside it. */
-export function SectionHeader({ heading, children }: { heading: ReactNode; children: ReactNode }) {
+export function SectionHeader({
+  heading,
+  children,
+  singleLine,
+}: {
+  heading: ReactNode;
+  children: ReactNode;
+  singleLine?: boolean;
+}) {
   return (
-    <div className={classes.header}>
+    <div className={singleLine ? `${classes.header} ${classes.singleLine}` : classes.header}>
       {heading}
       <div>{children}</div>
     </div>
