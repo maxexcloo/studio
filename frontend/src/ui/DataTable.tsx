@@ -179,7 +179,8 @@ export function DataTable<T>({
   /** For editable grids that cannot drop columns: scroll sideways below this width. */
   minWidth?: number;
 }) {
-  const [sort, setSort] = useState<Sort | undefined>(initialSort);
+  const [sortOverride, setSort] = useState<Sort>();
+  const sort = sortOverride ?? initialSort;
   const phone = usePhone();
   const hasMain = columns.some((column) => column.main);
   const fold = phone && !minWidth && hasMain;
