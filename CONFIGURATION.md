@@ -26,6 +26,8 @@ Start from [kubernetes.yaml](config/kubernetes.yaml): a one-replica Deployment w
 
 Set `STUDIO_WORKERS` to connect directly to an existing worker Service. To give Studio control of GPU placement, set `STUDIO_KUBERNETES_NAMESPACES` and let it discover deployments labelled `studio.excloo.dev/kind` (`image` or `video`). Studio scales those deployments between zero and one replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool.
 
+Set the optional `studio.excloo.dev/dashboard-host` deployment annotation to link the workload's HTTPS dashboard in Settings › Workers.
+
 ```dotenv
 STUDIO_KUBERNETES_GPUS={"gpu":2,"gaming":1}
 STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,radiance

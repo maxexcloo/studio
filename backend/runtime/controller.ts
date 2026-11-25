@@ -27,6 +27,7 @@ export interface Workload {
   pool: string;
   gpus: number;
   url: string;
+  dashboardUrl?: string;
   /** With the text capability: the gateway model it serves (STUDIO_LOCAL_TEXT_MODEL). */
   model?: string;
   /** With the text capability: whether its text models read images. */
@@ -378,6 +379,7 @@ export class RuntimeController {
           ...(servesText(workload) ? { text: true as const } : {}),
           pool: workload.pool,
           gpus: workload.gpus,
+          ...(workload.dashboardUrl ? { dashboardUrl: workload.dashboardUrl } : {}),
           acceptedOperations: this.active.get(workload.id) ?? 0,
           ...(isRadiance(workload) ? { radiance: true as const } : {}),
           ...(load?.jobs.length ? { jobs: load.jobs } : {}),
