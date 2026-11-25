@@ -245,7 +245,7 @@ function MenuRows({
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
-      {group.map((action) => {
+      {group.map((action, position) => {
         const {
           id,
           label,
@@ -258,7 +258,7 @@ function MenuRows({
           link,
           onClick,
         } = action;
-        const describedBy = `${uid}-${id}-description`;
+        const describedBy = `${childUid}-${index}-${position}-description`;
         const radioMenu = action.menu?.some((group) =>
           group.some((option) => option.selected !== undefined),
         );

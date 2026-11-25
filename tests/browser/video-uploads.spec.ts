@@ -20,6 +20,7 @@ test.skip(!clip, "Video encoder unavailable");
 
 test("A video uploads as a reference, and Recreate runs an upload's suggested prompt as its version", async ({
   page,
+  isMobile,
 }) => {
   const state = await fixtures(page);
   const uploads: string[] = [];
@@ -79,10 +80,14 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
       },
     });
   });
-  await closeReferences(page);
-  const closeGenerate = page.getByRole("button", { name: "Close Generate", exact: true });
-  if (await closeGenerate.isVisible()) await closeGenerate.click();
-  await openNav(page, "Videos");
+  if (isMobile) {
+    await closeReferences(page);
+    const closeGenerate = page.getByRole("button", { name: "Close Generate", exact: true });
+    if (await closeGenerate.isVisible()) await closeGenerate.click();
+    await openNav(page, "Videos");
+  } else {
+    await page.goto("/videos");
+  }
   await expect(page).toHaveURL(/\/videos/);
   await showOnly(page, "Uploads");
   await page.locator('[data-media-id="clip"]').click();
