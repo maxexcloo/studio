@@ -2,6 +2,7 @@ import { Alert, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import type { ComponentProps } from "react";
 
+import { compareNames } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
@@ -39,7 +40,7 @@ export function StudioSettings() {
   const save = useDeploymentSetting();
   if (deployment.isPending) return <LoadingState label="Loading Studio" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
-  const { catalogue } = deployment.data;
+  const catalogue = [...deployment.data.catalogue].sort((a, b) => compareNames(a.label, b.label));
   const flagRow = (flag: Flag) => (
     <SettingRow
       key={flag.key}
