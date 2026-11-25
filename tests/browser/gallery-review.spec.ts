@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, showGalleryView, stamp, toolbarSearch } from "./fixtures";
+import {
+  expandAssistantMenu,
+  fixtures,
+  image,
+  showGalleryView,
+  stamp,
+  toolbarSearch,
+} from "./fixtures";
 
 const result = (id: string, title: string, createdAt = stamp) => ({
   id,
@@ -173,6 +180,7 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
   await expect.poll(() => [...asked].sort()).toEqual(warmed(7, 2));
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
+  await expandAssistantMenu(menu, "Suggestions");
   const chosen = page.waitForRequest(
     (request) =>
       request.url().endsWith("/api/suggestions") && request.postDataJSON().surface === "change",

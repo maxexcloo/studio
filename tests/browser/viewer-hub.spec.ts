@@ -462,6 +462,45 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
   await expect(field).toHaveValue("An amber bird");
 });
 
+test("The viewer restores drafts per result and keeps an edit when a run fails", async ({
+  page,
+  isMobile,
+}) => {
+  const { viewer } = await seed(page, {}, async (page, state) => {
+    state.gallery.push({
+      ...state.gallery[0],
+      id: "neighbour",
+      jobId: "job-neighbour",
+      prompt: "An ivory fox",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await page.route(/\/api\/sessions\/[^/]+\/generations$/, (route) =>
+      route.fulfill({ status: 503, json: { error: "The worker is unavailable." } }),
+    );
+  });
+  const summary = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const surface = isMobile ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
+  const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  if (isMobile) await summary.click();
+  await field.fill("An amber bird at night");
+  if (isMobile) await closeTextEditor(page, "Prompt");
+  else await page.keyboard.press("Escape");
+
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(summary).toHaveValue("An ivory fox");
+  await page.keyboard.press("ArrowLeft");
+  await expect(summary).toHaveValue("An amber bird at night");
+
+  const response = page.waitForResponse(
+    (result) => result.url().endsWith("/generations") && result.status() === 503,
+  );
+  await sendField(page, "Prompt", "An amber bird in fog", "Generate");
+  await response;
+  await expect(surface).toBeVisible();
+  await expect(field).toHaveValue("An amber bird in fog");
+});
+
 test("A delayed automatic change runs on its source without closing the next image", async ({
   page,
 }) => {
