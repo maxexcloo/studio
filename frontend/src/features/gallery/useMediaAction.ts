@@ -430,6 +430,7 @@ export function useAnimateModifiers() {
     settingsAction: (): Action => ({
       id: "animate-modifiers",
       label: "Modifiers",
+      description: ticked.length ? `${ticked.length} selected` : undefined,
       menu: [
         options.map((item) => ({
           id: `modifier:${item.id}`,

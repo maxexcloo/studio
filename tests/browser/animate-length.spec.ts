@@ -71,7 +71,21 @@ for (const review of [false, true]) {
       createdAt: stamp,
     });
     await page.goto("/images");
-    await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+    const tile = page.getByRole("button", { name: "Open image: Amber Bird", exact: true });
+    if (!review) {
+      const prefetched = page.waitForRequest(
+        (request) =>
+          request.url().endsWith("/api/suggestions") &&
+          request.method() === "POST" &&
+          request.postDataJSON()?.itemId === "length-bird" &&
+          request.postDataJSON()?.surface === "animate",
+      );
+      await tile.focus();
+      await tile.press("Shift+F10");
+      await prefetched;
+      await page.getByRole("menuitem", { name: "Select", exact: true }).press("Escape");
+    }
+    await tile.click();
     await viewerAction(page, "Animate");
     const menu = page.getByRole("menu", { name: "Animate", exact: true });
     await expect(
@@ -81,12 +95,14 @@ for (const review of [false, true]) {
     await menu.getByText(length, { exact: true }).click();
     await expect(menu.getByRole("radio", { name: length, exact: true })).toBeChecked();
     if (review) await menu.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
-    await menu.getByRole("menuitem", { name: "Modifiers", exact: true }).click();
+    const modifiers = menu.getByRole("menuitem", { name: "Modifiers", exact: true });
+    await modifiers.click();
     const modifier = menu.getByRole("menuitem", { name: "Slow", exact: true });
     await expect(modifier).toHaveAccessibleDescription("Use gradual movement.");
     await modifier.click();
     await expect(modifier).toHaveAttribute("aria-checked", "true");
     await backToActionMenu(menu);
+    await expect(modifiers).toHaveAccessibleDescription("1 selected");
     await expandAssistantMenu(menu, "Templates");
     const template = menu.getByRole("menuitem", { name: "Action", exact: true });
     await expect(template).toHaveAccessibleDescription("One action and its follow-through.");

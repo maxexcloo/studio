@@ -667,6 +667,30 @@ test("Viewer prompt offers Reset once edited, without a menu, and restores its o
   await expect(field).toHaveValue("A bird at night");
 });
 
+test("The expanded viewer prompt stays open through its action bar menu", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Phones use the full-screen prompt editor");
+  const { viewer } = await seed(page);
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const height = () => field.evaluate((element) => element.getBoundingClientRect().height);
+  const resting = await height();
+  const draft = "An amber bird\nAbove the hills\nAt first light";
+  await field.fill(draft);
+  await expect.poll(height).toBeGreaterThan(resting);
+  await viewerAction(page, "Share");
+  const menu = page.getByRole("menu", { name: "Share", exact: true });
+  await expect(menu).toBeVisible();
+  await expect.poll(height).toBeGreaterThan(resting);
+  await menu.getByRole("menuitem", { name: "Copy Prompt", exact: true }).click();
+  await expect(menu).toBeHidden();
+  await expect.poll(height).toBeGreaterThan(resting);
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect.poll(height).toBeLessThanOrEqual(resting);
+  await expect(field).toHaveValue(draft);
+});
+
 test("The viewer prompt offers suggestions for review beside the field and in the phone editor", async ({
   page,
   isMobile,

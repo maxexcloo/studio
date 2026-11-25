@@ -74,7 +74,7 @@ export function ViewerDetails({
           <FocusTrap.InitialFocus />
           <Drawer.Header>
             <Stack gap={4}>
-              <ViewerTitle component="h2" item={item} title={title} fw={600} lh={1.2} />
+              <ViewerTitle component="h2" item={item} title={title} />
               <ViewerMetadata item={item} full />
             </Stack>
             <Drawer.CloseButton aria-label="Close Details" />
@@ -107,7 +107,7 @@ export function ViewerDetails({
         <ScrollArea h="100%" overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
             <Stack gap={4}>
-              <ViewerTitle item={item} title={title} fw={600} lh={1.2} />
+              <ViewerTitle item={item} title={title} />
               <ViewerMetadata item={item} full />
             </Stack>
             {shown && details(shown)}

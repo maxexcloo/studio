@@ -65,6 +65,7 @@ export function MediaViewerActions(props: ItemActionsProps) {
   return (
     <ActionBarSurface
       aria-label="Generation Actions"
+      data-viewer-actions
       radius="lg"
       className={classes.actions}
       onClick={(event) => event.stopPropagation()}

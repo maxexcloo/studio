@@ -270,6 +270,7 @@ export function ViewerPrompt({
         variant="unstyled"
         autosize
         oneLine
+        expandWithin="[data-viewer-actions]"
         minRows={1}
         maxRows={4}
         className={classes.prompt}
