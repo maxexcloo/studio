@@ -483,7 +483,7 @@ test("Dream waits paused until resumed, queues one hidden job per account only w
   assert.equal(dreamJobs().length, 0);
   store.save({ ...mcp, status: "completed" });
 
-  state.replies = [{ brief: "A fox tracks hoofprints\nin fresh snow" }];
+  state.replies = [{ prompt: "dream 1", brief: "A fox tracks hoofprints\nin fresh snow" }];
   await dream.tick();
   const [job] = dreamJobs("alice");
   assert.equal(job.priority, queuePriority.dream);
