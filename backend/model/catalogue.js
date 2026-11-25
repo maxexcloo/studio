@@ -218,7 +218,8 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
    * The catalogue across every worker (comfy/backends.js), with whether each
    * capability's workers answered (`backends`), so MCP can refuse local video
    * while no video worker is up. Without `wait`, a worker not read since Studio started counts as
-   * not answering (its stored observation stands in) and is read in the background.
+   * not answering (its stored observation stands in) and is read in the background. A predicate
+   * waits only for matching workers.
    */
   async function mediaModels(force = false, { wait = true } = {}) {
     const workers = listWorkers();
@@ -233,7 +234,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         workers.map((worker) =>
           stopped.has(worker.id)
             ? Promise.reject(new Error("stopped"))
-            : wait || contextFor(worker.id).info
+            : (typeof wait === "function" ? wait(worker) : wait) || contextFor(worker.id).info
               ? backendModels(worker.id, force)
               : (backendModels(worker.id).catch(() => null), Promise.reject(new Error("unread"))),
         ),

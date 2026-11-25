@@ -20,7 +20,7 @@ const routes = createGenerationSubmission({
   mediaModels: async (_force, options) => {
     catalogueReads.push(options?.wait);
     return {
-      models: { profiles: [granted, other], workers: [{ id: "primary", available: false }] },
+      models: { profiles: [granted, other], workers: [{ id: "primary", available: false, parked: true }] },
     };
   },
   comfyDownMessage: (message) => message,
