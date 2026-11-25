@@ -17,13 +17,13 @@ import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, filterTableRows } from "../../ui/DataTable";
-import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { inspirationQuery } from "../generation/inspiration";
+import { LibraryDate } from "./LibraryDate";
 import {
   type ImportRecord,
   LibraryImportReview,
@@ -362,17 +362,7 @@ export function LibraryImports({
           key: "added",
           header: "Added",
           sortValue: (record) => record.createdAt,
-          cell: (record) =>
-            record.createdAt && (
-              <Text
-                size={phone ? "xs" : "sm"}
-                c={phone ? "dimmed" : undefined}
-                title={formatDateTime(record.createdAt)}
-                style={{ whiteSpace: "nowrap" }}
-              >
-                {formatDate(record.createdAt)}
-              </Text>
-            ),
+          cell: (record) => <LibraryDate phone={phone} value={record.createdAt} />,
         },
         {
           key: "status",
@@ -390,6 +380,12 @@ export function LibraryImports({
               </Text>
             );
           },
+        },
+        {
+          key: "updated",
+          header: "Updated",
+          sortValue: (record) => record.updatedAt,
+          cell: (record) => <LibraryDate phone={phone} value={record.updatedAt} />,
         },
       ]}
       rowActions={importActions}

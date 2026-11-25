@@ -16,6 +16,7 @@ import {
 } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
 import { modelFamilyLabel } from "../generation/modelFamily";
+import { LibraryDate } from "./LibraryDate";
 
 export interface LibraryItem {
   key: string;
@@ -30,6 +31,7 @@ export interface LibraryItem {
   note?: string;
   description?: string;
   bytes?: number;
+  updatedAt?: number;
   families?: string[];
   triggers?: string[];
   type?: string;
@@ -193,6 +195,7 @@ export function LibraryCatalogueTable({
   const inView = items.filter((item) =>
     view === "outdated" ? updating(item) : item.installed === (view === "installed"),
   );
+  const withUpdated = inView.some((item) => item.updatedAt !== undefined);
   // Sorted by type, family and name first, so the stable sort on the first column keeps that order.
   const rows = inView
     .filter(
@@ -439,6 +442,16 @@ export function LibraryCatalogueTable({
               );
             },
           },
+          ...(withUpdated
+            ? [
+                {
+                  key: "updated",
+                  header: "Updated",
+                  sortValue: (item: LibraryItem) => item.updatedAt,
+                  cell: (item: LibraryItem) => <LibraryDate phone={phone} value={item.updatedAt} />,
+                },
+              ]
+            : []),
         ]}
         rowActions={(item) => {
           const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;

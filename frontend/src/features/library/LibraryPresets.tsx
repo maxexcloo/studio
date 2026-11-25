@@ -4,7 +4,6 @@ import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
-import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
@@ -29,6 +28,7 @@ import {
   presetHolds,
   presetReplacesUnsaved,
 } from "../generation/presets";
+import { LibraryDate } from "./LibraryDate";
 
 const kindLabels = { image: "Image", video: "Video" };
 const kindOf = (preset: Preset) => kindLabels[preset.input.kind || "image"];
@@ -217,16 +217,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               key: "saved",
               header: "Saved",
               sortValue: (preset) => preset.savedAt,
-              cell: (preset) =>
-                preset.savedAt && (
-                  <Text
-                    {...secondary}
-                    title={formatDateTime(preset.savedAt)}
-                    style={{ whiteSpace: "nowrap" }}
-                  >
-                    {formatDate(preset.savedAt)}
-                  </Text>
-                ),
+              cell: (preset) => <LibraryDate phone={phone} value={preset.savedAt} />,
             },
           ]}
           rowActions={

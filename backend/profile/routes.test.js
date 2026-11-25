@@ -110,6 +110,7 @@ test("Library prompt edits reach the writer immediately and preserve history and
   assert.ok(listing.body.instructions.some(({ id }) => id === "summarise-taste"));
   const title = listing.body.instructions.find(({ id }) => id === "gallery-title");
   assert.equal(title.version, null);
+  assert.equal(title.editedAt, undefined);
   // The preview has an example for every variable an instruction can hold.
   for (const { initial } of listing.body.instructions)
     for (const name of promptVariables(initial)) assert.ok(name in listing.body.examples, name);
@@ -146,6 +147,8 @@ test("Library prompt edits reach the writer immediately and preserve history and
     body.versions.map((version) => version.text),
     [title.initial, text],
   );
+  const current = (await call("GET", path)).body.instructions.find(({ id }) => id === title.id);
+  assert.equal(current.editedAt, body.versions[0].at);
 });
 
 test("versions list, show, revert as a new version and approve an AI draft", async (t) => {
@@ -172,6 +175,7 @@ test("versions list, show, revert as a new version and approve an AI draft", asy
   );
   assert.equal(list.body.versions[0].text, undefined, "the list carries no text");
   assert.equal(list.body.meta.aiDrafted, true);
+  assert.equal(editor.listEditableProfiles()[0].editedAt, list.body.versions[0].at);
   const one = await call("GET", "/api/profiles/editable/krea-test/versions/1");
   assert.match(one.body.version.text, /"Seed"/);
   assert.equal((await call("GET", "/api/profiles/editable/krea-test/versions/9")).status, 404);

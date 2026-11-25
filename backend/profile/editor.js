@@ -47,6 +47,7 @@ export function listEditableProfiles() {
         family: String(meta.family || ""),
         readable: Boolean(raw),
         version: version?.version || 0,
+        ...(version?.editedAt ? { editedAt: version.editedAt } : {}),
         origin: version?.origin || "seed",
         aiDrafted: version?.aiDrafted === true,
         uncensored: meta.uncensored === true,

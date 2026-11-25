@@ -25,6 +25,7 @@ export interface ProfileRow {
   family?: string;
   kind: "image" | "video";
   version: number;
+  editedAt?: string;
   aiDrafted?: boolean;
   /** A combined profile's current backend. */
   backend?: string;
@@ -118,6 +119,7 @@ export interface PromptInstruction {
   initial: string;
   hash: string;
   version: number | null;
+  editedAt?: string;
 }
 export const promptInstructionsPath = "/api/profiles/prompt-instructions";
 export const promptInstructionsQuery = queryOptions({
