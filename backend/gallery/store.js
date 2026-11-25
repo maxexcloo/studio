@@ -284,6 +284,14 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
     .map(parse);
 }
 
+/** Counts matching gallery items for every owner without loading their records. */
+export function galleryCountsByOwner(query) {
+  const { sql, params } = where(query);
+  return statement(
+    `SELECT owner_id AS owner, count(*) AS count FROM studio_gallery ${indexFor(query)} ${sql} GROUP BY owner_id`,
+  ).all(...params);
+}
+
 /** A chat's finished visible results grouped by recorded set ID. Text comes from each latest row. */
 export function galleryChatSets(ownerId, type, { conversationId, turnId }) {
   return statement(

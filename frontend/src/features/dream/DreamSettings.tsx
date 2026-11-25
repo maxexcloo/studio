@@ -104,13 +104,13 @@ export function DreamPreferences() {
           toggle("uncensored", "Uncensored", "Allow explicit themes.")}
       </SettingGroup>
       <SettingGroup title="Mix">
-        {mix("mixNew", "New Ideas", "Fresh concepts from your taste.")}
         {mix(
           "mixComparisons",
           "Comparisons",
           "One liked prompt with a single setting changed, to learn which you prefer.",
         )}
         {mix("mixExisting", "Existing Work", "Recreations, variations and series of liked images.")}
+        {mix("mixNew", "New Ideas", "Fresh concepts from your taste.")}
       </SettingGroup>
       <SettingGroup title="Images">
         {toggle("images", "Enabled")}

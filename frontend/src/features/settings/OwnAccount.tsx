@@ -125,18 +125,6 @@ export function OwnAccount() {
       <PersonalMcpToken>
         <SettingGroup title="Sign-In">
           <SettingRow
-            label="Email & Password"
-            description={
-              editable ? own.username : `${own.username} · Managed by your sign-in provider.`
-            }
-          >
-            {editable && (
-              <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
-                Change
-              </Button>
-            )}
-          </SettingRow>
-          <SettingRow
             label="Access"
             description={
               admin
@@ -147,6 +135,18 @@ export function OwnAccount() {
             <Badge miw="max-content" color="gray">
               {admin ? "Administrator" : own.accessProfile?.name || "No Group"}
             </Badge>
+          </SettingRow>
+          <SettingRow
+            label="Email & Password"
+            description={
+              editable ? own.username : `${own.username} · Managed by your sign-in provider.`
+            }
+          >
+            {editable && (
+              <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
+                Change
+              </Button>
+            )}
           </SettingRow>
           <SettingRow label="Sign-In Method">
             <Text size="sm">

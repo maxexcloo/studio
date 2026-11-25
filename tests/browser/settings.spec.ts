@@ -9,6 +9,11 @@ test("Settings follow the settled section order and run maintenance and worker r
   await signIn(page, { id: "admin", role: "administrator" });
   const cleared: unknown[] = [];
   let statusReads = 0;
+  await page.route("**/api/gallery/errors/counts", (route) =>
+    route.fulfill({
+      json: cleared.length ? { total: 0, owners: {} } : { total: 2, owners: { member: 2 } },
+    }),
+  );
   await page.route("**/api/gallery/errors/clear", (route) => {
     cleared.push(route.request().postDataJSON());
     return route.fulfill({ json: { ok: true, cleared: 2 } });
@@ -48,14 +53,17 @@ test("Settings follow the settled section order and run maintenance and worker r
     ).toHaveText(order.slice(4, -1));
   await section(page, "Settings", "Studio");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
-  await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
-  await page.getByRole("option", { name: "member@example.test", exact: true }).click();
+  const owners = danger.getByRole("combobox", { name: "Whose Failed Items", exact: true });
+  await owners.click();
+  await expect(page.getByRole("option", { name: "All Accounts (2)", exact: true })).toBeVisible();
+  await page.getByRole("option", { name: "member@example.test (2)", exact: true }).click();
   await danger.getByRole("button", { name: "Delete", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Delete Failed Items", exact: true });
   await expect(confirm).toContainText("Remove member@example.test's failed and cancelled items");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(confirm).toBeHidden();
   expect(cleared).toEqual([{ owner: "member" }]);
+  await expect(owners).toHaveValue("member@example.test (0)");
   await section(page, "Settings", "Workers");
   // Each worker's status comes first, under the page's own title, one line each: what it runs, its
   // state, what waits for it and its free memory.
@@ -986,7 +994,7 @@ test("Administration › Dream saves shared queue delays and hands an override b
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   await page.goto("/settings#dream-policy");
-  const delay = page.getByRole("textbox", { name: "Model & LoRA Switch Delay", exact: true });
+  const delay = page.getByRole("textbox", { name: "Image Model Switch Delay", exact: true });
   await delay.fill("8");
   await delay.press("Enter");
   const idle = page.getByRole("textbox", { name: "Video Idle Delay", exact: true });

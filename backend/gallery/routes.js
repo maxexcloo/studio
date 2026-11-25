@@ -26,6 +26,7 @@ import {
   forgetGalleryItems,
   galleryChangeCount,
   galleryChatSets,
+  galleryCountsByOwner,
   galleryFilter,
   galleryItem,
   galleryItems,
@@ -563,6 +564,21 @@ export function registerGalleryHistoryRoutes(app, { rated = () => {} } = {}) {
 }
 
 export function registerGalleryErrorRoutes(app) {
+  const errors = { status: ["failed", "cancelled"] };
+  directRoute(app, "GET", "/api/gallery/errors/counts", (account) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const counts = galleryCountsByOwner(errors);
+    return {
+      status: 200,
+      payload: {
+        total: counts.reduce((sum, { count }) => sum + count, 0),
+        owners: Object.fromEntries(
+          counts.filter(({ owner }) => owner).map(({ owner, count }) => [owner, count]),
+        ),
+      },
+    };
+  });
   // `owner` (administrators only) clears another account's failed items, or "all" every account's.
   directRoute(app, "POST", "/api/gallery/errors/clear", (account, { body }) => {
     const owner = body?.owner;
@@ -571,7 +587,7 @@ export function registerGalleryErrorRoutes(app) {
     const mine = (item) => recordBelongsToAccount(item, account);
     const owned =
       owner === undefined ? mine : owner === "all" ? () => true : (item) => item.ownerId === owner;
-    const cleared = galleryItems({ status: ["failed", "cancelled"] }).filter(owned);
+    const cleared = galleryItems(errors).filter(owned);
     hideGalleryItems(cleared);
     forgetGalleryItems(cleared);
     return { status: 200, payload: { ok: true, cleared: cleared.length } };

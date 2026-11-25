@@ -90,24 +90,19 @@ export function DreamAdministration() {
           "Minutes after an account's latest generation request before Dream makes its images.",
         )}
         {delay(
+          "imageSwitchMinutes",
+          "Image Model Switch Delay",
+          "Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.",
+        )}
+        {delay(
           "videoIdleMinutes",
           "Video Idle Delay",
           "Minutes after an account's latest generation request before Dream makes its videos.",
-        )}
-        {delay(
-          "imageSwitchMinutes",
-          "Model & LoRA Switch Delay",
-          "Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.",
         )}
       </SettingGroup>
       <SettingGroup title="Limits">
         {limit("dailyImages", "Daily Images", "The most images a person may let Dream make a day.")}
         {limit("dailyVideos", "Daily Videos", "The most videos a person may let Dream make a day.")}
-        {limit(
-          "pauseAfterUnseen",
-          "Pause After Unseen",
-          "The most unseen results a person may let Dream wait on before it pauses.",
-        )}
         <SettingRow
           label="Allow Pause Off"
           description={`People may set Pause After Unseen to 0, so Dream never waits.${lockedNote(unseenOff)}`}
@@ -121,6 +116,11 @@ export function DreamAdministration() {
             }
           />
         </SettingRow>
+        {limit(
+          "pauseAfterUnseen",
+          "Pause After Unseen",
+          "The most unseen results a person may let Dream wait on before it pauses.",
+        )}
       </SettingGroup>
     </Stack>
   );
