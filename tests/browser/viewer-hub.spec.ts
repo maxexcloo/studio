@@ -561,11 +561,11 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   await field.focus();
   await expect.poll(height).toBeGreaterThan(line * 1.5);
   await expect(summary).toHaveCount(0);
-  // Another viewer control leaves the prompt, keeping its edit.
+  // The viewer's action menu keeps the prompt expanded with its edit.
   await field.fill(`${prompt} in autumn`);
   await viewer.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Edit in Composer", exact: true })).toBeVisible();
-  await expect.poll(height).toBeLessThan(line * 1.5);
+  await expect.poll(height).toBeGreaterThan(line * 1.5);
   await expect(field).toHaveValue(`${prompt} in autumn`);
 });
 
@@ -665,6 +665,30 @@ test("Viewer prompt offers Reset once edited, without a menu, and restores its o
   if (!phone) await expect(field).toBeFocused();
   await edit("Undo").click();
   await expect(field).toHaveValue("A bird at night");
+});
+
+test("The expanded viewer prompt stays open through its action bar menu", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Phones use the full-screen prompt editor");
+  const { viewer } = await seed(page);
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const height = () => field.evaluate((element) => element.getBoundingClientRect().height);
+  const resting = await height();
+  const draft = "An amber bird\nAbove the hills\nAt first light";
+  await field.fill(draft);
+  await expect.poll(height).toBeGreaterThan(resting);
+  await viewerAction(page, "Share");
+  const menu = page.getByRole("menu", { name: "Share", exact: true });
+  await expect(menu).toBeVisible();
+  await expect.poll(height).toBeGreaterThan(resting);
+  await menu.getByRole("menuitem", { name: "Copy Prompt", exact: true }).click();
+  await expect(menu).toBeHidden();
+  await expect.poll(height).toBeGreaterThan(resting);
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect.poll(height).toBeLessThanOrEqual(resting);
+  await expect(field).toHaveValue(draft);
 });
 
 test("The viewer prompt offers suggestions for review beside the field and in the phone editor", async ({

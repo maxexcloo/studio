@@ -61,6 +61,7 @@ import {
   useMediaReview,
 } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
+import { usePrefetchResultSuggestions } from "./usePrefetchResultSuggestions";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { VariationDialog, keepAndVaryAction } from "./VariationDialog";
@@ -484,18 +485,23 @@ export function useMediaActions(
     mode: ViewerChange;
     prompt?: string;
   }>();
-  const requested = suggestions?.id === item.id ? suggestions : undefined;
-  const suggestionPrompt = requested?.prompt;
-  const suggestionAction = requested?.mode;
-  const steps = useChangeSuggestions({
-    query: nextStepsQuery(item, suggestionPrompt, suggestionAction),
-    fresh: () => askNextSteps(item, true, suggestionPrompt, suggestionAction),
-    enabled: assistedChanges && Boolean(requested),
-    disabled: draft?.pending,
-    onPick: (request) => {
-      if (suggestions && !draft?.pending) pick(suggestions.mode, request);
-    },
-  });
+  const suggestionOptions = (mode: ViewerChange) => {
+    const requested = suggestions?.id === item.id && suggestions.mode === mode;
+    const prompt = requested ? suggestions.prompt : undefined;
+    return {
+      query: nextStepsQuery(item, prompt, mode),
+      fresh: () => askNextSteps(item, true, prompt, mode),
+      enabled: assistedChanges && requested,
+      disabled: draft?.pending,
+      onPick: (request: string) => {
+        if (!draft?.pending) pick(mode, request);
+      },
+    };
+  };
+  const steps = {
+    edit: useChangeSuggestions(suggestionOptions("edit")),
+    recreate: useChangeSuggestions(suggestionOptions("recreate")),
+  };
   const openChanges = (mode: ViewerChange) => () =>
     setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
   // With no model that edits images, Edit's changes grey out rather than failing when picked.
@@ -533,7 +539,7 @@ export function useMediaActions(
             ]
           : []),
       ],
-      suggestions: assistedChanges && !(mode === "edit" && noEdits) ? steps : undefined,
+      suggestions: assistedChanges && !(mode === "edit" && noEdits) ? steps[mode] : undefined,
       ...(assistedChanges
         ? changeTemplates(
             assistant.data?.changes ?? [],
@@ -847,6 +853,7 @@ export function MediaActionMenu({
   onSelect,
   ...options
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
+  usePrefetchResultSuggestions(item);
   const groups = useMediaActions(item, options).flatMap((group) =>
     group.some(({ id }) => id === "discover" || id === "share")
       ? group.map((action) => action.menu?.flat() ?? [action])

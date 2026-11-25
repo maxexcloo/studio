@@ -5,6 +5,7 @@ import {
   create,
   fixtures,
   image,
+  openNav,
   openReferenceChoices,
   pressGenerate,
   showOnly,
@@ -19,6 +20,7 @@ test.skip(!clip, "Video encoder unavailable");
 
 test("A video uploads as a reference, and Recreate runs an upload's suggested prompt as its version", async ({
   page,
+  isMobile,
 }) => {
   const state = await fixtures(page);
   const uploads: string[] = [];
@@ -48,6 +50,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(1);
   expect(uploads[0]).toContain("Content-Type: video/webm");
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
 
   state.gallery.push({
     id: "clip",
@@ -77,7 +80,15 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
       },
     });
   });
-  await page.goto("/videos");
+  if (isMobile) {
+    await closeReferences(page);
+    const closeGenerate = page.getByRole("button", { name: "Close Generate", exact: true });
+    if (await closeGenerate.isVisible()) await closeGenerate.click();
+    await openNav(page, "Videos");
+  } else {
+    await page.goto("/videos");
+  }
+  await expect(page).toHaveURL(/\/videos/);
   await showOnly(page, "Uploads");
   await page.locator('[data-media-id="clip"]').click();
   // An upload video's Recreate, its only option, opens its suggested prompt.

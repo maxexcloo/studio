@@ -23,6 +23,7 @@ export type DreamItem = MediaItem & {
   dream?: {
     prompt: string;
     why: string;
+    brief?: string;
     at: string;
     state: "unseen" | "kept" | "discarded";
     decidedAt?: string;

@@ -18,14 +18,23 @@ import {
 
 const ideas = [
   { label: "Blue-Hour Lighthouse", prompt: "A lighthouse in rolling fog at blue hour" },
-  { label: "Lantern Market", prompt: "A harbour market under paper lanterns" },
+  {
+    label: "Lantern Market",
+    brief: "Paper lanterns reflected in wet stalls",
+    prompt: "A harbour market under paper lanterns",
+  },
   { label: "Sleeping Fishing Boats", prompt: "Fishing boats asleep on a glassy bay" },
   { label: "Quiet Coast", prompt: "Clouds above a quiet coast" },
   { label: "Rocky Beach Sunrise", prompt: "Dawn on a rocky beach" },
   { label: "Boats Under Stars", prompt: "Boats under stars" },
 ];
 const steps = [
-  { label: "Warmer Light", request: "make the light warmer", prompt: "An amber bird, warm light" },
+  {
+    label: "Warmer Light",
+    brief: "Golden light catches the wing edges",
+    request: "make the light warmer",
+    prompt: "An amber bird, warm light",
+  },
   { label: "Closer Crop", request: "crop closer", prompt: "A close crop of an amber bird" },
   { label: "Night Version", request: "set it at night", prompt: "An amber bird at night" },
   { label: "Rain", request: "add rain", prompt: "A bird in rain" },
@@ -124,6 +133,9 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(
     compactMenu.getByRole("menuitem", { name: ideas[0].label, exact: true }),
   ).toBeVisible();
+  const lantern = compactMenu.getByRole("menuitem", { name: ideas[1].label, exact: true });
+  await expect(lantern).toHaveAccessibleDescription(ideas[1].brief!);
+  await expect(lantern.getByText(ideas[1].brief!, { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(compactMenu).toBeHidden();
   await expandComposer(page);
@@ -155,7 +167,7 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
   await expect(
     suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }),
-  ).toBeVisible();
+  ).toHaveAccessibleDescription(steps[0].brief!);
   expect(asked.at(-1)).toEqual({
     surface: "draft",
     kind: "image",
@@ -171,7 +183,7 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await expect(prompt).toHaveValue("A fox");
 });
 
-test("The viewer groups Suggestions and Templates without styles or item descriptions", async ({
+test("The viewer groups Suggestions and Templates with their briefs", async ({
   page,
 }, testInfo) => {
   await openViewer(page);
@@ -208,7 +220,9 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await expandAssistantMenu(menu, "Suggestions");
   await expect(menu.getByRole("menuitem", { name: "Loading…", exact: true })).toBeDisabled();
   release[0]();
-  await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
+  await expect(
+    menu.getByRole("menuitem", { name: steps[0].label, exact: true }),
+  ).toHaveAccessibleDescription(steps[0].brief!);
   await backToActionMenu(menu);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").last()).toHaveText("Edit in Composer");

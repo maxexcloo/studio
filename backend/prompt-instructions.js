@@ -33,6 +33,7 @@ function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
       initial,
       hash: hashOf({ text, number }),
       version: number ?? null,
+      ...(saved?.at ? { editedAt: saved.at } : {}),
     });
     current.set(id, record);
     return record;

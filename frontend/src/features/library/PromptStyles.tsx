@@ -15,6 +15,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
+import { maxMenuBrief } from "../../../../shared/suggestions";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord } from "../../ui/DataTable";
@@ -163,7 +164,7 @@ function StyleEditor({
             label="Brief"
             description="One short line under its name in the menu, about 40 characters."
             required
-            maxLength={60}
+            maxLength={maxMenuBrief}
             value={draft.description}
             onChange={(event) => change({ description: event.currentTarget.value })}
           />

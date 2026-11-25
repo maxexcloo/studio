@@ -103,7 +103,7 @@ function LibraryCaption({ item, full }: { item: MediaItem; full: boolean }) {
   const prompt = item.prompt?.trim();
   return (
     <div className={classes.caption}>
-      <ViewerTitle item={item} title={title} fw={600} lineClamp={full ? undefined : 2} />
+      <ViewerTitle item={item} title={title} lineClamp={full ? undefined : 2} />
       <ViewerMetadata item={item} />
       {prompt && prompt.toLowerCase() !== title.toLowerCase() && (
         <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>

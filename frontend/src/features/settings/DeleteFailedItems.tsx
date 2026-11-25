@@ -1,8 +1,8 @@
 import { Button, Select } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { post } from "../../api";
+import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { compareNames } from "../../ui/DataTable";
 import { SettingRow } from "../../ui/SettingRows";
@@ -10,6 +10,12 @@ import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { queueQuery } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
+
+const failedItemsQuery = queryOptions({
+  queryKey: ["gallery-error-counts"],
+  queryFn: () =>
+    api<{ total: number; owners: Record<string, number> }>("/api/gallery/errors/counts"),
+});
 
 /**
  * Settings › Studio › Delete Failed Items: removes failed and cancelled items, which the gallery
@@ -20,6 +26,10 @@ export function DeleteFailedItems() {
   const client = useQueryClient();
   const multiUser = useAccount().data?.mode === "multi-user";
   const accounts = useQuery({ ...accountAdminQuery, enabled: multiUser });
+  const { data: counts, refetch: refreshCounts } = useQuery({
+    ...failedItemsQuery,
+    enabled: multiUser,
+  });
   const [owner, setOwner] = useState("all");
   const [confirming, setConfirming] = useState(false);
   const owners = [
@@ -28,6 +38,11 @@ export function DeleteFailedItems() {
       .map((entry) => ({ value: entry.id, label: entry.username }))
       .sort((a, b) => compareNames(a.label, b.label)),
   ];
+  const options = owners.map(({ value, label }) => {
+    if (!counts) return { value, label };
+    const count = value === "all" ? counts.total : (counts.owners[value] ?? 0);
+    return { value, label: `${label} (${count.toLocaleString()})` };
+  });
   const whose = !multiUser
     ? "all"
     : owner === "all"
@@ -36,7 +51,12 @@ export function DeleteFailedItems() {
   const remove = useMutation({
     mutationFn: () => post("/api/gallery/errors/clear", multiUser ? { owner } : undefined),
     onSuccess: () => {
-      for (const queryKey of [galleryKey, ["gallery-filters"], queueQuery.queryKey])
+      for (const queryKey of [
+        galleryKey,
+        ["gallery-filters"],
+        queueQuery.queryKey,
+        failedItemsQuery.queryKey,
+      ])
         void client.invalidateQueries({ queryKey });
       setConfirming(false);
     },
@@ -54,10 +74,11 @@ export function DeleteFailedItems() {
       {multiUser && (
         <Select
           aria-label="Whose Failed Items"
-          data={owners}
+          data={options}
           value={owner}
           allowDeselect={false}
           searchable={owners.length > 8}
+          onDropdownOpen={() => void refreshCounts()}
           onChange={(value) => value && setOwner(value)}
         />
       )}

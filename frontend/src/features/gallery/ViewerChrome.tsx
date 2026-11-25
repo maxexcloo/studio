@@ -45,12 +45,19 @@ export function ViewerTitle({
 }: TextProps & { item: MediaItem; title?: string; component?: "h2" }) {
   const timestamp = mediaTimestamp(item);
   return (
-    <Text {...props} title={[title, timestamp?.label].filter(Boolean).join(" · ")}>
-      <span>{title}</span>
+    <Text
+      size="sm"
+      lh={1.25}
+      {...props}
+      title={[title, timestamp?.label].filter(Boolean).join(" · ")}
+    >
+      <Text component="strong" inherit fw={700}>
+        {title}
+      </Text>
       {timestamp && (
         <>
           {" · "}
-          <Text component="time" dateTime={timestamp.value} inherit fw={400} c="dimmed">
+          <Text component="time" dateTime={timestamp.value} inherit>
             {timestamp.label}
           </Text>
         </>
@@ -94,7 +101,7 @@ export function ViewerChrome({
         {/* Docked Details carries the title itself. */}
         {item && !(details?.opened && !details.phone) && (
           <Paper withBorder radius="md" px="sm" py={4} miw={0}>
-            <ViewerTitle item={item} size="sm" fw={500} truncate />
+            <ViewerTitle item={item} truncate />
             <ViewerMetadata item={item} />
           </Paper>
         )}

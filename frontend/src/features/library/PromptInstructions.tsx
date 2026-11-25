@@ -23,6 +23,7 @@ import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionTo
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useReturnFocus } from "../../ui/useReturnFocus";
+import { LibraryDate } from "./LibraryDate";
 import { type InstructionSection, instructionAreas } from "./LibraryNavigation";
 import { type PromptInstruction, promptInstructionsPath, promptInstructionsQuery } from "./queries";
 import { VersionTitle, VersionsDialog } from "./Versions";
@@ -332,6 +333,12 @@ export function PromptInstructions({
                   },
                 ]
               : []),
+            {
+              key: "updated",
+              header: "Updated",
+              sortValue: ({ editedAt }) => editedAt,
+              cell: ({ editedAt }) => <LibraryDate phone={phone} value={editedAt} />,
+            },
             {
               key: "version",
               header: "Version",

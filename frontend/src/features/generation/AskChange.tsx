@@ -191,6 +191,7 @@ export function useChangeSuggestions<K extends QueryKey>({
     .map((step): Action => ({
       id: `step:${step.label}`,
       label: step.label,
+      description: step.brief,
       onClick: () => onPick(step.request),
     }));
   const { action, refresh: again } = suggested(options, {

@@ -479,15 +479,24 @@ test("unfinished work shows as the account chooses: none, in progress, or queued
     queue.save({ ...queue.job("account-a", job.id), status: "cancelled" });
 });
 
-test("Clear Failed takes the account's own failed items; administrators may name an owner or all", async () => {
+test("Failed item counts match the administrator's account and all-account delete scopes", async () => {
   const { registerGalleryErrorRoutes } = await import("./gallery/routes.js");
-  const posts = {};
-  registerGalleryErrorRoutes({ post: (route, handler) => (posts[route] = handler) });
-  const failed = (ownerId, jobId) => ({ ...item(ownerId, jobId), status: "failed", url: "" });
+  const handlers = {};
+  registerGalleryErrorRoutes({
+    get: (route, handler) => (handlers[route] = handler),
+    post: (route, handler) => (handlers[route] = handler),
+  });
+  const failed = (ownerId, jobId, status = "failed") => ({
+    ...item(ownerId, jobId),
+    status,
+    url: "",
+  });
   const account = (userId, role = "user") => ({
     studioAccount: { userId, role, authenticated: true, features: { gallery: true } },
   });
-  const clear = (req) => call(posts["/api/gallery/errors/clear"], req);
+  const admin = account("admin", "administrator");
+  const counts = (req = admin) => call(handlers["/api/gallery/errors/counts"], req);
+  const clear = (req) => call(handlers["/api/gallery/errors/clear"], req);
   const left = () =>
     galleryRows()
       .map((record) => record.jobId)
@@ -495,23 +504,28 @@ test("Clear Failed takes the account's own failed items; administrators may name
   setGallery([
     failed("account-a", "a-failed"),
     failed("account-b", "b-failed"),
+    failed("account-b", "b-cancelled", "cancelled"),
     failed("account-c", "c-failed"),
+    failed("", "unowned-failed"),
     item("account-b", "b-done"),
   ]);
 
+  assert.deepEqual(await counts(), {
+    total: 5,
+    owners: { "account-a": 1, "account-b": 2, "account-c": 1 },
+  });
+  assert.equal((await counts(account("account-a"))).reason, "computer-only");
   assert.equal((await clear({ ...account("account-a"), body: {} })).cleared, 1);
-  assert.deepEqual(left(), ["b-done", "b-failed", "c-failed"]);
+  assert.deepEqual(left(), ["b-cancelled", "b-done", "b-failed", "c-failed", "unowned-failed"]);
   assert.equal(
     (await clear({ ...account("account-a"), body: { owner: "all" } })).reason,
     "computer-only",
     "only administrators clear other accounts' items",
   );
-  assert.equal(
-    (await clear({ ...account("admin", "administrator"), body: { owner: "account-b" } })).cleared,
-    1,
-  );
-  assert.deepEqual(left(), ["b-done", "c-failed"]);
-  await clear({ ...account("admin", "administrator"), body: { owner: "all" } });
+  assert.equal((await clear({ ...admin, body: { owner: "account-b" } })).cleared, 2);
+  assert.deepEqual(await counts(), { total: 2, owners: { "account-c": 1 } });
+  assert.equal((await clear({ ...admin, body: { owner: "all" } })).cleared, 2);
+  assert.deepEqual(await counts(), { total: 0, owners: {} });
   assert.deepEqual(left(), ["b-done"]);
 });
 

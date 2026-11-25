@@ -5,7 +5,7 @@ import test, { type TestContext } from "node:test";
 
 import express from "express";
 
-import { type Change, maxSuggestions } from "../../shared/suggestions.ts";
+import { type Change, maxMenuBrief, maxSuggestions } from "../../shared/suggestions.ts";
 import type { userContent } from "./model-content.ts";
 import { createNextStepWork, createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
 import type { TasteRecord, TasteWriter } from "./taste.ts";
@@ -145,8 +145,16 @@ function replies(system: string) {
   if (system.includes('"ideas"'))
     return JSON.stringify({
       ideas: [
-        { label: "Foghorn at Blue Hour", prompt: "A foghorn lighthouse at blue hour" },
-        { label: "Lantern Market", prompt: `A harbour market ${"under lanterns ".repeat(20)}` },
+        {
+          label: "Foghorn at Blue Hour",
+          brief: "  Low fog\nrolls past the lighthouse  ",
+          prompt: "A foghorn lighthouse at blue hour",
+        },
+        {
+          label: "Lantern Market",
+          brief: "Lanterns reflect in the market's puddles along the harbour front.",
+          prompt: `A harbour market ${"under lanterns ".repeat(20)}`,
+        },
         { label: "Market at Dusk", prompt: "A harbour market at dusk" },
         { label: "Evening Market", prompt: "A harbour market at dusk" },
       ],
@@ -156,6 +164,7 @@ function replies(system: string) {
       steps: [
         {
           label: "warmer light please now",
+          brief: "Golden light across the water",
           request: "make the light warmer",
           prompt: "A harbour at dawn, warm golden light",
         },
@@ -263,12 +272,17 @@ test("updated account exclusions discard matching composer ideas", async () => {
       JSON.stringify({
         ideas: [
           { label: "Quiet Machines", prompt: "A laundry room on a stage" },
+          {
+            label: "Empty Doorway",
+            brief: "Light from a laundry room",
+            prompt: "A shaft of light in an empty doorway",
+          },
           { label: "Misty Jetty", prompt: "A lone ferry pulls away from a misty jetty" },
         ],
       }),
   });
   const ask = { surface: "composer", kind: "image" };
-  assert.equal((await suggestions.suggest("alice", ask)).suggestions.length, 2);
+  assert.equal((await suggestions.suggest("alice", ask)).suggestions.length, 3);
   exclusions.push("laundry room");
   assert.deepEqual(
     (await suggestions.suggest("alice", ask)).suggestions.map(({ label }) => label),
@@ -278,7 +292,7 @@ test("updated account exclusions discard matching composer ideas", async () => {
     calls.at(-1)![1].content,
     /Never include these or anything equivalent: laundry room/,
   );
-  assert.equal((await suggestions.suggest("bob", ask)).suggestions.length, 2);
+  assert.equal((await suggestions.suggest("bob", ask)).suggestions.length, 3);
 });
 
 test("composer ideas come from the taste profile, framed as data, whole and distinct", async () => {
@@ -287,8 +301,10 @@ test("composer ideas come from the taste profile, framed as data, whole and dist
   assert.equal(result.suggestions.length, 3);
   assert.deepEqual(result.suggestions[0], {
     label: "Foghorn at Blue Hour",
+    brief: "Low fog rolls past the lighthouse",
     prompt: "A foghorn lighthouse at blue hour",
   });
+  assert.equal(result.suggestions[1].brief?.length, maxMenuBrief);
   assert.equal(
     result.suggestions[1].prompt,
     `A harbour market ${"under lanterns ".repeat(20)}`.trim(),
@@ -415,6 +431,7 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
   assert.deepEqual(result.suggestions, [
     {
       label: "Warmer Light Please Now",
+      brief: "Golden light across the water",
       request: "make the light warmer",
       prompt: "A harbour at dawn, warm golden light",
     },
@@ -654,6 +671,8 @@ test("all creative suggestion surfaces share context and variety while motion ke
       assert.match(system.content, /current prompt and reference images first/);
       assert.match(system.content, /Preserve identity, species, breed, age/);
       assert.match(system.content, /not synonyms or near-duplicates/);
+      assert.match(system.content, /"brief": "<short brief>"/);
+      assert.match(system.content, /one plain line of about 40 characters/);
       assert.match(context.content, /35-year-old woman with a broad build/);
       if (surface === "animate" || kind === "video") {
         assert.match(system.content, /Vary motion, subject action/);
@@ -954,13 +973,21 @@ test("next steps kept from an image's enrich read open without a model call, and
   assert.match(task.context, /The menu already offers.*Closer Crop/);
   assert.doesNotMatch(task.context, /Prompt:/, "the read already sends the prompt");
   const kept = task.keep(JSON.parse(replies('"steps"').replace(/^[^{]*/, "")));
-  Object.assign(source, { nextSteps: kept });
+  assert.ok(kept);
   const body = { surface: "viewer", jobId: "job-a", itemId: "result-a" };
+  const legacy = kept.steps.map(({ brief: _brief, ...step }) => step);
+  Object.assign(source, { nextSteps: { ...kept, steps: legacy } });
+  assert.deepEqual((await suggestions.suggest("alice", body)).suggestions, legacy);
+  Object.assign(source, { nextSteps: kept });
   const opened = await suggestions.suggest("alice", body);
-  assert.deepEqual(
-    opened.suggestions.map(({ label }) => label),
-    ["Warmer Light Please Now"],
-  );
+  assert.deepEqual(opened.suggestions, [
+    {
+      label: "Warmer Light Please Now",
+      brief: "Golden light across the water",
+      request: "make the light warmer",
+      prompt: "A harbour at dawn, warm golden light",
+    },
+  ]);
   assert.equal(calls.length, 0);
   await suggestions.suggest("alice", { ...body, fresh: true });
   assert.equal(calls.length, 1);

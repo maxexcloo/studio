@@ -96,6 +96,7 @@ export interface WrittenPrompt {
   thinking: string;
   model: string;
   why?: string;
+  brief?: string;
   title?: string;
   motifs?: string[];
   cardContext?: ResultContext;
@@ -144,6 +145,7 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
             ...job.dream,
             prompt: written.prompt,
             ...(written.why ? { why: written.why } : {}),
+            ...(written.brief ? { brief: written.brief } : {}),
             ...(written.motifs ? { motifs: written.motifs } : {}),
             ...(written.cardContext ? { cardContext: written.cardContext } : {}),
             ...(written.inputs ? { inputs: { ...job.dream.inputs, ...written.inputs } } : {}),

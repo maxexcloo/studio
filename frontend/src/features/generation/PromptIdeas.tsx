@@ -62,6 +62,7 @@ export function usePromptIdeas({
     .map((idea): Action => ({
       id: `idea:${idea.label}`,
       label: idea.label,
+      description: idea.brief,
       onClick: () => {
         setPicked({ before: base, after: idea.prompt, label: idea.label });
         onChange(idea.prompt);

@@ -12,6 +12,7 @@ import {
   type VariationDirection,
   changeActions,
   directionVariants,
+  maxMenuBrief,
   maxSuggestionReferences,
   maxSuggestions,
   variationDirections,
@@ -235,6 +236,8 @@ const targetLines = (target?: WritingTarget | null) =>
   target ? [targetLine(target), precedence] : [];
 const clean = (value: unknown, limit = Infinity) =>
   (typeof value === "string" ? value : "").replace(/\s+/g, " ").trim().slice(0, limit);
+const withBrief = (instruction: string) =>
+  `${instruction}\nInclude a "brief" for each idea, one plain line of about 40 characters, adding a concrete detail the label leaves out.`;
 const promptText = (value: unknown) =>
   typeof value === "string" ? value.trim().slice(0, maxPromptCharacters) : "";
 const json = (text: string) => {
@@ -259,6 +262,8 @@ const unlike = (labels: string[]) => {
 };
 const describeIdea = (idea: PromptIdea | NextStep) =>
   `${idea.label}: ${"request" in idea ? idea.request : idea.prompt}`;
+const allowedIdea = (exclusions: string[]) => (idea: PromptIdea | NextStep) =>
+  !namedMotif(`${describeIdea(idea)} ${idea.brief || ""}`, exclusions);
 function referenceNotes(references: DraftReference[]) {
   let attached = 0;
   return references.flatMap(({ caption, image }, index) => {
@@ -368,7 +373,13 @@ function readSteps(reply: { steps?: unknown } | null, offered: string[], motion 
     .map((step: Record<string, unknown>): NextStep => {
       const request = clean(step?.request, 160);
       const prompt = motion ? request : promptText(step?.prompt);
-      return { label: shortTitle(clean(step?.label, 40), 4), request, ...(prompt && { prompt }) };
+      const brief = clean(step?.brief, maxMenuBrief).trimEnd();
+      return {
+        label: shortTitle(clean(step?.label, 40), 4),
+        ...(brief && { brief }),
+        request,
+        ...(prompt && { prompt }),
+      };
     })
     .filter((step: NextStep) => {
       const label = sameLabel(step.label);
@@ -592,7 +603,7 @@ export function createSuggestions({
         call: "suggestions",
         model: await model.model("suggestions", false, promptWriter(ownerId)),
         messages: [
-          { role: "system", content: system },
+          { role: "system", content: withBrief(system) },
           {
             role: "user",
             content: userContent(
@@ -618,15 +629,19 @@ export function createSuggestions({
       const labels = new Set<string>();
       const prompts = new Set<string>();
       const ideas = (Array.isArray(reply?.ideas) ? reply.ideas : [])
-        .map((idea: Record<string, unknown>) => ({
-          label: shortTitle(clean(idea?.label, 40), 4),
-          prompt: promptText(idea?.prompt),
-        }))
+        .map((idea: Record<string, unknown>): PromptIdea => {
+          const brief = clean(idea?.brief, maxMenuBrief).trimEnd();
+          return {
+            label: shortTitle(clean(idea?.label, 40), 4),
+            ...(brief && { brief }),
+            prompt: promptText(idea?.prompt),
+          };
+        })
+        .filter(allowedIdea(exclusions))
         .filter(({ label, prompt }: PromptIdea) => {
           const title = sameLabel(label);
           const words = sameLabel(prompt);
           if (!title || !words || labels.has(title) || prompts.has(words)) return false;
-          if (namedMotif(`${label} ${prompt}`, exclusions)) return false;
           if (cardDraft !== undefined && cardDraft.length + 2 + prompt.length > maxPromptCharacters)
             return false;
           labels.add(title);
@@ -636,9 +651,7 @@ export function createSuggestions({
         .slice(0, maxSuggestions) as PromptIdea[];
       return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
-    const steps = readSteps(reply, offered, surface === "animate").filter(
-      ({ label, request }) => !namedMotif(`${label} ${request}`, exclusions),
-    );
+    const steps = readSteps(reply, offered, surface === "animate").filter(allowedIdea(exclusions));
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
@@ -920,7 +933,7 @@ export function createSuggestions({
       const offered = fixed(fixedKinds.viewer);
       const exclusions = explicitExclusions(taste.exclusions(ownerId));
       return {
-        instructions: viewerInstruction("image", true, uncensored),
+        instructions: withBrief(viewerInstruction("image", true, uncensored)),
         context: [
           ...tasteContext(ownerId).lines,
           "",
@@ -931,7 +944,7 @@ export function createSuggestions({
         ].join("\n"),
         keep(reply: unknown) {
           const steps = readSteps(reply as { steps?: unknown } | null, offered).filter(
-            ({ label, request }) => !namedMotif(`${label} ${request}`, exclusions),
+            allowedIdea(exclusions),
           );
           return steps.length ? savedSteps(suggestionRevision.image, steps, uncensored) : undefined;
         },
@@ -1184,9 +1197,7 @@ export function createSuggestions({
         Boolean(saved.uncensored) === uncensored
       ) {
         const distinct = unlike(fixed(surface === "animate" ? "animate" : "change"));
-        const suggestions = saved.steps.filter(
-          (step) => distinct(step) && !namedMotif(`${step.label} ${step.request}`, exclusions),
-        );
+        const suggestions = saved.steps.filter(distinct).filter(allowedIdea(exclusions));
         if (suggestions.length) return { suggestions };
       }
       const { known, lines, motionLines } = tasteContext(ownerId);

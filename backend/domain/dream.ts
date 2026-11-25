@@ -56,6 +56,7 @@ import {
   resolutions,
   snapDimension,
 } from "../../shared/resolution.ts";
+import { maxMenuBrief } from "../../shared/suggestions.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
 import { dreamVideoSlot, frameSize, uncensoredDreamProfile } from "../animate-profile.js";
@@ -124,6 +125,7 @@ export type { DreamSettings } from "../../shared/dream.ts";
 export interface DreamOrigin {
   prompt: string;
   why: string;
+  brief?: string;
   at: string;
   uncensored?: true;
   /** Named card details quoted from the written prompt. */
@@ -2249,8 +2251,8 @@ export function createDream(options: {
         ]
       : [];
     const collectCards = media === "image" && !reword;
-    const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"`;
-    const language = `Write "why" and "title" in ${australianEnglish}; only "prompt" uses American English.`;
+    const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>", "brief": "<one concrete line of about 40 characters, adding a detail the title leaves out>"`;
+    const language = `Write "why", "title" and "brief" in ${australianEnglish}; only "prompt" uses American English.`;
     const reply = `Reply with JSON only: {${replyShape}}. ${language}`;
     let messages: { role: "system" | "user"; content: string }[];
     /** The liked items whose prompts the writer sees, recorded once the idea is written. */
@@ -2538,6 +2540,7 @@ export function createDream(options: {
         prompt?: unknown;
         why?: unknown;
         title?: unknown;
+        brief?: unknown;
         motifs?: unknown;
         cardContext?: unknown;
       } = {};
@@ -2583,6 +2586,7 @@ export function createDream(options: {
         }
         // What the idea explores leads its why line, ahead of the writer's note.
         const why = [note, clean(reply.why, 160)].filter(Boolean).join(" · ");
+        const ideaBrief = clean(reply.brief, maxMenuBrief).trimEnd();
         const cardContext = collectCards
           ? { ...quotedCards(reply.cardContext, prompt), ...pinnedContext }
           : undefined;
@@ -2602,6 +2606,7 @@ export function createDream(options: {
           thinking,
           model,
           ...(title ? { title } : {}),
+          ...(ideaBrief && !namedMotif(ideaBrief, forbidden) ? { brief: ideaBrief } : {}),
           ...(chosenMotifs.length ? { motifs: chosenMotifs } : {}),
           ...(cardContext && Object.keys(cardContext).length ? { cardContext } : {}),
           ...(Object.keys(inputs).length ? { inputs } : {}),

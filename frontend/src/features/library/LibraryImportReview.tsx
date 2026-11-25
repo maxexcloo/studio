@@ -45,6 +45,7 @@ export interface ImportRecord {
   name?: string;
   state: string;
   createdAt?: string;
+  updatedAt?: string;
   /** Where it stands in Library › Imports. */
   audit: "busy" | "failed" | "needs-files" | "ready" | "substitute";
   /** Failed, or waiting on a file no provider gives: Clear Stale removes it. */

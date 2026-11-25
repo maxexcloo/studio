@@ -8,7 +8,6 @@ import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
-import { formatDate, formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import {
@@ -28,6 +27,7 @@ import {
   definitionPath,
   definitionVersionText,
 } from "./DefinitionEditor";
+import { LibraryDate } from "./LibraryDate";
 import {
   type ProfileRow,
   type ProfileStats,
@@ -478,6 +478,12 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 ),
               },
               {
+                key: "updated",
+                header: "Updated",
+                sortValue: (entry) => entry.editedAt,
+                cell: (entry) => <LibraryDate phone={phone} value={entry.editedAt} />,
+              },
+              {
                 key: "version",
                 header: "Version",
                 sortValue: (entry) => entry.version,
@@ -636,6 +642,12 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               ),
             },
             {
+              key: "updated",
+              header: "Updated",
+              sortValue: (entry) => entry.editedAt || undefined,
+              cell: (entry) => <LibraryDate phone={phone} value={entry.editedAt} />,
+            },
+            {
               key: "profiles",
               header: "Used By",
               sortValue: (entry) => users.get(entry.packId)?.length || 0,
@@ -646,22 +658,6 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               header: "Version",
               sortValue: (entry) => entry.version,
               cell: (entry) => <Version {...entry} />,
-            },
-            {
-              key: "updated",
-              header: "Updated",
-              sortValue: (entry) => entry.editedAt,
-              cell: (entry) =>
-                entry.editedAt && (
-                  <Text
-                    size={phone ? "xs" : "sm"}
-                    c={phone ? "dimmed" : undefined}
-                    title={formatDateTime(entry.editedAt)}
-                    style={{ whiteSpace: "nowrap" }}
-                  >
-                    {formatDate(entry.editedAt)}
-                  </Text>
-                ),
             },
           ]}
           rowActions={(entry) =>
