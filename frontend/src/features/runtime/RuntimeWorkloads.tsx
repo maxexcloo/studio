@@ -1,6 +1,5 @@
 import {
   Alert,
-  Anchor,
   Badge,
   Box,
   Button,
@@ -493,21 +492,9 @@ export function RuntimeWorkloads({
                 (item.phase !== "parked" && reasons[item.id]);
               return (
                 <>
-                  {item.dashboardUrl ? (
-                    <Anchor
-                      href={item.dashboardUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="sm"
-                      fw={500}
-                    >
-                      {item.label}
-                    </Anchor>
-                  ) : (
-                    <Text size="sm" fw={500}>
-                      {item.label}
-                    </Text>
-                  )}
+                  <Text size="sm" fw={500}>
+                    {item.label}
+                  </Text>
                   {note && (
                     <Text
                       size="xs"
@@ -583,6 +570,17 @@ export function RuntimeWorkloads({
                 onClick={() => setBenchmarkId(item.id)}
               >
                 Benchmark…
+              </Menu.Item>
+            )}
+            {item.dashboardUrl && (
+              <Menu.Item
+                component="a"
+                href={item.dashboardUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                leftSection={<icons.external size={16} />}
+              >
+                Open Dashboard
               </Menu.Item>
             )}
             <Menu.Item
