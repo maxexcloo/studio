@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
+import { dreamItem, expandAssistantMenu, fixtures, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string | RegExp) {
@@ -141,7 +141,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   const bar = page.getByRole("group", { name: "Dream Actions" });
   await expect
     .poll(() => bar.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)))
-    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "Pass Reason", "Super Like", "Accept", "Suggestions"]);
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeDisabled();
   // The square card after the wide one keeps the same box, so neither it nor the buttons move.
@@ -212,7 +212,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "Pass Reason", "Super Like", "Accept", "Suggestions"]);
   await preview.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(preview).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -492,18 +492,15 @@ test("Dream Library shows result details and preloads the next five Suggestions 
   await expect(card.getByText("Library Result 0", { exact: true })).toBeVisible();
   await expect(card.getByText(/^Archipelago( · |$)/)).toBeVisible();
   await expect(card.locator("time")).toHaveAttribute("datetime", stamp);
-  const warmed = (count: number) =>
-    library
-      .slice(0, count)
-      .flatMap(({ id }) => ["viewer", "recreate", "edit", "animate"].map((mode) => `${id}:${mode}`))
-      .sort();
-  await expect.poll(() => [...asked].sort()).toEqual(warmed(6));
-  expect(asked.slice(0, 4)).toEqual([
-    "review-0:viewer",
-    "review-0:recreate",
-    "review-0:edit",
-    "review-0:animate",
-  ]);
+  const warmed = (count: number, visited: number) =>
+    [
+      ...library.slice(0, count).map(({ id }) => `${id}:viewer`),
+      ...library
+        .slice(0, visited)
+        .flatMap(({ id }) => ["recreate", "edit", "animate"].map((mode) => `${id}:${mode}`)),
+    ].sort();
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(6, 1));
+  expect(asked.slice(0, 2)).toEqual(["review-0:viewer", "review-1:viewer"]);
 
   await card.getByRole("button", { name: "View", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
@@ -514,12 +511,13 @@ test("Dream Library shows result details and preloads the next five Suggestions 
   await preview.getByRole("button", { name: "Accept", exact: true }).click();
 
   await expect(header.getByText("Library Result 1", { exact: true })).toBeVisible();
-  await expect.poll(() => [...asked].sort()).toEqual(warmed(7));
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(7, 2));
   await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await expandAssistantMenu(page.getByRole("menu").first(), "Suggestions");
   await expect(
     page.getByRole("menuitem", { name: "Closer Crop", exact: true }),
   ).toHaveAccessibleDescription("Fill the frame with the subject");
-  expect([...asked].sort()).toEqual(warmed(7));
+  expect([...asked].sort()).toEqual(warmed(7, 2));
 });
 
 test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => {
@@ -558,25 +556,17 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     ]);
 });
 
-test("A touch screen says until the first Pass that holding it adds a reason", async ({
-  page,
-  isMobile,
-}) => {
-  test.skip(!isMobile, "Touch hint");
+test("Dream offers an explicit Pass Reason beside Pass", async ({ page }) => {
   await fixtures(page);
-  await serveDream(page, { unseen: ["one", "two"].map((id) => dreamItem(id)) });
+  const dream = await serveDream(page, { unseen: ["one", "two"].map((id) => dreamItem(id)) });
   await page.goto("/dream");
-  const hint = page.getByText("Hold Pass to add a reason", { exact: true });
-  await expect(hint).toBeVisible();
   await page
     .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Pass", exact: true })
-    .tap();
+    .getByRole("button", { name: "Pass Reason", exact: true })
+    .click();
+  await confirmPass(page, "Glitch");
   await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
-  await expect(hint).toBeHidden();
-  await page.reload();
-  await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
-  await expect(hint).toBeHidden();
+  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ ids: ["one"], reason: "glitch" });
 });
 
 test("Projects show what is new in each since the last visit, and the viewer judges it", async ({
@@ -687,7 +677,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect.poll(() => dream.settings.useLoadedProfile).toBe(false);
   const imagesGroup = settings.getByRole("region", { name: "Images", exact: true });
   const videosGroup = settings.getByRole("region", { name: "Videos", exact: true });
-  const videos = videosGroup.getByRole("switch", { name: "Enabled", exact: true });
+  const videos = videosGroup.getByRole("switch", { name: "Enable Dream Videos", exact: true });
   const videoAmount = videosGroup.getByRole("textbox", { name: "Daily Videos", exact: true });
   await expect(videoAmount).toBeEnabled();
   await videos.click({ force: true });
@@ -707,7 +697,9 @@ test("Dream explains itself while off and saves its settings in Settings", async
       { videos: false },
       { dailyImages: 200 },
     ]);
-  await imagesGroup.getByRole("switch", { name: "Enabled", exact: true }).click({ force: true });
+  await imagesGroup
+    .getByRole("switch", { name: "Enable Dream Images", exact: true })
+    .click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
 });
@@ -847,13 +839,6 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
     }),
   );
   await page.goto("/settings#taste");
-  const history = page.getByRole("region", { name: "History", exact: true });
-  const historyRows = history.getByRole("table", { name: "History", exact: true }).getByRole("row");
-  await expect(historyRows).toHaveCount(4);
-  await history.getByRole("button", { name: "Show All", exact: true }).click();
-  await expect(historyRows).toHaveCount(5);
-  await history.getByRole("button", { name: "Show Less", exact: true }).click();
-  await expect(historyRows).toHaveCount(4);
   const learnt = page.getByRole("region", { name: "Learnt From Your Ratings", exact: true });
   await expect(learnt.getByText("Quiet coastal scenes in soft, misty light.")).toBeVisible();
   await expect(learnt.getByRole("button", { name: "Portrait 2:3", exact: true })).toBeVisible();
@@ -1148,7 +1133,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass", "A", "B", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "Pass Reason", "A", "B", "Accept", "Suggestions"]);
 
   // A side opens in the preview; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
@@ -1225,7 +1210,7 @@ test("A three-way comparison fits a small phone and can accept the selected side
   await page.goto("/dream");
   const card = page.getByRole("group", { name: "Which Style?", exact: true });
   const actions = page.getByRole("group", { name: "Comparison Answers" });
-  const buttons = ["Undo", "Pass", "A", "B", "C", "Accept", "Suggestions"];
+  const buttons = ["Undo", "Pass", "Pass Reason", "A", "B", "C", "Accept", "Suggestions"];
   await expect
     .poll(() =>
       actions.getByRole("button").evaluateAll((nodes) => nodes.map((node) => node.ariaLabel)),
@@ -1455,7 +1440,16 @@ test("The preview swipes between comparison sides and Super Likes the shown imag
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass Both", "Pass", "Super Like", "Accept", "Accept Both", "Suggestions"]);
+    .toEqual([
+      "Undo",
+      "Pass Both",
+      "Pass",
+      "Pass Reason",
+      "Super Like",
+      "Accept",
+      "Accept Both",
+      "Suggestions",
+    ]);
   await answers.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();

@@ -34,7 +34,7 @@ import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome, ViewerMetadata, ViewerTitle } from "../gallery/ViewerChrome";
-import { ViewerDetails } from "../gallery/ViewerDetails";
+import { ViewerDetails, dismissViewer } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
 import { ZoomImage } from "../gallery/zoomImage";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
@@ -320,6 +320,18 @@ export function DreamPreview({
   function onKeyDown(event: KeyboardEvent) {
     const target = event.target as HTMLElement;
     if (
+      event.key === "Escape" &&
+      !event.defaultPrevented &&
+      !event.nativeEvent.isComposing &&
+      event.currentTarget.contains(target) &&
+      !layerAbove(stage.current, event)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      dismissViewer(!phone && details, stage.current, () => setDetails(false), closeIfTop);
+      return;
+    }
+    if (
       !event.currentTarget.contains(target) ||
       target.closest("aside, input, textarea, select, [contenteditable='true'], [role='slider']") ||
       event.defaultPrevented ||
@@ -342,6 +354,7 @@ export function DreamPreview({
       id={id}
       opened
       onClose={closeIfTop}
+      closeOnEscape={false}
       fullScreen
       variant="viewer"
       withCloseButton={false}

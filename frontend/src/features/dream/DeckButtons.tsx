@@ -1,6 +1,6 @@
 import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
-import { Check, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { Check, ChevronDown, X } from "lucide-react";
+import { Fragment, type ReactNode } from "react";
 
 import { likeColour } from "../../theme";
 import { icons } from "../../ui/icons";
@@ -85,36 +85,56 @@ export function DeckButtons({
           ? "Hold to Add a Reason"
           : id === "like" && card.kind === "set"
             ? rate
-            : undefined;
+            : !quickRating && id === "like"
+              ? "Keep, Like and Teach Dream"
+              : !quickRating && (id === "keep" || id === "both")
+                ? "Keep Unrated and Teach Dream"
+                : undefined;
         return (
-          <Tooltip key={id} label={description ?? title}>
-            <ActionIcon
-              className={classes.answer}
-              data-touch-target
-              variant="light"
-              color={side ? "blue" : looks[id].color}
-              radius="50%"
-              data-size={
-                side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
-              }
-              aria-label={title}
-              aria-description={description}
-              aria-keyshortcuts={pass ? "Shift+F10" : undefined}
-              data-pass={pass || undefined}
-              {...(pass && hold)}
-              onClick={(event) => {
-                if (!pass || !consumeClick(event)) act(choice);
-              }}
-            >
-              {side ? (
-                <Text fw={700} fz={26}>
-                  {title}
-                </Text>
-              ) : (
-                looks[id].glyph
-              )}
-            </ActionIcon>
-          </Tooltip>
+          <Fragment key={id}>
+            <Tooltip label={description ?? title}>
+              <ActionIcon
+                className={classes.answer}
+                data-touch-target
+                variant="light"
+                color={side ? "blue" : looks[id].color}
+                radius="50%"
+                data-size={
+                  side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
+                }
+                aria-label={title}
+                aria-description={description}
+                aria-keyshortcuts={pass ? "Shift+F10" : undefined}
+                data-pass={pass || undefined}
+                {...(pass && hold)}
+                onClick={(event) => {
+                  if (!pass || !consumeClick(event)) act(choice);
+                }}
+              >
+                {side ? (
+                  <Text fw={700} fz={26}>
+                    {title}
+                  </Text>
+                ) : (
+                  looks[id].glyph
+                )}
+              </ActionIcon>
+            </Tooltip>
+            {pass && (
+              <Tooltip label="Pass Reason">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  data-touch-target
+                  aria-label="Pass Reason"
+                  onClick={askPass}
+                >
+                  <ChevronDown size={16} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </Fragment>
         );
       })}
       {trailing}

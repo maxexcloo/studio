@@ -62,8 +62,8 @@ export const seedStyles = Object.freeze([
     enabled: true,
     instruction:
       "Fix Issues. Resolve the specific ambiguity most likely to spoil the result. State exact counts, explicit" +
-      " contacts and which person or object does what. Name the anatomy these models break where it shows, a" +
-      " third breast or nipple, doubled or fused areolae, an extra finger. Describe a readable silhouette or an" +
+      " contacts and which person or object does what. Where anatomy matters, describe the intended visible" +
+      " proportions, contours and individual digits in the pose. Describe a readable silhouette or an" +
       " unobstructed area for any requested lettering, and preserve its wording verbatim. Keep the intended" +
       " appearance and framing.",
   },
@@ -160,8 +160,7 @@ export const seedStyles = Object.freeze([
     instruction:
       "Short Dialogue. If the selected model makes sound and the source supports speech, give one established" +
       " speaker a brief line that makes sense in this exact moment. Make the speaker's mouth readable and leave" +
-      " room for a listener's glance, nod or reply only when time permits. In a silent profile, tell the" +
-      " exchange through expression, eye line and one visible gesture. Without a plausible speaker, use an" +
+      " room for a listener's glance, nod or reply only when time permits. Without a plausible speaker, use an" +
       " established cue and its visible response.",
   },
   {
@@ -320,7 +319,7 @@ export const seedStyles = Object.freeze([
       "Recreate the scene with the same subject in a clearly different pose that suits the setting and their" +
       " activity, such as seated instead of standing, leaning on something nearby, glancing over a shoulder or" +
       " mid-stride. Describe the body position, where the weight rests and what the hands do. Keep identity," +
-      " face, build, pose, framing and light. Keep the location, outfit and visual style.",
+      " face, build, framing and light. Keep the location, outfit and visual style.",
   },
   {
     id: "closer-shot",
@@ -377,8 +376,8 @@ export const seedStyles = Object.freeze([
     enabled: true,
     instruction:
       "Render the scene in one clearly different art medium, such as ink and wash, relief print, cut paper or" +
-      " painted animation, chosen to suit the subject. As an edit, keep the composition as it is; as a recreate," +
-      " build a new hierarchy and place the main shapes to suit the story. In both, describe the identifying" +
+      " painted animation, chosen to suit the subject. Preserve the framing, visual hierarchy and placement of the" +
+      " main shapes. Describe the new medium's identifying" +
       " marks, edge treatment and palette, and keep identity, outfit, action, objects and setting.",
   },
   {

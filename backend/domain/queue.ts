@@ -210,7 +210,7 @@ const stallMinutes = (job: OwnedJob) =>
 
 /** Only this database's recorded IDs reach the provider adapter. Recoverable work keeps its run. */
 export class GenerationQueue {
-  private observing = new Set<string>();
+  private observing = new Map<string, OwnedJob>();
   private scheduling = new Set<string>();
   private checkingEligibility = new Set<string>();
   /**
@@ -482,25 +482,12 @@ export class GenerationQueue {
 
   private async run() {
     const held = this.held();
-    const dreamDelay = (job: OwnedJob) =>
-      job.priority === queuePriority.dream ? this.adapter.dreamIdleWait?.(job) : undefined;
-    // Read once until the observations below are awaited; this tick's saves update the list.
     const jobs = new Map(this.store.openJobs().map((job) => [job.id, job]));
     this.updateModelIdle(jobs.values());
     const save = (job: OwnedJob) => {
       const saved = this.store.save(job);
       jobs.set(saved.id, saved);
       return saved;
-    };
-    const wait = (job: OwnedJob, reason: string) => {
-      if (job.status !== "waiting" || job.reason !== reason)
-        save({ ...job, status: "waiting", reason });
-    };
-    const saveObservation = (latest: OwnedJob, observation: Partial<OwnedJob>) => {
-      const changed = Object.entries(observation).some(
-        ([key, value]) => !isDeepStrictEqual(latest[key as keyof OwnedJob], value),
-      );
-      return changed ? this.store.save({ ...latest, ...observation }) : latest;
     };
     for (const job of jobs.values()) {
       if (!pendingStatuses.has(job.status) || this.acceptedIds.has(job.id)) continue;
@@ -518,7 +505,7 @@ export class GenerationQueue {
       .filter((job) => job.status === "writing" && !this.writing.has(job.id) && !held(job))
       .sort((a, b) => mediaRank(a) - mediaRank(b));
     for (const job of unwritten) {
-      const delay = dreamDelay(job);
+      const delay = this.dreamDelay(job);
       const resident = delay && (await this.adapter.dreamResidentModel?.(job));
       const latest = this.store.job(job.ownerId, job.id);
       if (this.stopped) return;
@@ -534,104 +521,131 @@ export class GenerationQueue {
         if (latest.reason !== reason) save({ ...latest, reason });
       }
     }
-    await Promise.all(
-      [...jobs.values()]
-        .filter(
-          (item) =>
-            !terminalStatuses.has(item.status) &&
-            this.acceptedIds.has(item.id) &&
-            !this.observing.has(item.id) &&
-            !this.submitting.has(item.id),
-        )
-        .map(async (initial) => {
-          this.observing.add(initial.id);
-          let job = initial;
-          try {
-            const observed = await this.adapter.observe(job);
-            if (!observed) {
-              const latest = this.store.job(job.ownerId, job.id)!;
-              if (terminalStatuses.has(latest.status)) return;
-              job = saveObservation(latest, {
-                reason: "Recovering the recorded generation; it will not be submitted again.",
-              });
-              if (this.stalled(job)) await this.giveUpStalled(job);
-              return;
-            }
-            const latest = this.store.job(job.ownerId, job.id)!;
-            if (terminalStatuses.has(latest.status)) return;
-            if (observed.restartInterrupted) {
-              if (latest.cancelRequested || latest.retried) {
-                const stopped = this.store.save({
-                  ...latest,
-                  status: latest.cancelRequested ? "cancelled" : "failed",
-                  reason: latest.cancelRequested
-                    ? "Cancelled."
-                    : observed.reason || "Interrupted by restart.",
-                  progress: undefined,
-                });
-                await this.adapter.settled?.(stopped);
-              } else {
-                const { seed } = observed.restartInterrupted;
-                const retry = this.store.save({
-                  ...latest,
-                  status: "queued",
-                  reason: "Resuming after Studio restarted.",
-                  retried: true,
-                  providerJobId: undefined,
-                  admittedAt: undefined,
-                  progress: undefined,
-                  ...(seed !== undefined && { input: { ...latest.input, seed } }),
-                });
-                this.acceptedIds.delete(retry.id);
-                this.progressSeen.delete(retry.id);
-                this.adapter.releaseAdmission?.(retry);
-                logEvent("Requeued an image interrupted by Studio restart", { job: retry.id });
-              }
-              return;
-            }
-            const observation = { ...observed, reason: observed.reason || "" };
-            job = { ...latest, ...observation };
-            if (observed.status === "completed") {
-              job = this.store.save(this.saving(job));
-              let saved;
-              try {
-                saved = await this.adapter.saveOutputs(job);
-              } catch (error) {
-                await this.saveFailed(job, error as Error & { gone?: boolean });
-                return;
-              }
-              this.goneSaves.delete(job.id);
-              // A cancellation that raced saving cannot discard already saved results.
-              const completed = this.store.save({ ...job, ...saved, status: savedStatus(saved) });
-              this.noteCompleted(completed);
-              await this.adapter.settled?.(completed);
-            } else {
-              job = saveObservation(latest, observation);
-              if (terminalStatuses.has(job.status)) {
-                this.progressSeen.delete(job.id);
-                await this.adapter.settled?.(job);
-              } else if (this.stalled(job)) await this.giveUpStalled(job);
-            }
-          } catch (error) {
-            const latest = this.store.job(job.ownerId, job.id)!;
-            if (terminalStatuses.has(latest.status)) return;
-            job = saveObservation(latest, {
-              reason: `Waiting for the recorded generation: ${(error as Error).message}`,
-            });
-            if (this.stalled(job)) await this.giveUpStalled(job);
-          } finally {
-            this.observing.delete(initial.id);
-          }
-        }),
-    );
+    const observations = [...jobs.values()]
+      .filter(
+        (job) =>
+          !terminalStatuses.has(job.status) &&
+          this.acceptedIds.has(job.id) &&
+          !this.observing.has(job.id) &&
+          !this.submitting.has(job.id),
+      )
+      .map((job) => this.observe(job));
+    await Promise.all([this.admit(), ...observations]);
+  }
+
+  private dreamDelay(job: OwnedJob) {
+    return job.priority === queuePriority.dream ? this.adapter.dreamIdleWait?.(job) : undefined;
+  }
+
+  private async observe(initial: OwnedJob) {
+    const saveObservation = (latest: OwnedJob, observation: Partial<OwnedJob>) => {
+      const changed = Object.entries(observation).some(
+        ([key, value]) => !isDeepStrictEqual(latest[key as keyof OwnedJob], value),
+      );
+      return changed ? this.store.save({ ...latest, ...observation }) : latest;
+    };
+    this.observing.set(initial.id, initial);
+    let job = initial;
+    try {
+      const observed = await this.adapter.observe(job);
+      if (!observed) {
+        const latest = this.store.job(job.ownerId, job.id)!;
+        if (terminalStatuses.has(latest.status)) return;
+        job = saveObservation(latest, {
+          reason: "Recovering the recorded generation; it will not be submitted again.",
+        });
+        if (this.stalled(job)) await this.giveUpStalled(job);
+        return;
+      }
+      const latest = this.store.job(job.ownerId, job.id)!;
+      if (terminalStatuses.has(latest.status)) return;
+      if (observed.restartInterrupted) {
+        if (latest.cancelRequested || latest.retried) {
+          const stopped = this.store.save({
+            ...latest,
+            status: latest.cancelRequested ? "cancelled" : "failed",
+            reason: latest.cancelRequested
+              ? "Cancelled."
+              : observed.reason || "Interrupted by restart.",
+            progress: undefined,
+          });
+          await this.adapter.settled?.(stopped);
+        } else {
+          const { seed } = observed.restartInterrupted;
+          const retry = this.store.save({
+            ...latest,
+            status: "queued",
+            reason: "Resuming after Studio restarted.",
+            retried: true,
+            providerJobId: undefined,
+            admittedAt: undefined,
+            progress: undefined,
+            ...(seed !== undefined && { input: { ...latest.input, seed } }),
+          });
+          this.acceptedIds.delete(retry.id);
+          this.progressSeen.delete(retry.id);
+          this.adapter.releaseAdmission?.(retry);
+          logEvent("Requeued an image interrupted by Studio restart", { job: retry.id });
+        }
+        return;
+      }
+      const observation = { ...observed, reason: observed.reason || "" };
+      job = { ...latest, ...observation };
+      if (observed.status === "completed") {
+        job = this.store.save(this.saving(job));
+        let saved;
+        try {
+          saved = await this.adapter.saveOutputs(job);
+        } catch (error) {
+          await this.saveFailed(job, error as Error & { gone?: boolean });
+          return;
+        }
+        this.goneSaves.delete(job.id);
+        // A cancellation that raced saving cannot discard already saved results.
+        const completed = this.store.save({ ...job, ...saved, status: savedStatus(saved) });
+        this.noteCompleted(completed);
+        await this.adapter.settled?.(completed);
+      } else {
+        job = saveObservation(latest, observation);
+        if (terminalStatuses.has(job.status)) {
+          this.progressSeen.delete(job.id);
+          await this.adapter.settled?.(job);
+        } else if (this.stalled(job)) await this.giveUpStalled(job);
+      }
+    } catch (error) {
+      const latest = this.store.job(job.ownerId, job.id)!;
+      if (terminalStatuses.has(latest.status)) return;
+      job = saveObservation(latest, {
+        reason: `Waiting for the recorded generation: ${(error as Error).message}`,
+      });
+      if (this.stalled(job)) await this.giveUpStalled(job);
+    } finally {
+      this.observing.delete(initial.id);
+      const latest = this.store.job(initial.ownerId, initial.id);
+      if (latest && (terminalStatuses.has(latest.status) || !this.acceptedIds.has(initial.id)))
+        await this.admit();
+    }
+  }
+
+  private async admit() {
     if (this.stopped) return;
-    // Read again: jobs were added, observed or cancelled while the observations were awaited.
+    const held = this.held();
+    const wait = (job: OwnedJob, reason: string) => {
+      if (job.status !== "waiting" || job.reason !== reason)
+        this.store.save({ ...job, status: "waiting", reason });
+    };
     const all = this.store.schedulable(reuseBypassLimit);
     this.updateModelIdle(all);
     const running = new Map<string, OwnedJob[]>();
     for (const job of all)
       if (!terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
         running.set(job.resource, [...(running.get(job.resource) ?? []), job]);
+    // A terminal observation still holds its slot until provider cleanup finishes.
+    for (const job of this.observing.values()) {
+      const active = running.get(job.resource) ?? [];
+      if (this.acceptedIds.has(job.id) && !active.some((entry) => entry.id === job.id))
+        running.set(job.resource, [...active, job]);
+    }
     const free = (resource: string) => this.slots(resource) - (running.get(resource)?.length ?? 0);
     // Resources whose every slot runs a job; the rest take work.
     const occupied = new Set([...running.keys()].filter((resource) => free(resource) <= 0));
@@ -728,7 +742,7 @@ export class GenerationQueue {
               skipped.push(job);
               continue;
             }
-            const delay = dreamDelay(job) || this.dreamModelWait(job);
+            const delay = this.dreamDelay(job) || this.dreamModelWait(job);
             const residentModel = delay && (await this.adapter.dreamResidentModel?.(job));
             const notReady = !residentModel && delay;
             if (this.stopped) return;
@@ -782,7 +796,7 @@ export class GenerationQueue {
             if (tier(job) === queuePriority.dream) this.updateModelIdle(this.store.openJobs());
             if (residentModel && this.store.hasOpenOwnWork(!localVideo(job)))
               reason ||= "Waiting for user work to start.";
-            if (!residentModel) reason ||= dreamDelay(job) || this.dreamModelWait(job);
+            if (!residentModel) reason ||= this.dreamDelay(job) || this.dreamModelWait(job);
             if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
               this.adapter.releaseAdmission?.(job);

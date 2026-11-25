@@ -42,7 +42,7 @@ export function useItemChange<T extends string>(
     show,
     restore,
   }: {
-    iterate: (iteration: Iteration) => void;
+    iterate: (iteration: Iteration, onQueued?: () => void) => void;
     review: boolean;
     show: (proposal: Change) => void;
     restore: (typed: T) => void;
@@ -67,13 +67,15 @@ export function useItemChange<T extends string>(
     }: {
       request: string;
       typed: T;
-      action?: ChangeAction;
+      action?: ChangeAction | ChangeAction[];
       profileId?: string;
       preview: boolean;
       freshSeed: boolean;
     }) => {
       const actions: ChangeAction[] = action
-        ? [action]
+        ? Array.isArray(action)
+          ? action
+          : [action]
         : video
           ? ["animate"]
           : ["edit", "recreate", "animate"];
@@ -87,21 +89,33 @@ export function useItemChange<T extends string>(
       }
     },
   });
-  function run(prompt: string, proposal: Change, profileId?: string, freshSeed = false) {
+  function run(
+    prompt: string,
+    proposal: Change,
+    profileId?: string,
+    freshSeed = false,
+    onQueued?: () => void,
+  ) {
     const action = proposal.action;
     // An image's animation, as proposed, has Animate's writer word the request for the video
     // model; a prompt the person edited runs as they wrote it.
     if (action === "animate" && !video && prompt.trim() === proposal.prompt.trim())
-      iterate({ kind: "animate", theme: "custom", instruction: proposal.request, modifiers });
+      iterate(
+        { kind: "animate", theme: "custom", instruction: proposal.request, modifiers },
+        onQueued,
+      );
     else
-      iterate({
-        kind: "prompt",
-        prompt: prompt.trim(),
-        operation:
-          action === "edit" ? "refine" : action === "animate" && !video ? "animate" : "image",
-        sameSeed: action === "recreate" && !freshSeed,
-        ...(action === "edit" && { profileId, profileBackend: proposal.profileBackend }),
-      });
+      iterate(
+        {
+          kind: "prompt",
+          prompt: prompt.trim(),
+          operation:
+            action === "edit" ? "refine" : action === "animate" && !video ? "animate" : "image",
+          sameSeed: action === "recreate" && !freshSeed,
+          ...(action === "edit" && { profileId, profileBackend: proposal.profileBackend }),
+        },
+        onQueued,
+      );
     setChange(null);
   }
   return {
@@ -113,12 +127,14 @@ export function useItemChange<T extends string>(
     send(
       request: string,
       text: T,
-      action?: ChangeAction,
+      action?: ChangeAction | ChangeAction[],
       editProfileId?: string,
       { freshSeed = false, preview = review } = {},
     ) {
       const typed = change?.typed ?? text;
-      const profileId = action === "edit" ? editProfileId : undefined;
+      const profileId = (Array.isArray(action) ? action.includes("edit") : action === "edit")
+        ? editProfileId
+        : undefined;
       ask.mutate(
         { request: request.trim(), typed, action, profileId, preview, freshSeed },
         {
@@ -135,8 +151,8 @@ export function useItemChange<T extends string>(
       if (change) restore(change.typed);
       setChange(null);
     },
-    run(prompt: string) {
-      if (change) run(prompt, change.proposal, change.profileId, change.freshSeed);
+    run(prompt: string, onQueued?: () => void) {
+      if (change) run(prompt, change.proposal, change.profileId, change.freshSeed, onQueued);
     },
   };
 }

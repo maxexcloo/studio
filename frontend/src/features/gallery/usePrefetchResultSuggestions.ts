@@ -30,9 +30,8 @@ export function usePrefetchResultSuggestions(current?: MediaItem, reviewItems?: 
       .slice(0, reviewSuggestionCount);
     const queries = [
       ...(reviewItems || current.type === "video" ? [nextStepsQuery(current)] : []),
-      ...specificQueries(current),
       ...(upcoming?.map((item) => nextStepsQuery(item)) ?? []),
-      ...(upcoming?.flatMap(specificQueries) ?? []),
+      ...specificQueries(current),
     ];
     let cancelled = false;
     async function prefetch() {

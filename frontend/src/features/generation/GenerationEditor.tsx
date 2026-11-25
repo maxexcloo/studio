@@ -139,7 +139,13 @@ export function blockedProps(reason: string | undefined) {
 
 /** Cmd/Ctrl+Enter submits unless blocked, without triggering native validation bubbles. */
 export function submitShortcut(event: React.KeyboardEvent<HTMLFormElement>, blocked: boolean) {
-  if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey) || event.nativeEvent.isComposing)
+  if (
+    event.defaultPrevented ||
+    !event.currentTarget.contains(event.target as Node) ||
+    event.key !== "Enter" ||
+    !(event.metaKey || event.ctrlKey) ||
+    event.nativeEvent.isComposing
+  )
     return;
   event.preventDefault();
   if (!blocked) event.currentTarget.requestSubmit();
@@ -179,7 +185,7 @@ export function GenerationEditor({
   onChange: (patch: Partial<GenerationInput>) => void;
   onReferencesChange: (references: ReferenceAsset[]) => void;
   /** The composer's: a picked character moves the draft to a model that keeps faces. */
-  onCharacterProfile?: (
+  onCharacterProfile: (
     profile: Profile,
     next: {
       references: ReferenceAsset[];

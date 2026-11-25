@@ -52,10 +52,24 @@ export interface ViewerDraftActions {
  * asks for a suggestion, template or Custom… change through `useItemChange`; tile choices use the
  * same request path. Review Prompt fills the field with a proposal until it is run or undone.
  */
-export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration) => void) {
+export function useViewerPrompt(
+  item: MediaItem,
+  iterate: (iteration: Iteration, onQueued?: () => void) => void,
+  drafts: Map<string, string>,
+) {
   const assistant = useQuery(assistantQuery).data;
   const original = typedPrompt(item);
-  const [prompt, setPrompt] = useState(original);
+  const [prompt, setText] = useState(() => drafts.get(item.id) ?? original);
+  function setPrompt(value: string) {
+    setText(value);
+    if (value === original) drafts.delete(item.id);
+    else drafts.set(item.id, value);
+  }
+  function clearSubmitted(submitted: string) {
+    const saved = drafts.get(item.id);
+    if (saved !== undefined && saved !== submitted) return;
+    setPrompt(original);
+  }
   const field = useRef<HTMLTextAreaElement>(null);
   const [reviewChoice, setReview] = useMediaReview();
   const review = reviewChoice ?? false;
@@ -63,7 +77,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
   const ask = useItemChange<string>(item, {
     iterate,
     review,
-    show: (proposal) => setPrompt(proposalText(proposal)),
+    show: (proposal) => setText(proposalText(proposal)),
     restore: setPrompt,
   });
   const pick = (action: ViewerChange, request: string, profileId?: string, fromPrompt = false) =>
@@ -90,7 +104,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
   const base = ask.typed ?? prompt;
   const suggestionPrompt = base === original ? undefined : base;
   const imageAction = item.type === "image" ? customAction?.action : undefined;
-  const templates = (item.type === "image" ? assistant?.changes : assistant?.themes) ?? [];
+  const templates = item.type === "image" ? (assistant?.changes ?? []) : [];
   const customSuggestions = useChangeSuggestions({
     query: nextStepsQuery(item, suggestionPrompt, imageAction),
     fresh: () => askNextSteps(item, true, suggestionPrompt, imageAction),
@@ -103,7 +117,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
       onClose={() => setCustomAction(null)}
       title={
         item.type === "video"
-          ? "Custom Animation"
+          ? "Rewrite Video Prompt"
           : imageAction === "edit"
             ? "Custom Edit"
             : "Custom Recreate"
@@ -138,6 +152,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     original,
     prompt,
     setPrompt,
+    clearSubmitted,
     field,
     ask,
     templates,
@@ -159,7 +174,7 @@ export function ViewerPrompt({
   pending,
 }: {
   state: ViewerPromptState;
-  iterate: (iteration: Iteration) => void;
+  iterate: (iteration: Iteration, onQueued?: () => void) => void;
   pending?: Iteration;
 }) {
   const {
@@ -167,6 +182,7 @@ export function ViewerPrompt({
     original,
     prompt,
     setPrompt,
+    clearSubmitted,
     field,
     ask,
     templates,
@@ -242,6 +258,17 @@ export function ViewerPrompt({
                 ask.pending,
                 imageAction,
               ),
+              ...(item.type === "video" && {
+                custom: [
+                  {
+                    id: "rewrite-video",
+                    label: "Rewrite Video Prompt…",
+                    icon: icons.custom,
+                    disabled: ask.pending,
+                    onClick: () => openCustom(mode, editProfileId, true),
+                  },
+                ],
+              }),
               last: [],
             }),
           ],
@@ -256,24 +283,23 @@ export function ViewerPrompt({
         label: generate ? "Generate" : "Run",
         disabled: !prompt.trim(),
         onSubmit: () => {
-          ask.run(prompt);
-          setPrompt(original);
+          setPrompt(prompt);
+          ask.run(prompt, () => clearSubmitted(prompt));
         },
       }
     : {
         label: "Generate",
         disabled: !prompt.trim() || prompt.trim() === original.trim() || running,
-        onSubmit: () => iterate({ kind: "prompt", prompt: prompt.trim(), operation: "image" }),
+        onSubmit: () =>
+          iterate({ kind: "prompt", prompt: prompt.trim(), operation: "image" }, () =>
+            clearSubmitted(prompt),
+          ),
       };
   function keys(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.nativeEvent.isComposing) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       if (!submit.disabled) submit.onSubmit();
-    } else if (event.key === "Escape" && change) {
-      // Undoing the proposal comes first; a second Escape leaves the box.
-      event.preventDefault();
-      ask.undo();
     }
   }
   const send = (

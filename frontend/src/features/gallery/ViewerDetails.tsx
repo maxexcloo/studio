@@ -11,6 +11,17 @@ import { ViewerMetadata, ViewerTitle } from "./ViewerChrome";
 
 import classes from "./MediaViewer.module.css";
 
+export function dismissViewer(
+  docked: boolean,
+  stage: HTMLElement | null,
+  closeDetails: () => void,
+  closeViewer: () => void,
+) {
+  if (!docked) return closeViewer();
+  closeDetails();
+  stage?.focus({ preventScroll: true });
+}
+
 export function ViewerDetails({
   item,
   title = mediaTitle(item),

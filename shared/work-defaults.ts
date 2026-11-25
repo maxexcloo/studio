@@ -10,4 +10,3 @@ export const workSettings = {
   dreamImageBackend: { key: "STUDIO_DREAM_IMAGE_BACKEND", choices: sides },
   dreamVideoBackend: { key: "STUDIO_DREAM_VIDEO_BACKEND", choices: sides },
 } as const;
-export type WorkSetting = keyof typeof workSettings;

@@ -2,6 +2,7 @@ import { animateProfile } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { step } from "../event-loop.js";
+import { makesSound } from "../prompt-animate.js";
 import { defaultSides } from "../work-defaults.js";
 import { familyLabels, modelsForAccount, withFailing, withPreferredDefaults } from "./catalogue.js";
 
@@ -62,6 +63,7 @@ export function registerModelRoutes(app, { catalogue }) {
         profileId: profile.id,
         label: profile.label || profile.id,
         cloud,
+        sound: makesSound(profile),
         size,
         offers,
         note,

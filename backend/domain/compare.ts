@@ -38,6 +38,7 @@ export interface ComparisonRecord {
 }
 type GalleryItem = QueueMedia & {
   jobId?: string;
+  uploaded?: boolean;
   type?: string;
   status?: string;
   resultSet?: { id: string };
@@ -128,13 +129,13 @@ export function registerCompareRoutes(
   function variantItem(ownerId: string, items: GalleryItem[], jobId: string, itemId?: string) {
     const saved = items.find(
       (item) =>
-        item.jobId === jobId &&
+        (jobId ? item.jobId === jobId : Boolean(itemId && item.uploaded && !item.jobId)) &&
         (!itemId || item.id === itemId) &&
         (item.type === "image" || item.type === "video") &&
         item.status !== "cancelled",
     );
     if (saved) return saved;
-    const job = store.job(ownerId, jobId);
+    const job = jobId ? store.job(ownerId, jobId) : undefined;
     if (!job) return null;
     const [pending] = options.pendingItems(job.id, {
       ...job.input,
@@ -384,15 +385,30 @@ export function registerCompareRoutes(
     )
       return { status: 400, payload: { ok: false, error: "Name the axis and project as text." } };
     const ownerId = account?.userId || "";
-    const image = (id: string) => {
+    const image = (id: string, index: number) => {
+      if (!id) return Boolean(itemIds?.[index] && imported(itemIds[index]));
       const job = store.job(ownerId, id);
       return job
         ? job.input.kind !== "video" && job.operation !== "upscale"
         : items.some((item) => item.jobId === id && item.type === "image");
     };
+    const imported = (id: string) =>
+      items.some(
+        (item) =>
+          item.id === id &&
+          item.uploaded &&
+          !item.jobId &&
+          item.type === "image" &&
+          item.status === "done" &&
+          Boolean(item.url),
+      );
     const chosen = (id: string, index: number) =>
       !id ||
-      items.some((item) => item.id === id && item.jobId === jobIds[index] && item.type === "image");
+      (jobIds[index]
+        ? items.some(
+            (item) => item.id === id && item.jobId === jobIds[index] && item.type === "image",
+          )
+        : imported(id));
     if (!jobIds.every(image) || (itemIds && !itemIds.every(chosen)))
       return { status: 404, payload: { ok: false, error: "A comparison image is unavailable." } };
     const record = create(ownerId, jobIds, items, labels as string[] | undefined, itemIds, {
@@ -625,7 +641,7 @@ export function registerCompareRoutes(
         status: 400,
         payload: { ok: false, error: "Choose a finished, available variant." },
       };
-    record.vote = winner?.jobId || null;
+    record.vote = winner ? (winner.jobId ?? "") : null;
     if (winner) record.winnerItemId = winner.id;
     else delete record.winnerItemId;
     record.votedAt = new Date().toISOString();

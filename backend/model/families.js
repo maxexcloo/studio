@@ -69,6 +69,7 @@ function familyFromMetadata(metadata = {}) {
   if (!text) return "";
   if (/krea[-_ .]?2/.test(text)) return "krea2";
   if (/z[-_ ]?image/.test(text)) return "zimage";
+  if (/qwen[-_ ]?image[-_ ]?2[._]?1/.test(text)) return "qwen_image_21";
   if (/qwen[-_ ]?image/.test(text)) return "qwen_image";
   if (/chroma/.test(text)) return "chroma";
   if (/hidream/.test(text)) return "hidream";

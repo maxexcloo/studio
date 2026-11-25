@@ -47,7 +47,7 @@ import { useVideoSound } from "./useVideoSound";
 import { playVideo, videoLifecycle } from "./videoPlayback";
 import { VideoControls, VideoPlayButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
-import { ViewerDetails } from "./ViewerDetails";
+import { ViewerDetails, dismissViewer } from "./ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
 import { ZoomImage } from "./zoomImage";
 
@@ -407,16 +407,22 @@ export function MediaViewer({
         : canNavigate
           ? `${currentIndex + 1} / ${Math.max(total ?? 0, viewable.length)}`
           : undefined;
+  const promptDrafts = useRef(new Map<string, string>());
   const iteration = useMediaIteration(item);
   const rememberQueued = (job: string) => setQueued((runs) => [...runs, { job, from: item.id }]);
   const closeForPrompt = () => {
     if (phone && shownId.current === item.id && !strip.settling.current) close();
   };
   // The run belongs to the item it started on, even once the viewer has moved on.
-  function iterate(next: Iteration) {
-    // A phone's prompt editor runs and returns to the gallery; desktop keeps the run in the strip.
-    if (next.kind === "prompt") closeForPrompt();
-    void iteration.mutateAsync(next).then(rememberQueued, () => {});
+  function iterate(next: Iteration, onQueued?: () => void) {
+    void iteration.mutateAsync(next).then(
+      (job) => {
+        rememberQueued(job);
+        onQueued?.();
+        if (next.kind === "prompt") closeForPrompt();
+      },
+      () => {},
+    );
   }
   const pending = iteration.variables;
   function move(direction: -1 | 1) {
@@ -466,9 +472,7 @@ export function MediaViewer({
   );
   // Escape closes the docked Details first, as the layer over the media, then the viewer.
   function dismiss() {
-    if (phone || !details) return close();
-    setDetails(false);
-    stage.current?.focus({ preventScroll: true });
+    dismissViewer(!phone && details, stage.current, () => setDetails(false), close);
   }
   const toggleDetails = () => {
     if (phone) setSheet(true);
@@ -891,6 +895,7 @@ export function MediaViewer({
                         item={displayed}
                         compare={compare}
                         iterate={iterate}
+                        promptDrafts={promptDrafts.current}
                         pending={pending}
                         onCompare={() => {
                           if (!compare && phone && quiet && hasRelatedThumbnails) setChrome("full");

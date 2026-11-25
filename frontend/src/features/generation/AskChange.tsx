@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { type PointerEvent, useMemo, useState } from "react";
+import { type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type Change,
@@ -53,17 +53,31 @@ export function useAskChange<T>({
   ask,
   show,
   restore,
+  scope,
 }: {
   /** Asks for `request` to the text `typed`, as it was before any proposal. */
   ask: (request: string, typed: T) => Promise<Suggestions<Change>>;
   show?: (proposal: Change, typed: T) => void;
   restore?: (typed: T) => void;
+  scope: string;
 }) {
   const assistant = useQuery(assistantQuery);
   const [change, setChange] = useState<{ proposal: Change; typed: T } | null>(null);
+  const latestScope = useRef(scope);
+  latestScope.current = scope;
+  const version = useRef(0);
+  useEffect(
+    () => () => {
+      version.current++;
+    },
+    [],
+  );
   const mutation = useMutation({
-    mutationFn: ({ text, typed }: { text: string; typed: T }) => ask(text, typed),
-    onSuccess: (answer, { typed }) => {
+    mutationFn: ({ text, typed }: { text: string; typed: T; version: number; scope: string }) =>
+      ask(text, typed),
+    onSuccess: (answer, request) => {
+      if (request.version !== version.current || request.scope !== latestScope.current) return;
+      const { typed } = request;
       if (answer.reason) return void notifications.show({ message: answer.reason });
       const proposal = answer.suggestions[0];
       setChange({ proposal, typed });
@@ -75,15 +89,25 @@ export function useAskChange<T>({
     proposal: change?.proposal,
     /** What the proposal replaced, which Undo restores. */
     typed: change?.typed,
-    pending: mutation.isPending,
+    pending:
+      mutation.isPending &&
+      mutation.variables?.version === version.current &&
+      mutation.variables.scope === scope,
     send: (text: string, typed: T) =>
-      mutation.mutate({ text: text.trim(), typed: change ? change.typed : typed }),
+      mutation.mutate({
+        text: text.trim(),
+        typed: change?.typed ?? typed,
+        scope,
+        version: ++version.current,
+      }),
     undo() {
+      version.current++;
       if (change) restore?.(change.typed);
       setChange(null);
     },
     /** Ends the review once the proposal runs. */
     done() {
+      version.current++;
       setChange(null);
     },
   };
@@ -186,8 +210,8 @@ export function useChangeSuggestions<K extends QueryKey>({
   const client = useQueryClient();
   const steps = useQuery({ ...query, enabled });
   const refresh = useMutation({
-    mutationFn: fresh,
-    onSuccess: (answer) => client.setQueryData<Suggestions<NextStep>>(query.queryKey, answer),
+    mutationFn: ({ fetch }: { key: K; fetch: typeof fresh }) => fetch(),
+    onSuccess: (answer, { key }) => client.setQueryData<Suggestions<NextStep>>(key, answer),
   });
   const options = [...(steps.data?.suggestions ?? [])]
     .slice(0, maxSuggestions)
@@ -203,7 +227,7 @@ export function useChangeSuggestions<K extends QueryKey>({
     answered: Boolean(steps.data || steps.error || refresh.error),
     failure: refresh.error?.message || steps.error?.message || steps.data?.reason,
     disabled,
-    onRefresh: () => refresh.mutate(),
+    onRefresh: () => refresh.mutate({ key: query.queryKey, fetch: fresh }),
   });
   return { action, refresh: again };
 }
@@ -248,7 +272,7 @@ export function suggestionItems(action: Action): Action[] {
 
 export function instructionTemplates(
   options: (AssistantOption & Partial<Pick<AssistantChangeOption, "instruction" | "actions">>)[],
-  pick: (request: string) => void,
+  pick: (request: string, actions: ImageChangeAction[] | undefined, id: string) => void,
   disabled?: boolean,
   action?: ImageChangeAction,
 ) {
@@ -261,7 +285,7 @@ export function instructionTemplates(
             description,
             marker: uncensored ? icons.uncensored : undefined,
             disabled,
-            onClick: () => pick(instruction),
+            onClick: () => pick(instruction, actions, id),
           },
         ]
       : [],

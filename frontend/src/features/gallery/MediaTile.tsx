@@ -339,6 +339,7 @@ export function MediaTile({
             alt=""
             width={media.width || 1024}
             height={media.height || 1024}
+            loading={eager ? "eager" : "lazy"}
             fetchPriority={eager ? "high" : undefined}
             decoding="async"
             draggable={false}

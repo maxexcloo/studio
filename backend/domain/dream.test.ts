@@ -2513,7 +2513,7 @@ test("A plain Pass dislikes a result and keeps it for reference, and a full back
       dream: { prompt: "p", why: "", at: "", state: "unseen" },
     });
   assert.equal(await dreamOnce(), undefined);
-  assert.match(state.logs.at(-1)!, /Dream waits while 60 results are unseen/);
+  assert.match(state.logs.at(-1)!, /Dream waits while 60 cards are unseen/);
   assert.equal(dream.unseen("alice").length, 60);
   // Each person sets how many unseen results Dream waits on, within the administrator's limit.
   await dream.save("alice", { pauseAfterUnseen: 100 });
@@ -4191,6 +4191,7 @@ test("Keep rates count each owner's judged Dream images by profile, LoRA and tag
     [1, "alice", "discarded", "taste"],
     [2, "alice", "discarded", "similar"],
     [3, "bob", "kept", undefined],
+    [4, "alice", "discarded", "glitch"],
   ] as const)
     fx.generated({
       id: `rated-${index}`,

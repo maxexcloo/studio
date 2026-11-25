@@ -89,8 +89,6 @@ const shapes: [number, number][] = [
 ];
 /** A width-over-height ratio as a taste shape, to two places. */
 export const shapeOf = (ratio: number) => String(Math.round(ratio * 100) / 100);
-/** The common shapes, portrait to landscape. */
-export const commonShapes = shapes.map(([w, h]) => shapeOf(w / h)).sort((a, b) => +a - +b);
 /** A shape's readable name, such as "Portrait 2:3" or "Square 1:1". */
 export function shapeName(shape: string) {
   const ratio = Number(shape);

@@ -111,10 +111,11 @@ export function useDeletePresets() {
 }
 
 /** The account's presets, named for the shared pickers, and their edits. Deleting offers Undo. */
-export function usePresets(enabled = true) {
+export function usePresets(enabled = true, inlineError = false) {
   const client = useQueryClient();
   const presets = useQuery({ ...presetsQuery, enabled });
   const change = useMutation({
+    meta: { inlineError },
     mutationFn: ({
       id,
       method,

@@ -46,6 +46,7 @@ interface AnimateChoice {
   profileId: string;
   label: string;
   cloud: boolean;
+  sound?: boolean;
   size?: { width: number; height: number };
   /** Why it runs somewhere other than the account prefers. */
   note?: string;
@@ -389,9 +390,11 @@ export interface AnimateRequest {
   modifiers?: string[];
 }
 /** Animate's templates for the account (Library › Templates), Custom last; none without the assistant. */
-export function useAnimateTemplates() {
+export function useAnimateTemplates(sound?: boolean) {
   const assistant = useQuery(assistantQuery).data;
-  return assistant?.available ? assistant.themes : [];
+  return assistant?.available
+    ? assistant.themes.filter((theme) => sound !== false || theme.id !== "dialogue")
+    : [];
 }
 /** Which Animate modifiers are ticked, per account; pruned to those still offered and capped at three. */
 const noModifiers: string[] = [];

@@ -49,17 +49,30 @@ export function DreamWhy({ item, question }: { item: DreamItem; question?: strin
       <Text size="sm" fw={600}>
         Why Dream Made This
       </Text>
+      {from && (
+        <Row label="Source">
+          {[from, dream.uncensored && "Uncensored"].filter(Boolean).join(" · ")}
+          {inputs.prompts?.[0] && (
+            <>
+              {" · "}
+              <Anchor
+                component={Link}
+                to={viewerPath({ ...inputs.prompts[0], type: inputs.prompts[0].type as MediaKind })}
+                state={followed}
+                inherit
+              >
+                View Source
+              </Anchor>
+            </>
+          )}
+        </Row>
+      )}
       {dream.brief && <Text size="sm">{dream.brief}</Text>}
       {question && <Text size="sm">{question}</Text>}
       {dream.why && (
         <Text size="sm" c="dimmed">
           {dream.why}
         </Text>
-      )}
-      {from && (
-        <Row label="Source">
-          {[from, dream.uncensored && "Uncensored"].filter(Boolean).join(" · ")}
-        </Row>
       )}
       {inputs.project && <Row label="Project">{inputs.project}</Row>}
       {inputs.likes && <Row label="Likes">{inputs.likes.join(", ")}</Row>}

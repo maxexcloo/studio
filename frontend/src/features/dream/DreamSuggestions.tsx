@@ -2,20 +2,30 @@ import { ActionIcon, Menu } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { VariationDirection } from "../../../../shared/suggestions";
+import type { ChangeAction, VariationDirection } from "../../../../shared/suggestions";
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
 import { type Action, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
+import { AnimateDialog } from "../gallery/AnimateDialog";
 import { useItemChange } from "../gallery/useItemChange";
-import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
+import {
+  type AnimateRequest,
+  animateProfileQuery,
+  typedPrompt,
+  useAnimateModifiers,
+  useAnimateReview,
+  useAnimateTemplates,
+  useMediaAction,
+  useMediaIteration,
+} from "../gallery/useMediaAction";
 import { VariationDialog, keepAndVaryAction } from "../gallery/VariationDialog";
 import {
+  assistMenu,
   instructionTemplates,
   requestTool,
-  suggestionItems,
   useChangeSuggestions,
 } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
@@ -57,6 +67,16 @@ function ItemSuggestions({
   const [opened, setOpened] = useState(false);
   const [custom, setCustom] = useState(false);
   const [request, setRequest] = useState("");
+  const [requestActions, setRequestActions] = useState<ChangeAction[]>();
+  const [animating, setAnimating] = useState<AnimateRequest>();
+  const modifiers = useAnimateModifiers();
+  const [review] = useAnimateReview();
+  const animateProfile = useQuery({
+    ...animateProfileQuery(item),
+    enabled: opened && item.status === "done" && Boolean(item.url),
+  });
+  const themes = useAnimateTemplates(animateProfile.data?.sound);
+
   const assistant = useQuery(assistantQuery).data;
   const [varying, setVarying] = useState<VariationDirection | "explore">();
   const iteration = useMediaIteration(item);
@@ -71,13 +91,22 @@ function ItemSuggestions({
   const prompt = typedPrompt(item);
   const canAskForMore = card.kind === "dream" && item.type === "image";
   const menuBounds = useActionMenuBounds(opened);
-  const send = (request: string) => change.send(request, prompt);
+  const send = (request: string, actions?: ChangeAction[]) => change.send(request, prompt, actions);
+  const setSuggested = (text: string) => {
+    setRequestActions(undefined);
+    setRequest(text);
+  };
+  const animate = (theme: string) => {
+    const choice = { theme, modifiers: modifiers.ticked };
+    if (review) setAnimating(choice);
+    else iteration.mutate({ kind: "animate", ...choice });
+  };
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item),
     fresh: () => askNextSteps(item, true),
     enabled: (opened || custom) && change.available,
     disabled: change.pending || iteration.isPending,
-    onPick: custom ? setRequest : send,
+    onPick: custom ? setSuggested : send,
   });
   const canVary =
     change.available &&
@@ -117,6 +146,19 @@ function ItemSuggestions({
         ]
       : []),
   ];
+  const templates = [
+    ...(item.type === "image" ? instructionTemplates(assistant?.changes ?? [], send) : []),
+    ...themes
+      .filter((theme) => theme.id !== "custom")
+      .map((theme): Action => ({
+        id: `animate:${theme.id}`,
+        label: theme.label,
+        description: theme.description,
+        marker: theme.uncensored ? icons.uncensored : undefined,
+        disabled: !animateProfile.data,
+        onClick: () => animate(theme.id),
+      })),
+  ];
   const loading = change.pending || iteration.isPending || compare.isPending || prepare.isPending;
   // Nothing to suggest for this result: the control greys out.
   const unavailable = !change.available && !more.length;
@@ -146,22 +188,20 @@ function ItemSuggestions({
             }
             groups={[
               ...(change.available
-                ? [
-                    suggestionItems(suggestions.action).map((option) => ({
-                      ...option,
-                      disabled: option.disabled || loading,
-                    })),
-                    [
+                ? assistMenu({
+                    suggestions,
+                    templates,
+                    custom: [
                       {
                         id: "custom",
-                        label: "Custom…",
+                        label: item.type === "video" ? "Rewrite Video Prompt…" : "Custom…",
                         icon: icons.custom,
                         disabled: loading,
                         onClick: () => setCustom(true),
                       },
-                      suggestions.refresh,
                     ],
-                  ]
+                    last: [],
+                  })
                 : []),
               more,
             ]}
@@ -180,22 +220,28 @@ function ItemSuggestions({
           }}
         />
       )}
+      {animating && (
+        <AnimateDialog item={item} {...animating} onClose={() => setAnimating(undefined)} />
+      )}
       <CustomDialog
         opened={custom}
-        title={item.type === "video" ? "Custom Animation" : "Custom Request"}
+        title={item.type === "video" ? "Rewrite Video Prompt" : "Custom Request"}
         draft={{ value: request, onChange: setRequest }}
         tools={[
           requestTool(
             instructionTemplates(
-              (item.type === "video" ? assistant?.themes : assistant?.changes) ?? [],
-              setRequest,
+              item.type === "image" ? (assistant?.changes ?? []) : [],
+              (text, actions) => {
+                setRequest(text);
+                setRequestActions(actions);
+              },
             ),
             suggestions,
           ),
         ]}
         action="Run"
         onClose={() => setCustom(false)}
-        onSend={send}
+        onSend={(text) => send(text, requestActions)}
       />
     </>
   );

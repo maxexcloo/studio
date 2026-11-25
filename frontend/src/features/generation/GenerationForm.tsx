@@ -2,7 +2,16 @@ import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { StudioSession } from "../../../../shared/queue";
 import { post } from "../../api";
@@ -86,6 +95,42 @@ function useDraftSubmit({
   });
 }
 
+function useComposerPrompt() {
+  const { setDraft, update } = useGeneration();
+  const draft = useDraft(true);
+  const { input } = draft;
+  const assistantScope = JSON.stringify([
+    input.kind,
+    draft.sessionId,
+    draft.parentJobId,
+    draft.presetId,
+    draft.operation,
+  ]);
+  const ask = useDraftChange({
+    scope: assistantScope,
+    input,
+    references: draft.references,
+    operation: draft.operation,
+    onChange: update,
+    onOperationChange: (operation) => setDraft((value) => ({ ...value, operation })),
+  });
+  const ideas = usePromptIdeas({
+    input,
+    references: draft.references,
+    enabled: !ask.proposal && !ask.pending,
+    onChange: (prompt) => update({ prompt }),
+  });
+  return { assistantScope, ask, ideas };
+}
+
+const composerPrompt = createContext<ReturnType<typeof useComposerPrompt> | null>(null);
+
+/** Proposal and idea Undo follow the draft between the dock and the full form. */
+export function ComposerPromptProvider({ children }: { children: ReactNode }) {
+  const state = useComposerPrompt();
+  return <composerPrompt.Provider value={state}>{children}</composerPrompt.Provider>;
+}
+
 export function GenerationForm({
   onSubmitted,
   onKindChange,
@@ -137,19 +182,7 @@ export function GenerationForm({
   });
   const label = submitLabel ?? submitState.label;
   const { blockedReason } = submitState;
-  const ask = useDraftChange({
-    input,
-    references: draft.references,
-    operation: draft.operation,
-    onChange: update,
-    onOperationChange: (operation) => setDraft((value) => ({ ...value, operation })),
-  });
-  const ideas = usePromptIdeas({
-    input,
-    references: draft.references,
-    enabled: !ask.proposal && !ask.pending,
-    onChange: (prompt) => update({ prompt }),
-  });
+  const { assistantScope, ask, ideas } = useContext(composerPrompt)!;
   const recent = usePromptHistory({
     kind: "positive",
     value: input.prompt,
@@ -161,13 +194,6 @@ export function GenerationForm({
     },
   }).popup;
   const undo = ask.proposal ? ask.undo : (ideas.undo ?? undefined);
-  const assistantScope = JSON.stringify([
-    input.kind,
-    draft.sessionId,
-    draft.parentJobId,
-    draft.presetId,
-    draft.operation,
-  ]);
   const generate = () => {
     ask.done();
     submit.mutate(undefined);
