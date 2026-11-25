@@ -170,6 +170,9 @@ test("Radiance video sizes snap before sizing a first frame or planning latent u
   });
   const info = radianceInfo([{ id: model }]);
   const profile = inferModels(info).profiles.find(({ id }) => id === workflow);
+  assert.equal(profile.constraints.frames.max, 161);
+  assert.equal(profile.constraints.frames.offset, 1);
+  assert.equal(profile.constraints.fps.max, 24);
   const size = frameSize(profile, 1411, 803);
   assert.equal(size.width % 32, 0);
   assert.equal(size.height % 32, 0);
@@ -187,4 +190,33 @@ test("Radiance video sizes snap before sizing a first frame or planning latent u
   assert.deepEqual([body.width, body.height], [1312, 768]);
   const graph = await customWorkflowGraph(body);
   assert.equal(videoRequest(graph[1].inputs).body.size, "1280x768");
+});
+
+test("ComfyUI LTX profiles keep their workflow's frame and FPS ranges", () => {
+  saveImportedWorkflow({
+    studio: {
+      id: "comfyui-ltx-video-ranges",
+      kind: "video",
+      family: "ltx2",
+      controls: {
+        frames: { node: "1", input: "length" },
+        fps: { node: "2", input: "frame_rate" },
+      },
+    },
+    graph: {
+      1: { class_type: "EmptyLTXVLatentVideo", inputs: { length: 241 } },
+      2: { class_type: "CreateVideo", inputs: { frame_rate: 30 } },
+    },
+  });
+  const info = {
+    EmptyLTXVLatentVideo: {
+      input: { required: { length: ["INT", { min: 9, max: 481, step: 8 }] } },
+    },
+    CreateVideo: { input: { required: { frame_rate: ["FLOAT", { min: 1, max: 60, step: 1 }] } } },
+  };
+  const profile = inferModels(info, {}, { configuredOnly: true }).profiles.find(
+    ({ id }) => id === "custom:comfyui-ltx-video-ranges",
+  );
+  assert.deepEqual(profile.constraints.frames, { default: 241, min: 9, max: 481, step: 8 });
+  assert.deepEqual(profile.constraints.fps, { default: 30, min: 1, max: 60, step: 1 });
 });

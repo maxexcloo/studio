@@ -17,6 +17,7 @@ import {
   radianceImageNode,
   radianceNodeSizeStep,
   radianceVideoLimits,
+  radianceVideoNode,
 } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
@@ -444,7 +445,10 @@ export function inferModels(
       });
       Object.assign(fpsRange, { default: 24, min: 24, max: 24, step: 1 });
     }
-    if (loraFamilyId(workflow.family) === "ltx2") {
+    if (
+      loraFamilyId(workflow.family) === "ltx2" &&
+      Object.values(workflow.graph || {}).some((node) => node.class_type === radianceVideoNode)
+    ) {
       Object.assign(frameRange, {
         ...radianceVideoLimits(String(defaults.model || "")).frames,
         default: Number(defaults.frames || 121),
