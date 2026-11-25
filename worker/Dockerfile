@@ -36,7 +36,7 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
         libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 python313 python313-dbm \
     && zypper clean --all \
     # renovate: datasource=pypi depName=uv
-    && python3 -m pip install --no-cache-dir uv==0.13.9
+    && python3 -m pip install --no-cache-dir uv==0.13.10
 # Radiance's rad-convert converts fine-tunes (studio_worker/convert.py). It comes last, so a
 # Radiance update changes only these layers.
 COPY --from=radiance /opt/radiance /opt/radiance
