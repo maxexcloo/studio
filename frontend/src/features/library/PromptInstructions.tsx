@@ -237,18 +237,18 @@ export function PromptInstructions({
   const mixed = new Set(inArea.map(({ suggestions }) => Boolean(suggestions))).size > 1;
   const writes = ({ suggestions }: PromptInstruction) =>
     suggestions ? "Suggestions" : "Prompts & Text";
-  // Edited (its Version column reads vN) and Default filter only where the page holds both.
-  const edits = new Set(inArea.map(({ version }) => version !== null)).size > 1;
+  const edits = new Set(inArea.map(({ isDefault }) => isDefault)).size > 1;
   const instructions = inArea
     .filter(
       (instruction) =>
         (!mixed ||
           !suggests ||
           Boolean(instruction.suggestions) === (suggests === "suggestions")) &&
-        (!edits || !edited || (instruction.version !== null) === (edited === "edited")),
+        (!edits || !edited || instruction.isDefault === (edited === "default")),
     )
     .sort((a, b) => compareNames(a.label, b.label));
   const phone = usePhone();
+  const withUpdated = instructions.some(({ editedAt }) => Boolean(editedAt));
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -333,23 +333,25 @@ export function PromptInstructions({
                   },
                 ]
               : []),
-            {
-              key: "updated",
-              header: "Updated",
-              sortValue: ({ editedAt }) => editedAt,
-              cell: ({ editedAt }) => <LibraryDate phone={phone} value={editedAt} />,
-            },
+            ...(withUpdated
+              ? [
+                  {
+                    key: "updated",
+                    header: "Updated",
+                    sortValue: ({ editedAt }: PromptInstruction) => editedAt,
+                    cell: ({ editedAt }: PromptInstruction) => (
+                      <LibraryDate phone={phone} value={editedAt} />
+                    ),
+                  },
+                ]
+              : []),
             {
               key: "version",
               header: "Version",
               sortValue: ({ version }) => version ?? 0,
-              // An edited instruction stands out from the defaults.
-              cell: ({ version }) => (
-                <Text
-                  size={phone ? "xs" : "sm"}
-                  c={version === null || phone ? "dimmed" : undefined}
-                >
-                  {version === null ? "Default" : `v${version}`}
+              cell: ({ version, isDefault }) => (
+                <Text size={phone ? "xs" : "sm"} c={isDefault || phone ? "dimmed" : undefined}>
+                  {version === null ? "Default" : `v${version}${isDefault ? " · Default" : ""}`}
                 </Text>
               ),
             },
@@ -362,6 +364,14 @@ export function PromptInstructions({
               >
                 Edit
               </Menu.Item>
+              {!instruction.isDefault && (
+                <Menu.Item
+                  leftSection={<icons.reset size={16} />}
+                  onClick={() => setEditing({ instruction, restored: instruction.initial })}
+                >
+                  Reset to Default…
+                </Menu.Item>
+              )}
               {instruction.version !== null && (
                 <Menu.Item
                   leftSection={<icons.versions size={16} />}

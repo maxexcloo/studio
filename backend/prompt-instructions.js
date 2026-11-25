@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { promptVariable, promptVariables } from "../shared/prompt-variables.ts";
 import { currentDataDir } from "./data-dir.js";
-import { readJsonFile } from "./json-store.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { conflict, hashOf, versionsIn, writeVersion } from "./profile/store.js";
 import { promptInstructionDefaults } from "./prompt-instruction-defaults.js";
 import { promptInstructionUsedBy } from "./prompt-instruction-used-by.js";
@@ -11,7 +11,15 @@ const failure = (message, status = 400) => Object.assign(new Error(message), { s
 const maxInstructionLength = 24_000;
 
 function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
-  const dir = (id) => path.join(dataDir, "history", "prompt-instructions", id);
+  const root = path.join(dataDir, "history", "prompt-instructions");
+  const dir = (id) => path.join(root, id);
+  const defaultsFile = path.join(root, "defaults.json");
+  let defaults;
+  try {
+    defaults = readJsonFile(defaultsFile);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   const current = new Map();
   function definition(id) {
     if (!Object.hasOwn(promptInstructionDefaults, id))
@@ -21,19 +29,23 @@ function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
   const version = (id, number) => readJsonFile(path.join(dir(id), `${number}.json`));
   function get(id) {
     if (current.has(id)) return current.get(id);
-    const { text: initial, ...details } = definition(id);
+    const { text: bundled, ...details } = definition(id);
+    const baseline = defaults?.instructions[id];
+    const initial = baseline?.text ?? bundled;
     const number = versionsIn(dir(id)).at(-1);
-    const saved = number ? version(id, number) : null;
+    const saved = number && (!baseline || number > baseline.version) ? version(id, number) : null;
     const text = saved?.useDefault ? initial : (saved?.text ?? initial);
+    const editedAt = saved?.at ?? (baseline && defaults.at);
     const record = Object.freeze({
       id,
       ...details,
       usedBy: promptInstructionUsedBy[id],
       text,
       initial,
-      hash: hashOf({ text, number }),
+      hash: hashOf({ text, initial, number }),
       version: number ?? null,
-      ...(saved?.at ? { editedAt: saved.at } : {}),
+      isDefault: text === initial,
+      ...(editedAt ? { editedAt } : {}),
     });
     current.set(id, record);
     return record;
@@ -65,6 +77,22 @@ function createPromptInstructionStore({ dataDir = currentDataDir() } = {}) {
   }
   return {
     list: () => Object.keys(promptInstructionDefaults).map(get),
+    adoptDefaults() {
+      const listed = Object.keys(promptInstructionDefaults).map(get);
+      if (defaults && listed.every(({ id, isDefault }) => isDefault && defaults.instructions[id]))
+        return { at: defaults.at, count: listed.length };
+      // The snapshot resets every instruction in one write without deleting its existing versions.
+      const next = {
+        at: new Date().toISOString(),
+        instructions: Object.fromEntries(
+          listed.map(({ id, text, version }) => [id, { text, version: version ?? 0 }]),
+        ),
+      };
+      writeJsonFile(defaultsFile, next);
+      defaults = next;
+      current.clear();
+      return { at: next.at, count: listed.length };
+    },
     get,
     save,
     history(id) {
