@@ -8,6 +8,7 @@
  *
  * Nothing here downloads, writes or deletes. Dependencies are injected so tests run offline.
  */
+import { loraCompatibility } from "../../shared/profiles.ts";
 import { civitaiLink } from "../civitai/import.js";
 import { civitaiAvailability } from "./availability.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
@@ -67,9 +68,42 @@ const civitaiTypes = { lora: "LORA", checkpoint: "Checkpoint" };
 /** Profiles here whose family the base model names. */
 const fitting = (families, profiles) =>
   profiles
-    .filter((profile) => profile.family && families.includes(profile.family))
+    .filter((profile) => profile.ready !== false && families.includes(profile.family))
     .map((profile) => profile.id)
     .slice(0, 8);
+
+function loraFits(families, profiles, targets) {
+  const matches = [];
+  const unverified = [];
+  for (const profile of profiles) {
+    const backends = profile.backendOptions?.length
+      ? profile.backendOptions
+          .filter((option) => option.ready !== false)
+          .map(({ profile }) => profile)
+      : [profile];
+    let match = false;
+    let uncertain = false;
+    for (const backend of backends) {
+      const modes = Object.values(backend.imageModes || {}).map((mode) => ({
+        ...backend,
+        ...mode,
+      }));
+      for (const variant of [backend, ...modes]) {
+        if (variant.capabilities?.lora === false) continue;
+        for (const target of targets) {
+          if (target?.hidden || ["acceleration", "supporting"].includes(target?.role)) continue;
+          if (variant.loraAdapter === "radiance-tags-v1" && target?.unavailableReason) continue;
+          const fit = loraCompatibility({ families, ...target }, variant);
+          if (fit === "fits" && target?.compatibility) match = true;
+          else if (fit !== "other") uncertain = true;
+        }
+      }
+    }
+    if (match) matches.push(profile.id);
+    else if (uncertain) unverified.push(profile.id);
+  }
+  return { profiles: matches.slice(0, 8), unverifiedProfiles: unverified.slice(0, 8) };
+}
 
 /**
  * Looks up a link or a search without importing it.
@@ -77,15 +111,28 @@ const fitting = (families, profiles) =>
  *   hfRequest(url, init)    Hugging Face (hf-access.js hfFetch)
  *   inspect(want)           whether a file is installed (library/routes.js inspectInstalled)
  *   families(baseModel)     families a base model names (lora/info.js familiesFromMetadata)
- *   profiles()              ready profiles [{id, family}]
+ *   profiles()              ready profiles with their resolved LoRA bases and modes
+ *   adapter(want)           matching catalogue metadata for an exact file
  */
 export async function lookupLibrary(
   { url = "", query = "", type = "", baseModel = "" } = {},
-  { json, hfRequest, inspect, families = () => [], profiles = async () => [] },
+  {
+    json,
+    hfRequest,
+    inspect,
+    families = () => [],
+    profiles = async () => [],
+    adapter = () => null,
+  },
 ) {
   const ready = await profiles().catch(() => []);
-  const fit = (baseModel) => {
+  const fit = (baseModel, type, resources = []) => {
     const named = baseModel ? families(baseModel) : [];
+    const files = resources.filter(({ want }) => want.folder === "loras");
+    if (type?.toLowerCase() === "lora" || files.length) {
+      const targets = files.length ? files.map(({ want }) => adapter(want)) : [null];
+      return { families: named, ...loraFits(named, ready, targets) };
+    }
     return { families: named, profiles: fitting(named, ready) };
   };
   if (!url) {
@@ -123,7 +170,19 @@ export async function lookupLibrary(
               ...(availability.available
                 ? {}
                 : { reason: availability.reason, note: availability.note }),
-              ...fit(String(version.baseModel || "")),
+              ...fit(
+                String(version.baseModel || ""),
+                model.type,
+                model.type?.toLowerCase() === "lora"
+                  ? (version.files || []).map((file) => ({
+                      want: {
+                        folder: "loras",
+                        file: file.name,
+                        sha256: file.hashes?.SHA256?.toLowerCase(),
+                      },
+                    }))
+                  : [],
+              ),
             };
           }),
       })),
@@ -154,7 +213,7 @@ export async function lookupLibrary(
       uncensored: resolved.uncensored,
       links: resolved.links,
       licence: civitaiLicence(model),
-      ...fit(resolved.baseModel),
+      ...fit(resolved.baseModel, resolved.type, resolved.resources),
       versions: (Array.isArray(model?.modelVersions) ? model.modelVersions : [])
         .slice(0, maxVersions)
         .map((version) => {
@@ -183,7 +242,7 @@ export async function lookupLibrary(
     uncensored: resolved.uncensored,
     links: resolved.links,
     gated: resolved.gated,
-    ...fit(resolved.baseModel),
+    ...fit(resolved.baseModel, resolved.type, resolved.resources),
     files: await Promise.all(resolved.resources.map((resource) => lookupFile(resource, inspect))),
   };
 }

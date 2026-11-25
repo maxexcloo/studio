@@ -1,4 +1,4 @@
-import { loraDefaultStrength, maxLoras } from "../shared/profiles.ts";
+import { activeLora, loraDefaultStrength, maxLoras } from "../shared/profiles.ts";
 import { isResolution, snapDimension } from "../shared/resolution.ts";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -73,7 +73,7 @@ function sanitizeLoras(
   { limit = maxLoras, adapter } = {},
 ) {
   const raw = Array.isArray(input.loras) ? input.loras : [];
-  const requested = raw.filter((item) => item?.enabled !== false && item?.name);
+  const requested = raw.filter((item) => item?.name && activeLora(item));
   if (requested.length && profile?.loraBase?.accepts === false)
     throw new Error(optionalLoraPolicyIssue(requested[0], null, profile));
   if (!profile?.capabilities?.lora) return [];
@@ -92,8 +92,8 @@ function sanitizeLoras(
     step: 0.01,
   });
   const sanitized = [];
-  // Disabled entries don't take a slot: apply the workflow's limit to enabled LoRAs only.
-  for (const item of raw.filter((entry) => entry && entry.enabled !== false).slice(0, limit)) {
+  for (const item of requested) {
+    if (sanitized.length >= limit) break;
     const name = String(item.name || "").trim();
     if (!name) continue;
     if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn't available in ComfyUI.`);
@@ -102,6 +102,7 @@ function sanitizeLoras(
     const strength = loraInfo?.strengthRange
       ? clampNumber(item.strength, fallback, strengthRange.min, strengthRange.max)
       : snapNumber(item.strength, fallback, strengthRange);
+    if (strength === 0) continue;
     const issue = optionalLoraPolicyIssue({ name, strength }, loraInfo, {
       ...profile,
       loraAdapter: adapter,

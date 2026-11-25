@@ -24,7 +24,12 @@ import {
   withCharacter,
 } from "../../shared/characters.ts";
 import { compareVariants, letter } from "../../shared/compare.ts";
-import { isCloudProfile, loraStrengthSweep, profileBackendLabels } from "../../shared/profiles.ts";
+import {
+  activeLora,
+  isCloudProfile,
+  loraStrengthSweep,
+  profileBackendLabels,
+} from "../../shared/profiles.ts";
 import { projectRangeInputs } from "../../shared/projects.ts";
 import { resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
@@ -878,6 +883,7 @@ export function registerGenerateTools({
       );
     const several = Boolean(profile_ids || each_profile);
     const axis = namedAxis || (strengthChoice ? "LoRA Strength" : "");
+    if (!strengthChoice && args.loras) args.loras = args.loras.filter(activeLora);
     if (axis) {
       const values = [strengthChoice, profile_ids, args.prompts.length > 1].filter(Boolean).length;
       if (values !== 1 || each_profile || shots)

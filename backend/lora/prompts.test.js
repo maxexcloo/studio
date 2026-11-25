@@ -57,6 +57,13 @@ test("a slider adds only the trigger word for the end its strength points to", (
   assert.equal(run(-1), "small breasts., A portrait");
 });
 
+test("zero weight leaves the prompt unchanged and triggers match whole phrases", () => {
+  const infos = { art: { triggers: ["art", "fine grain", "<mva>"] } };
+  const prompt = "A cart with FINE\nGRAIN, <mva> front view";
+  assert.equal(withLoraTriggers(prompt, [{ name: "art", strength: 0 }], infos), prompt);
+  assert.equal(withLoraTriggers(prompt, [{ name: "art", strength: 1 }], infos), `art, ${prompt}`);
+});
+
 test("a recommended negative fills above cfg 1 with the LoRAs' own; optional and none never do", () => {
   const recommended = { negative: { effect: "recommended", default: "blurry" } };
   const infos = { a: { negative: "colour bleed" }, b: {} };
@@ -65,6 +72,10 @@ test("a recommended negative fills above cfg 1 with the LoRAs' own; optional and
     "blurry, colour bleed",
   );
   assert.equal(recommendedNegative(recommended, { cfg: 1 }), "");
+  assert.equal(
+    recommendedNegative(recommended, { cfg: 4, stack: [{ name: "a", strength: 0 }], infos }),
+    "blurry",
+  );
   assert.equal(recommendedNegative(recommended, { cfg: 4, takesNegative: false }), "");
   assert.equal(
     recommendedNegative({ negative: { effect: "optional", default: "blurry" } }, { cfg: 4 }),

@@ -1,4 +1,4 @@
-import { runBackend } from "../shared/profiles.ts";
+import { activeLora, runBackend } from "../shared/profiles.ts";
 import { isResolution, withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, routeJob } from "./comfy/backends.js";
@@ -469,7 +469,7 @@ export function createGenerationQueue({
         combined.backend,
         input.profileBackend,
         Boolean(input.referenceAssets?.length),
-        input.loras?.some((lora) => lora?.enabled !== false) ?? false,
+        input.loras?.some(activeLora) ?? false,
       );
     else delete input.profileBackend;
     if (isResolution(input.resolutionTier)) {

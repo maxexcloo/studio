@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { activeLora } from "../shared/profiles.ts";
 import { snapDimension } from "../shared/resolution.ts";
 import { accountOutputSubfolder } from "./account-ownership.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -106,7 +107,7 @@ async function applyMappedInputs(graph, workflow, body) {
 
 function enabledLoras(body, limit) {
   return Array.isArray(body.loras)
-    ? body.loras.filter((item) => item?.enabled !== false && item?.name).slice(0, limit)
+    ? body.loras.filter((item) => item?.name && activeLora(item)).slice(0, limit)
     : [];
 }
 

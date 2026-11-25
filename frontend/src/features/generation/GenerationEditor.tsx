@@ -11,7 +11,7 @@ import { useIsMutating } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { maxLoras, slotCapacity } from "../../../../shared/profiles";
+import { activeLora, maxLoras, slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { ClearButton } from "../../ui/ClearButton";
 import { icons } from "../../ui/icons";
@@ -86,7 +86,7 @@ export function submitBlockedReason({
     listedProfile,
     input.profileBackend,
     referenceCount > 0,
-    input.loras.some((lora) => lora.enabled),
+    input.loras.some(activeLora),
   );
   const slots = runReferenceSlots(profile);
   const supplied = references.length
@@ -114,7 +114,7 @@ export function submitBlockedReason({
           ? `This backend takes at most ${referenceMaximum} reference images. Choose another backend or remove references.`
           : unused.length
             ? "Some references don't fit this backend's slots. Remove them or choose another backend."
-            : input.loras.filter((lora) => lora.enabled !== false).length > loraMaximum
+            : input.loras.filter(activeLora).length > loraMaximum
               ? `This backend takes at most ${loraMaximum} enabled LoRAs. Disable or remove LoRAs, or choose another backend.`
               : requiredReference
                 ? "Add a reference image."

@@ -560,9 +560,10 @@ const libraryRoutes = registerLibraryRoutes(app, {
   },
   // Lookup says which ready profiles a link's base model fits.
   readyProfiles: async () =>
-    ((await mediaModels(false)).models.profiles || [])
-      .filter((profile) => profile.ready !== false)
-      .map(({ id, family }) => ({ id, family })),
+    ((await mediaModels(false)).models.profiles || []).filter(
+      (profile) =>
+        profile.ready !== false || profile.backendOptions?.some((option) => option.ready),
+    ),
   profiles: async () =>
     ((await presetModels()).profiles || []).map((profile) => ({
       id: profile.id,

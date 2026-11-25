@@ -1,7 +1,14 @@
+import { activeLora, loraTriggerWords } from "../../shared/profiles.ts";
 // What a stacked LoRA adds to a prompt (its trigger words, leading), and the negative a profile's guide recommends.
 import { cleanTriggers } from "./catalogue.js";
 
-const has = (prompt, text) => String(prompt).toLowerCase().includes(String(text).toLowerCase());
+function hasTrigger(prompt, trigger) {
+  const word = "[\\p{L}\\p{M}\\p{N}_]";
+  const start = new RegExp(`^${word}`, "u").test(trigger) ? `(?<!${word})` : "";
+  const end = new RegExp(`${word}$`, "u").test(trigger) ? `(?!${word})` : "";
+  const phrase = trigger.split(/\s+/).map(RegExp.escape).join("\\s+");
+  return new RegExp(`${start}${phrase}${end}`, "iu").test(prompt);
+}
 
 /**
  * A stacked LoRA's Trigger Words choice as a run, record or MCP stack keeps it: `false` for none,
@@ -15,17 +22,6 @@ export const keptTriggers = (triggers) =>
       : {};
 
 /**
- * A LoRA's trigger words to apply by default. A slider's two words name its two ends, so only the
- * end its strength points to: the first for a positive strength, the second for a negative one.
- */
-function defaultTriggers(item, info) {
-  const triggers = cleanTriggers(info?.triggers);
-  if (triggers.length !== 2 || !/slider/i.test(`${item.name} ${info?.title || ""}`))
-    return triggers;
-  return [Number(item.strength) < 0 ? triggers[1] : triggers[0]];
-}
-
-/**
  * The prompt with the trigger words switched on for each enabled LoRA (all of them, or a slider's
  * one end, unless `triggers` is `false` or lists the chosen ones) at the start, in stack order, once each, skipping
  * any the prompt already says. Studio applies it once for every generation path, when it prepares
@@ -33,20 +29,19 @@ function defaultTriggers(item, info) {
  */
 export function withLoraTriggers(prompt, stack = [], infos = {}) {
   const text = String(prompt || "").trim();
-  const same = (a, b) => a.toLowerCase() === b.toLowerCase();
-  const lead = [];
+  const lead = new Map();
   for (const item of stack) {
-    if (item?.enabled === false || item?.triggers === false) continue;
-    const chosen = Array.isArray(item?.triggers) ? item.triggers.map(String) : null;
-    const triggers = chosen
-      ? cleanTriggers(infos[item.name]?.triggers).filter((trigger) =>
-          chosen.some((word) => same(word, trigger)),
-        )
-      : defaultTriggers(item, infos[item.name]);
-    for (const trigger of triggers)
-      if (!has(text, trigger) && !lead.some((word) => same(word, trigger))) lead.push(trigger);
+    if (!activeLora(item)) continue;
+    const info = infos[item.name];
+    for (const trigger of loraTriggerWords(item, {
+      ...info,
+      triggers: cleanTriggers(info?.triggers),
+    })) {
+      const key = trigger.toLowerCase().replace(/\s+/g, " ");
+      if (!lead.has(key) && !hasTrigger(text, trigger)) lead.set(key, trigger);
+    }
   }
-  return lead.length ? `${lead.join(", ")}, ${text}` : text;
+  return [...lead.values(), text].filter(Boolean).join(", ");
 }
 
 /**
@@ -61,7 +56,9 @@ export function recommendedNegative(
   const negative = prompting?.negative;
   if (!takesNegative || negative?.effect !== "recommended" || !(Number(cfg) > 1)) return "";
   const parts = [String(negative.default || "").trim()];
-  for (const { name } of stack) {
+  for (const item of stack) {
+    if (!activeLora(item)) continue;
+    const { name } = item;
     const own = typeof infos[name]?.negative === "string" ? infos[name].negative.trim() : "";
     if (own) parts.push(own);
   }

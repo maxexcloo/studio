@@ -10,6 +10,31 @@ export const defaultModelKeys = {
 export const loraTypes = ["slider", "style", "character", "concept"] as const;
 /** How a LoRA runs: an optional effect, or part of a recipe (an acceleration adapter, a supporting file). */
 export const loraRoles = ["effect", "acceleration", "supporting"] as const;
+
+export function activeLora(item: { enabled?: unknown; strength?: unknown } | null | undefined) {
+  return (
+    Boolean(item) &&
+    item?.enabled !== false &&
+    item?.strength !== 0 &&
+    !(typeof item?.strength === "string" && item.strength.trim() && Number(item.strength) === 0)
+  );
+}
+
+export function loraTriggerWords(
+  item: { name: string; enabled?: boolean; strength?: number; triggers?: boolean | string[] },
+  info?: { title?: string; type?: string; triggers?: string[] },
+): string[] {
+  if (!activeLora(item) || item.triggers === false) return [];
+  const words = info?.triggers || [];
+  const chosen = Array.isArray(item.triggers)
+    ? new Set(item.triggers.map((word) => word.toLowerCase()))
+    : null;
+  if (chosen) return words.filter((word) => chosen.has(word.toLowerCase()));
+  const slider = info?.type
+    ? info.type === "slider"
+    : /slider/i.test(`${item.name} ${info?.title || ""}`);
+  return slider && words.length === 2 ? [words[Number(item.strength) < 0 ? 1 : 0]] : words;
+}
 /** The backends one profile can run on, by name; a combined profile keeps each one's graph and settings in `studio.backends`. */
 export const profileBackendLabels: Readonly<Record<string, string>> = Object.freeze({
   comfyui: "ComfyUI",
@@ -263,7 +288,14 @@ export function loraStrengthSpread(info: LoraStrengthInfo, current: number) {
 /** A strength sweep's starting picks: without the LoRA, then its default and the choices beside it. */
 export function loraStrengthSweep(info: LoraStrengthInfo) {
   const choices = loraStrengthChoices(info);
-  const at = choices.indexOf(loraDefaultStrength(info));
+  const recommended = loraDefaultStrength(info);
+  if (recommended === 0) {
+    const negative = choices.filter((strength) => strength < 0);
+    const positive = choices.filter((strength) => strength > 0);
+    if (negative.length && positive.length) return [0, negative.at(-1)!, positive[0]];
+    return [0, ...(negative.length ? negative.slice(-3) : positive.slice(0, 3))];
+  }
+  const at = choices.indexOf(recommended);
   const start = Math.max(0, Math.min(at - 1, choices.length - 3));
   return [0, ...choices.slice(start, start + 3)];
 }
