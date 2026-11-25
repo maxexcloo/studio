@@ -497,8 +497,8 @@ test("The viewer restores drafts per result and keeps an edit when a run fails",
   );
   await sendField(page, "Prompt", "An amber bird in fog", "Generate");
   await response;
-  await expect(surface).toBeVisible();
-  await expect(field).toHaveValue("An amber bird in fog");
+  await expect(viewer).toBeVisible();
+  await expect(summary).toHaveValue("An amber bird in fog");
 });
 
 test("A delayed automatic change runs on its source without closing the next image", async ({
