@@ -32,6 +32,7 @@ import { directRoute } from "../domain/direct-route.ts";
  *   POST /api/profiles/prompt-styles/revert         {version, baseHash}
  *   POST /api/profiles/prompt-styles/approve        clears AI-Drafted on the styles
  *   GET  /api/profiles/prompt-instructions          current writer templates and their defaults
+ *   POST /api/profiles/prompt-instructions/defaults  adopt current instructions as the site defaults
  *   GET  /api/profiles/prompt-instructions/:id/history  the saved versions, newest first
  *   PUT  /api/profiles/prompt-instructions/:id      {text, baseHash}: saves one instruction as a new version
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
@@ -344,6 +345,9 @@ export function registerProfileRoutes(
     instructions: promptInstructionStore().list(),
     examples: promptInstructionExamples(),
   }));
+  route("POST", "/api/profiles/prompt-instructions/defaults", () =>
+    promptInstructionStore().adoptDefaults(),
+  );
   route("GET", "/api/profiles/prompt-instructions/:id/history", (_account, { params }) => ({
     versions: saved(promptInstructionStore().history(params.id)),
   }));

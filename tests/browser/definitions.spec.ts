@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { formatDate } from "../../frontend/src/ui/dates";
 import {
   editDefinition,
   fixtures,
@@ -8,6 +9,7 @@ import {
   section,
   serveProfiles,
   signIn,
+  stamp,
 } from "./fixtures";
 
 test("Profile edits preserve workflow metadata and retain unsaved text after a conflict", async ({
@@ -578,6 +580,8 @@ test("Library edits a background prompt and reads the saved version back", async
     initial,
     hash: "current",
     version: null as number | null,
+    isDefault: true,
+    editedAt: undefined as string | undefined,
   };
   await page.route("**/api/profiles/prompt-instructions", (route) =>
     route.fulfill({
@@ -587,7 +591,15 @@ test("Library edits a background prompt and reads the saved version back", async
   await page.route("**/api/profiles/prompt-instructions/summarise-taste", (route) => {
     const { text, baseHash } = route.request().postDataJSON();
     expect(baseHash).toBe(instruction.hash);
-    instruction = { ...instruction, text, version: 2, hash: "version-2" };
+    const version = (instruction.version ?? 1) + 1;
+    instruction = {
+      ...instruction,
+      text,
+      version,
+      hash: `version-${version}`,
+      isDefault: text === initial,
+      editedAt: stamp,
+    };
     return route.fulfill({ json: instruction });
   });
   await page.route("**/api/profiles/prompt-instructions/summarise-taste/history", (route) =>
@@ -606,6 +618,7 @@ test("Library edits a background prompt and reads the saved version back", async
   const table = page.getByRole("table", { name: "Dream Instructions", exact: true });
   // Each instruction says where Studio uses it.
   await expect(table.getByText("Used by the Taste summary", { exact: true })).toBeVisible();
+  await expect(table.getByRole("columnheader", { name: /Updated/ })).toHaveCount(0);
   const open = async () => {
     await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
@@ -624,6 +637,7 @@ test("Library edits a background prompt and reads the saved version back", async
   await open();
   await expect(text).toHaveValue(changed);
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(table.getByText(formatDate(stamp), { exact: true })).toBeVisible();
   // Versions… restores a saved version into the editor as an unsaved change.
   await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
   await page.getByRole("menuitem", { name: "Versions…", exact: true }).click();
@@ -641,4 +655,10 @@ test("Library edits a background prompt and reads the saved version back", async
   await editor.getByRole("tab", { name: "Edit", exact: true }).click();
   await expect(text).toHaveValue(initial);
   await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  await table.getByRole("button", { name: "Actions for Summarise Taste", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Reset to Default…", exact: true }).click();
+  await expect(text).toHaveValue(initial);
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(table.getByText("v3 · Default", { exact: true })).toBeVisible();
 });

@@ -149,6 +149,34 @@ test("Library prompt edits reach the writer immediately and preserve history and
   );
   const current = (await call("GET", path)).body.instructions.find(({ id }) => id === title.id);
   assert.equal(current.editedAt, body.versions[0].at);
+  assert.equal(current.isDefault, true);
+  const siteEdit = await call("PUT", edit, { text, baseHash: current.hash });
+  assert.equal(siteEdit.body.isDefault, false);
+  const adopted = await call("POST", `${path}/defaults`);
+  assert.equal(adopted.status, 200);
+  assert.equal(adopted.body.count, listing.body.instructions.length);
+  const adoptedRules = (await call("GET", path)).body.instructions;
+  assert.ok(
+    adoptedRules.every(({ editedAt, isDefault }) => editedAt === adopted.body.at && isDefault),
+  );
+  const baseline = adoptedRules.find(({ id }) => id === title.id);
+  assert.equal(baseline.initial, text);
+  assert.equal(baseline.version, siteEdit.body.version);
+  assert.notEqual(baseline.hash, siteEdit.body.hash);
+  assert.deepEqual((await call("POST", `${path}/defaults`)).body, adopted.body);
+
+  const override = await call("PUT", edit, { text: title.initial, baseHash: baseline.hash });
+  assert.equal(override.body.isDefault, false);
+  const resetToSite = await call("PUT", edit, {
+    text: baseline.initial,
+    baseHash: override.body.hash,
+  });
+  assert.equal(resetToSite.body.isDefault, true);
+  const history = (await call("GET", `${edit}/history`)).body.versions;
+  assert.deepEqual(
+    history.map(({ text }) => text),
+    [text, title.initial, text, title.initial, text],
+  );
 });
 
 test("versions list, show, revert as a new version and approve an AI draft", async (t) => {

@@ -119,6 +119,7 @@ export interface PromptInstruction {
   initial: string;
   hash: string;
   version: number | null;
+  isDefault: boolean;
   editedAt?: string;
 }
 export const promptInstructionsPath = "/api/profiles/prompt-instructions";
