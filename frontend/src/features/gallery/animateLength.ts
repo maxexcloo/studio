@@ -27,7 +27,7 @@ export function retainedAnimationProfile(
 
 /**
  * The reference mode's timing, shared by menu choices, writing and submission: the length the
- * person last chose in Animate, else Studio's Video Length (Settings › Where Work Runs).
+ * person last chose in Animate, else Studio's configured video length.
  */
 export function animationInput(input: GenerationInput, listed: Profile, seconds?: number | null) {
   const profile = profileForBackend(listed, undefined, true)!;

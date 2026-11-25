@@ -1,20 +1,13 @@
 import { SegmentedControl, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import { dreamVideoSeconds } from "../../../../shared/dream";
 import { LoadFailed } from "../../ui/LoadFailed";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
 import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
-import {
-  type Setting,
-  type WorkValues,
-  deploymentQuery,
-  lockedNote,
-  useDeploymentSetting,
-} from "./deployment";
+import { type Setting, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
 const sides = [
   { value: "cloud", label: "Cloud" },
@@ -37,8 +30,6 @@ export function WhereWorkRuns() {
       <LoadingState fill label="Loading Where Work Runs" />
     );
   const { defaults, work } = deployment.data;
-  const set = (name: keyof WorkValues, value: string | number | null) =>
-    save.mutate({ key: work[name].key, value });
   const modelRow = (kind: "image" | "video", setting: Setting) => {
     const offered = defaults.profiles.filter((profile) => profile.kind === kind);
     const effective = offered.find((profile) => profile.id === setting.effective);
@@ -73,34 +64,14 @@ export function WhereWorkRuns() {
         data={sides}
         value={work[name].value}
         disabled={work[name].locked}
-        onChange={(side) => set(name, side)}
+        onChange={(side) => save.mutate({ key: work[name].key, value: side })}
       />
     </SettingRow>
   );
   return (
     <Stack gap="lg">
       <SettingGroup title="Images">{modelRow("image", defaults.image)}</SettingGroup>
-      <SettingGroup title="Videos">
-        {modelRow("video", defaults.video)}
-        <SettingRow
-          wide
-          label="Video Length"
-          description={`How long new video drafts and Dream's videos run; Animate starts here until someone picks a length in its menu. Each model keeps to the lengths it allows.${lockedNote(work.videoSeconds)}`}
-        >
-          <SegmentedControl
-            role="radiogroup"
-            aria-label="Video Length"
-            fullWidth
-            value={String(work.videoSeconds.value ?? 0)}
-            disabled={work.videoSeconds.locked}
-            data={dreamVideoSeconds.map((seconds) => ({
-              value: String(seconds),
-              label: seconds ? `${seconds} s` : "Auto",
-            }))}
-            onChange={(value) => set("videoSeconds", Number(value) || null)}
-          />
-        </SettingRow>
-      </SettingGroup>
+      <SettingGroup title="Videos">{modelRow("video", defaults.video)}</SettingGroup>
       <SettingGroup title="Dream">
         {dreamRow("dreamImageBackend", "Images")}
         {dreamRow("dreamVideoBackend", "Videos")}

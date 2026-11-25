@@ -16,9 +16,7 @@ interface Source {
 }
 export type Setting = Source & { key: string; configured: string; effective: string };
 export type Flag = Source & { key: string; label: string; description: string; value: boolean };
-/** Settings › Where Work Runs' values (backend/work-defaults.js); Video Length null for Auto. */
-export interface WorkValues {
-  videoSeconds: number | null;
+interface WorkValues {
   dreamImageBackend: "local" | "cloud";
   dreamVideoBackend: "local" | "cloud";
 }

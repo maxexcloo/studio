@@ -309,9 +309,7 @@ test("An administrator turns LoRAs and Uncensored off for itself in Preferences"
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
-test("Where Work Runs saves Studio's Video Length and Dream's side for everyone", async ({
-  page,
-}) => {
+test("Where Work Runs saves Dream's side for everyone", async ({ page }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   const saved: { key: string; value: unknown }[] = [];
@@ -329,20 +327,11 @@ test("Where Work Runs saves Studio's Video Length and Dream's side for everyone"
   await expect
     .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
     .toEqual(["Images", "Videos", "Dream", "Text"]);
-  await group("Videos")
-    .getByRole("radiogroup", { name: "Video Length", exact: true })
-    .getByText("8 s", { exact: true })
-    .click();
   await group("Dream")
     .getByRole("radiogroup", { name: "Dream Images", exact: true })
     .getByText("Cloud", { exact: true })
     .click();
-  await expect
-    .poll(() => saved)
-    .toEqual([
-      { key: "STUDIO_VIDEO_SECONDS", value: 8 },
-      { key: "STUDIO_DREAM_IMAGE_BACKEND", value: "cloud" },
-    ]);
+  await expect.poll(() => saved).toEqual([{ key: "STUDIO_DREAM_IMAGE_BACKEND", value: "cloud" }]);
   // A person's own Settings no longer offer any of these.
   await signIn(page, { id: "member", role: "user" });
   // Only the hash changes, so reload to read the new account.

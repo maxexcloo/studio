@@ -48,7 +48,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
-Administrators set each kind's default model (which decides whether it runs locally or in the cloud), the Video Length new videos start at, and where Dream runs in **Settings › Where Work Runs**, and Dream's delays and account overrides in **Settings › Dream**, both under Administration. [Settings](#settings) lists the matching variables.
+Administrators set each kind's default model (which decides whether it runs locally or in the cloud) and where Dream runs in **Settings › Where Work Runs**, and Dream's delays and account overrides in **Settings › Dream**, both under Administration. [Settings](#settings) lists the matching variables.
 
 ### Radiance
 
@@ -205,7 +205,7 @@ The dry run reports mappings, counts and conflicts; a conflict stops the apply a
 | `STUDIO_SELF_REVIEW`                | Score recent Dream project images against their project's brief                             | `1`                                          | Studio                 |
 | `STUDIO_SUGGESTED_PROMPTS`          | Write prompts for uploads and other items without one                                       | `1`                                          | Studio                 |
 | `STUDIO_TASTE_UPDATES`              | Summarise each account's taste as it rates                                                  | `1`                                          | Studio                 |
-| `STUDIO_VIDEO_SECONDS`              | Video Length in seconds for new video drafts and Dream, and Animate until someone picks one | each profile's own (Auto)                    | Where Work Runs        |
+| `STUDIO_VIDEO_SECONDS`              | Video Length in seconds for new video drafts and Dream, and Animate until someone picks one | each profile's own (Auto)                    |                        |
 | `STUDIO_WORKERS`                    | Workers as a JSON array ([Workers](#workers))                                               | discovered by runtime control, else none     |                        |
 | `STUDIO_WORKER_TOKEN`               | Token shared with the packaged ComfyUI worker                                               | none                                         |                        |
 
