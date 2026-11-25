@@ -495,7 +495,11 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
           workload("image", "Image", "running"),
           workload("text", "Text", "running"),
           workload("video", "Video", "parked"),
-          { ...workload("radiance", "Radiance", "parked", 2), radiance: true },
+          {
+            ...workload("radiance", "Radiance", "parked", 2),
+            radiance: true,
+            dashboardUrl: "https://radiance.example.test",
+          },
         ],
       },
     }),
@@ -535,6 +539,11 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   const history = page.getByRole("region", { name: "History", exact: true });
   await expect(history).toBeVisible();
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
+  await table.getByRole("button", { name: "Actions for Radiance", exact: true }).click();
+  const dashboard = page.getByRole("menuitem", { name: "Open Dashboard", exact: true });
+  await expect(dashboard).toHaveAttribute("href", "https://radiance.example.test");
+  await page.keyboard.press("Escape");
+  await expect(dashboard).toBeHidden();
   const controls = page.getByRole("region", { name: "Placement", exact: true });
   await expect(controls.getByRole("list", { name: "Workers", exact: true })).toContainText(
     "Image Worker · Images · Idle",

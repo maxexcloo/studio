@@ -132,10 +132,12 @@ export function usePromptHistory({
   kind,
   value,
   onPick,
+  button = false,
 }: {
   kind: PromptKind;
   value: string;
   onPick: (text: string) => void;
+  button?: boolean;
 }): { action: Action; popup: ReactNode } {
   const [opened, setOpened] = useState(false),
     [query, setQuery] = useState("");
@@ -188,7 +190,22 @@ export function usePromptHistory({
       position="top-end"
       opened={opened}
       onOpenedChange={setOpened}
-      target={<span />}
+      target={
+        button ? (
+          <ActionIcon
+            type="button"
+            variant="subtle"
+            color="gray"
+            aria-label={title}
+            onClick={() => setOpened(!opened)}
+          >
+            <icons.history size={18} />
+          </ActionIcon>
+        ) : (
+          <span />
+        )
+      }
+      tooltip={button}
       onClear={() => edit.mutate({ action: "clear" })}
       clearDisabled={!history.data?.prompts.some((entry) => !entry.liked)}
       actions={

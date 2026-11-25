@@ -1,5 +1,5 @@
 import { ActionIcon, Menu } from "@mantine/core";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { VariationDirection } from "../../../../shared/suggestions";
@@ -12,8 +12,14 @@ import { useStageComparison } from "../compare/variants";
 import { useItemChange } from "../gallery/useItemChange";
 import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
 import { VariationDialog, keepAndVaryAction } from "../gallery/VariationDialog";
-import { suggestionItems, useChangeSuggestions } from "../generation/AskChange";
+import {
+  instructionTemplates,
+  requestTool,
+  suggestionItems,
+  useChangeSuggestions,
+} from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
 import { sideControl, sideIconSize } from "./DeckButtons";
@@ -50,6 +56,8 @@ function ItemSuggestions({
   const compare = useMutation({ mutationFn: () => stage.again(pair!), onSuccess: onApplied });
   const [opened, setOpened] = useState(false);
   const [custom, setCustom] = useState(false);
+  const [request, setRequest] = useState("");
+  const assistant = useQuery(assistantQuery).data;
   const [varying, setVarying] = useState<VariationDirection | "explore">();
   const iteration = useMediaIteration(item);
   const prepare = useMediaAction(item, onApplied);
@@ -67,9 +75,9 @@ function ItemSuggestions({
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item),
     fresh: () => askNextSteps(item, true),
-    enabled: opened && change.available,
+    enabled: (opened || custom) && change.available,
     disabled: change.pending || iteration.isPending,
-    onPick: send,
+    onPick: custom ? setRequest : send,
   });
   const canVary =
     change.available &&
@@ -174,7 +182,17 @@ function ItemSuggestions({
       )}
       <CustomDialog
         opened={custom}
-        title="Custom Change"
+        title={item.type === "video" ? "Custom Animation" : "Custom Request"}
+        draft={{ value: request, onChange: setRequest }}
+        tools={[
+          requestTool(
+            instructionTemplates(
+              (item.type === "video" ? assistant?.themes : assistant?.changes) ?? [],
+              setRequest,
+            ),
+            suggestions,
+          ),
+        ]}
         action="Run"
         onClose={() => setCustom(false)}
         onSend={send}

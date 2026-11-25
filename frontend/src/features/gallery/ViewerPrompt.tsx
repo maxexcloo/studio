@@ -12,8 +12,10 @@ import {
   SendButton,
   assistMenu,
   changeTemplates,
+  instructionTemplates,
   proposalText,
   proposalUndo,
+  requestTool,
   useChangeSuggestions,
 } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
@@ -51,6 +53,7 @@ export interface ViewerDraftActions {
  * same request path. Review Prompt fills the field with a proposal until it is run or undone.
  */
 export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration) => void) {
+  const assistant = useQuery(assistantQuery).data;
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -71,6 +74,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
   const [customAction, setCustomAction] = useState<
     (Pick<ViewerAsk, "action" | "profileId"> & { fromPrompt: boolean }) | null
   >(null);
+  const [customRequest, setCustomRequest] = useState("");
   const openCustom = (action: ViewerChange, profileId?: string, fromPrompt = false) =>
     setCustomAction({ action, profileId, fromPrompt });
   // A tile's menu opened the viewer with its choice, asked once the assistant is ready.
@@ -83,22 +87,48 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     if ("custom" in asked.change) openCustom(asked.action, asked.profileId);
     else pick(asked.action, asked.change.request, asked.profileId);
   }, [asked, ask.available]);
+  const base = ask.typed ?? prompt;
+  const suggestionPrompt = base === original ? undefined : base;
+  const imageAction = item.type === "image" ? customAction?.action : undefined;
+  const templates = (item.type === "image" ? assistant?.changes : assistant?.themes) ?? [];
+  const customSuggestions = useChangeSuggestions({
+    query: nextStepsQuery(item, suggestionPrompt, imageAction),
+    fresh: () => askNextSteps(item, true, suggestionPrompt, imageAction),
+    enabled: ask.available && Boolean(customAction),
+    onPick: setCustomRequest,
+  });
   const custom = (
     <CustomDialog
       opened={Boolean(customAction)}
       onClose={() => setCustomAction(null)}
-      title="Custom Change"
+      title={
+        item.type === "video"
+          ? "Custom Animation"
+          : imageAction === "edit"
+            ? "Custom Edit"
+            : "Custom Recreate"
+      }
       action={(customAction?.fromPrompt ? reviewPrompt : review) ? "Ask" : "Run"}
+      draft={{ value: customRequest, onChange: setCustomRequest }}
+      tools={
+        ask.available && customAction
+          ? [
+              requestTool(
+                instructionTemplates(templates, setCustomRequest, undefined, imageAction),
+                customSuggestions,
+              ),
+            ]
+          : undefined
+      }
       onSend={(request) =>
         customAction &&
         pick(customAction.action, request, customAction.profileId, customAction.fromPrompt)
       }
     />
   );
-  const base = ask.typed ?? prompt;
   const draft: ViewerDraftActions = {
     changedPrompt: prompt.trim() !== original.trim() ? prompt.trim() : undefined,
-    suggestionPrompt: base === original ? undefined : base,
+    suggestionPrompt,
     pending: ask.pending,
     pick,
     custom: openCustom,
@@ -110,6 +140,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     setPrompt,
     field,
     ask,
+    templates,
     custom,
     draft,
     openCustom,
@@ -138,13 +169,13 @@ export function ViewerPrompt({
     setPrompt,
     field,
     ask,
+    templates,
     custom,
     draft,
     openCustom,
     reviewPrompt,
     setReview,
   } = state;
-  const assistant = useQuery(assistantQuery).data;
   const change = ask.proposal;
   const [mode, setMode] = useRemembered<ViewerChange>("viewer-prompt-change", "recreate");
   const { menu: editProfiles, profileId: selectedEdit } = useActionProfile("image");
@@ -156,13 +187,6 @@ export function ViewerPrompt({
   const base = queried ? queried.prompt : undefined;
   const pick = (request: string) => state.pick(mode, request, editProfileId, true);
   const imageAction = item.type === "image" ? mode : undefined;
-  const templates = imageAction
-    ? (assistant?.changes ?? [])
-    : (assistant?.themes ?? []).flatMap((theme) =>
-        theme.id !== "custom" && theme.instruction
-          ? [{ ...theme, instruction: theme.instruction }]
-          : [],
-      );
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item, base, imageAction),
     fresh: () => askNextSteps(item, true, base, imageAction),

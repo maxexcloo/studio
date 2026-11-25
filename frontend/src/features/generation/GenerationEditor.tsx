@@ -31,6 +31,7 @@ import {
   usesNegative,
 } from "./payload";
 import { type DraftChange, PromptFields, useGenerationPromptAssistant } from "./PromptFields";
+import type { usePromptIdeas } from "./PromptIdeas";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
 
@@ -154,6 +155,7 @@ export function GenerationEditor({
   onKindChange,
   onClear,
   onUndoClear,
+  recent,
   onSubmit,
   operation,
   ask,
@@ -169,7 +171,7 @@ export function GenerationEditor({
   fill = false,
   onDone,
   onNegativeWritten,
-  ideas: offerIdeas = false,
+  ideas,
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
@@ -190,6 +192,7 @@ export function GenerationEditor({
   onClear: () => void;
   /** Restores the draft Clear replaced; Clear shows as Undo while it is set. */
   onUndoClear?: () => void;
+  recent: ReactNode;
   onSubmit: () => void;
   operation?: Draft["operation"];
   ask: DraftChange;
@@ -216,7 +219,7 @@ export function GenerationEditor({
   onDone?: () => void;
   onNegativeWritten?: () => void;
   /** Offers taste-led prompt ideas in the prompt's AI menu while the prompt is empty. */
-  ideas?: boolean;
+  ideas: ReturnType<typeof usePromptIdeas>;
 }) {
   const anyReferences = Boolean(references.length || input.referenceAssets.length);
   const profile = useMemo(
@@ -358,7 +361,7 @@ export function GenerationEditor({
               negative={usesNegative(profile)}
               autoFocus={autoFocusPrompt}
               fill={fill}
-              ideas={offerIdeas}
+              ideas={ideas}
               ask={ask}
             />
           </TextToolsBar.Provider>
@@ -406,6 +409,7 @@ export function GenerationEditor({
             />
             <Group className={classes.actions} gap="xs" wrap="nowrap" miw={0} justify="flex-end">
               <ClearButton className={classes.resting} onClear={onClear} onUndo={onUndoClear} />
+              <div className={classes.resting}>{recent}</div>
               <Tooltip
                 label={blockedReason}
                 disabled={!blockedReason}

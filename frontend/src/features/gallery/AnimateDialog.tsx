@@ -10,7 +10,7 @@ import { TextBox } from "../../ui/TextBox";
 import { TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
 import { useReturnFocus } from "../../ui/useReturnFocus";
-import { suggestionsTool, useChangeSuggestions } from "../generation/AskChange";
+import { instructionTemplates, requestTool, useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import {
@@ -54,7 +54,11 @@ export function AnimateDialog({
   const writing = useRef<AbortController>(null);
   const asking = theme === "custom" && !chosen && writer.isIdle;
   const assistant = useQuery(assistantQuery);
-  const offered = Boolean(assistant.data?.available) && item.type === "image";
+  const available = Boolean(assistant.data?.available);
+  const offered = available && item.type === "image";
+  const templates = available
+    ? instructionTemplates(assistant.data?.themes ?? [], setInstruction)
+    : [];
   const ideas = useChangeSuggestions({
     query: motionIdeasQuery(item),
     fresh: () => askMotionIdeas(item, true),
@@ -120,7 +124,11 @@ export function AnimateDialog({
               inline
               value={instruction}
               onChange={setInstruction}
-              tools={offered ? [suggestionsTool(ideas)] : []}
+              tools={
+                offered || templates.length
+                  ? [requestTool(templates, offered ? ideas : undefined)]
+                  : []
+              }
               submit={
                 phone
                   ? [

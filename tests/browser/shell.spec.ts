@@ -1,15 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  create,
-  fixtures,
-  image,
-  openLoraChoices,
-  openTheme,
-  promptMenu,
-  promptTool,
-  stamp,
-} from "./fixtures";
+import { create, fixtures, image, openLoraChoices, openTheme, promptMenu, stamp } from "./fixtures";
 
 test("Nested pickers consume outside presses one layer at a time", async ({ page, isMobile }) => {
   // Keep native popovers on touch projects too, rather than their full-screen phone sheets.
@@ -131,7 +122,7 @@ test("Popups anchored to the composer stay put while the gallery scrolls", async
     }),
   );
   await create(page);
-  await promptTool(page, "Prompt", "Recent");
+  await page.getByRole("button", { name: "Recent", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Recent", exact: true });
   await expect(panel.getByText("Earlier landscape")).toBeVisible();
   // Once its scale-in has finished; measured in one task, before any scroll handler could move it back.

@@ -20,12 +20,28 @@ export const dreamDefaults = {
   pauseAfterUnseen: 60,
 };
 export type DreamSettings = typeof dreamDefaults;
-/** The largest value of each percentage Dream setting, all from 0. */
-export const dreamSettingMaxima = {
-  mixNew: 100,
-  mixComparisons: 100,
-  mixExisting: 100,
-};
+export const dreamMixKeys = ["mixComparisons", "mixExisting", "mixNew"] as const;
+export type DreamMixKey = (typeof dreamMixKeys)[number];
+export const dreamMixBudget = 100;
+
+export function dreamMixTotal(settings: Pick<DreamSettings, DreamMixKey>) {
+  return dreamMixKeys.reduce((total, key) => total + settings[key], 0);
+}
+
+/** Older mixes were unbounded weights. Keep their proportions when bringing them under the cap. */
+function normaliseDreamMix(settings: DreamSettings): DreamSettings {
+  const total = dreamMixTotal(settings);
+  if (total <= dreamMixBudget) return settings;
+  const mix = { ...settings };
+  let largest: DreamMixKey = dreamMixKeys[0];
+  for (const key of dreamMixKeys) {
+    const weight = settings[key];
+    mix[key] = Math.max(weight > 0 ? 1 : 0, Math.round((weight / total) * dreamMixBudget));
+    if (weight > settings[largest]) largest = key;
+  }
+  mix[largest] += dreamMixBudget - dreamMixTotal(mix);
+  return mix;
+}
 /** The clip lengths Dream offers; 0 is Auto. Each model clamps to its own frame limits. */
 export const dreamVideoSeconds = [0, 5, 8, 10] as const;
 export const maxDreamIdleMinutes = 120;
@@ -135,7 +151,7 @@ export const defaultDreamLimits: DreamLimits = {
 export function withinDreamLimits(settings: DreamSettings, limits: DreamLimits): DreamSettings {
   const unseen = settings.pauseAfterUnseen;
   return {
-    ...settings,
+    ...normaliseDreamMix(settings),
     dailyImages: Math.min(settings.dailyImages, limits.dailyImages),
     dailyVideos: Math.min(settings.dailyVideos, limits.dailyVideos),
     pauseAfterUnseen:
@@ -162,11 +178,10 @@ export function dreamSettingError(
       ? ""
       : `Set ${key} to a whole number from ${min} to ${max}.`;
   }
-  if (key in dreamSettingMaxima) {
-    const max = dreamSettingMaxima[key as keyof typeof dreamSettingMaxima];
-    return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= max
+  if (dreamMixKeys.some((mixKey) => mixKey === key)) {
+    return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= dreamMixBudget
       ? ""
-      : `Set ${key} to a whole number from 0 to ${max}.`;
+      : `Set ${key} to a whole number from 0 to ${dreamMixBudget}.`;
   }
   return typeof value === "boolean" ? "" : `Set ${key} to true or false.`;
 }

@@ -83,6 +83,7 @@ export function usePromptIdeas({
         }
       : undefined,
     label: current?.label,
+    clear: () => setPicked(null),
     undo:
       current &&
       (() => {

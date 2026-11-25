@@ -15,17 +15,11 @@ import {
   draftStepsQuery,
   draftSuggestionContext,
 } from "../taste/suggestions";
-import {
-  ProposalLabel,
-  assistMenu,
-  proposalUndo,
-  useAskChange,
-  useChangeSuggestions,
-} from "./AskChange";
+import { ProposalLabel, assistMenu, useAskChange, useChangeSuggestions } from "./AskChange";
 import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptHistory } from "./PromptHistory";
-import { usePromptIdeas } from "./PromptIdeas";
+import type { usePromptIdeas } from "./PromptIdeas";
 import { referenceKey, referenceLabel } from "./references";
 
 import classes from "./PromptFields.module.css";
@@ -120,7 +114,7 @@ export function PromptFields({
   autoFocus = false,
   compact = false,
   fill = false,
-  ideas: offerIdeas = false,
+  ideas,
   ask,
 }: {
   input: GenerationInput;
@@ -137,7 +131,7 @@ export function PromptFields({
   /** Fills the phone Generate sheet: the prompt takes the room left above the settings, typed in place. */
   fill?: boolean;
   /** Offers ideas in the AI menu for an empty prompt or a draft with applied cards. */
-  ideas?: boolean;
+  ideas: ReturnType<typeof usePromptIdeas>;
   /** Sends the assistant's Custom… as a change to the draft (`useDraftChange`). */
   ask?: DraftChange;
 }) {
@@ -154,12 +148,6 @@ export function PromptFields({
     enabled: false,
     disabled: ask?.pending,
     onPick: (request) => ask?.sendRequest(request),
-  });
-  const ideas = usePromptIdeas({
-    input,
-    references,
-    enabled: offerIdeas && !proposal && !ask?.pending,
-    onChange: (prompt) => onChange({ prompt }),
   });
   // Suggestions load as the AI menu opens, so they are ready to open.
   const suggestions =
@@ -184,10 +172,9 @@ export function PromptFields({
       })
     : [];
   const cover = pictures[0];
-  const undo = proposal ? ask.undo : offerIdeas && ideas.undo;
   const assistantTool =
     assistant.stop ??
-    (assistant.templates || suggestions || undo
+    (assistant.templates || suggestions
       ? {
           id: "assistant",
           label: "Improve Prompt",
@@ -195,17 +182,14 @@ export function PromptFields({
           icon: icons.assistant,
           disabled: ask?.pending,
           onOpen: suggestions?.load,
-          menu: [
-            ...proposalUndo(undo),
-            ...assistMenu({
-              suggestions,
-              // An empty prompt has nothing to rewrite: its ideas stand alone.
-              templates: ideas.suggestions ? [] : (assistant.templates ?? []),
-              custom: assistant.custom,
-              others: [assistant.more ?? []],
-              last: [],
-            }),
-          ],
+          menu: assistMenu({
+            suggestions,
+            // An empty prompt has nothing to rewrite: its ideas stand alone.
+            templates: ideas.suggestions ? [] : (assistant.templates ?? []),
+            custom: assistant.custom,
+            others: [assistant.more ?? []],
+            last: [],
+          }),
         }
       : undefined);
   return (
@@ -260,7 +244,7 @@ export function PromptFields({
           proposal ? (
             <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
           ) : (
-            ideas.label
+            ideas.label && <span>{ideas.label}</span>
           )
         }
       />
@@ -288,6 +272,11 @@ const NegativePrompt = memo(function NegativePrompt({
   fill: boolean;
   assistant?: Action;
 }) {
+  const history = usePromptHistory({
+    kind: "negative",
+    value,
+    onPick: (negative) => onChange({ negative }),
+  });
   return (
     <PromptBox
       name="negative"
@@ -296,6 +285,7 @@ const NegativePrompt = memo(function NegativePrompt({
       onChange={(negative) => onChange({ negative })}
       fill={fill}
       assistant={assistant}
+      history={history}
       autosize={!fill}
       minRows={2}
       maxRows={4}
@@ -304,7 +294,7 @@ const NegativePrompt = memo(function NegativePrompt({
 });
 
 /**
- * The prompt and negative prompt share one box: its AI tool and Recent Prompts, the borderless
+ * The prompt and negative prompt share one box: its tools, the borderless
  * field and, in the phone Generate sheet, editing in place.
  */
 function PromptBox({
@@ -314,6 +304,7 @@ function PromptBox({
   onChange,
   fill,
   assistant,
+  history,
   after,
   bare = false,
   ...props
@@ -322,16 +313,12 @@ function PromptBox({
   label: string;
   fill: boolean;
   assistant?: Action;
+  history?: ReturnType<typeof usePromptHistory>;
   /** Content after the box, such as the assistant's dialog. */
   after?: ReactNode;
   /** Keeps the field's own text styles (the compact composer). */
   bare?: boolean;
 }) {
-  const history = usePromptHistory({
-    kind: name === "prompt" ? "positive" : "negative",
-    value,
-    onPick: onChange,
-  });
   return (
     <div
       className={name === "prompt" ? classes.area : classes.negative}
@@ -340,8 +327,8 @@ function PromptBox({
     >
       <TextBox
         {...props}
-        tools={assistant ? [assistant, history.action] : [history.action]}
-        popups={history.popup}
+        tools={[...(assistant ? [assistant] : []), ...(history ? [history.action] : [])]}
+        popups={history?.popup}
         classNames={bare ? undefined : { input: classes.input }}
         variant="unstyled"
         aria-label={label}

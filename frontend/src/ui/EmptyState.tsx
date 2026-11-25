@@ -1,18 +1,27 @@
 import { Center, Stack, Text } from "@mantine/core";
 import type { ReactNode } from "react";
 
-/** One short, centred Title Case line such as No Images, with an optional action beneath. */
+/** One short Title Case line such as No Images, with an optional action beneath. */
 export function EmptyState({
   children,
   action,
   fill = false,
+  inline = false,
 }: {
   children: ReactNode;
   /** A button beneath the line, such as New Character. */
   action?: ReactNode;
   /** Takes the place its container gives it, with no minimum height of its own. */
   fill?: boolean;
+  /** Sits at the start of a settings group. */
+  inline?: boolean;
 }) {
+  if (inline)
+    return (
+      <Text size="sm" c="dimmed">
+        {children}
+      </Text>
+    );
   return (
     // Grows to centre in any flex or sized container, as LoadingState does; a view's empty state
     // also makes the Library and Settings section around it grow (WorkspaceSections.module.css).

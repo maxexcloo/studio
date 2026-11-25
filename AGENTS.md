@@ -112,8 +112,8 @@ recur across features.
   record's toolbar action is New X, opening a dialog titled New X whose primary
   is Create; editing it is Edit X with Save. Clearing a
   form or popup is the shared `ClearButton` ✕ immediately before the primary,
-  as in the composer's Generate row, never a text action in a heading; no
-  other action sits beside or below the primary. Consequential actions sit in
+  never a text action in a heading. The composer's Recent sits between
+  Clear and Generate. Consequential actions sit in
   a final Danger Zone or row menu and use `ConfirmDialog`, titled with the
   action and no question mark.
 - A dialog with a single field lets its title name it: the field keeps an
@@ -291,8 +291,9 @@ recur across features.
   itself; there is no worker choice. Trigger words apply when submitting,
   without altering the typed prompt.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
-  text in place, leaving the box's look unchanged, with Undo first in its AI
-  menu, and show the action and changed words below the field. Suggestions
+  text in place, leaving the box's look unchanged, and show the action and
+  changed words below the field. Proposal Undo uses Clear in the composer
+  and comes first in the viewer's AI menu. Suggestions
   never act on their own, and nothing floats over the text. They preload for
   the viewer's and Library review's items and load as other menus open; an
   empty composer prompt's ideas load once the page is idle and again after one

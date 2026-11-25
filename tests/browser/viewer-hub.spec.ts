@@ -231,7 +231,7 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
     await viewerChangeMenu(page, mode);
     if (profile) await editProfile(profile);
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
-    const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
+    const custom = page.getByRole("dialog", { name: `Custom ${mode}`, exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
     await custom.getByRole("button", { name: "Ask", exact: true }).click();
     await closeTextEditor(page, "Prompt");
