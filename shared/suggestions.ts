@@ -1,16 +1,20 @@
-/** A short menu title and the complete prompt applied on selection. */
+/** A short menu title and brief, with the complete prompt applied on selection. */
 export interface PromptIdea {
   label: string;
+  brief?: string;
   prompt: string;
 }
 /** A suggestion names a change. Studio writes the new prompt when the person chooses it. */
 export interface NextStep {
   label: string;
+  brief?: string;
   request: string;
   prompt?: string;
 }
 /** The number of distinct ideas requested for a generated suggestion picker. */
 export const maxSuggestions = 10;
+/** Maximum length of the line under a suggestion or template name. */
+export const maxMenuBrief = 60;
 /** Maximum reference images supplied to a composer suggestion. */
 export const maxSuggestionReferences = 4;
 /** How a requested change is carried out; a composer draft has nothing to upscale. */

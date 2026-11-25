@@ -120,6 +120,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     prompts: 0,
     writingRefusal: "",
     replies: [] as {
+      brief?: string;
       prompt: string;
       title?: string;
       motifs?: string[];
@@ -454,7 +455,7 @@ function fixture(t: TestContext, catalogue = profiles) {
 }
 
 test("Dream waits paused until resumed, queues one hidden job per account only while Studio is idle and waits below other work", async (t) => {
-  const { dream, store, admission, dreamJobs, live } = fixture(t);
+  const { dream, store, admission, dreamJobs, live, state } = fixture(t);
   assert.deepEqual(dream.read("alice").settings, dreamDefaults);
   await dream.tick();
   assert.equal(dreamJobs().length, 0);
@@ -482,6 +483,7 @@ test("Dream waits paused until resumed, queues one hidden job per account only w
   assert.equal(dreamJobs().length, 0);
   store.save({ ...mcp, status: "completed" });
 
+  state.replies = [{ brief: "A fox tracks hoofprints\nin fresh snow" }];
   await dream.tick();
   const [job] = dreamJobs("alice");
   assert.equal(job.priority, queuePriority.dream);
@@ -494,6 +496,7 @@ test("Dream waits paused until resumed, queues one hidden job per account only w
     prompt: "dream 1",
     why: "You like foxes.",
   });
+  assert.equal(job.dream?.brief, "A fox tracks hoofprints in fresh snow");
   // Its session is Dream's own.
   assert.equal(store.session("alice", job.sessionId)?.title, "Dream");
   assert.equal(dream.status("alice").status, "generating");

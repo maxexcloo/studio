@@ -121,7 +121,10 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
         height: 900,
         dream: { ...dreamItem("one").dream, why: "Exploring new ground · The harbour at dusk" },
       }),
-      ...["two", "three", "four", "five"].map((id) => dreamItem(id)),
+      ...["two", "three", "four"].map((id) => dreamItem(id)),
+      dreamItem("five", {
+        dream: { ...dreamItem("five").dream, brief: "Mist on the harbour's edge" },
+      }),
     ],
   });
   await page.goto("/images");
@@ -199,6 +202,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const details = await previewDetails(preview, isMobile);
   await expect(details).toContainText("Because you like five.");
+  await expect(details.getByText("Mist on the harbour's edge", { exact: true })).toBeVisible();
   await expect(details.getByText("Dream prompt five", { exact: true }).last()).toBeVisible();
   await closeDetails(preview, details, isMobile);
   await expect
@@ -472,7 +476,15 @@ test("Dream Library shows result details and preloads the next five Suggestions 
     if (surface === "composer") return route.fallback();
     asked.push(`${itemId}:${action || surface}`);
     return route.fulfill({
-      json: { suggestions: [{ label: "Closer Crop", request: "crop closer" }] },
+      json: {
+        suggestions: [
+          {
+            label: "Closer Crop",
+            brief: "Fill the frame with the subject",
+            request: "crop closer",
+          },
+        ],
+      },
     });
   });
   await page.goto("/dream/library");
@@ -504,7 +516,9 @@ test("Dream Library shows result details and preloads the next five Suggestions 
   await expect(header.getByText("Library Result 1", { exact: true })).toBeVisible();
   await expect.poll(() => [...asked].sort()).toEqual(warmed(7));
   await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Closer Crop", exact: true }),
+  ).toHaveAccessibleDescription("Fill the frame with the subject");
   expect([...asked].sort()).toEqual(warmed(7));
 });
 

@@ -728,7 +728,7 @@ Reply with JSON only: {"edits": [{"project": 1, "field": "styles", "text": "<the
 {{avoidFiller}}
 {{data}}
 Give each idea a concrete title of at most four words in Title Case, such as "Lantern-Lit Crossing" or "Over the Shoulder".
-Reply with JSON only: {"ideas": [{"label": "<title>", "prompt": "<prompt text>"}]}.`,
+Reply with JSON only: {"ideas": [{"label": "<title>", "brief": "<short brief>", "prompt": "<prompt text>"}]}.`,
   },
   "suggest-draft": {
     label: "Draft Change Suggestions",
@@ -750,7 +750,7 @@ Suggest {{maxSuggestions}} useful, distinct changes, some from these angles: {{a
 {{avoidFiller}}
 Give each a concrete label of at most four words in Title Case and a short, precise request.
 {{data}}
-Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}]}.`,
+Reply with JSON only: {"steps": [{"label": "<label>", "brief": "<short brief>", "request": "<the change>"}]}.`,
   },
   "suggest-loras": {
     label: "Suggest LoRAs",
@@ -774,7 +774,7 @@ Include a camera move only when it reveals or follows something specific, and sa
 {{avoidFiller}}
 Name the distinctive action in a Title Case label of at most four words. Give one short sentence naming the anchor, the motion and its visible ending. Leave prompt syntax, shot timings and technical settings to the video prompt writer.
 {{data}}
-Reply with JSON only: {"steps": [{"label": "<label>", "request": "<what happens>"}]}.`,
+Reply with JSON only: {"steps": [{"label": "<label>", "brief": "<short brief>", "request": "<what happens>"}]}.`,
   },
   "suggest-projects": {
     label: "Suggest Projects & Cards",
@@ -802,7 +802,7 @@ Reply with JSON only: {"projects": [{"name": "<name>", "description": "<descript
 {{avoidFiller}}
 Give each a concrete label of at most four words in Title Case and a short, precise request. Write requests only. Studio writes the full prompt when the person chooses one.
 {{data}}
-Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}]}.`,
+Reply with JSON only: {"steps": [{"label": "<label>", "brief": "<short brief>", "request": "<the change>"}]}.`,
   },
   "suggestion-appearance": {
     label: "Appearance Suggestion Scope",

@@ -12,7 +12,7 @@
  */
 import path from "node:path";
 
-import { imageChangeActions } from "../shared/suggestions.ts";
+import { imageChangeActions, maxMenuBrief } from "../shared/suggestions.ts";
 import { customStyles, defaultPreset, seedStyles, systemStyles } from "./assistant-presets.js";
 import { currentDataDir } from "./data-dir.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
@@ -56,7 +56,7 @@ function cleanStyles(value) {
       id,
       kind,
       label: text(entry.label, 40),
-      description: text(entry.description, 60),
+      description: text(entry.description, maxMenuBrief),
       instruction: text(entry.instruction, 2000),
       enabled: entry.enabled !== false,
       ...(kind === "animate" && entry.modifier === true ? { modifier: true } : {}),

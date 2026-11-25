@@ -49,6 +49,7 @@ export function DreamWhy({ item, question }: { item: DreamItem; question?: strin
       <Text size="sm" fw={600}>
         Why Dream Made This
       </Text>
+      {dream.brief && <Text size="sm">{dream.brief}</Text>}
       {question && <Text size="sm">{question}</Text>}
       {dream.why && (
         <Text size="sm" c="dimmed">
