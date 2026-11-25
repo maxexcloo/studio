@@ -180,6 +180,8 @@ export function LibraryCatalogueTable({
   const [type, setType] = useState<string | null>(null);
   const [modelType, setModelType] = useState<string | null>(null);
   const models = label === "Files";
+  const nameOf = (item: LibraryItem) =>
+    models ? (item.file || item.key).split("/").at(-1)! : resourceName(item);
   // Whether a model is an original or a finetune is shown only where the catalogue says so.
   const withModelType = models && items.some((item) => item.modelType);
   // LoRA types are set only by editing an entry; until one is, every row would read Unclassified.
@@ -203,7 +205,7 @@ export function LibraryCatalogueTable({
       (a, b) =>
         compareNames(typeLabel(a), typeLabel(b)) ||
         compareNames(familySummary(a), familySummary(b)) ||
-        compareNames(resourceName(a), resourceName(b)),
+        compareNames(nameOf(a), nameOf(b)),
     );
   const filterCount = Number(!!family) + Number(!!type) + Number(!!modelType);
   // A filter shows only where its choices would narrow the list.
@@ -295,7 +297,7 @@ export function LibraryCatalogueTable({
         label={`Library ${label}`}
         rows={rows}
         rowKey={(item) => item.key}
-        rowName={resourceName}
+        rowName={nameOf}
         loading={loading && `Loading ${label}`}
         query={query}
         searchText={(item) => [
@@ -360,13 +362,14 @@ export function LibraryCatalogueTable({
             key: "name",
             header: "Name",
             main: true,
-            sortValue: resourceName,
+            sortValue: nameOf,
             cell: (item) => (
               <>
                 <TableRecord
-                  name={resourceName(item)}
-                  openLabel={`Edit ${resourceName(item)}`}
+                  name={nameOf(item)}
+                  openLabel={`Edit ${nameOf(item)}`}
                   onOpen={onEdit && (() => onEdit(item))}
+                  tooltip={models && item.sha256 ? fileHashes(item.sha256) : undefined}
                   detail={
                     phone &&
                     [typeLabel(item), familySummary(item)]
@@ -374,8 +377,8 @@ export function LibraryCatalogueTable({
                       .join(" · ")
                   }
                 />
-                {item.file && <FileName file={item.file} sha256={item.sha256} />}
-                {(item.description || item.note) && (
+                {!models && item.file && <FileName file={item.file} sha256={item.sha256} />}
+                {!models && (item.description || item.note) && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {item.description || item.note}
                   </Text>
@@ -535,6 +538,16 @@ export function LibraryCatalogueTable({
   );
 }
 
+function fileHashes(sha256: string) {
+  return (
+    <div style={{ maxWidth: "21rem", overflowWrap: "anywhere", whiteSpace: "normal" }}>
+      <div>SHA256 {sha256}</div>
+      {/* AutoV2 is the SHA-256's first ten hex digits, as Civitai shows it. */}
+      <div>AutoV2 {sha256.slice(0, 10).toUpperCase()}</div>
+    </div>
+  );
+}
+
 /** A catalogued file's name with its extension, and its hashes on hover where its source recorded them. */
 export function FileName({
   file,
@@ -547,17 +560,7 @@ export function FileName({
     </Text>
   );
   return sha256 ? (
-    <Tooltip
-      multiline
-      w={360}
-      label={
-        <>
-          <div style={{ overflowWrap: "anywhere" }}>SHA256 {sha256}</div>
-          {/* AutoV2 is the SHA-256's first ten hex digits, as Civitai shows it. */}
-          <div>AutoV2 {sha256.slice(0, 10).toUpperCase()}</div>
-        </>
-      }
-    >
+    <Tooltip multiline w={360} label={fileHashes(sha256)}>
       {name}
     </Tooltip>
   ) : (

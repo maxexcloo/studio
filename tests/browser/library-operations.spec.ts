@@ -296,29 +296,31 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
   await openNav(page, "Library");
   await section(page, "Library", "Files");
   const table = page.getByRole("table", { name: "Library Files", exact: true });
-  await expect(table.getByText("Base Model", { exact: true })).toBeVisible();
+  await expect(table.getByText("base.safetensors", { exact: true })).toBeVisible();
   await updates(page, "Check");
-  await expect(table.getByRole("row").filter({ hasText: "Base Model" })).toContainText(
+  await expect(table.getByRole("row").filter({ hasText: "base.safetensors" })).toContainText(
     "Update Available",
   );
   expect(applied).toEqual([]);
-  await table.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
+  await table.getByRole("button", { name: "Actions for base.safetensors", exact: true }).click();
   await page.getByRole("menuitem", { name: "Update to Version 2", exact: true }).click();
-  await expect(table.getByRole("row").filter({ hasText: "Base Model" })).toContainText("Updating");
-  await table.getByRole("button", { name: "Actions for Paid Version Model", exact: true }).click();
+  await expect(table.getByRole("row").filter({ hasText: "base.safetensors" })).toContainText(
+    "Updating",
+  );
+  await table.getByRole("button", { name: "Actions for paid.safetensors", exact: true }).click();
   await page.getByRole("menuitem", { name: "Update to Free 2", exact: true }).click();
-  await expect(table.getByRole("row").filter({ hasText: "Paid Version Model" })).toContainText(
+  await expect(table.getByRole("row").filter({ hasText: "paid.safetensors" })).toContainText(
     "Updating",
   );
   expect(applied).toEqual([{ key: items[0].key }, { key: items[1].key, alternative: true }]);
   replacementVerified = true;
   await updates(page, "Check");
-  const original = table.getByRole("row").filter({ hasText: "Base Model" });
+  const original = table.getByRole("row").filter({ hasText: "base.safetensors" });
   await expect(original).toContainText(
     "Replacement verified; existing file retained because a profile still uses it.",
   );
   await expect(original.getByText("Installed", { exact: true })).toBeVisible();
-  await original.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
+  await original.getByRole("button", { name: "Actions for base.safetensors", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: /^Update to / })).toHaveCount(0);
   await page.keyboard.press("Escape");
   expect(applied).toHaveLength(2);
@@ -769,7 +771,7 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
       json: {
         items: [
           model("xl", "XL Base", ["sdxl"]),
-          model("flux", "Flux Base", ["flux2_dev"]),
+          model("Flux", "Flux Base", ["flux2_dev"]),
           model("later", "Later Model", ["sdxl"], false),
         ],
       },
@@ -779,7 +781,7 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   const table = page.getByRole("table", { name: "Library Files", exact: true });
   await expect(table.getByRole("row")).toHaveCount(3);
   const names = table.getByRole("button", { name: /^Edit / });
-  await expect(names).toHaveText(["Flux Base", "XL Base"]);
+  await expect(names).toHaveText(["Flux.safetensors", "xl.safetensors"]);
   // Files sort by type, then family and name, until a header chooses otherwise; phones fold Type.
   if (!test.info().project.use.isMobile)
     await expect(table.getByRole("columnheader", { name: "Type", exact: true })).toHaveAttribute(
@@ -791,14 +793,14 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(name).toHaveAttribute("aria-sort", "ascending");
   await name.getByRole("button").click();
   await expect(name).toHaveAttribute("aria-sort", "descending");
-  await expect(names).toHaveText(["XL Base", "Flux Base"]);
+  await expect(names).toHaveText(["xl.safetensors", "Flux.safetensors"]);
   await page.getByRole("button", { name: "Filter Files", exact: true }).click();
   await page
     .getByRole("radiogroup", { name: "Family", exact: true })
     .getByText("SDXL", { exact: true })
     .click();
   await expect(table.getByRole("row")).toHaveCount(2);
-  await expect(table).toContainText("XL Base");
+  await expect(table).toContainText("xl.safetensors");
   await page
     .getByRole("dialog", { name: "Filter Files", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
@@ -810,15 +812,15 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(2);
   // Escape leaves search, keeping the query and the Library open.
   await page.keyboard.press("Escape");
-  await expect(table).toContainText("Flux Base");
-  await expect(table).not.toContainText("XL Base");
+  await expect(table).toContainText("Flux.safetensors");
+  await expect(table).not.toContainText("xl.safetensors");
   await (await toolbarSearch(page, "Files")).fill("nothing");
   await expect(page.getByText("No Matches", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear Search", exact: true }).click();
   await page.keyboard.press("Escape");
   await chooseView(page, "Files", "Available");
   await expect(table.getByRole("row")).toHaveCount(2);
-  await expect(table).toContainText("Later Model");
+  await expect(table).toContainText("later.safetensors");
 });
 
 test("Library shows import grades and what each imported image is missing", async ({ page }) => {

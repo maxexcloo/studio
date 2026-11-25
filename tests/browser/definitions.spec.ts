@@ -257,7 +257,7 @@ test("Model classification saves and reads back while definition administration 
   await openNav(page, "Library");
   await section(page, "Library", "Files");
   const edit = async () => {
-    await page.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
+    await page.getByRole("button", { name: "Actions for base.safetensors", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   };
   await edit();
