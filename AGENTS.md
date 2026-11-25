@@ -192,8 +192,9 @@ recur across features.
   preview fills the stage above the verdicts and shares the viewer's
   gestures, top chrome, media controls and Details surface. Verdicts in
   fullscreen use the buttons. Passing a Dream result dislikes it and keeps it in
-  Discards for reference. Holding Pass
-  opens the reason picker: Too Similar and Glitch pass without a rating.
+  Discards for reference. The Pass Reason control beside Pass opens the
+  reason picker. Too Similar and Glitch pass without a rating and stay out of
+  Dream's preference keep rates.
   Comparisons in the deck and fullscreen video
   offer Pass, the lettered choices and Accept. Fullscreen image comparisons
   offer the single-image verdicts. Accept keeps the image shown and Super Like
@@ -295,7 +296,9 @@ recur across features.
   changed words below the field. Proposal Undo uses Clear in the composer
   and comes first in the viewer's AI menu. Suggestions
   never act on their own, and nothing floats over the text. They preload for
-  the viewer's and Library review's items and load as other menus open; an
+  the viewer and for upcoming Library review cards, with the current card's
+  secondary menus warmed after upcoming cards' Suggestions. Other menus load
+  suggestions as they open. An
   empty composer prompt's ideas load once the page is idle and again after one
   is picked, so its menu opens ready.
 - Report actual endpoint health: configuration alone does not prove readiness.

@@ -68,6 +68,24 @@ async function seed(
   return { state, viewer };
 }
 
+test("A finished result saves as a preset without staging a new draft", async ({ page }) => {
+  const { state } = await seed(page);
+  const posted = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === "/api/user-presets",
+  );
+  await viewerAction(page, "Recreate", "Save as Preset…");
+  const dialog = page.getByRole("dialog", { name: "Save as Preset", exact: true });
+  await dialog.getByRole("textbox", { name: "Preset Name", exact: true }).fill("Amber Bird Study");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  expect((await posted).postDataJSON()).toMatchObject({
+    title: "Amber Bird Study",
+    input: { prompt: "An amber bird", profileId: "image:test", steps: 28 },
+  });
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+  expect(state.jobs).toHaveLength(1);
+});
 test("The viewer resolves an older result’s checkpoint to its profile name", async ({ page }) => {
   await page.clock.setFixedTime(new Date(stamp));
   const model = "krea2_turbo_int8_convrot";

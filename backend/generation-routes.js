@@ -81,12 +81,17 @@ export function createGenerationSubmission({
     )
       return { backend: defaultWorkerId() };
     try {
-      const available = await mediaModels();
-      const profile =
-        available.models.profiles.find((item) => item.id === input?.profileId) ||
-        available.models.profiles.find(
+      const matching = ({ models }) =>
+        models.profiles.find((item) => item.id === input?.profileId) ||
+        models.profiles.find(
           (item) => item.workflow === input?.workflow && item.model === input?.model,
         );
+      let available = await mediaModels(false, { wait: !admission });
+      let profile = matching(available);
+      if (admission && !profile) {
+        available = await mediaModels();
+        profile = matching(available);
+      }
       if (!profile) {
         if (
           kindCapability === "video" &&

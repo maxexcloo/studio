@@ -342,6 +342,7 @@ test("Suggest can queue a variation of a library import without a job or prompt"
   const suggest = actions.getByRole("button").last();
   await expect(suggest).toHaveAccessibleName("Suggestions");
   await suggest.click();
+  await expandAssistantMenu(page.getByRole("menu").first(), "Suggestions");
   const submitted = page.waitForRequest(
     (request) =>
       request.method() === "POST" &&
@@ -1281,6 +1282,7 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
   await preview.getByRole("button", { name: "Suggestions", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Edit Comparison", exact: true })).toBeVisible();
+  await expandAssistantMenu(page.getByRole("menu").first(), "Suggestions");
   await expect(page.getByRole("menuitem", { name: "Closer Crop", exact: true })).toBeVisible();
   expect((await request).postDataJSON()).toMatchObject({
     surface: "viewer",

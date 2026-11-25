@@ -320,18 +320,6 @@ export function DreamPreview({
   function onKeyDown(event: KeyboardEvent) {
     const target = event.target as HTMLElement;
     if (
-      event.key === "Escape" &&
-      !event.defaultPrevented &&
-      !event.nativeEvent.isComposing &&
-      event.currentTarget.contains(target) &&
-      !layerAbove(stage.current, event)
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      dismissViewer(!phone && details, stage.current, () => setDetails(false), closeIfTop);
-      return;
-    }
-    if (
       !event.currentTarget.contains(target) ||
       target.closest("aside, input, textarea, select, [contenteditable='true'], [role='slider']") ||
       event.defaultPrevented ||
@@ -353,8 +341,9 @@ export function DreamPreview({
     <Modal
       id={id}
       opened
-      onClose={closeIfTop}
-      closeOnEscape={false}
+      onClose={closeWhenTop(id, () =>
+        dismissViewer(!phone && details, stage.current, () => setDetails(false), close),
+      )}
       fullScreen
       variant="viewer"
       withCloseButton={false}

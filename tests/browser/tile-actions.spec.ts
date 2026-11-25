@@ -135,6 +135,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Edit",
     "Recreate",
     "Upscale",
+    "Compare With Upload…",
     "Keep & Vary",
     "More Like This",
     "Similar",

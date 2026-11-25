@@ -710,6 +710,16 @@ export function useMediaActions(
                     description: changedPrompt === "" ? "Write a prompt first" : undefined,
                     onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
+                  ...(image && item.jobId
+                    ? [
+                        {
+                          id: "save-result-preset",
+                          label: "Save as Preset…",
+                          icon: icons.preset,
+                          onClick: onSavePreset,
+                        },
+                      ]
+                    : []),
                 ],
               ],
               [
@@ -726,16 +736,6 @@ export function useMediaActions(
                     ]
                   : []),
                 recreateAction,
-                ...(image && item.jobId
-                  ? [
-                      {
-                        id: "save-result-preset",
-                        label: "Save as Preset…",
-                        icon: icons.preset,
-                        onClick: onSavePreset,
-                      },
-                    ]
-                  : []),
               ],
             ),
     }),

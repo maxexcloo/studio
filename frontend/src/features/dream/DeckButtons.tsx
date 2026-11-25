@@ -63,6 +63,7 @@ export function DeckButtons({
 }) {
   const comparison = card.kind === "pair" && !singleImageComparison;
   const answers = dreamChoices(card, singleImageComparison, quickRating).at(-1)!;
+  const reasonButton = answers.some(({ id }) => id === "discard") ? "discard" : "neither";
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
   const { consumeClick, ...hold } = useHold(card.key, askPass);
   return (
@@ -90,51 +91,56 @@ export function DeckButtons({
               : !quickRating && (id === "keep" || id === "both")
                 ? "Keep Unrated and Teach Dream"
                 : undefined;
-        return (
-          <Fragment key={id}>
-            <Tooltip label={description ?? title}>
+        const answer = (
+          <Tooltip label={description ?? title}>
+            <ActionIcon
+              className={classes.answer}
+              data-touch-target
+              variant="light"
+              color={side ? "blue" : looks[id].color}
+              radius="50%"
+              data-size={
+                side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
+              }
+              aria-label={title}
+              aria-description={description}
+              aria-keyshortcuts={pass ? "Shift+F10" : undefined}
+              data-pass={pass || undefined}
+              {...(pass && hold)}
+              onClick={(event) => {
+                if (!pass || !consumeClick(event)) act(choice);
+              }}
+            >
+              {side ? (
+                <Text fw={700} fz={26}>
+                  {title}
+                </Text>
+              ) : (
+                looks[id].glyph
+              )}
+            </ActionIcon>
+          </Tooltip>
+        );
+        return pass && id === reasonButton ? (
+          <div key={id} className={classes.passChoices}>
+            {answer}
+            <Tooltip label="Pass Reason">
               <ActionIcon
-                className={classes.answer}
+                className={classes.passReasonButton}
+                variant="default"
+                color="gray"
+                radius="xl"
+                size="sm"
                 data-touch-target
-                variant="light"
-                color={side ? "blue" : looks[id].color}
-                radius="50%"
-                data-size={
-                  side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
-                }
-                aria-label={title}
-                aria-description={description}
-                aria-keyshortcuts={pass ? "Shift+F10" : undefined}
-                data-pass={pass || undefined}
-                {...(pass && hold)}
-                onClick={(event) => {
-                  if (!pass || !consumeClick(event)) act(choice);
-                }}
+                aria-label="Pass Reason"
+                onClick={askPass}
               >
-                {side ? (
-                  <Text fw={700} fz={26}>
-                    {title}
-                  </Text>
-                ) : (
-                  looks[id].glyph
-                )}
+                <ChevronDown size={16} />
               </ActionIcon>
             </Tooltip>
-            {pass && (
-              <Tooltip label="Pass Reason">
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  data-touch-target
-                  aria-label="Pass Reason"
-                  onClick={askPass}
-                >
-                  <ChevronDown size={16} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </Fragment>
+          </div>
+        ) : (
+          <Fragment key={id}>{answer}</Fragment>
         );
       })}
       {trailing}
