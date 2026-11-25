@@ -968,6 +968,17 @@ test("Library preset loading confirms replacement and restores saved references 
   });
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An unsaved owl");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.keys(localStorage).some(
+          (key) =>
+            key.startsWith("studio-composer-draft:") &&
+            JSON.parse(localStorage.getItem(key)!).image.input.prompt === "An unsaved owl",
+        ),
+      ),
+    )
+    .toBe(true);
   await page.evaluate(() => {
     const key = Object.keys(localStorage).find((key) => key.startsWith("studio-composer-draft:"))!;
     const drafts = JSON.parse(localStorage.getItem(key)!);

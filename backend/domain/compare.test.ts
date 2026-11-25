@@ -294,6 +294,47 @@ test("compare runs queue one seeded set, read back per owner and record the star
     ],
   );
 
+  gallery.push(
+    {
+      id: "upload",
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      uploaded: true,
+      url: "/upload.png",
+    },
+    {
+      id: "foreign-upload",
+      ownerId: "bob",
+      type: "image",
+      status: "done",
+      uploaded: true,
+      url: "/foreign.png",
+    },
+  );
+  const jobCount = store.jobs("alice").length;
+  const importComparison = await request("", {
+    jobIds: [winner.jobId, ""],
+    itemIds: ["w-0", "upload"],
+  });
+  assert.equal(importComparison.status, 201);
+  assert.equal(store.jobs("alice").length, jobCount);
+  const importedReloaded = await request(`/${importComparison.body.id}`);
+  assert.deepEqual(
+    importedReloaded.body.variants.map((entry: { item: { id: string } }) => entry.item.id),
+    ["w-0", "upload"],
+  );
+  const importedVote = await request(
+    `/${importComparison.body.id}/vote`,
+    { itemId: "upload" },
+    "PUT",
+  );
+  assert.equal(importedVote.body.winnerItemId, "upload");
+  assert.equal(
+    (await request("", { jobIds: [winner.jobId, ""], itemIds: ["w-0", "foreign-upload"] })).status,
+    404,
+  );
+
   // Two outputs of the same job stay distinct, including their winner and taste signal.
   const batch = await request("", {
     jobIds: [winner.jobId, winner.jobId],

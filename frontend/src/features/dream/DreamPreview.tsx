@@ -34,7 +34,7 @@ import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome, ViewerMetadata, ViewerTitle } from "../gallery/ViewerChrome";
-import { ViewerDetails } from "../gallery/ViewerDetails";
+import { ViewerDetails, dismissViewer } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
 import { ZoomImage } from "../gallery/zoomImage";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
@@ -341,7 +341,9 @@ export function DreamPreview({
     <Modal
       id={id}
       opened
-      onClose={closeIfTop}
+      onClose={closeWhenTop(id, () =>
+        dismissViewer(!phone && details, stage.current, () => setDetails(false), close),
+      )}
       fullScreen
       variant="viewer"
       withCloseButton={false}

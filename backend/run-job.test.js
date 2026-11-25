@@ -21,7 +21,8 @@ writeTestWorkflows(process.env.STUDIO_DATA_DIR);
 const { jobs, runJob } = await import("./jobs.js");
 const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
-const { registerJobRoutes } = await import("./job-routes.js");
+const { registerQueueRoutes } = await import("./domain/routes.ts");
+const { findDirectRoute } = await import("./domain/direct-route.ts");
 const { openDatabase } = await import("./persistence/runtime.ts");
 const { createGenerationQueueAdapter } = await import("./domain/generation-adapter.ts");
 const { GenerationQueue } = await import("./domain/queue.ts");
@@ -230,11 +231,16 @@ test(
         },
       }),
     );
-    const routes = new Map();
-    registerJobRoutes(
-      { get() {}, post: (route, handler) => routes.set(route, handler) },
-      { store: records, queue: generations },
-    );
+    const app = {};
+    registerQueueRoutes(app, {
+      store: records,
+      queue: generations,
+      admit: async () => {
+        throw new Error("Unexpected admission");
+      },
+      media: () => [],
+      ownsItem: () => false,
+    });
     await generations.tick();
     const prompt = await queued;
     await fake.socketFor(id);
@@ -250,7 +256,10 @@ test(
       },
     });
     await waitFor(() => jobs.get(id)?.keepsPicture, "the saved picture");
-    await routes.get("/api/queue/cancel")({ params: {} }, { json() {} });
+    const cancelAll = findDirectRoute(app, "POST", "/api/queue/cancel-all");
+    const cancelled = await cancelAll.run(null, { params: cancelAll.params, query: {} });
+    assert.equal(cancelled.status, 200);
+    assert.equal(cancelled.payload.outcomes[0].job.id, id);
     await running;
     const item = galleryRows().find((entry) => entry.jobId === id);
     assert.equal(item.status, "done");

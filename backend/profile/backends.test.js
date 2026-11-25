@@ -284,8 +284,11 @@ test("combined admission queues parked variants and keeps worker, reference and 
   const comfy = await startFakeComfy({ objectInfo: info });
   t.after(() => comfy.close());
   let radianceReads = 0;
-  const radiance = http.createServer((_request, response) => {
+  const coldCatalogue = Promise.withResolvers();
+  t.after(() => coldCatalogue.resolve());
+  const radiance = http.createServer(async (_request, response) => {
     radianceReads++;
+    await coldCatalogue.promise;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ data: [] }));
   });
@@ -388,6 +391,20 @@ test("combined admission queues parked variants and keeps worker, reference and 
   );
 
   parked = new Set(["spare"]);
+  try {
+    const ready = await routes.validateInput(
+      request({
+        profileBackend: "comfyui",
+        workflow: profile.workflow,
+        model: profile.model,
+        referenceAssets: [{ slot: "comfy-reference", assetId: "owned" }],
+      }),
+      artist,
+    );
+    assert.deepEqual(ready, { status: 200, payload: { ok: true, backend: "comfy" } });
+  } finally {
+    coldCatalogue.resolve();
+  }
   const missing = await routes.validateInput(request(), artist);
   assert.equal(missing.status, 409);
   assert.match(missing.payload.error, /missing MissingRadianceNode/);

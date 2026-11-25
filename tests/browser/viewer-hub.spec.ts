@@ -68,6 +68,24 @@ async function seed(
   return { state, viewer };
 }
 
+test("A finished result saves as a preset without staging a new draft", async ({ page }) => {
+  const { state } = await seed(page);
+  const posted = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === "/api/user-presets",
+  );
+  await viewerAction(page, "Recreate", "Save as Preset…");
+  const dialog = page.getByRole("dialog", { name: "Save as Preset", exact: true });
+  await dialog.getByRole("textbox", { name: "Preset Name", exact: true }).fill("Amber Bird Study");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  expect((await posted).postDataJSON()).toMatchObject({
+    title: "Amber Bird Study",
+    input: { prompt: "An amber bird", profileId: "image:test", steps: 28 },
+  });
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+  expect(state.jobs).toHaveLength(1);
+});
 test("The viewer resolves an older result’s checkpoint to its profile name", async ({ page }) => {
   await page.clock.setFixedTime(new Date(stamp));
   const model = "krea2_turbo_int8_convrot";
@@ -442,6 +460,45 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
   await viewer.getByRole("button", { name: "AI", exact: true }).click();
   await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("An amber bird");
+});
+
+test("The viewer restores drafts per result and keeps an edit when a run fails", async ({
+  page,
+  isMobile,
+}) => {
+  const { viewer } = await seed(page, {}, async (page, state) => {
+    state.gallery.push({
+      ...state.gallery[0],
+      id: "neighbour",
+      jobId: "job-neighbour",
+      prompt: "An ivory fox",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await page.route(/\/api\/sessions\/[^/]+\/generations$/, (route) =>
+      route.fulfill({ status: 503, json: { error: "The worker is unavailable." } }),
+    );
+  });
+  const summary = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const surface = isMobile ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
+  const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  if (isMobile) await summary.click();
+  await field.fill("An amber bird at night");
+  if (isMobile) await closeTextEditor(page, "Prompt");
+  else await page.keyboard.press("Escape");
+
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(summary).toHaveValue("An ivory fox");
+  await page.keyboard.press("ArrowLeft");
+  await expect(summary).toHaveValue("An amber bird at night");
+
+  const response = page.waitForResponse(
+    (result) => result.url().endsWith("/generations") && result.status() === 503,
+  );
+  await sendField(page, "Prompt", "An amber bird in fog", "Generate");
+  await response;
+  await expect(viewer).toBeVisible();
+  await expect(summary).toHaveValue("An amber bird in fog");
 });
 
 test("A delayed automatic change runs on its source without closing the next image", async ({

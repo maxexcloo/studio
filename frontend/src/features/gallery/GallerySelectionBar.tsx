@@ -1,5 +1,5 @@
 import { Button, Divider, Menu, Text } from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -24,6 +24,7 @@ import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
 import {
   type AnimateRequest,
+  animateProfileQuery,
   useAnimateLengthSetting,
   useAnimateModifiers,
   useAnimateTemplates,
@@ -107,10 +108,15 @@ export function GallerySelectionBar({
   const recreateOn = useRecreateOn();
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
-  const templates = useAnimateTemplates();
   const modifiers = useAnimateModifiers();
   const { menu: profiles, profileId } = useActionProfile("video");
-  const length = useAnimateLengthSetting(finishedImages[0], profileId);
+  const firstImage = finishedImages[0];
+  const length = useAnimateLengthSetting(firstImage, profileId);
+  const animation = useQuery({
+    ...animateProfileQuery(firstImage ?? {}, profileId),
+    enabled: Boolean(firstImage),
+  });
+  const templates = useAnimateTemplates(animation.data?.sound);
   const client = useQueryClient();
   const animate = useMutation({
     mutationFn: async (request: AnimateRequest) => {
@@ -131,11 +137,11 @@ export function GallerySelectionBar({
     selected.length >= 2 &&
     selected.length <= compareLimit &&
     selected.every((item) => item.type === "image" && item.status === "done");
-  const comparable = images && selected.every((item) => item.jobId);
+  const comparable = images && selected.every((item) => item.jobId || item.uploaded);
   const compare = useMutation({
     mutationFn: () =>
       post<{ id: string }>("/api/comparisons", {
-        jobIds: selected.map((item) => item.jobId),
+        jobIds: selected.map((item) => item.jobId ?? ""),
         itemIds: selected.map((item) => item.id),
       }),
     onSuccess: (comparison) => {
@@ -215,7 +221,9 @@ export function GallerySelectionBar({
         onClick: () => void stopSelected(),
       }),
     finishedImages.length > 0 &&
-      templates.length > 0 &&
+      templates.some((template) => template.id !== "custom") &&
+      !!animation.data &&
+      !animation.isError &&
       itemAction("animate", {
         loading: animate.isPending,
         menu: assistMenu({

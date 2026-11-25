@@ -306,6 +306,7 @@ test("The viewer groups Suggestions and Templates with their briefs", async ({
   expect(asked.filter((body) => body.surface === "change")).toEqual([]);
   await viewerAction(page, "Discover");
   await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText([
+    "Compare With Upload…",
     "Keep & Vary",
     "More Like This",
     "Similar",
@@ -528,6 +529,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Refresh",
     "Run Again",
     "Run Again, Same Seed",
+    "Save as Preset…",
     "Compare in Composer",
     "Recreate in Composer",
   ]);

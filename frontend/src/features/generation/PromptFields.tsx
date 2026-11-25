@@ -1,6 +1,6 @@
 import { ActionIcon, Image } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ComponentProps, type ReactNode, type Ref, memo } from "react";
+import { type ComponentProps, type ReactNode, type Ref, memo, useState } from "react";
 
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
@@ -38,16 +38,20 @@ export function useDraftChange({
   input,
   references,
   operation,
+  scope,
   onChange,
   onOperationChange,
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
   operation: Operation;
+  scope: string;
   onChange: (patch: Partial<GenerationInput>) => void;
   onOperationChange: (operation: Operation) => void;
 }) {
+  const context = draftSuggestionContext(input, references);
   const ask = useAskChange<{ prompt: string; operation: Operation }>({
+    scope: JSON.stringify([scope, input.prompt, input.profileBackend, context]),
     ask: (request, typed) => {
       const actions: ChangeAction[] =
         input.kind === "video"
@@ -55,12 +59,7 @@ export function useDraftChange({
           : references.length
             ? ["edit", "recreate"]
             : ["recreate"];
-      return askDraftChange(
-        draftSuggestionContext(input, references),
-        typed.prompt,
-        request,
-        actions,
-      );
+      return askDraftChange(context, typed.prompt, request, actions);
     },
     show: ({ action, prompt }, typed) => {
       onChange({ prompt, originalPrompt: typed.prompt });
@@ -141,10 +140,14 @@ export function PromptFields({
   // Suggestions change the prompt as it was before any proposal.
   const base = ask?.typed?.prompt ?? input.prompt;
   const context = draftSuggestionContext(input, references);
-  const steps = draftStepsQuery(context, base.trim());
+  const [requested, setRequested] = useState<{
+    context: typeof context;
+    prompt: string;
+  }>();
+  const steps = draftStepsQuery(requested?.context ?? context, requested?.prompt ?? "");
   const draftSuggestions = useChangeSuggestions({
     query: steps,
-    fresh: () => askDraftSteps(context, base.trim(), true),
+    fresh: () => askDraftSteps(requested?.context ?? context, requested?.prompt ?? "", true),
     enabled: false,
     disabled: ask?.pending,
     onPick: (request) => ask?.sendRequest(request),
@@ -153,7 +156,14 @@ export function PromptFields({
   const suggestions =
     ideas.suggestions ??
     (ask?.available && base.trim()
-      ? { ...draftSuggestions, load: () => void client.fetchQuery(steps).catch(() => {}) }
+      ? {
+          ...draftSuggestions,
+          load: () => {
+            const prompt = base.trim();
+            setRequested({ context, prompt });
+            void client.fetchQuery(draftStepsQuery(context, prompt)).catch(() => {});
+          },
+        }
       : undefined);
   const preview = useMediaPreview();
   const pictures = compact

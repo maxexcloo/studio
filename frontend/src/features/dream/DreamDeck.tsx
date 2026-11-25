@@ -20,7 +20,6 @@ import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
-import { useRemembered } from "../auth/useRemembered";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { usePrefetchResultSuggestions } from "../gallery/usePrefetchResultSuggestions";
@@ -341,18 +340,14 @@ export function DreamDeck({
   /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
   const isPass = (choice: Verdict | PairAnswer) =>
     !quickRating && (choice === "neither" || (top?.kind !== "set" && choice === "discard"));
-  // Touch screens have no tooltips, so they say once, until the first Pass, that holding it asks why.
-  const [passHinted, setPassHinted] = useRemembered("dream-pass-hint", false);
   const askPass = () => {
     if (!top || busy.current) return;
-    setPassHinted(true);
     setPassReason(passReasons[0]);
     setPassing(top.key);
   };
   async function act(choice: Verdict | PairAnswer, reason?: DreamPassReason) {
     if (!top || busy.current) return;
     const passReason = isPass(choice) ? (reason ?? "skip") : undefined;
-    if (passReason) setPassHinted(true);
     busy.current = true;
     const out = (viewing ? previewFly : fly).current;
     try {
@@ -590,11 +585,6 @@ export function DreamDeck({
           )
         }
       />
-      {touch && !passHinted && !quickRating && top.kind !== "set" && (
-        <Text size="xs" c="dimmed" ta="center">
-          Hold Pass to add a reason
-        </Text>
-      )}
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"

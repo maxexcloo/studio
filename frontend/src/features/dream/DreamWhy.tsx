@@ -1,8 +1,10 @@
 import { Anchor, Stack, Text } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 import { Fragment, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import type { MediaKind } from "../../types";
+import { galleryItemQuery } from "../gallery/queries";
 import { followed, viewerPath } from "../gallery/viewerLink";
 import type { DreamItem } from "./queries";
 
@@ -41,25 +43,51 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /** Details › Why Dream Made This: its reason and what fed it, as recorded when it was made. */
 export function DreamWhy({ item, question }: { item: DreamItem; question?: string }) {
   const { dream } = item;
+  const inputs = dream?.inputs ?? {};
+  const recorded = inputs.prompts?.find((liked) => liked.id === item.parentItemId);
+  const parent = useQuery({
+    ...galleryItemQuery(item.parentItemId ?? ""),
+    enabled: Boolean(dream && item.parentItemId && !recorded),
+  }).data?.item;
   if (!dream) return null;
-  const inputs = dream.inputs ?? {};
   const from = dream.pair ? "Comparison" : source(dream.arm);
+  const sourceResult = recorded ?? parent;
+  const sourceLink = sourceResult
+    ? {
+        to: viewerPath({ ...sourceResult, type: sourceResult.type as MediaKind }),
+        label: "View Source",
+      }
+    : dream.projectId
+      ? { to: `/dream/projects/${encodeURIComponent(dream.projectId)}`, label: "View Project" }
+      : dream.arm === "exploit" || dream.arm?.startsWith("explore")
+        ? { to: "/settings#taste", label: "View Taste" }
+        : null;
   return (
     <Stack gap={4}>
       <Text size="sm" fw={600}>
         Why Dream Made This
       </Text>
+      {(from || sourceLink) && (
+        <Row label="Source">
+          {[from || "Previous Result", dream.uncensored && "Uncensored"]
+            .filter(Boolean)
+            .join(" · ")}
+          {sourceLink && (
+            <>
+              {" · "}
+              <Anchor component={Link} to={sourceLink.to} state={followed} inherit>
+                {sourceLink.label}
+              </Anchor>
+            </>
+          )}
+        </Row>
+      )}
       {dream.brief && <Text size="sm">{dream.brief}</Text>}
       {question && <Text size="sm">{question}</Text>}
       {dream.why && (
         <Text size="sm" c="dimmed">
           {dream.why}
         </Text>
-      )}
-      {from && (
-        <Row label="Source">
-          {[from, dream.uncensored && "Uncensored"].filter(Boolean).join(" · ")}
-        </Row>
       )}
       {inputs.project && <Row label="Project">{inputs.project}</Row>}
       {inputs.likes && <Row label="Likes">{inputs.likes.join(", ")}</Row>}

@@ -631,8 +631,6 @@ export function inferModels(
     )?.id || "";
   return {
     ...incomplete,
-    imageModels: imageProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
-    videoModels: videoProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     profiles,
     textEncoders: clips,
     vaes,

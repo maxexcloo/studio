@@ -69,7 +69,7 @@ export function createGenerationQueue({
   // towards the last worker, keeping the first free for manual work.
   async function queueResourceFor(input, priority = queuePriority.manual) {
     if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
-    const models = await mediaModels(false)
+    const models = await mediaModels(false, { wait: false })
       .then((result) => result.models)
       .catch(() => ({ profiles: [] }));
     const profile = models.profiles?.find((item) => item.id === input.profileId);

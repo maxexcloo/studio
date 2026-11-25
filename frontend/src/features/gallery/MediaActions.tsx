@@ -42,6 +42,7 @@ import { automaticEditProfile } from "./editProfile";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import { useActionProfile } from "./mediaProfiles";
+import { CompareUploadDialog, SaveResultPresetDialog } from "./MediaResultDialogs";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
 import { ReportIssueDialog, issues, useReportIssue } from "./ReportIssueDialog";
@@ -230,6 +231,8 @@ interface MediaActionOptions {
   iterate?: (iteration: Iteration) => void;
   onApplied?: () => void;
   onCompare?: () => void;
+  onCompareUpload: () => void;
+  onSavePreset: () => void;
   /** Opens Animate's dialog: Custom…, or any template or suggested motion under Review Prompt. */
   onAnimate: (choice: AnimateRequest) => void;
   onVary: (
@@ -259,6 +262,8 @@ export function useMediaActions(
     iterate,
     onApplied = () => {},
     onCompare,
+    onCompareUpload,
+    onSavePreset,
     onAnimate,
     onVary,
     onDelete,
@@ -412,7 +417,7 @@ export function useMediaActions(
     action.isPending ||
     length.loading ||
     ((!video || Boolean(animationProfileId)) && !animation.data);
-  const templates = useAnimateTemplates();
+  const templates = useAnimateTemplates(animation.data?.sound);
   const modifiers = useAnimateModifiers();
   const request = { profileId: animationProfileId, modifiers: modifiers.ticked };
   const templateItem = (template: AssistantOption): Action => ({
@@ -555,6 +560,16 @@ export function useMediaActions(
   // Discovery from this image, A–Z: More Like This, the gallery ranked by likeness to it
   // (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
+    ...(image && item.jobId && !item.uploaded
+      ? [
+          {
+            id: "compare-upload",
+            label: "Compare With Upload…",
+            icon: icons.compare,
+            onClick: onCompareUpload,
+          },
+        ]
+      : []),
     ...(image && assistedChanges && variationPrompt.trim()
       ? [keepAndVaryAction((direction) => onVary(direction, variationPrompt, onApplied))]
       : []),
@@ -695,6 +710,16 @@ export function useMediaActions(
                     description: changedPrompt === "" ? "Write a prompt first" : undefined,
                     onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
+                  ...(image && item.jobId
+                    ? [
+                        {
+                          id: "save-result-preset",
+                          label: "Save as Preset…",
+                          icon: icons.preset,
+                          onClick: onSavePreset,
+                        },
+                      ]
+                    : []),
                 ],
               ],
               [
@@ -806,6 +831,8 @@ export function useMediaDialogs(
 ) {
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [reporting, setReporting] = useState(false);
+  const [comparingUpload, setComparingUpload] = useState(false);
+  const [savingPreset, setSavingPreset] = useState(false);
   const [varying, setVarying] = useState<{
     direction: VariationDirection | "explore";
     prompt: string;
@@ -818,9 +845,17 @@ export function useMediaDialogs(
       onVary: (direction: VariationDirection | "explore", prompt: string, onApplied: () => void) =>
         setVarying({ direction, prompt, onApplied }),
       onReportQueued,
+      onCompareUpload: () => setComparingUpload(true),
+      onSavePreset: () => setSavingPreset(true),
     },
     dialogs: (
       <>
+        {comparingUpload && (
+          <CompareUploadDialog item={item} onClose={() => setComparingUpload(false)} />
+        )}
+        {savingPreset && (
+          <SaveResultPresetDialog item={item} onClose={() => setSavingPreset(false)} />
+        )}
         {animating && (
           <AnimateDialog
             item={item}

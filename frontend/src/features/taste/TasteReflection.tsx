@@ -2,9 +2,6 @@ import { Group, Image, Stack, Text } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import { api } from "../../api";
-import { HistoryTable } from "../../ui/DataTable";
-import { EmptyState } from "../../ui/EmptyState";
-import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 
 /** How alike a window of images is (backend/domain/reflection.ts). */
@@ -14,18 +11,8 @@ interface Sameness {
   converging: boolean;
   examples: { id: string; url: string; title: string }[];
 }
-interface Day {
-  day: string;
-  profileId: string;
-  profileName: string;
-  model: string;
-  made: number;
-  liked: number;
-  disliked: number;
-}
 interface Reflection {
   sameness: { made: Sameness; liked: Sameness };
-  days: Day[];
 }
 const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 export const reflectionQuery = queryOptions({
@@ -78,80 +65,15 @@ function VarietyRow({ label, sameness }: { label: string; sameness: Sameness }) 
 export function TasteVariety() {
   const reflection = useQuery(reflectionQuery);
   const data = reflection.data;
+  if (!data || !(data.sameness.liked.converging || data.sameness.made.converging)) return null;
   return (
     <SettingGroup title="Variety">
-      {reflection.isPending && <LoadingState label="Loading Variety" />}
-      {data && (
-        <>
-          <VarietyRow label="Recent Likes" sameness={data.sameness.liked} />
-          <VarietyRow label="Recent Results" sameness={data.sameness.made} />
-        </>
+      {data.sameness.liked.converging && (
+        <VarietyRow label="Recent Likes" sameness={data.sameness.liked} />
       )}
-    </SettingGroup>
-  );
-}
-
-export function TasteHistory() {
-  const reflection = useQuery(reflectionQuery);
-  return (
-    <SettingGroup title="History">
-      <HistoryTable
-        label="History"
-        compact
-        rows={reflection.data?.days || []}
-        rowKey={(row) => `${row.day} ${row.profileId} ${row.model}`}
-        rowName={(row) => `${row.day} ${row.profileName || row.profileId}`}
-        loading={reflection.isPending && "Loading Results"}
-        empty={<EmptyState inline>No Results in the Last 30 Days</EmptyState>}
-        columns={[
-          {
-            key: "day",
-            header: "Day",
-            cell: (row) => (
-              <Text size="sm" style={{ whiteSpace: "nowrap" }}>
-                {row.day}
-              </Text>
-            ),
-            sortValue: (row) => row.day,
-          },
-          {
-            key: "model",
-            header: "Model",
-            main: true,
-            cell: (row) => (
-              <Stack gap={0}>
-                <Text size="sm" truncate>
-                  {row.profileName || row.profileId || "Unknown"}
-                </Text>
-                {row.model && (
-                  <Text size="xs" c="dimmed" truncate>
-                    {row.model}
-                  </Text>
-                )}
-              </Stack>
-            ),
-            sortValue: (row) => row.profileName || row.profileId,
-          },
-          {
-            key: "made",
-            header: "Made",
-            cell: (row) => <Text size="sm">{row.made}</Text>,
-            sortValue: (row) => row.made,
-          },
-          {
-            key: "liked",
-            header: "Liked",
-            cell: (row) => <Text size="sm">{percent(row.liked / row.made)}</Text>,
-            sortValue: (row) => row.liked / row.made,
-          },
-          {
-            key: "disliked",
-            header: "Disliked",
-            cell: (row) => <Text size="sm">{percent(row.disliked / row.made)}</Text>,
-            sortValue: (row) => row.disliked / row.made,
-          },
-        ]}
-      />
+      {data.sameness.made.converging && (
+        <VarietyRow label="Recent Results" sameness={data.sameness.made} />
+      )}
     </SettingGroup>
   );
 }

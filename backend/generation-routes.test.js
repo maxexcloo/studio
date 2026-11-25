@@ -12,13 +12,20 @@ const { createGenerationSubmission } = await import("./generation-routes.js");
 const granted = { id: "custom:granted", kind: "image", workflow: "custom:granted" };
 const other = { id: "custom:other", kind: "image", workflow: "custom:other", uncensored: true };
 for (const profile of [granted, other]) profile.model = profile.id;
+const catalogueReads = [];
 const routes = createGenerationSubmission({
   loadComfyContext: async () => {
     throw new Error("No ComfyUI in this fixture.");
   },
-  mediaModels: async () => ({
-    models: { profiles: [granted, other], workers: [{ id: "primary", available: false }] },
-  }),
+  mediaModels: async (_force, options) => {
+    catalogueReads.push(options?.wait);
+    return {
+      models: {
+        profiles: [granted, other],
+        workers: [{ id: "primary", available: false, parked: true }],
+      },
+    };
+  },
   comfyDownMessage: (message) => message,
 });
 const artist = {
@@ -47,4 +54,5 @@ test("an ordinary account runs only the profile it is granted", async () => {
   const chosen = request({ ...input, modelName: "uncensored-checkpoint.safetensors" });
   assert.equal((await routes.validateInput(chosen, administrator)).status, 200);
   assert.equal(chosen.modelName, "uncensored-checkpoint.safetensors");
+  assert.deepEqual(catalogueReads, [false, false, false, false, false]);
 });

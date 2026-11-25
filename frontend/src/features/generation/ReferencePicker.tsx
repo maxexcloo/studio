@@ -18,7 +18,7 @@ import { PromptCardChoices } from "../characters/PromptCardChoices";
 import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { chipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
-import { draftForProfile, useDraft, useGeneration } from "./GenerationProvider";
+import { useDraft } from "./GenerationProvider";
 import {
   controlRange,
   referenceDetails,
@@ -46,7 +46,7 @@ import {
   useReferencePlacement,
 } from "./references";
 import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
-import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowser";
+import type { ReferenceBrowser } from "./useReferenceBrowser";
 
 /** The Library's cards, after the gallery's tabs, with Characters. */
 const cardTabs: typeof galleryTabs = [
@@ -59,18 +59,18 @@ export function ReferencePicker({
   value,
   onChange,
   profile: selectedProfile,
-  input: selectedInput,
+  input,
   onInputChange,
-  opened: controlled,
-  onOpenedChange,
-  browser: controlledBrowser,
+  opened,
+  onOpenedChange: setOpened,
+  browser,
   onCharacterProfile,
 }: {
   /**
    * Where the sheet may move the model for a picked character, which then takes the character's
    * references and prompt: the composer's form (GenerationEditor) passes its draft's.
    */
-  onCharacterProfile?: (
+  onCharacterProfile: (
     profile: Profile,
     next: {
       references: ReferenceAsset[];
@@ -78,24 +78,17 @@ export function ReferencePicker({
       cardParts?: GenerationInput["cardParts"];
     },
   ) => void;
-  browser?: ReferenceBrowser;
-  value?: ReferenceAsset[];
-  onChange?: (references: ReferenceAsset[]) => void;
+  browser: ReferenceBrowser;
+  value: ReferenceAsset[];
+  onChange: (references: ReferenceAsset[]) => void;
   profile?: Profile;
-  input?: GenerationInput;
+  input: GenerationInput;
   /** Changes the editor's own input, such as the denoise an img2img start image's Strength sets. */
-  onInputChange?: (patch: Partial<GenerationInput>) => void;
-  opened?: boolean;
-  onOpenedChange?: (opened: boolean) => void;
+  onInputChange: (patch: Partial<GenerationInput>) => void;
+  opened: boolean;
+  onOpenedChange: (opened: boolean) => void;
 }) {
-  const [localOpen, setLocalOpen] = useState(false);
-  const opened = controlled ?? localOpen;
-  const setOpened = (opened: boolean) => {
-    setLocalOpen(opened);
-    onOpenedChange?.(opened);
-  };
   const phone = usePhone();
-  const { setDraft } = useGeneration();
   // The open sheet follows the prompt its characters, outfits and scenes join.
   const draft = useDraft(opened);
   const prompt = String(draft.input.prompt || "");
@@ -107,13 +100,10 @@ export function ReferencePicker({
     value,
     onChange,
     profile: selectedProfile,
-    input: selectedInput,
+    input,
   });
   const { profile } = list;
-  const references = orderedReferences(
-    referenceDetails(value || draft.references, selectedInput || draft.input, profile),
-    profile,
-  );
+  const references = orderedReferences(referenceDetails(value, input, profile), profile);
   const slots = runReferenceSlots(profile);
   const { placed: active, unused } = splitReferenceSlots(references, slots);
   const preview = useMediaPreview();
@@ -132,7 +122,6 @@ export function ReferencePicker({
   const [adding, setAdding] = usePickerChoices(phone && opened, !references.length);
   const placement = useReferencePlacement(list);
   // An img2img start image's Strength is the profile's denoise, where the profile maps one.
-  const input = selectedInput || draft.input;
   const startSlot =
     profile?.kind === "image" ? startImageSlot({ ...profile, mediaInputs: slots }) : undefined;
   const denoiseRange =
@@ -145,13 +134,8 @@ export function ReferencePicker({
     min: denoiseRange.min ?? 0,
     max: denoiseRange.max ?? 1,
     step: denoiseRange.step ?? 0.05,
-    onChange: (value: number) =>
-      onInputChange
-        ? onInputChange({ denoise: value })
-        : setDraft((previous) => ({ ...previous, input: { ...previous.input, denoise: value } })),
+    onChange: (value: number) => onInputChange({ denoise: value }),
   };
-  const localBrowser = useReferenceBrowser();
-  const browser = controlledBrowser || localBrowser;
   const chosen = browser.state.target;
   const referenceTabs = charactersOn ? [galleryTabs, cardTabs] : [galleryTabs];
   const tab = referenceTabs.flat().some((item) => item.value === browser.state.tab)
@@ -369,14 +353,7 @@ export function ReferencePicker({
           sort={cardOrder.sort}
           prompt={prompt}
           parts={input.cardParts}
-          onChange={(prompt, cardParts) => {
-            if (onInputChange) onInputChange({ prompt, cardParts });
-            else
-              setDraft((previous) => ({
-                ...previous,
-                input: { ...previous.input, prompt, cardParts },
-              }));
-          }}
+          onChange={(prompt, cardParts) => onInputChange({ prompt, cardParts })}
           onLayer={setLayer}
         />
       ) : tab === "characters" ? (
@@ -387,20 +364,14 @@ export function ReferencePicker({
           prompt={prompt}
           parts={input.cardParts}
           profile={profile}
-          switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile)}
+          switchable
           onChange={(next) => {
             const editor = next.profile;
             // The composer's draft moves to the character's model, its images and prompt with it.
-            if (editor && onCharacterProfile) onCharacterProfile(editor, next);
-            else if (editor) setDraft((previous) => draftForProfile(previous, editor, next));
+            if (editor) onCharacterProfile(editor, next);
             else {
               list.set(next.references);
-              if (onInputChange) onInputChange({ prompt: next.prompt, cardParts: next.cardParts });
-              else
-                setDraft((previous) => ({
-                  ...previous,
-                  input: { ...previous.input, prompt: next.prompt, cardParts: next.cardParts },
-                }));
+              onInputChange({ prompt: next.prompt, cardParts: next.cardParts });
             }
             settle();
           }}

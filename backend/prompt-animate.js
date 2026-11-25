@@ -86,7 +86,7 @@ function pacing(seconds, fps = 0) {
 }
 
 /** Whether the profile makes sound with the picture. */
-function makesSound(profile) {
+export function makesSound(profile) {
   const family = String(profile.family || "").replaceAll("-", "_");
   return family === "ltx2" || families[family]?.audio === true || isCloudProfile(profile);
 }
@@ -112,9 +112,12 @@ export function animateInstructions({
   explicit = false,
 }) {
   const { seconds = 0, fps = 0 } = clip;
-  const theme = animateTheme(writing.theme);
-  if (!theme) throw new AssistantError("Choose a known animation theme.", { status: 400 });
   const audio = makesSound(profile);
+  const theme =
+    !audio && writing.theme === "dialogue"
+      ? (animateTheme("reaction") ?? animateTheme(writing.theme))
+      : animateTheme(writing.theme);
+  if (!theme) throw new AssistantError("Choose a known animation theme.", { status: 400 });
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
   // About two and a half spoken words a second, leaving room for the action around them.
   const speech = Math.round(2.5 * (seconds || 6));

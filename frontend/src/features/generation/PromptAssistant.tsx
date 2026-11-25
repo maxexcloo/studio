@@ -9,7 +9,14 @@ import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { assistMenu, suggested } from "./AskChange";
+import { askDraftSteps, draftStepsQuery, draftSuggestionContext } from "../taste/suggestions";
+import {
+  assistMenu,
+  instructionTemplates,
+  requestTool,
+  suggested,
+  useChangeSuggestions,
+} from "./AskChange";
 import { CustomDialog } from "./CustomDialog";
 import { profileForLoras } from "./payload";
 
@@ -111,7 +118,7 @@ export function usePromptAssistant({
   scopeKey?: string;
   /**
    * Sends Custom…'s text as a change to the draft (`useDraftChange`), proposed in the prompt for
-   * Undo. Without it, Custom… rewrites with the Custom style.
+   * Undo.
    */
   change?: {
     send: (request: string) => void;
@@ -120,9 +127,19 @@ export function usePromptAssistant({
 }) {
   const status = useQuery(assistantQuery);
   // Custom… asks what to change first.
-  const [asking, setAsking] = useState(false);
-  // A custom rewrite lands in the prompt box with the caret at its end, ready to edit.
-  const editAfter = useRef(false);
+  const [asking, setAsking] = useState<{
+    context: ReturnType<typeof draftSuggestionContext>;
+    prompt: string;
+  }>();
+  const [requestText, setRequestText] = useState("");
+  const context = asking?.context ?? draftSuggestionContext(input, references);
+  const base = asking?.prompt ?? "";
+  const suggestions = useChangeSuggestions({
+    query: draftStepsQuery(context, base),
+    fresh: () => askDraftSteps(context, base, true),
+    enabled: Boolean(asking && base.trim()),
+    onPick: setRequestText,
+  });
   // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
   const [loraFeedback, setLoraFeedback] = useState<{ message: string; error?: boolean }>();
@@ -220,12 +237,10 @@ export function usePromptAssistant({
     mutationFn: async ({
       action,
       preset,
-      instruction,
       preview,
     }: {
       action: Action;
       preset?: string;
-      instruction?: string;
       preview?: boolean;
     }) => {
       if (!profile || !input.prompt.trim())
@@ -240,13 +255,13 @@ export function usePromptAssistant({
       controller.current = abort;
       const body: Record<string, unknown> = {
         profileId: profile.id,
+        profileBackend: input.profileBackend,
+        hasReferences,
         prompt: input.prompt,
         loras: input.loras.filter((item) => item.enabled !== false).map((item) => item.name),
       };
       if (action === "rewrite") {
         body.preset = preset;
-        if (instruction) body.instruction = instruction;
-        body.stream = false;
         body.references = info?.vision
           ? await Promise.all(
               references.slice(0, 4).map((asset) => referenceImage(asset, abort.signal)),
@@ -287,16 +302,6 @@ export function usePromptAssistant({
           originalPrompt: current.input.originalPrompt ?? source.prompt,
           assistant: { preset, model: result.model, source: "ui" },
         });
-        if (editAfter.current) {
-          editAfter.current = false;
-          requestAnimationFrame(() => {
-            const field = document.querySelector<HTMLTextAreaElement>(
-              "textarea[data-expanded-prompt]",
-            );
-            field?.focus();
-            field?.setSelectionRange(field.value.length, field.value.length);
-          });
-        }
       } else {
         if (preview) {
           setNegativeIdea({ key: negativeKey, value: result.negative?.trim() || "" });
@@ -422,7 +427,6 @@ export function usePromptAssistant({
     if (style) setPresetId(style);
     assistance.mutate({ action, preset: style });
   };
-  const custom = info.presets.some((item) => item.id === "custom");
   const styles = info.presets.filter((item) => item.id !== "custom");
   const templates: ToolAction[] = styles.map((item) => ({
     id: `style:${item.id}`,
@@ -433,19 +437,20 @@ export function usePromptAssistant({
     disabled,
     onClick: () => run("rewrite", item.id),
   }));
-  const customActions: ToolAction[] =
-    custom || change
-      ? [
-          {
-            id: "custom",
-            label: "Custom…",
-            icon: icons.custom,
-            // A change can write a prompt from nothing; the Custom style rewrites one.
-            disabled: !change && disabled,
-            onClick: () => setAsking(true),
-          },
-        ]
-      : [];
+  const customActions: ToolAction[] = change
+    ? [
+        {
+          id: "custom",
+          label: "Custom…",
+          icon: icons.custom,
+          onClick: () =>
+            setAsking({
+              context: draftSuggestionContext(input, references),
+              prompt: input.prompt,
+            }),
+        },
+      ]
+    : [];
   const more: ToolAction[] = negativeOffered
     ? [{ id: "negative", label: "Write Negative", disabled, onClick: () => run("negative") }]
     : [];
@@ -465,22 +470,25 @@ export function usePromptAssistant({
         onClick: () => controller.current?.abort(),
       }
     : undefined;
-  // A change lands in the prompt as a proposal; the Custom style's rewrite, ready to edit.
-  function ask(text: string) {
-    if (change) change.send(text);
-    else if (!assisting) {
-      editAfter.current = true;
-      // Not remembered as the last style, which runs from one tap.
-      assistance.mutate({ action: "rewrite", preset: "custom", instruction: text });
-    }
-  }
-  const dialog = (
+  const dialog = change && (
     <CustomDialog
-      opened={asking}
-      onClose={() => setAsking(false)}
+      opened={Boolean(asking)}
+      onClose={() => setAsking(undefined)}
       title="Custom Improvement"
       action="Improve"
-      onSend={ask}
+      draft={{ value: requestText, onChange: setRequestText }}
+      tools={[
+        requestTool(
+          instructionTemplates(
+            input.kind === "video" ? (info.themes ?? []) : (info.changes ?? []),
+            setRequestText,
+            undefined,
+            input.kind === "image" && !hasReferences ? "recreate" : undefined,
+          ),
+          base.trim() ? suggestions : undefined,
+        ),
+      ]}
+      onSend={change.send}
     />
   );
   const preview = negativeIdea?.key === negativeKey ? negativeIdea.value : undefined;

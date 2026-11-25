@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -233,6 +234,20 @@ function useGenerationState() {
   const drafts = useRef(restored);
   const [store] = useState(() => draftStore(restored.image));
   const draft = useSyncExternalStore(store.subscribe, store.settled);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveDrafts = useCallback(() => {
+    if (saveTimer.current === undefined) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = undefined;
+    localStorage.setItem(storageKey, JSON.stringify(drafts.current));
+  }, [storageKey]);
+  useEffect(() => {
+    window.addEventListener("pagehide", saveDrafts);
+    return () => {
+      window.removeEventListener("pagehide", saveDrafts);
+      saveDrafts();
+    };
+  }, [saveDrafts]);
   const setDraft = useCallback(
     (value: Draft | ((previous: Draft) => Draft)) => {
       const previous = store.get();
@@ -240,9 +255,10 @@ function useGenerationState() {
       const next = store.get();
       drafts.current[previous.input.kind] = previous;
       drafts.current[next.input.kind] = next;
-      localStorage.setItem(storageKey, JSON.stringify(drafts.current));
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(saveDrafts, 120);
     },
-    [store, storageKey],
+    [store, saveDrafts],
   );
   const changeKind = useCallback(
     (kind: MediaKind) => {

@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, showGalleryView, stamp, toolbarSearch } from "./fixtures";
+import {
+  expandAssistantMenu,
+  fixtures,
+  image,
+  showGalleryView,
+  stamp,
+  toolbarSearch,
+} from "./fixtures";
 
 const result = (id: string, title: string, createdAt = stamp) => ({
   id,
@@ -157,23 +164,23 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
   const deck = page.getByRole("region", { name: "Review", exact: true });
   const card = deck.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card.getByText("Review Result 0", { exact: true })).toBeVisible();
-  const warmed = (count: number) =>
+  const warmed = (count: number, currentCount: number) =>
     results
       .slice(0, count)
-      .flatMap(({ id }) => ["viewer", "recreate", "edit", "animate"].map((mode) => `${id}:${mode}`))
+      .flatMap(({ id }, index) =>
+        (index < currentCount ? ["viewer", "recreate", "edit", "animate"] : ["viewer"]).map(
+          (mode) => `${id}:${mode}`,
+        ),
+      )
       .sort();
-  await expect.poll(() => [...asked].sort()).toEqual(warmed(6));
-  expect(asked.slice(0, 4)).toEqual([
-    "review-0:viewer",
-    "review-0:recreate",
-    "review-0:edit",
-    "review-0:animate",
-  ]);
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(6, 1));
+  expect(asked.slice(0, 2)).toEqual(["review-0:viewer", "review-1:viewer"]);
   await deck.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(card.getByText("Review Result 1", { exact: true })).toBeVisible();
-  await expect.poll(() => [...asked].sort()).toEqual(warmed(7));
+  await expect.poll(() => [...asked].sort()).toEqual(warmed(7, 2));
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
+  await expandAssistantMenu(menu, "Suggestions");
   const chosen = page.waitForRequest(
     (request) =>
       request.url().endsWith("/api/suggestions") && request.postDataJSON().surface === "change",
@@ -183,7 +190,7 @@ test("Gallery Review loads the next five Suggestions across pages and reuses the
     itemId: "review-1",
     request: "change the light",
   });
-  expect([...asked].sort()).toEqual(warmed(7));
+  expect([...asked].sort()).toEqual(warmed(7, 2));
 });
 
 test("Video Review opened directly leaves for the video gallery", async ({ page }) => {

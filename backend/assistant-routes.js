@@ -184,14 +184,30 @@ export function registerAssistantRoutes(
   const refuse = (status, error) => ({ refusal: { status, payload: { ok: false, error } } });
   /** The account's prompt writer (account-policy.js `promptWriter`). */
   const writerOf = (account) => promptWriter(account);
+  const writingProfile = (listed, body, withLoras = false) => {
+    const hasReferences = body?.hasReferences === true;
+    const backend = runBackend(
+      listed.backendOptions || [],
+      listed.backend,
+      body?.profileBackend,
+      hasReferences,
+      withLoras,
+    );
+    const selected = runProfile(listed, backend);
+    const mode = hasReferences ? selected.imageModes?.reference : undefined;
+    return mode
+      ? { ...selected, ...mode, defaults: { ...selected.defaults, ...mode.defaults } }
+      : selected;
+  };
   /** The engine and the account's profile, or `refusal`: the answer explaining why not. */
   const ready = async (account, body) => {
     if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff);
     if (!engine) return refuse(503, "The prompt assistant is not configured.");
     const id = String(body?.profileId || "");
-    const profile = (await profiles({ studioAccount: account })).find((item) => item.id === id);
-    if (!profile) return refuse(404, "Choose a model this account can use.");
-    return { profile, guide: guide(profile) };
+    const listed = (await profiles({ studioAccount: account })).find((item) => item.id === id);
+    if (!listed) return refuse(404, "Choose a model this account can use.");
+    const profile = writingProfile(listed, body);
+    return { listed, profile, guide: guide(profile) };
   };
   const stackFrom = async (account, names) => {
     if (!Array.isArray(names) || !names.length || !allowed(account, "loras"))
@@ -447,20 +463,7 @@ export function registerAssistantRoutes(
   writer("/api/assistant/loras", async (account, body, context, signal) => {
     if (!allowed(account, "loras"))
       return { status: 403, payload: { ok: false, error: "LoRAs are off for this account." } };
-    const listed = context.profile;
-    const hasReferences = body?.hasReferences === true;
-    const backend = runBackend(
-      listed.backendOptions || [],
-      listed.backend,
-      body?.profileBackend,
-      hasReferences,
-      true,
-    );
-    const selected = runProfile(listed, backend);
-    const mode = hasReferences ? selected.imageModes?.reference : undefined;
-    const profile = mode
-      ? { ...selected, ...mode, defaults: { ...selected.defaults, ...mode.defaults } }
-      : selected;
+    const profile = writingProfile(context.listed, body, true);
     const names = profile.options?.loras;
     const req = { studioAccount: account };
     const likes = await liked(req, profile);

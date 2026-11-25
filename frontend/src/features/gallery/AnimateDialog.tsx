@@ -16,7 +16,9 @@ import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import {
   type AnimateRequest,
   type Iteration,
+  animateProfileQuery,
   useAnimateReview,
+  useAnimateTemplates,
   useAnimateWriter,
   useMediaIteration,
 } from "./useMediaAction";
@@ -50,28 +52,38 @@ export function AnimateDialog({
   const [review] = useAnimateReview();
   const writer = useAnimateWriter(item);
   const [instruction, setInstruction] = useState(chosen ?? "");
+  const [pickedTheme, setPickedTheme] = useState<string>();
+  const chosenTheme = pickedTheme ?? theme;
+  const choice = useQuery({ ...animateProfileQuery(item, profileId), enabled: theme === "custom" });
+  const offeredThemes = useAnimateTemplates(choice.data?.sound);
   const [prompt, setPrompt] = useState("");
   const writing = useRef<AbortController>(null);
   const asking = theme === "custom" && !chosen && writer.isIdle;
   const assistant = useQuery(assistantQuery);
   const available = Boolean(assistant.data?.available);
   const offered = available && item.type === "image";
-  const templates = available
-    ? instructionTemplates(assistant.data?.themes ?? [], setInstruction)
-    : [];
+  const templates = instructionTemplates(offeredThemes, (text, _actions, id) => {
+    setInstruction(text);
+    setPickedTheme(id);
+  });
+  const changeInstruction = (text: string) => {
+    setInstruction(text);
+    setPickedTheme(undefined);
+  };
+  const requestInstruction = pickedTheme ? undefined : instruction.trim() || undefined;
   const ideas = useChangeSuggestions({
     query: motionIdeasQuery(item),
     fresh: () => askMotionIdeas(item, true),
     enabled: asking && offered,
-    onPick: setInstruction,
+    onPick: changeInstruction,
   });
   const write = () => {
     writing.current?.abort();
     writing.current = new AbortController();
     writer.mutate(
       {
-        theme,
-        instruction: instruction.trim() || undefined,
+        theme: chosenTheme,
+        instruction: requestInstruction,
         profileId,
         modifiers,
         signal: writing.current.signal,
@@ -87,16 +99,22 @@ export function AnimateDialog({
   const animate = () => {
     if (!instruction.trim()) return;
     if (review) return write();
-    run({ kind: "animate", theme, instruction: instruction.trim(), profileId, modifiers });
+    run({
+      kind: "animate",
+      theme: chosenTheme,
+      instruction: requestInstruction,
+      profileId,
+      modifiers,
+    });
     onClose();
   };
   const submitPrompt = () => {
     if (!written || !prompt.trim()) return;
     run({
       kind: "animate",
-      theme,
+      theme: chosenTheme,
       modifiers,
-      instruction: instruction.trim() || undefined,
+      instruction: requestInstruction,
       written: { ...written, prompt: prompt.trim() },
     });
     onClose();
@@ -123,7 +141,7 @@ export function AnimateDialog({
               data-autofocus={!phone || undefined}
               inline
               value={instruction}
-              onChange={setInstruction}
+              onChange={changeInstruction}
               tools={
                 offered || templates.length
                   ? [requestTool(templates, offered ? ideas : undefined)]

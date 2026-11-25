@@ -55,8 +55,9 @@ import { keepRatesQuery } from "../dream/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { isProfile, profileName } from "../generation/payload";
+import { ProfileSelect } from "../generation/ProfilePicker";
 import { preferencesQuery, useSavePreferences } from "../settings/accountPreferences";
-import { TasteHistory, TasteVariety } from "./TasteReflection";
+import { TasteVariety } from "./TasteReflection";
 
 import classes from "./TasteProfile.module.css";
 
@@ -445,6 +446,7 @@ interface RatedRow {
   value: string;
   name: string;
   count?: KeepCount;
+  preference?: string;
 }
 /** One kind of learnt values with their keep rates, each with its actions. */
 function KeepRateTable({
@@ -473,9 +475,16 @@ function KeepRateTable({
             main: true,
             sortValue: (row) => row.name,
             cell: (row) => (
-              <Text size="sm" truncate>
-                {row.name}
-              </Text>
+              <Stack gap={0}>
+                <Text size="sm" truncate>
+                  {row.name}
+                </Text>
+                {row.preference && (
+                  <Text size="xs" c="dimmed">
+                    {row.preference}
+                  </Text>
+                )}
+              </Stack>
             ),
           },
           {
@@ -510,12 +519,20 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
   const taste = useQuery(tasteQuery);
   const keepRates = useQuery(keepRatesQuery);
   const nameOf = useValueNames();
+  const models = useQuery(modelsQuery).data?.profiles ?? [];
   const change = useTasteChange();
   const dialogChange = useTasteChange(true);
   const [clearing, setClearing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [editingPrefer, setEditingPrefer] = useState(false);
   const [editingExclusions, setEditingExclusions] = useState(false);
+  const [editingModels, setEditingModels] = useState<"favourites" | "less">();
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const editModels = (kind: "favourites" | "less") => {
+    dialogChange.reset();
+    setSelectedModel(null);
+    setEditingModels(kind);
+  };
   const saved = (next: Taste) => {
     client.setQueryData(tasteQuery.queryKey, next);
     void client.invalidateQueries({ queryKey: ["suggestions"], refetchType: "none" });
@@ -548,14 +565,15 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
   const error = refresh.error || taste.error || keepRates.error;
   const own = data?.preferences ?? {};
   const exclusions = own.exclusions ?? [];
-  const mark = (kind: TasteMarkKind, value: string, to: "favourites" | "less" | "never") => {
+  const markChange = (kind: TasteMarkKind, value: string, to: "favourites" | "less" | "never") => {
     const add = (marks?: TasteMarks) => ({ ...marks, [kind]: [...(marks?.[kind] ?? []), value] });
-    change.mutate({
+    return {
       favourites: to === "favourites" ? add(own.favourites) : without(own.favourites, kind, value),
       less: to === "less" ? add(own.less) : without(own.less, kind, value),
       ...(to === "never" && { exclusions: [...exclusions, value] }),
-    });
+    };
   };
+  const mark = (...args: Parameters<typeof markChange>) => change.mutate(markChange(...args));
   const marked = (kind: TasteMarkKind) => (value: string) =>
     [...(own.favourites?.[kind] ?? []), ...(own.less?.[kind] ?? [])].includes(value) ||
     exclusions.includes(value);
@@ -606,13 +624,23 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
           ...data.learnt[kind].filter(include),
           ...Object.keys(counts).filter(
             (value) =>
-              include(value) && !alreadyMarked(value) && keepRate(counts[value]) !== undefined,
+              include(value) &&
+              (kind === "models" || !alreadyMarked(value)) &&
+              keepRate(counts[value]) !== undefined,
           ),
         ]);
         const rows = [...values]
           .flatMap((value): RatedRow[] => {
             const shown = name(value);
-            return shown ? [{ value, name: shown, count: counts[value] }] : [];
+            const preference =
+              kind === "models"
+                ? own.favourites?.models?.includes(value)
+                  ? "Favourite"
+                  : own.less?.models?.includes(value)
+                    ? "Less Of"
+                    : undefined
+                : undefined;
+            return shown ? [{ value, name: shown, count: counts[value], preference }] : [];
           })
           .sort((a, b) => compareNames(a.name, b.name));
         return rows.length ? [{ title, kind, rows }] : [];
@@ -632,9 +660,8 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
   const learntLine =
     data &&
     [
-      data.signals &&
-        `Learnt from ${data.signals} ${data.signals === 1 ? "like, comparison or iteration" : "likes, comparisons and iterations"}`,
-      data.updatedAt && `Updated ${formatDateTime(data.updatedAt)}`,
+      data.signals && `${data.signals} Recent ${data.signals === 1 ? "Signal" : "Signals"}`,
+      data.updatedAt && `Summary updated ${formatDateTime(data.updatedAt)}`,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -716,7 +743,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
               label="Favourites"
               description={
                 <OwnPills
-                  hint="Add items from the ratings below to see them more often."
+                  hint="Add a model here or choose an item from the ratings below."
                   values={favourites}
                   name="Favourites"
                   pending={change.isPending}
@@ -726,12 +753,21 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
                   }}
                 />
               }
-            />
+            >
+              <Button
+                size="compact-sm"
+                variant="default"
+                aria-label="Edit Favourites"
+                onClick={() => editModels("favourites")}
+              >
+                Edit
+              </Button>
+            </SettingRow>
             <SettingRow
               label="Less Of"
               description={
                 <OwnPills
-                  hint="Add items from the ratings below to see them less often."
+                  hint="Add a model here or choose an item from the ratings below."
                   values={less}
                   name="Less Of"
                   pending={change.isPending}
@@ -741,7 +777,16 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
                   }}
                 />
               }
-            />
+            >
+              <Button
+                size="compact-sm"
+                variant="default"
+                aria-label="Edit Less Of"
+                onClick={() => editModels("less")}
+              >
+                Edit
+              </Button>
+            </SettingRow>
           </SettingGroup>
         </>
       )}
@@ -768,7 +813,7 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
                 </SimpleGrid>
               )}
               {ratings.length > 0 && (
-                <SettingGroup title="Keep Rates">
+                <SettingGroup title="Recent Dream Image Verdicts">
                   <Stack gap="sm">
                     <Text size="xs" c="dimmed">
                       How often you kept results with each model, LoRA or tag.
@@ -794,7 +839,6 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
       )}
       <ChatChoices />
       <ChatNotes />
-      <TasteHistory />
       <TasteVariety />
       <SettingGroup danger>
         <SettingRow
@@ -847,6 +891,38 @@ export function TasteProfile({ heading }: { heading: ReactNode }) {
           onClose={() => setEditingExclusions(false)}
           save={(next) => dialogChange.mutateAsync({ exclusions: next })}
         />
+      </TasteEditDialog>
+      <TasteEditDialog
+        id="taste-model-preference"
+        title={editingModels === "less" ? "Edit Less Of" : "Edit Favourites"}
+        opened={Boolean(editingModels)}
+        onClose={() => setEditingModels(undefined)}
+      >
+        <Stack>
+          <ProfileSelect
+            name="Model"
+            profiles={models.filter(
+              (model) => !(editingModels && own[editingModels]?.models?.includes(model.id)),
+            )}
+            value={selectedModel}
+            onChange={(model) => setSelectedModel(model?.id ?? null)}
+            field
+          />
+          {dialogChange.error && <Alert color="red">{dialogChange.error.message}</Alert>}
+          <DialogFooter onCancel={() => setEditingModels(undefined)}>
+            <Button
+              disabled={!selectedModel || !editingModels || dialogChange.isPending}
+              onClick={() => {
+                if (selectedModel && editingModels)
+                  dialogChange.mutate(markChange("models", selectedModel, editingModels), {
+                    onSuccess: () => setEditingModels(undefined),
+                  });
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </Stack>
       </TasteEditDialog>
       <ConfirmDialog
         opened={clearing}

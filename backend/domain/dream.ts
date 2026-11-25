@@ -1163,6 +1163,13 @@ export function createDream(options: {
   /** The series Dream is still adding to, whose results wait until it ends; none once images stop. */
   const openSeries = ({ series, settings }: DreamRecord) =>
     settings.enabled && settings.images && settings.dailyImages > 0 ? series?.id : undefined;
+  function unseenCards(ownerId: string, record: DreamRecord) {
+    const items = record.settings.enabled
+      ? readyUnseen(ownerId, options.unseenReadiness(ownerId), openSeries(record))
+      : [];
+    return dreamCardCounts(items, record.settings);
+  }
+
   function unseen(ownerId: string) {
     const all = pool(ownerId, "unseen");
     return readyUnseen(
@@ -1188,7 +1195,7 @@ export function createDream(options: {
   }
   /**
    * How the latest judged Dream images kept, by profile (`profile:<id>`), LoRA (`lora:<name>`) and
-   * a profile's results with any LoRA (`loras:<id>`): a pass for any reason but likeness counts
+   * a profile's results with any LoRA (`loras:<id>`): a pass for taste counts
    * against them, as a keep counts for them. Its keep rate follows Laplace's rule, so an untried
    * profile or LoRA starts at one half.
    */
@@ -1199,7 +1206,7 @@ export function createDream(options: {
       type: "image",
       limit: judgedRates,
     })) {
-      if (item.dream?.passReason === "similar") continue;
+      if (item.dream?.passReason === "similar" || item.dream?.passReason === "glitch") continue;
       const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
       const tags = Array.isArray(item.caption?.tags) ? item.caption.tags : [];
       for (const key of new Set([
@@ -2644,10 +2651,10 @@ export function createDream(options: {
     const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
     const unseenLimit = record.settings.pauseAfterUnseen;
-    if (unseenLimit && options.count(ownerId, { dreamState: "unseen" }) >= unseenLimit)
+    if (unseenLimit && unseenCards(ownerId, record).unseen >= unseenLimit)
       return {
         status: "waiting",
-        reason: `Dream waits while ${unseenLimit} results are unseen; judge some to continue.`,
+        reason: `Dream waits while ${unseenLimit} cards are unseen; judge some to continue.`,
       };
     const counts = daily(ownerId, record);
     const { due, imagesDone } = kinds(record.settings, counts);
@@ -4324,12 +4331,7 @@ export function createDream(options: {
       return rates;
     },
     unseenCount(ownerId: string) {
-      const record = read(ownerId);
-      const { settings } = record;
-      const items = settings.enabled
-        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), openSeries(record))
-        : [];
-      return dreamCardCounts(items, settings);
+      return unseenCards(ownerId, read(ownerId));
     },
     /** An explicit Dream Super Like qualifies the result for automatic continuation. */
     superLike(ownerId: string, itemId: string) {

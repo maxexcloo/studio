@@ -57,6 +57,36 @@ function fixture(filename = ":memory:") {
   };
 }
 
+test("a held provider observation cannot delay admission on another resource", async () => {
+  const { store, queue, adapter, submitted } = fixture();
+  try {
+    const session = store.createSession("alice", "Images");
+    const first = store.enqueue("alice", session.id, {}, "image", undefined, "primary");
+    await queue.tick();
+    const observed = deferred();
+    const release = deferred();
+    adapter.observe = async () => {
+      observed.resolve();
+      await release.promise;
+      return { status: "completed" };
+    };
+    const same = store.enqueue("alice", session.id, {}, "image", undefined, "primary");
+    const other = store.enqueue("alice", session.id, {}, "image", undefined, "secondary");
+    const tick = queue.tick();
+    try {
+      await observed.promise;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.deepEqual(submitted, [first.id, other.id]);
+    } finally {
+      release.resolve();
+      await tick;
+    }
+    assert.deepEqual(submitted, [first.id, other.id, same.id]);
+  } finally {
+    store.close();
+  }
+});
+
 test("sessions and queue records are scoped to the authenticated owner", () => {
   const { store } = fixture();
   try {

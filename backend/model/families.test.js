@@ -9,7 +9,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-types-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { classifyModel } = await import("./families.js");
+const { classifyModel, primeModelMetadata } = await import("./families.js");
 
 /* ------------------------------------------------------------ recognition */
 
@@ -90,6 +90,30 @@ test("Qwen-Image 2.1 is read from its weights or its name", () => {
     ],
     ["qwen_image_21", "name"],
   );
+});
+
+test("Qwen-Image 2.1 metadata takes precedence over the generic Qwen family", async (t) => {
+  const previous = process.env.STUDIO_WORKERS;
+  const { reloadWorkers } = await import("../workers.js");
+  process.env.STUDIO_WORKERS = JSON.stringify([
+    { id: "metadata", url: "http://127.0.0.1:1", capabilities: ["image"] },
+  ]);
+  reloadWorkers();
+  t.after(() => {
+    if (previous === undefined) delete process.env.STUDIO_WORKERS;
+    else process.env.STUDIO_WORKERS = previous;
+    reloadWorkers();
+  });
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json({
+      "modelspec.architecture": "qwen-image",
+      "modelspec.title": "Qwen-Image 2.1",
+    }),
+  );
+  const file = "preview-layout.safetensors";
+  await primeModelMetadata("metadata", { unet: [file] });
+  const found = classifyModel("unet", file);
+  assert.deepEqual([found.family, found.via], ["qwen_image_21", "metadata"]);
 });
 
 /* ------------------------------------------------------------ MOSS-Image */

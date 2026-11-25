@@ -43,7 +43,8 @@ export function ViewerActionGroups({ groups, labelled, equal }: Omit<ViewerActio
 interface ItemActionsProps {
   item: MediaItem;
   compare: boolean;
-  iterate: (iteration: Iteration) => void;
+  iterate: (iteration: Iteration, onQueued?: () => void) => void;
+  promptDrafts: Map<string, string>;
   /** The run being queued from this item. */
   pending?: Iteration;
   onApplied: () => void;
@@ -79,6 +80,7 @@ function ItemActions({
   item,
   compare,
   iterate,
+  promptDrafts,
   pending,
   onApplied,
   onCompare,
@@ -90,7 +92,7 @@ function ItemActions({
 }: ItemActionsProps) {
   const transfer = useMediaTransfer(item, true);
   const { handlers, dialogs } = useMediaDialogs(item, iterate, onReportQueued);
-  const prompt = useViewerPrompt(item, iterate);
+  const prompt = useViewerPrompt(item, iterate, promptDrafts);
   const groups = useMediaActions(item, {
     transfer,
     compare,

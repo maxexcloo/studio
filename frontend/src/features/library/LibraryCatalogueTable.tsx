@@ -178,9 +178,9 @@ export function LibraryCatalogueTable({
   const phone = usePhone();
   const [view, setView] = useState("installed");
   const [query, setQuery] = useState("");
-  const [family, setFamily] = useState<string | null>(null);
-  const [type, setType] = useState<string | null>(null);
-  const [modelType, setModelType] = useState<string | null>(null);
+  const [selectedFamily, setFamily] = useState<string | null>(null);
+  const [selectedType, setType] = useState<string | null>(null);
+  const [selectedModelType, setModelType] = useState<string | null>(null);
   const models = label === "Files";
   const nameOf = (item: LibraryItem) =>
     models ? (item.file || item.key).split("/").at(-1)! : resourceName(item);
@@ -189,12 +189,21 @@ export function LibraryCatalogueTable({
   // LoRA types are set only by editing an entry; until one is, every row would read Unclassified.
   const withType = models || items.some((item) => item.type);
   const withSize = items.some((item) => item.bytes);
-  const families = unique(items.flatMap(familiesOf));
   const typeLabel = (item: LibraryItem) =>
     [resourceType(item), item.modelType && modelTypes[item.modelType]].filter(Boolean).join(" · ");
   const inView = items.filter((item) =>
     view === "outdated" ? updating(item) : item.installed === (view === "installed"),
   );
+  const families = unique(inView.flatMap(familiesOf));
+  const types = unique(inView.map(resourceType));
+  const modelTypesFound = unique(inView.map((item) => item.modelType || "unclassified"));
+  const family =
+    families.length > 1 && families.includes(selectedFamily ?? "") ? selectedFamily : null;
+  const type = types.length > 1 && types.includes(selectedType ?? "") ? selectedType : null;
+  const modelType =
+    modelTypesFound.length > 1 && selectedModelType && modelTypesFound.includes(selectedModelType)
+      ? selectedModelType
+      : null;
   const withUpdated = inView.some((item) => item.updatedAt !== undefined);
   // Sorted by type, family and name first, so the stable sort on the first column keeps that order.
   const rows = inView
@@ -212,8 +221,6 @@ export function LibraryCatalogueTable({
     );
   const filterCount = Number(!!family) + Number(!!type) + Number(!!modelType);
   // A filter shows only where its choices would narrow the list.
-  const types = unique(items.map(resourceType));
-  const modelTypesFound = unique(items.map((item) => item.modelType || "unclassified"));
   const filterChoices = [
     families.length > 1 && (
       <FilterChoices
@@ -223,9 +230,6 @@ export function LibraryCatalogueTable({
         value={family}
         onChange={setFamily}
       />
-    ),
-    models && types.length > 1 && (
-      <FilterChoices key="type" label="Type" data={types} value={type} onChange={setType} />
     ),
     withModelType && modelTypesFound.length > 1 && (
       <FilterChoices
@@ -239,6 +243,9 @@ export function LibraryCatalogueTable({
         value={modelType}
         onChange={setModelType}
       />
+    ),
+    withType && types.length > 1 && (
+      <FilterChoices key="type" label="Type" data={types} value={type} onChange={setType} />
     ),
   ].filter(Boolean);
   const unclassified = items.filter((item) => libraryItemCategory(item) === "unclassified").length;

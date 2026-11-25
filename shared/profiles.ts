@@ -1,11 +1,5 @@
 /** The most LoRAs a stack runs: a loader holds up to this many (rgthree stacks and Radiance take 4). */
 export const maxLoras = 8;
-/** Each kind's account default model per side, by preference key. */
-export const defaultModelKeys = {
-  images: { cloud: "imageCloud", local: "imageLocal" },
-  text: { cloud: "textCloud", local: "textLocal" },
-  videos: { cloud: "videoCloud", local: "videoLocal" },
-} as const;
 /** What a LoRA does to a picture, as the catalogue classifies it. */
 export const loraTypes = ["slider", "style", "character", "concept"] as const;
 /** How a LoRA runs: an optional effect, or part of a recipe (an acceleration adapter, a supporting file). */

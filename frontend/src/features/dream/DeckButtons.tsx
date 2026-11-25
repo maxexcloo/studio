@@ -1,6 +1,6 @@
 import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
-import { Check, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { Check, ChevronDown, X } from "lucide-react";
+import { Fragment, type ReactNode } from "react";
 
 import { likeColour } from "../../theme";
 import { icons } from "../../ui/icons";
@@ -63,6 +63,7 @@ export function DeckButtons({
 }) {
   const comparison = card.kind === "pair" && !singleImageComparison;
   const answers = dreamChoices(card, singleImageComparison, quickRating).at(-1)!;
+  const reasonButton = answers.some(({ id }) => id === "discard") ? "discard" : "neither";
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
   const { consumeClick, ...hold } = useHold(card.key, askPass);
   return (
@@ -85,9 +86,13 @@ export function DeckButtons({
           ? "Hold to Add a Reason"
           : id === "like" && card.kind === "set"
             ? rate
-            : undefined;
-        return (
-          <Tooltip key={id} label={description ?? title}>
+            : !quickRating && id === "like"
+              ? "Keep, Like and Teach Dream"
+              : !quickRating && (id === "keep" || id === "both")
+                ? "Keep Unrated and Teach Dream"
+                : undefined;
+        const answer = (
+          <Tooltip label={description ?? title}>
             <ActionIcon
               className={classes.answer}
               data-touch-target
@@ -115,6 +120,27 @@ export function DeckButtons({
               )}
             </ActionIcon>
           </Tooltip>
+        );
+        return pass && id === reasonButton ? (
+          <div key={id} className={classes.passChoices}>
+            {answer}
+            <Tooltip label="Pass Reason">
+              <ActionIcon
+                className={classes.passReasonButton}
+                variant="default"
+                color="gray"
+                radius="xl"
+                size="sm"
+                data-touch-target
+                aria-label="Pass Reason"
+                onClick={askPass}
+              >
+                <ChevronDown size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </div>
+        ) : (
+          <Fragment key={id}>{answer}</Fragment>
         );
       })}
       {trailing}

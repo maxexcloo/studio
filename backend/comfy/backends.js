@@ -296,8 +296,6 @@ export function mergeWorkerModels(entries, empty = {}) {
   const result = {
     ...base,
     profiles,
-    imageModels: images.map((profile) => ({ label: profile.label, value: profile.id })),
-    videoModels: videos.map((profile) => ({ label: profile.label, value: profile.id })),
     defaults: {
       imageModel: selected(
         images,

@@ -396,7 +396,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   const request = dialog.getByRole("textbox", { name: "Change", exact: true });
   await request.fill("make it night");
-  await dialog.getByRole("button", { name: "Improve", exact: true }).click();
+  await request.press("Control+Enter");
   await expect(dialog).toBeHidden();
   await expect(prompt).toHaveValue("A castle at night");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");

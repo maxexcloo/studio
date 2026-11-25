@@ -41,6 +41,7 @@ export const galleryTabs: { value: Tab; label: string }[] = [
 export function GalleryChoices({
   label,
   more = [],
+  uploadsOnly = false,
   uploadTile,
   browser,
   enabled,
@@ -52,6 +53,7 @@ export function GalleryChoices({
   /** Names the picker and its grid, such as "References". */
   label: string;
   more?: { value: Tab; label: string }[][];
+  uploadsOnly?: boolean;
   uploadTile?: ReactNode;
   browser: ReferenceBrowser;
   enabled: boolean;
@@ -64,11 +66,13 @@ export function GalleryChoices({
   ) => { label: string; selected: boolean; disabled: boolean; onToggle: () => void };
   onLayer?: (open: boolean) => void;
 }) {
-  const tabs = [galleryTabs, ...more];
+  const tabs = uploadsOnly ? [] : [galleryTabs, ...more];
   const { query, filters, originalsOnly } = browser.state;
-  const tab = tabs.flat().some((item) => item.value === browser.state.tab)
-    ? browser.state.tab
-    : "gallery";
+  const tab = uploadsOnly
+    ? "uploads"
+    : tabs.flat().some((item) => item.value === browser.state.tab)
+      ? browser.state.tab
+      : "gallery";
   const searched = galleryTabs.find((item) => item.value === tab)?.label;
   const uploads = tab === "uploads";
   function browse(patch: Partial<ReferenceBrowser["state"]>) {

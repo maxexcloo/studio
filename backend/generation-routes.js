@@ -8,7 +8,7 @@ import { startFrameSize } from "./animate-profile.js";
 import { assistantRecord } from "./assistant-routes.js";
 import { listCards } from "./cards.js";
 import { characterPrompt, sheetReferences } from "./character-sheets.js";
-import { routeProfile } from "./comfy/backends.js";
+import { matchesWorkerBackend, routeProfile } from "./comfy/backends.js";
 import { logEvent } from "./crash-log.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { families } from "./family-catalogue.js";
@@ -81,12 +81,39 @@ export function createGenerationSubmission({
     )
       return { backend: defaultWorkerId() };
     try {
-      const available = await mediaModels();
-      const profile =
-        available.models.profiles.find((item) => item.id === input?.profileId) ||
-        available.models.profiles.find(
+      const matching = ({ models }) =>
+        models.profiles.find((item) => item.id === input?.profileId) ||
+        models.profiles.find(
           (item) => item.workflow === input?.workflow && item.model === input?.model,
         );
+      let available = await mediaModels(false, { wait: !admission });
+      let profile = matching(available);
+      if (admission) {
+        if (!profile) {
+          available = await mediaModels();
+          profile = matching(available);
+        } else {
+          const selected = profile;
+          const backend = input.profileBackend || selected.backend || "";
+          const candidates = workers.filter(
+            (worker) =>
+              worker.capabilities.includes(capabilityForProfile(selected)) &&
+              matchesWorkerBackend(worker, selected, backend),
+          );
+          const statuses = available.models.workers?.filter((worker) =>
+            candidates.some((candidate) => candidate.id === worker.id),
+          );
+          if (
+            statuses?.some((worker) => !worker.parked) &&
+            !statuses.some((worker) => worker.available)
+          ) {
+            available = await mediaModels(false, {
+              wait: (worker) => candidates.some((candidate) => candidate.id === worker.id),
+            });
+            profile = matching(available);
+          }
+        }
+      }
       if (!profile) {
         if (
           kindCapability === "video" &&
