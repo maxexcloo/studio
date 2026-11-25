@@ -208,16 +208,23 @@ export function TextBox({
       props.description
     );
   const [expanded, setExpanded] = useState(false);
+  const pressedWithinExpansion = useRef(false);
   const resting = oneLine && (phone || !expanded);
   useEffect(() => {
     const scope = expandWithin && field.current?.closest(expandWithin);
     if (!expanded || phone || !scope) return;
+    const press = (event: PointerEvent) => {
+      const target = event.target as Element;
+      pressedWithinExpansion.current =
+        scope.contains(target) || Boolean(target.closest(popupLayer) && layerAbove(scope));
+    };
     const outside = (event: globalThis.MouseEvent) => {
       if (scope.contains(event.target as Node) || layerAbove(scope)) return;
       setExpanded(false);
       if (document.activeElement === field.current) field.current?.blur();
     };
     const escapeScope = (event: globalThis.KeyboardEvent) => {
+      pressedWithinExpansion.current = false;
       if (
         event.key !== "Escape" ||
         event.isComposing ||
@@ -230,9 +237,11 @@ export function TextBox({
       event.stopPropagation();
       setExpanded(false);
     };
+    document.addEventListener("pointerdown", press, true);
     document.addEventListener("click", outside, true);
     document.addEventListener("keydown", escapeScope, true);
     return () => {
+      document.removeEventListener("pointerdown", press, true);
       document.removeEventListener("click", outside, true);
       document.removeEventListener("keydown", escapeScope, true);
     };
@@ -511,13 +520,18 @@ export function TextBox({
       {...(oneLine && {
         maxRows: resting ? 1 : props.maxRows,
         onFocus: (event) => {
+          pressedWithinExpansion.current = false;
           setExpanded(true);
           props.onFocus?.(event);
         },
         onBlur: (event) => {
           const scope = expandWithin && event.currentTarget.closest(expandWithin);
           const next = event.relatedTarget;
-          if (!scope || (next && !scope.contains(next) && !layerAbove(scope))) setExpanded(false);
+          if (
+            !scope ||
+            (!pressedWithinExpansion.current && !scope.contains(next) && !layerAbove(scope))
+          )
+            setExpanded(false);
           props.onBlur?.(event);
         },
         inputContainer: (children) => (

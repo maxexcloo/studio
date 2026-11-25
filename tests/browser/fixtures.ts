@@ -421,6 +421,7 @@ export async function fixtures(page: Page) {
         ],
         changes: [],
       });
+    if (path === "/api/gallery/errors/counts") return respond({ total: 0, owners: {} });
     if (path === "/api/suggestions")
       return respond({
         suggestions: [],

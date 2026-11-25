@@ -48,6 +48,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(1);
   expect(uploads[0]).toContain("Content-Type: video/webm");
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
 
   state.gallery.push({
     id: "clip",
