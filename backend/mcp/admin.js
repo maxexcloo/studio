@@ -281,7 +281,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "lookup",
     "look up a model",
-    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url import takes.',
+    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit. For LoRAs, unverifiedProfiles lists possible matches without a confirmed adapter target. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url import takes.',
     {
       url: z.string().trim().url().max(2000).optional(),
       query: z.string().trim().min(2).max(120).optional(),

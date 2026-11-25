@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { activeLora } from "../shared/profiles.ts";
 import { snapDimension } from "../shared/resolution.ts";
 import { upscaleQualities } from "../shared/upscale.ts";
 import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
@@ -130,14 +131,18 @@ export function createGenerationSubmission({
               error: "This account cannot use the selected model.",
             },
           };
-        if (Array.isArray(input?.loras) && input.loras.length && !mayUseFeature(account, "loras"))
+        if (
+          Array.isArray(input?.loras) &&
+          input.loras.some(activeLora) &&
+          !mayUseFeature(account, "loras")
+        )
           return {
             status: 403,
             payload: { ok: false, permanent: true, error: "LoRAs are off for this account." },
           };
         const allowed = loraAllowed(account);
         const refused = (Array.isArray(input?.loras) ? input.loras : []).find(
-          (item) => item?.enabled !== false && !allowed(String(item?.name || "")),
+          (item) => activeLora(item) && !allowed(String(item.name || "")),
         );
         if (refused)
           return {
@@ -251,16 +256,14 @@ export function createGenerationSubmission({
       // Read each requested LoRA's family first (a worker's files answer over HTTP), so validation
       // refuses one trained for another model instead of applying it.
       const requested = (Array.isArray(input?.loras) ? input.loras : [])
-        .filter(
-          (item) => item && item.enabled !== false && typeof item.name === "string" && item.name,
-        )
+        .filter((item) => activeLora(item) && typeof item.name === "string" && item.name)
         .map((item) => item.name);
       if (requested.length) await loraInfos(backend, requested.slice(0, 32)).catch(() => null);
       const body = sanitizeGenerateBody(input, context.info, context.stats, prompting);
       // A burst alone in Studio's queue takes the two-card copy only while Radiance shows itself idle too.
       const twin = options?.alone && fastTwin(body, context.info);
       if (twin && (await new RadianceClient(workerById(backend).url).idle())) body.modelName = twin;
-      const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
+      const enabledLoras = (body.loras || []).filter(activeLora);
       if (enabledLoras.length) {
         const issue = optionalLoraIssue(
           enabledLoras,
@@ -627,7 +630,7 @@ export function createGenerationSubmission({
         try {
           validateReferenceSlots(references, profile);
           const requested = (Array.isArray(input.loras) ? input.loras : []).filter(
-            (lora) => lora?.enabled !== false && lora?.name,
+            (lora) => lora?.name && activeLora(lora),
           );
           const installed =
             requested.length && getCustomWorkflow(input.workflow, input.profileBackend);

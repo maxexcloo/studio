@@ -140,6 +140,10 @@ test("every strength a LoRA is offered or given lies within the range the server
   assert.equal(loraDefaultStrength(cases[3]), 1);
   assert.deepEqual(loraStrengthChoices(cases[1]), [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2]);
   assert.deepEqual(loraStrengthSweep(cases[1]), [0, 0.7, 0.8, 0.9]);
+  assert.deepEqual(
+    loraStrengthSweep({ strengthRange: { min: -2, max: 2, default: 0 } }),
+    [0, -0.5, 0.5],
+  );
   assert.equal(
     loraStrengthIssue({ title: "Glow", ...cases[1] }, 1.3),
     "Glow supports strength 0.5 to 1.2.",

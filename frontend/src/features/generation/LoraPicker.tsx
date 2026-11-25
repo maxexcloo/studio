@@ -20,12 +20,15 @@ import { keptLabel } from "../../../../shared/dream";
 import { ratingSortLabels } from "../../../../shared/gallery-sort";
 import {
   type LoraConstraints,
+  activeLora,
+  loraCompatibility,
   loraDefaultStrength,
   loraFamilyId,
   loraName,
   loraRejection,
   loraStrengthIssue,
   loraStrengthRange,
+  loraTriggerWords,
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import { likeColour } from "../../theme";
@@ -465,6 +468,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
                   .map((key) => modelFamilyLabel(key))
                   .join(", "),
                 typeNames[typeOf(file)] || typeOf(file),
+                loraCompatibility(metadata[file], profile) === "unknown" ? "Unverified" : "",
                 keptLabel(keepRates.data?.loras[file]),
               ]
                 .filter(Boolean)
@@ -691,15 +695,12 @@ function StackEntry({
   const range = info?.strengthRange;
   const { min, max, step } = loraStrengthRange(info);
   const enabled = lora.enabled !== false;
-  const strengthIssue = enabled && loraStrengthIssue(info, lora.strength, title);
+  const active = activeLora(lora);
+  const strengthIssue = active && loraStrengthIssue(info, lora.strength, title);
   // The trigger words switched on lead the prompt when the run is sent (backend/lora/prompts.js).
   const triggers = info?.triggers || [];
-  const chosenTriggers =
-    lora.triggers === false
-      ? []
-      : Array.isArray(lora.triggers)
-        ? triggers.filter((word) => (lora.triggers as string[]).includes(word))
-        : triggers;
+  const chosenTriggers = loraTriggerWords(lora, info);
+  const automaticTriggers = loraTriggerWords({ ...lora, triggers: true }, info);
   return (
     <Stack gap={4} className={classes.entry} data-disabled={!enabled || undefined}>
       <Group gap="xs" wrap="nowrap">
@@ -762,7 +763,7 @@ function StackEntry({
             {strengthIssue}
           </Text>
         )}
-        {!compatible && (
+        {active && !compatible && (
           <Text size="xs" c="yellow">
             {unavailable || "This model can't use this LoRA. Disable or remove it."}
           </Text>
@@ -771,11 +772,14 @@ function StackEntry({
           <Chip.Group
             multiple
             value={chosenTriggers}
-            // Kept in the catalogue's order; all on is the default, none on is off.
             onChange={(words) => {
+              if (!active) return;
               const next = triggers.filter((word) => words.includes(word));
+              const automatic =
+                next.length === automaticTriggers.length &&
+                next.every((word) => automaticTriggers.includes(word));
               onChange({
-                triggers: next.length === triggers.length ? true : next.length ? next : false,
+                triggers: automatic ? true : next.length ? next : false,
               });
             }}
           >
@@ -785,7 +789,7 @@ function StackEntry({
                   Trigger Words
                 </Text>
                 {triggers.map((word) => (
-                  <Chip key={word} value={word} size="xs" variant="light">
+                  <Chip key={word} value={word} size="xs" variant="light" disabled={!active}>
                     {word}
                   </Chip>
                 ))}

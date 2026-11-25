@@ -388,7 +388,7 @@ export function registerLibraryRoutes(
     profiles = async () => [],
     /** Drafts a checkpoint import's profile and guide (profile/drafts.js), or null. */
     draftProfile = null,
-    /** Lookup: the family ids for a base model, and the ready profiles [{id, family}] it may fit. */
+    /** Lookup: the family ids for a base model and the ready profiles it may fit. */
     families = () => [],
     readyProfiles = async () => [],
     /** Family ids for a base model name ("Flux.1 D", "sdxl"). */
@@ -752,6 +752,7 @@ export function registerLibraryRoutes(
     });
   });
   route("POST", "/api/library/lookup", async (_account, { body }) => {
+    const entries = catalogue().entries({ throttleMs: 5000 });
     const found = await lookupLibrary(
       {
         url: String(body?.url || "").trim(),
@@ -759,7 +760,17 @@ export function registerLibraryRoutes(
         type: ["lora", "checkpoint"].includes(body?.type) ? body.type : "",
         baseModel: String(body?.baseModel || ""),
       },
-      { json, hfRequest, inspect, families, profiles: readyProfiles },
+      {
+        json,
+        hfRequest,
+        inspect,
+        families,
+        profiles: readyProfiles,
+        adapter: ({ file, sha256 }) => {
+          const entry = entries[`loras/${file}`];
+          return sha256 && entry?.sha256 === sha256 ? entry : null;
+        },
+      },
     );
     return ok({ lookup: found });
   });

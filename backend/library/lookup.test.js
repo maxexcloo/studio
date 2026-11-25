@@ -65,7 +65,10 @@ test("a lookup lists a Civitai model's versions and files with availability, lic
     found.files.map((file) => [file.name, file.folder, file.status, file.downloadable]),
     [["watercolour-v2.safetensors", "loras", "installed", true]],
   );
-  assert.deepEqual([found.families, found.profiles], [["krea2"], ["krea-fast"]]);
+  assert.deepEqual(
+    [found.families, found.profiles, found.unverifiedProfiles],
+    [["krea2"], [], ["krea-fast"]],
+  );
   assert.deepEqual(found.licence, {
     commercial: true,
     commercialUses: ["Image"],
@@ -74,6 +77,42 @@ test("a lookup lists a Civitai model's versions and files with availability, lic
   });
   await assert.rejects(lookupLibrary({ url: "https://civitai.com/images/5" }, deps), /Import it/);
   await assert.rejects(lookupLibrary({}, deps), /link, or a query/);
+});
+
+test("LoRA lookup uses the exact file's policy and the backend's adapter base and conditioning", async () => {
+  const variant = {
+    id: "edit",
+    family: "krea2",
+    loraBase: { family: "krea2", model: "adapter-bf16", accepts: true },
+    recipe: { conditioning: "reference" },
+  };
+  const found = await lookupLibrary(
+    { url: "https://civitai.com/models/9?modelVersionId=20" },
+    {
+      ...deps,
+      profiles: async () => [
+        { id: "edit", backendOptions: [{ ready: true, profile: variant }] },
+        { ...variant, id: "wrong-conditioning", recipe: { conditioning: "first-last" } },
+        { ...variant, id: "wrong-base", loraBase: { ...variant.loraBase, model: "other-bf16" } },
+        { ...variant, id: "parked", backendOptions: [{ ready: false, profile: variant }] },
+        { ...variant, id: "unknown", recipe: undefined },
+        { ...variant, id: "disabled", capabilities: { lora: false } },
+      ],
+      adapter: ({ file }) =>
+        file === "watercolour-v2.safetensors"
+          ? {
+              families: ["krea2"],
+              compatibility: {
+                baseModels: ["adapter-bf16"],
+                conditionings: ["reference"],
+                unlisted: "other",
+              },
+            }
+          : null,
+    },
+  );
+  assert.deepEqual(found.profiles, ["edit"]);
+  assert.deepEqual(found.unverifiedProfiles, ["unknown"]);
 });
 
 test("a search lists Civitai models with each version's availability", async () => {

@@ -155,6 +155,9 @@ test("a run with LoRAs moves to the stack's model, records it, and takes the ada
   assert.equal(plain.body.modelName, "krea-2-turbo-iq8r");
   assert.equal(plain.graph[1].inputs.model, "krea-2-turbo-iq8r");
   assert.equal(plain.graph[1].inputs.loras, "[]");
+  const zero = await run([{ name: "not-installed.safetensors", strength: 0 }]);
+  assert.deepEqual(zero.body.loras, []);
+  assert.deepEqual(zero.graph[1].inputs, plain.graph[1].inputs);
   const { body, graph: styled } = await run([{ name: "a.safetensors", strength: 0.5 }]);
   assert.equal(body.modelName, "krea-2-turbo-bf16");
   assert.equal(styled[1].inputs.model, "krea-2-turbo-bf16");
