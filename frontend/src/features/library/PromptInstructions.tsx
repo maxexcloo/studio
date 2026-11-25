@@ -17,7 +17,7 @@ import { type ReactNode, useState } from "react";
 import { promptVariable, promptVariables } from "../../../../shared/prompt-variables";
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
@@ -212,7 +212,7 @@ function InstructionEditor({
   );
 }
 
-/** One instruction type's Library › Prompting page: its instructions, suggestion ones flagged, by name. */
+/** One instruction type's Library › Prompting page. */
 export function PromptInstructions({
   section,
   heading,
@@ -238,11 +238,15 @@ export function PromptInstructions({
     suggestions ? "Suggestions" : "Prompts & Text";
   // Edited (its Version column reads vN) and Default filter only where the page holds both.
   const edits = new Set(inArea.map(({ version }) => version !== null)).size > 1;
-  const instructions = inArea.filter(
-    (instruction) =>
-      (!mixed || !suggests || Boolean(instruction.suggestions) === (suggests === "suggestions")) &&
-      (!edits || !edited || (instruction.version !== null) === (edited === "edited")),
-  );
+  const instructions = inArea
+    .filter(
+      (instruction) =>
+        (!mixed ||
+          !suggests ||
+          Boolean(instruction.suggestions) === (suggests === "suggestions")) &&
+        (!edits || !edited || (instruction.version !== null) === (edited === "edited")),
+    )
+    .sort((a, b) => compareNames(a.label, b.label));
   const phone = usePhone();
   return (
     <Stack gap="md">
@@ -298,7 +302,7 @@ export function PromptInstructions({
           query={query}
           searchText={({ label, text, usedBy }) => [label, usedBy, text]}
           empty={`No ${label}`}
-          initialSort={{ key: "name", descending: false }}
+          initialSort={{ key: mixed ? "writes" : "name", descending: false }}
           columns={[
             {
               key: "name",

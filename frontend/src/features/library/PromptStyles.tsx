@@ -17,7 +17,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
+import { DataTable, TableRecord } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
@@ -271,17 +271,14 @@ export function PromptTemplates({
       ) : (
         <DataTable
           label={label}
-          // Sorted by name first, so the stable Enabled sort keeps that order within it.
-          rows={styles
-            .filter((style) => style.kind === kind)
-            .sort((a, b) => compareNames(a.label, b.label))}
+          rows={styles.filter((style) => style.kind === kind)}
           rowKey={(style) => `${style.kind}:${style.id}`}
           rowName={(style) => style.label}
           loading={list.isPending && "Loading Templates"}
           query={query}
           searchText={(style) => [style.label, style.description, style.instruction]}
           empty="No Templates"
-          initialSort={{ key: "enabled", descending: false }}
+          initialSort={{ key: "name", descending: false }}
           columns={[
             {
               key: "enabled",

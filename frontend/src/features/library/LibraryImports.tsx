@@ -314,7 +314,6 @@ export function LibraryImports({
       </Menu.Item>
     </>
   );
-  // Keyed by title, so each view starts from its own sort rather than the empty table's.
   const importTable = (title: string, rows: ImportRecord[]) => (
     <DataTable
       key={title}
@@ -329,7 +328,7 @@ export function LibraryImports({
         importStatus(record).label,
         ...lacking(record),
       ]}
-      initialSort={{ key: "added", descending: true }}
+      initialSort={{ key: "name", descending: false }}
       empty="No Matches"
       compact
       columns={[
@@ -521,6 +520,7 @@ export function LibraryImports({
                   rowKey={substituteKey}
                   rowName={(row) => `${nameOf(row.record)}: ${fileName(row.resource)}`}
                   selection={{ selected, onChange: selectSubstitutes, disabled: deciding }}
+                  initialSort={{ key: "original", descending: false }}
                   empty="No Matches"
                   compact
                   columns={[
