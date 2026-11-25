@@ -836,10 +836,14 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   const history = page.getByRole("region", { name: "History", exact: true });
   const historyRows = history.getByRole("table", { name: "History", exact: true }).getByRole("row");
   await expect(historyRows).toHaveCount(4);
+  await history.getByRole("button", { name: "Show All", exact: true }).click();
+  await expect(historyRows).toHaveCount(5);
+  await history.getByRole("button", { name: "Show Less", exact: true }).click();
+  await expect(historyRows).toHaveCount(4);
   const learnt = page.getByRole("region", { name: "Learnt From Your Ratings", exact: true });
   await expect(learnt.getByText("Quiet coastal scenes in soft, misty light.")).toBeVisible();
   await expect(learnt.getByRole("button", { name: "Portrait 2:3", exact: true })).toBeVisible();
-  const mine = page.getByRole("region", { name: "My Preferences", exact: true });
+  const mine = page.getByRole("region", { name: "Preferences", exact: true });
   await expect(mine.getByText("Model: Image Quality", { exact: true })).toBeVisible();
 
   // Learnt words are steered from their menus: Add to Less Of waits under Less Of until removed.
@@ -860,15 +864,11 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   await learnt.getByRole("button", { name: "crowds", exact: true }).click();
   await page.getByRole("menuitem", { name: "Add to Exclusions", exact: true }).click();
   await expect.poll(() => dream.requests.at(-1)?.body?.preferences.exclusions).toEqual(["crowds"]);
-  await expect(
-    page
-      .getByRole("region", { name: "Exclusions", exact: true })
-      .getByText("crowds", { exact: true }),
-  ).toBeVisible();
+  await expect(mine.getByText("crowds", { exact: true })).toBeVisible();
 
-  // My Preferences are free text, saved from their dialog.
-  await mine.getByRole("button", { name: "Edit", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "My Preferences", exact: true });
+  // The preference note is saved from its dialog.
+  await mine.getByRole("button", { name: "Edit In My Words", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Edit Preferences", exact: true });
   const text = "Photographic, natural light.";
   await fillBox(editor, "In My Words", text, Boolean(testInfo.project.use.isMobile));
   await editor.getByRole("button", { name: "Save", exact: true }).click();
@@ -884,11 +884,11 @@ test("Settings › Taste shows what Studio learnt and saves the person's own tas
   ).toBeVisible();
 });
 
-test("Where Taste Applies switches an area at once and says what it changes", async ({ page }) => {
+test("Taste Enabled switches an area at once and says what it changes", async ({ page }) => {
   await fixtures(page);
   await serveDream(page);
   await page.goto("/settings#taste");
-  const areas = page.getByRole("region", { name: "Where Taste Applies", exact: true });
+  const areas = page.getByRole("region", { name: "Enabled", exact: true });
   const writing = areas.getByRole("switch", { name: "Use My Taste in Prompt Writing" });
   await expect(writing).not.toBeChecked();
   await expect(areas.getByRole("switch", { name: "Use My Taste in Dream" })).toBeChecked();
@@ -945,7 +945,7 @@ test("Taste shows keep rates by model and tag kind, and marks values from their 
   await expect(row("Colours", "golden light")).toHaveCount(0);
   await expect(
     page
-      .getByRole("region", { name: "My Preferences", exact: true })
+      .getByRole("region", { name: "Preferences", exact: true })
       .getByText("Tag: golden light", { exact: true }),
   ).toBeVisible();
   // Exclusions are for words and tags; a model can only be a favourite or less of.

@@ -73,80 +73,84 @@ function VarietyRow({ label, sameness }: { label: string; sameness: Sameness }) 
   );
 }
 
-/** Whether results are converging on one look, and how each model has fared day by day. */
-export function TasteReflection() {
+/** Whether results are converging on one look. */
+export function TasteVariety() {
   const reflection = useQuery(reflectionQuery);
   const data = reflection.data;
   return (
-    <>
-      <SettingGroup title="Variety">
-        {reflection.isPending && <LoadingState label="Loading Variety" />}
-        {data && (
-          <>
-            <VarietyRow label="Recent Results" sameness={data.sameness.made} />
-            <VarietyRow label="Recent Likes" sameness={data.sameness.liked} />
-          </>
-        )}
-      </SettingGroup>
-      <SettingGroup title="History">
-        <HistoryTable
-          label="History"
-          compact
-          rows={data?.days || []}
-          rowKey={(row) => `${row.day} ${row.profileId} ${row.model}`}
-          rowName={(row) => `${row.day} ${row.profileName || row.profileId}`}
-          loading={reflection.isPending && "Loading Results"}
-          empty="No Results in the Last 30 Days"
-          columns={[
-            {
-              key: "day",
-              header: "Day",
-              cell: (row) => (
-                <Text size="sm" style={{ whiteSpace: "nowrap" }}>
-                  {row.day}
+    <SettingGroup title="Variety">
+      {reflection.isPending && <LoadingState label="Loading Variety" />}
+      {data && (
+        <>
+          <VarietyRow label="Recent Likes" sameness={data.sameness.liked} />
+          <VarietyRow label="Recent Results" sameness={data.sameness.made} />
+        </>
+      )}
+    </SettingGroup>
+  );
+}
+
+export function TasteHistory() {
+  const reflection = useQuery(reflectionQuery);
+  return (
+    <SettingGroup title="History">
+      <HistoryTable
+        label="History"
+        compact
+        rows={reflection.data?.days || []}
+        rowKey={(row) => `${row.day} ${row.profileId} ${row.model}`}
+        rowName={(row) => `${row.day} ${row.profileName || row.profileId}`}
+        loading={reflection.isPending && "Loading Results"}
+        empty="No Results in the Last 30 Days"
+        columns={[
+          {
+            key: "day",
+            header: "Day",
+            cell: (row) => (
+              <Text size="sm" style={{ whiteSpace: "nowrap" }}>
+                {row.day}
+              </Text>
+            ),
+            sortValue: (row) => row.day,
+          },
+          {
+            key: "model",
+            header: "Model",
+            main: true,
+            cell: (row) => (
+              <Stack gap={0}>
+                <Text size="sm" truncate>
+                  {row.profileName || row.profileId || "Unknown"}
                 </Text>
-              ),
-              sortValue: (row) => row.day,
-            },
-            {
-              key: "model",
-              header: "Model",
-              main: true,
-              cell: (row) => (
-                <Stack gap={0}>
-                  <Text size="sm" truncate>
-                    {row.profileName || row.profileId || "Unknown"}
+                {row.model && (
+                  <Text size="xs" c="dimmed" truncate>
+                    {row.model}
                   </Text>
-                  {row.model && (
-                    <Text size="xs" c="dimmed" truncate>
-                      {row.model}
-                    </Text>
-                  )}
-                </Stack>
-              ),
-              sortValue: (row) => row.profileName || row.profileId,
-            },
-            {
-              key: "made",
-              header: "Made",
-              cell: (row) => <Text size="sm">{row.made}</Text>,
-              sortValue: (row) => row.made,
-            },
-            {
-              key: "liked",
-              header: "Liked",
-              cell: (row) => <Text size="sm">{percent(row.liked / row.made)}</Text>,
-              sortValue: (row) => row.liked / row.made,
-            },
-            {
-              key: "disliked",
-              header: "Disliked",
-              cell: (row) => <Text size="sm">{percent(row.disliked / row.made)}</Text>,
-              sortValue: (row) => row.disliked / row.made,
-            },
-          ]}
-        />
-      </SettingGroup>
-    </>
+                )}
+              </Stack>
+            ),
+            sortValue: (row) => row.profileName || row.profileId,
+          },
+          {
+            key: "made",
+            header: "Made",
+            cell: (row) => <Text size="sm">{row.made}</Text>,
+            sortValue: (row) => row.made,
+          },
+          {
+            key: "liked",
+            header: "Liked",
+            cell: (row) => <Text size="sm">{percent(row.liked / row.made)}</Text>,
+            sortValue: (row) => row.liked / row.made,
+          },
+          {
+            key: "disliked",
+            header: "Disliked",
+            cell: (row) => <Text size="sm">{percent(row.disliked / row.made)}</Text>,
+            sortValue: (row) => row.disliked / row.made,
+          },
+        ]}
+      />
+    </SettingGroup>
   );
 }

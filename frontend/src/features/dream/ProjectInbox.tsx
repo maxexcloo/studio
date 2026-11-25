@@ -220,7 +220,7 @@ function ProposalEditor({
       {rule !== undefined && (
         <TextBox
           aria-label="Rule"
-          description="A rule that only bans (never X, no X) joins your Exclusions; any other joins My Preferences in Settings › Taste."
+          description="A rule that only bans (never X, no X) joins your Exclusions; any other joins In My Words in Settings › Taste."
           autosize
           minRows={2}
           maxLength={maxTasteRule}

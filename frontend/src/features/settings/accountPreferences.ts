@@ -24,7 +24,7 @@ export interface Preferences {
   appearance?: Partial<Appearance>;
   /** The gallery's saved views, in the order saved. */
   galleryViews?: SavedGalleryView[];
-  /** Where Taste Applies (Settings › Taste); unsaved areas take `tasteAreasOf`'s defaults. */
+  /** Enabled (Settings › Taste); unsaved areas take `tasteAreasOf`'s defaults. */
   tasteAreas?: Partial<Record<TasteArea, Partial<TasteAreaSetting>>>;
 }
 interface PreferencesStatus {

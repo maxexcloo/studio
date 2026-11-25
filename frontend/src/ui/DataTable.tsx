@@ -2,11 +2,9 @@ import {
   ActionIcon,
   Anchor,
   Box,
-  Button,
   Checkbox,
   Group,
   Menu,
-  Stack,
   Table,
   Text,
   Tooltip,
@@ -22,6 +20,7 @@ import { icons } from "./icons";
 import { LoadingState } from "./LoadingState";
 import { NameWithFlags } from "./NameWithFlags";
 import { PopupTooltip } from "./PopupTooltip";
+import { PreviewList } from "./PreviewList";
 import { usePhone } from "./usePhone";
 
 import classes from "./DataTable.module.css";
@@ -345,15 +344,5 @@ export function DataTable<T>({
 
 /** Keeps recent history compact and expands the same table in place. */
 export function HistoryTable<T>({ rows, ...table }: Parameters<typeof DataTable<T>>[0]) {
-  const [all, setAll] = useState(false);
-  return (
-    <Stack gap={4} align="flex-start">
-      <DataTable {...table} rows={all ? rows : rows.slice(0, 3)} />
-      {rows.length > 3 && (
-        <Button variant="subtle" size="compact-sm" aria-expanded={all} onClick={() => setAll(!all)}>
-          {all ? "Show Less" : "Show All"}
-        </Button>
-      )}
-    </Stack>
-  );
+  return <PreviewList items={rows}>{(shown) => <DataTable {...table} rows={shown} />}</PreviewList>;
 }
