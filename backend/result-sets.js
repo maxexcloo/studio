@@ -1,4 +1,6 @@
 // Variations of a selected image or its set, written by the queue's prompt stage.
+import { randomUUID } from "node:crypto";
+
 import { recreationPrompt } from "../shared/media.ts";
 import { directRoute } from "./domain/direct-route.ts";
 import { recreateSource } from "./gallery/recreate.js";
@@ -124,6 +126,7 @@ export function registerResultSetRoutes(app, { store, admit, item, defaultImageP
       return { status: 400, payload: { ok: false, error: "That image has no source prompt." } };
     if (image) delete input.typedPrompt;
     const jobIds = [];
+    const queueSet = set?.id || randomUUID();
     for (let offset = 0; offset < variations; offset++) {
       const result = await admit(
         {
@@ -147,6 +150,7 @@ export function registerResultSetRoutes(app, { store, admit, item, defaultImageP
           parentJobId: job.id,
           parentItemId: found.id,
         },
+        { queueSet },
       );
       if (result.status >= 400)
         return jobIds.length ? { status: 200, payload: { jobIds } } : result;

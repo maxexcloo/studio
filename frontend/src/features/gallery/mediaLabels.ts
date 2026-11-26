@@ -1,4 +1,4 @@
-import { comparisonSetTitle } from "../../../../shared/compare";
+import { isComparisonSet } from "../../../../shared/compare";
 import { promptWords } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
 import { dateFormat } from "../../ui/dates";
@@ -6,7 +6,7 @@ import { isProfile, profileName, shownProfileName } from "../generation/payload"
 
 /** The label of the compare variant an item is ("Seed 583061750"), which names what sets it apart. */
 export const comparisonVariant = ({ resultSet }: Pick<MediaItem, "resultSet">) =>
-  resultSet?.title === comparisonSetTitle ? resultSet.variation : undefined;
+  isComparisonSet(resultSet) ? resultSet?.variation : undefined;
 
 /**
  * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the title

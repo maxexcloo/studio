@@ -410,16 +410,12 @@ export function MediaViewer({
   const promptDrafts = useRef(new Map<string, string>());
   const iteration = useMediaIteration(item);
   const rememberQueued = (job: string) => setQueued((runs) => [...runs, { job, from: item.id }]);
-  const closeForPrompt = () => {
-    if (phone && shownId.current === item.id && !strip.settling.current) close();
-  };
   // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration, onQueued?: () => void) {
     void iteration.mutateAsync(next).then(
       (job) => {
         rememberQueued(job);
         onQueued?.();
-        if (next.kind === "prompt") closeForPrompt();
       },
       () => {},
     );
@@ -904,7 +900,6 @@ export function MediaViewer({
                         onDelete={() => setDeleting(true)}
                         onReportQueued={(job) => {
                           rememberQueued(job);
-                          closeForPrompt();
                         }}
                         onRetried={onRetried}
                         onVersionChange={(id, active) => {

@@ -87,7 +87,7 @@ export function ComparePage() {
       client.setQueryData(comparisonQuery(id).queryKey, result);
       if (!proposal) return;
       void client.invalidateQueries({ queryKey: inboxQuery.queryKey });
-      notifications.show({ message: `Proposed for ${proposal.name}'s brief in Dream's Inbox` });
+      notifications.show({ message: `Proposed for ${proposal.name}'s brief in Dream Suggestions` });
     },
     onSettled: () =>
       Promise.all(

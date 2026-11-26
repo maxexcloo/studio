@@ -314,9 +314,9 @@ export function ProjectForm({
     </SettingRow>
   );
   const allowed = (
-    <SettingGroup title="Allowed Inputs">
+    <SettingGroup title="Generation Limits">
       <Text size="sm" c="dimmed">
-        Chats and Dream keep to these; Any leaves an input open.
+        Chats and Dream keep to these limits; Any leaves an option open.
       </Text>
       {pick(
         "Aspects",

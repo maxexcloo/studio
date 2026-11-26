@@ -300,6 +300,33 @@ for (const [name, migrate] of [
 const runtime = await loadRuntime(process.env, {
   dataDir,
   textModels: async () => assistantEngine?.listModelDetails() ?? [],
+  mediaModels: async () => {
+    const listed =
+      (await mediaModels(false, { wait: false }).catch(() => null))?.models?.profiles ?? [];
+    return listed.flatMap((profile) => {
+      if (profile.kind !== "image" && profile.kind !== "video") return [];
+      const option = profile.backendOptions?.find((item) => item.id === "radiance")?.profile;
+      const source = option ?? (profile.backend === "radiance" ? profile : null);
+      const radianceModel = String(source?.model || source?.defaults?.model || "");
+      if (!source || !radianceModel) return [];
+      const defaults = source.defaults ?? {};
+      return [
+        {
+          id: profile.id,
+          label: profile.displayName || profile.label || profile.id,
+          kind: profile.kind,
+          radianceModel,
+          ...(typeof defaults.width === "number" ? { width: defaults.width } : {}),
+          ...(typeof defaults.height === "number" ? { height: defaults.height } : {}),
+          ...(typeof defaults.steps === "number" ? { steps: defaults.steps } : {}),
+          ...(typeof defaults.frames === "number" ? { frames: defaults.frames } : {}),
+          ...(typeof defaults.fps === "number" ? { fps: defaults.fps } : {}),
+          ...(typeof defaults.duration === "number" ? { duration: defaults.duration } : {}),
+          ...(typeof defaults.cfg === "number" ? { cfg: defaults.cfg } : {}),
+        },
+      ];
+    });
+  },
 });
 if (runtime) {
   useWorkloadWorkers(runtime.controller.workloads);

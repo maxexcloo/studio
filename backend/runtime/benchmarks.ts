@@ -4,11 +4,13 @@ import {
   type BenchmarkModel,
   type BenchmarkRun,
   type BenchmarkStatus,
+  type BenchmarkSuite,
   type BenchmarkSummary,
   type RuntimePodLog,
   activeBenchmark,
 } from "../../shared/runtime.ts";
-import { RadianceClient } from "../providers/radiance.ts";
+import { upsamplerModels } from "../assistant-presets.js";
+import { RadianceClient, radianceWorkMs, videoFailure } from "../providers/radiance.ts";
 import {
   RuntimeConflict,
   RuntimeRequestError,
@@ -25,17 +27,38 @@ interface BenchmarkStore {
   write(runs: BenchmarkRun[]): void;
 }
 
-/** Starts the line the Job prints its summary on, last, after BetterBench's own output. */
+export interface BenchmarkMediaModel extends BenchmarkModel {
+  kind: "image" | "video";
+  /** The underlying Radiance model id served by `/v1/models`. */
+  radianceModel: string;
+  width?: number;
+  height?: number;
+  steps?: number;
+  frames?: number;
+  fps?: number;
+  duration?: number;
+  cfg?: number;
+}
+
+interface BenchmarkQueueBridge {
+  busy(workloadId: string): boolean;
+  wake(): void;
+}
+
+/** Starts the line the Job prints its summary on, last, after the benchmark's own output. */
 const marker = "STUDIO-BENCHMARK ";
 const historyLimit = 50;
 /** The pods the Job runs, which the models' network policy admits. */
 const podLabel = "betterbench";
+const knownSuites = new Set<BenchmarkSuite>(["betterbench", "qualitybench", "radiance-media"]);
+const smokePrompt = "A red ceramic mug on a wooden table in soft morning daylight";
+const smokeNegative = "";
 
 /**
  * BetterBench's quick run against the endpoint and model it is given, then its report's headline
  * figures (the HTML report's tiles) on one JSON line after `marker`, computed by its own report code.
  */
-const script = `import json, sys
+const betterBenchScript = `import json, sys
 from betterbench.cli import main
 from betterbench.report import combined_score, concurrency_rows, prefill_rows
 main(["run", "--endpoint", sys.argv[1], "--model", sys.argv[2], "--quick", "--no-html", "--out", "/data/results.json"])
@@ -44,11 +67,101 @@ combined = combined_score(results) or {}
 levels = concurrency_rows(results)
 depths = [row for row in prefill_rows(results) if not row["skipped"]]
 print(${JSON.stringify(marker)} + json.dumps({
+    "suite": "betterbench",
     "version": results["betterbench_version"],
     "decode": combined.get("decode"),
     "ttftMs": combined.get("ttft_p50"),
     "aggregate": {"level": levels[-1]["level"], "tps": levels[-1]["aggregate_tps"]} if levels else None,
     "prefill": {"depth": depths[-1]["target_depth"], "tps": depths[-1]["pp_med"]} if depths else None,
+}))
+`;
+
+/**
+ * QualityBench (https://github.com/launch80/QualityBench) runner against an OpenAI-compatible
+ * endpoint. Supports QualityBench's CLI and extracts overall and per-task accuracy figures onto
+ * the final `STUDIO-BENCHMARK` JSON line.
+ */
+const qualityBenchScript = `import glob, json, os, shutil, subprocess, sys
+endpoint, model = sys.argv[1], sys.argv[2]
+out_dir = "/data/qualitybench"
+os.makedirs(out_dir, exist_ok=True)
+out_file = os.path.join(out_dir, "results.json")
+exe = shutil.which("qualitybench") or shutil.which("l80-qualitybench")
+base_cmd = [exe] if exe else [sys.executable, "-m", "qualitybench"]
+help_out = subprocess.run(base_cmd + ["run", "--help"], capture_output=True, text=True)
+use_run = help_out.returncode == 0
+help_text = help_out.stdout + help_out.stderr
+if not use_run:
+    help_out = subprocess.run(base_cmd + ["--help"], capture_output=True, text=True)
+    help_text = help_out.stdout + help_out.stderr
+cmd = list(base_cmd) + (["run"] if use_run else [])
+if "--endpoint" in help_text:
+    cmd += ["--endpoint", endpoint]
+elif "--base-url" in help_text:
+    cmd += ["--base-url", endpoint]
+elif "--url" in help_text:
+    cmd += ["--url", endpoint]
+cmd += ["--model", model]
+if "--quick" in help_text:
+    cmd += ["--quick"]
+if "--no-html" in help_text:
+    cmd += ["--no-html"]
+if "--out" in help_text:
+    cmd += ["--out", out_file]
+elif "--output" in help_text:
+    cmd += ["--output", out_file]
+elif "--output-dir" in help_text:
+    cmd += ["--output-dir", out_dir]
+env = dict(os.environ)
+key = env.get("QUALITYBENCH_API_KEY") or env.get("OPENAI_API_KEY") or ""
+env.setdefault("OPENAI_API_KEY", key)
+env.setdefault("OPENAI_BASE_URL", endpoint)
+proc = subprocess.run(cmd, env=env)
+if proc.returncode != 0:
+    sys.exit(proc.returncode)
+candidates = [out_file] + sorted(glob.glob(os.path.join(out_dir, "**", "*.json"), recursive=True))
+data = None
+for path in candidates:
+    if os.path.isfile(path):
+        try:
+            parsed = json.load(open(path))
+            if isinstance(parsed, dict):
+                data = parsed
+                break
+        except Exception:
+            pass
+if not isinstance(data, dict):
+    sys.exit("QualityBench wrote no JSON results.")
+def pct(val):
+    if not isinstance(val, (int, float)):
+        return None
+    return round(val * 100.0, 2) if 0.0 <= val <= 1.0 else round(float(val), 2)
+tasks = []
+raw_tasks = data.get("tasks") or data.get("benchmarks") or data.get("results") or {}
+if isinstance(raw_tasks, dict):
+    for name, info in raw_tasks.items():
+        if isinstance(info, dict):
+            val = next((info.get(k) for k in ("score", "accuracy", "pass_rate", "pass@1", "overall") if isinstance(info.get(k), (int, float))), None)
+            if val is not None:
+                tasks.append({"name": str(name), "score": pct(val)})
+        elif isinstance(info, (int, float)):
+            tasks.append({"name": str(name), "score": pct(info)})
+elif isinstance(raw_tasks, list):
+    for item in raw_tasks:
+        if isinstance(item, dict) and item.get("name"):
+            val = next((item.get(k) for k in ("score", "accuracy", "pass_rate", "pass@1") if isinstance(item.get(k), (int, float))), None)
+            if val is not None:
+                tasks.append({"name": str(item["name"]), "score": pct(val)})
+overall = next((data.get(k) for k in ("overall_score", "score", "accuracy", "overall") if isinstance(data.get(k), (int, float))), None)
+if overall is None and isinstance(data.get("summary"), dict):
+    overall = next((data["summary"].get(k) for k in ("overall_score", "score", "accuracy", "overall") if isinstance(data["summary"].get(k), (int, float))), None)
+score = pct(overall) if overall is not None else (round(sum(t["score"] for t in tasks) / len(tasks), 2) if tasks else None)
+version = str(data.get("qualitybench_version") or data.get("version") or data.get("schema_version") or "")
+print(${JSON.stringify(marker)} + json.dumps({
+    "suite": "qualitybench",
+    "version": version,
+    "score": score,
+    "tasks": tasks[:12],
 }))
 `;
 
@@ -63,21 +176,45 @@ export function benchmarkJob({
   model,
   image,
   secret,
+  suite = "betterbench",
 }: {
   name: string;
   workload: Workload;
   model: string;
   image: string;
   secret: string;
+  suite?: "betterbench" | "qualitybench";
 }) {
-  const labels = { "app.kubernetes.io/name": podLabel, "studio.excloo.dev/benchmark": workload.id };
+  const labels = {
+    "app.kubernetes.io/name": podLabel,
+    "studio.excloo.dev/benchmark": workload.id,
+    ...(suite !== "betterbench" ? { "studio.excloo.dev/benchmark-suite": suite } : {}),
+  };
+  const isQuality = suite === "qualitybench";
+  const env = isQuality
+    ? [
+        {
+          name: "QUALITYBENCH_API_KEY",
+          valueFrom: { secretKeyRef: { name: secret, key: "API_KEY" } },
+        },
+        {
+          name: "OPENAI_API_KEY",
+          valueFrom: { secretKeyRef: { name: secret, key: "API_KEY" } },
+        },
+      ]
+    : [
+        {
+          name: "BETTERBENCH_API_KEY",
+          valueFrom: { secretKeyRef: { name: secret, key: "API_KEY" } },
+        },
+      ];
   return {
     apiVersion: "batch/v1",
     kind: "Job",
     metadata: { name, namespace: workload.namespace, labels },
     spec: {
       backoffLimit: 0,
-      activeDeadlineSeconds: 2 * 60 * 60,
+      activeDeadlineSeconds: (isQuality ? 4 : 2) * 60 * 60,
       ttlSecondsAfterFinished: 24 * 60 * 60,
       template: {
         metadata: { labels },
@@ -94,14 +231,18 @@ export function benchmarkJob({
             {
               name: podLabel,
               image,
-              command: ["python", "-c", script, `${workload.url}/v1`, model],
-              env: [
-                {
-                  name: "BETTERBENCH_API_KEY",
-                  valueFrom: { secretKeyRef: { name: secret, key: "API_KEY" } },
-                },
+              command: [
+                "python",
+                "-c",
+                isQuality ? qualityBenchScript : betterBenchScript,
+                `${workload.url}/v1`,
+                model,
               ],
-              resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "1Gi" } },
+              env,
+              resources: {
+                requests: { cpu: "100m", memory: "256Mi" },
+                limits: { memory: isQuality ? "2Gi" : "1Gi" },
+              },
               securityContext: {
                 allowPrivilegeEscalation: false,
                 capabilities: { drop: ["ALL"] },
@@ -130,6 +271,21 @@ export function parseBenchmarkLog(text: string): BenchmarkSummary | undefined {
   } catch {
     return undefined;
   }
+  if (raw.suite === "qualitybench") {
+    const tasks = Array.isArray(raw.tasks)
+      ? raw.tasks
+          .filter(
+            (item: any) => item && typeof item.name === "string" && figure(item.score) !== null,
+          )
+          .map((item: any) => ({ name: item.name, score: figure(item.score)! }))
+      : [];
+    return {
+      suite: "qualitybench",
+      version: String(raw.version ?? ""),
+      score: figure(raw.score),
+      ...(tasks.length ? { tasks } : {}),
+    };
+  }
   return {
     version: String(raw.version ?? ""),
     decode: figure(raw.decode),
@@ -146,20 +302,30 @@ export function parseBenchmarkLog(text: string): BenchmarkSummary | undefined {
 }
 
 const brief = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 240);
+const isUpsampler = (id: string) => {
+  const bare = id.replace(/^local\//, "");
+  return upsamplerModels().some((model) => model === id || model.replace(/^local\//, "") === bare);
+};
 
 /**
- * Benchmarks the local text of Studio's workloads one at a time with a BetterBench Job, which runs
- * beside the model's ordinary work, and keeps the past runs. Without STUDIO_BENCHMARK_IMAGE there
- * are none.
+ * Benchmarks and tests Studio's workloads one at a time: BetterBench (text speed), QualityBench
+ * (text quality), and Radiance Media Test (image/video smoke & speed). Studio holds new queue jobs
+ * on the benchmarked workload while a run is active so work and benchmarks don't starve each other.
  */
 export class Benchmarks {
   readonly configured: boolean;
+  readonly suites: BenchmarkSuite[];
   private runs: BenchmarkRun[];
   /** Holds the batch's place while its models are checked, before the runs exist. */
   private starting = false;
+  private startingWorkload = "";
   private transition = Promise.resolve();
   private checking?: Promise<void>;
   private polling?: NodeJS.Timeout;
+  /** In-process Radiance media tests: their abort controllers and timestamped logs. */
+  private mediaRuns = new Map<string, AbortController>();
+  private mediaLogs = new Map<string, string[]>();
+  private queue?: BenchmarkQueueBridge;
   private options: {
     request: KubernetesRequest;
     workloads: Workload[];
@@ -167,6 +333,7 @@ export class Benchmarks {
     store?: BenchmarkStore;
     fetchImpl?: typeof fetch;
     textModels?: () => Promise<BenchmarkModel[]>;
+    mediaModels?: () => Promise<BenchmarkMediaModel[]>;
     now?: () => number;
     pollMs?: number;
   };
@@ -174,16 +341,50 @@ export class Benchmarks {
   constructor(options: Benchmarks["options"]) {
     this.options = options;
     const { environment } = options;
-    this.configured = Boolean(environment.STUDIO_BENCHMARK_IMAGE);
-    if (this.configured && !environment.STUDIO_BENCHMARK_SECRET)
-      throw new Error("STUDIO_BENCHMARK_SECRET is required with STUDIO_BENCHMARK_IMAGE.");
+    const hasBetterBench = Boolean(environment.STUDIO_BENCHMARK_IMAGE);
+    const hasQualityBench = Boolean(environment.STUDIO_QUALITYBENCH_IMAGE);
+    if ((hasBetterBench || hasQualityBench) && !environment.STUDIO_BENCHMARK_SECRET)
+      throw new Error(
+        "STUDIO_BENCHMARK_SECRET is required with STUDIO_BENCHMARK_IMAGE or STUDIO_QUALITYBENCH_IMAGE.",
+      );
+    const hasRadianceMedia = options.workloads.some((workload) => workload.backend === "radiance");
+    this.suites = [
+      ...(hasBetterBench ? (["betterbench"] as const) : []),
+      ...(hasQualityBench ? (["qualitybench"] as const) : []),
+      ...(hasRadianceMedia && options.mediaModels ? (["radiance-media"] as const) : []),
+    ];
+    this.configured = this.suites.length > 0;
     this.options.store ??= memoryStore<BenchmarkRun[]>();
     this.runs = this.options.store.read() ?? [];
+    // An in-process Radiance media test cannot survive a Studio restart; mark it interrupted.
+    let changed = false;
+    for (const run of this.runs) {
+      if (run.suite === "radiance-media" && run.status === "running") {
+        run.status = "failed";
+        run.error = "Interrupted by Studio restart.";
+        run.finishedAt = this.now;
+        changed = true;
+      }
+    }
+    if (changed) this.save();
     if (this.runs.some(activeBenchmark)) this.follow();
   }
 
+  /** Connects the generation queue so benchmarks wait for in-flight work and hold new work. */
+  useQueue(bridge: BenchmarkQueueBridge) {
+    this.queue = bridge;
+  }
+
+  /** Whether a benchmark or test is currently holding `workloadId` (waiting, running or stopping). */
+  holding(workloadId: string) {
+    return (
+      (this.starting && this.startingWorkload === workloadId) ||
+      this.runs.some((run) => run.workload === workloadId && activeBenchmark(run))
+    );
+  }
+
   list(): BenchmarkStatus {
-    return { configured: this.configured, runs: this.runs };
+    return { configured: this.configured, suites: this.suites, runs: this.runs };
   }
 
   private get now() {
@@ -222,15 +423,41 @@ export class Benchmarks {
     }
   }
 
-  private workload(id: string) {
-    if (!this.configured) throw new RuntimeRequestError("Benchmarks need STUDIO_BENCHMARK_IMAGE.");
+  private parseSuite(value?: string): BenchmarkSuite {
+    if (!value) return "betterbench";
+    if (!knownSuites.has(value as BenchmarkSuite))
+      throw new RuntimeRequestError("Choose BetterBench, QualityBench, or Radiance Test.");
+    return value as BenchmarkSuite;
+  }
+
+  private workload(id: string, suite: BenchmarkSuite = "betterbench") {
+    if (!this.suites.includes(suite)) {
+      if (suite === "qualitybench")
+        throw new RuntimeRequestError("QualityBench needs STUDIO_QUALITYBENCH_IMAGE.");
+      if (suite === "radiance-media")
+        throw new RuntimeRequestError("Radiance tests need a Radiance workload.");
+      throw new RuntimeRequestError("Benchmarks need STUDIO_BENCHMARK_IMAGE.");
+    }
+    if (suite === "radiance-media") {
+      const workload = this.options.workloads.find(
+        (item) => item.id === id && item.backend === "radiance",
+      );
+      if (!workload) throw new RuntimeRequestError("Radiance tests run on a Radiance workload.");
+      return workload;
+    }
     const workload = this.options.workloads.find((item) => item.id === id && servesText(item));
     if (!workload) throw new RuntimeRequestError("workload must be a workload serving local text.");
     return workload;
   }
 
-  async models(id: string) {
-    return this.servedModels(this.workload(id));
+  async models(id: string, suite?: string): Promise<BenchmarkModel[]> {
+    const chosen = this.parseSuite(suite);
+    const workload = this.workload(id, chosen);
+    if (chosen === "radiance-media") {
+      const models = await this.servedMediaModels(workload);
+      return models.map(({ id, label, kind }) => ({ id, label, kind }));
+    }
+    return this.servedModels(workload);
   }
 
   private async servedModels(workload: Workload): Promise<BenchmarkModel[]> {
@@ -245,13 +472,20 @@ export class Benchmarks {
         }),
         this.options.textModels?.() ?? [],
       ]);
-      // Cold models do not report capabilities. The gateway's local catalogue classifies text.
+      // Cold models do not report capabilities. The gateway's local catalogue classifies text;
+      // exclude specialised prompt upsamplers (such as local/flux-pup), which are not chat LLMs.
       const available = new Set(
         served.filter(({ state }) => state !== "failed").map(({ id }) => id),
       );
       return text
-        .filter(({ id }) => id.startsWith("local/") && available.has(id.slice(6)))
-        .map(({ id, label }) => ({ id: id.slice(6), label: label === id ? id.slice(6) : label }));
+        .filter(
+          ({ id }) => id.startsWith("local/") && !isUpsampler(id) && available.has(id.slice(6)),
+        )
+        .map(({ id, label }) => ({
+          id: id.slice(6),
+          label: label === id ? id.slice(6) : label,
+          kind: "text" as const,
+        }));
     }
     try {
       const response = await fetchImpl(`${workload.url}/health`, {
@@ -262,49 +496,94 @@ export class Benchmarks {
       await response.body?.cancel();
       if (response.ok) {
         const model = workload.model!.replace(/^[^/]+\//, "");
-        return [{ id: model, label: model }];
+        return isUpsampler(model) ? [] : [{ id: model, label: model, kind: "text" }];
       }
     } catch {}
     throw stopped();
   }
 
-  async start(id: string, requestedBy: string, models: string[]) {
-    const workload = this.workload(id);
+  private async servedMediaModels(workload: Workload): Promise<BenchmarkMediaModel[]> {
+    const fetchImpl = this.options.fetchImpl ?? fetch;
+    const key = this.options.environment.STUDIO_RADIANCE_KEY;
+    const signal = AbortSignal.timeout(5000);
+    const stopped = () => new RuntimeConflict(`${workload.label} isn't answering: start it first.`);
+    const [served, media] = await Promise.all([
+      new RadianceClient(workload.url, fetchImpl, key || "").models(signal).catch(() => {
+        throw stopped();
+      }),
+      this.options.mediaModels?.() ?? [],
+    ]);
+    const available = new Set(served.filter(({ state }) => state !== "failed").map(({ id }) => id));
+    return media.filter((item) => available.has(item.radianceModel));
+  }
+
+  async start(id: string, requestedBy: string, models: string[], suite?: string) {
+    const chosen = this.parseSuite(suite);
+    const workload = this.workload(id, chosen);
     if (this.starting || this.runs.some(activeBenchmark))
       throw new RuntimeConflict("A benchmark is already running.");
     this.starting = true;
+    this.startingWorkload = workload.id;
     try {
-      const available = new Set((await this.servedModels(workload)).map(({ id }) => id));
+      const inventory =
+        chosen === "radiance-media"
+          ? await this.servedMediaModels(workload)
+          : await this.servedModels(workload);
+      const byId = new Map(inventory.map((item) => [item.id, item]));
       const selected = [...new Set(models)];
-      if (!selected.length || selected.some((model) => !available.has(model)))
-        throw new RuntimeRequestError("Choose available text models.");
-      const runs = selected.map<BenchmarkRun>((model) => ({
-        id: randomBytes(8).toString("hex"),
-        workload: workload.id,
-        label: workload.label,
-        model,
-        status: "queued",
-        requestedBy,
-      }));
+      if (!selected.length || selected.some((model) => !byId.has(model)))
+        throw new RuntimeRequestError(
+          chosen === "radiance-media"
+            ? "Choose available Radiance models."
+            : "Choose available text models.",
+        );
+      const runs = selected.map<BenchmarkRun>((model) => {
+        const info = byId.get(model)!;
+        return {
+          id: randomBytes(8).toString("hex"),
+          ...(chosen !== "betterbench" ? { suite: chosen } : {}),
+          workload: workload.id,
+          label: workload.label,
+          model,
+          ...(info.label && info.label !== model ? { modelLabel: info.label } : {}),
+          status: "queued",
+          requestedBy,
+        };
+      });
       return await this.serialise(async () => {
         this.runs.unshift(...runs);
         this.save();
-        const launched = await this.launch(runs[0], workload).catch((error) => {
-          this.runs = this.runs.slice(runs.length);
-          this.save();
-          throw error;
-        });
-        if (launched) this.save();
+        // Wait for any already-accepted generation work on this workload to finish before starting.
+        if (!this.queue?.busy(workload.id)) {
+          const launched = await this.launch(runs[0], workload).catch((error) => {
+            this.runs = this.runs.slice(runs.length);
+            this.save();
+            throw error;
+          });
+          if (launched) this.save();
+        }
         this.follow();
         return runs;
       });
     } finally {
       this.starting = false;
+      this.startingWorkload = "";
     }
   }
 
   private async launch(run: BenchmarkRun, workload: Workload) {
+    const suite = run.suite ?? "betterbench";
+    if (suite === "radiance-media") {
+      run.status = "running";
+      run.startedAt = this.now;
+      this.runRadianceMedia(run, workload);
+      return true;
+    }
     const job = this.jobFor(run)!;
+    const image =
+      suite === "qualitybench"
+        ? this.options.environment.STUDIO_QUALITYBENCH_IMAGE!
+        : this.options.environment.STUDIO_BENCHMARK_IMAGE!;
     const response = await this.options
       .request(
         "POST",
@@ -313,8 +592,9 @@ export class Benchmarks {
           name: job.name,
           workload,
           model: run.model,
-          image: this.options.environment.STUDIO_BENCHMARK_IMAGE!,
+          image,
           secret: this.options.environment.STUDIO_BENCHMARK_SECRET!,
+          suite,
         }),
       )
       .catch(() => undefined);
@@ -332,12 +612,168 @@ export class Benchmarks {
     return true;
   }
 
+  private appendMediaLog(runId: string, message: string) {
+    const lines = this.mediaLogs.get(runId) ?? [];
+    lines.push(`${this.now} ${message}`);
+    this.mediaLogs.set(runId, lines.slice(-200));
+  }
+
+  private runRadianceMedia(run: BenchmarkRun, workload: Workload) {
+    const controller = new AbortController();
+    this.mediaRuns.set(run.id, controller);
+    this.mediaLogs.set(run.id, []);
+    const log = (message: string) => this.appendMediaLog(run.id, message);
+    const clock = this.options.now ?? Date.now;
+    const client = new RadianceClient(
+      workload.url,
+      this.options.fetchImpl ?? fetch,
+      this.options.environment.STUDIO_RADIANCE_KEY || "",
+    );
+    void (async () => {
+      try {
+        const media = await this.servedMediaModels(workload);
+        const spec = media.find((item) => item.id === run.model);
+        if (!spec) throw new Error(`Radiance model ${run.model} is no longer available.`);
+        const models = await client.models(controller.signal);
+        const initial = models.find((item) => item.id === spec.radianceModel)?.state || "unknown";
+        log(
+          `Testing ${spec.label} (${spec.radianceModel}, ${spec.kind}, initial state: ${initial})`,
+        );
+        const started = clock();
+        if (spec.kind === "image") {
+          const width = spec.width || 1024;
+          const height = spec.height || 1024;
+          const steps = spec.steps || 8;
+          log(`Requesting ${width}×${height} image (${steps} steps)`);
+          const images = await client.images(
+            "/v1/images/generations",
+            {
+              model: spec.radianceModel,
+              prompt: smokePrompt,
+              ...(smokeNegative ? { negative_prompt: smokeNegative } : {}),
+              width,
+              height,
+              steps,
+              ...(spec.cfg !== undefined ? { cfg: spec.cfg } : {}),
+              seed: 42,
+              n: 1,
+            },
+            AbortSignal.any([controller.signal, AbortSignal.timeout(radianceWorkMs)]),
+          );
+          const elapsed = Math.max(0, clock() - started);
+          const bytes = images[0].byteLength;
+          log(`Completed in ${(elapsed / 1000).toFixed(1)} s (${bytes} bytes)`);
+          await this.serialise(async () => {
+            if (run.status === "stopping" || run.status === "stopped") return;
+            this.finish(run, {
+              status: "completed",
+              summary: {
+                suite: "radiance-media",
+                version: "1",
+                kind: "image",
+                loadMs: initial === "resident" ? 0 : null,
+                generateMs: elapsed,
+                bytes,
+              },
+            });
+          });
+        } else {
+          const body: Record<string, unknown> = {
+            model: spec.radianceModel,
+            prompt: smokePrompt,
+            seed: 42,
+            ...(spec.width ? { width: spec.width } : {}),
+            ...(spec.height ? { height: spec.height } : {}),
+            ...(spec.steps ? { steps: spec.steps } : {}),
+            ...(spec.frames ? { frames: spec.frames } : {}),
+            ...(spec.fps ? { fps: spec.fps } : {}),
+            ...(spec.duration ? { seconds: spec.duration } : {}),
+          };
+          log("Submitting video test to Radiance");
+          const created = await client.createVideo(
+            body,
+            AbortSignal.any([controller.signal, AbortSignal.timeout(radianceWorkMs)]),
+          );
+          const acceptedAt = clock();
+          const loadMs = initial === "resident" ? 0 : Math.max(0, acceptedAt - started);
+          log(
+            `Video job ${created.id} accepted after ${(loadMs / 1000).toFixed(1)} s (status: ${created.status})`,
+          );
+          let current = created;
+          try {
+            while (!["completed", "succeeded", "done"].includes(current.status)) {
+              const failed = videoFailure(current);
+              if (failed) throw new Error(failed);
+              await new Promise<void>((resolve, reject) => {
+                const timer = setTimeout(resolve, 2000);
+                controller.signal.addEventListener(
+                  "abort",
+                  () => {
+                    clearTimeout(timer);
+                    reject(new Error("Stopped."));
+                  },
+                  { once: true },
+                );
+              });
+              current = await client.video(created.id, controller.signal);
+            }
+            const bytes = (await client.videoContent(created.id, controller.signal)).byteLength;
+            const generateMs = Math.max(0, clock() - acceptedAt);
+            log(
+              `Completed video in ${(generateMs / 1000).toFixed(1)} s (${bytes} bytes, load ${(loadMs / 1000).toFixed(1)} s)`,
+            );
+            await this.serialise(async () => {
+              if (run.status === "stopping" || run.status === "stopped") return;
+              this.finish(run, {
+                status: "completed",
+                summary: {
+                  suite: "radiance-media",
+                  version: "1",
+                  kind: "video",
+                  loadMs,
+                  generateMs,
+                  bytes,
+                },
+              });
+            });
+          } finally {
+            await client.deleteVideo(created.id).catch(() => undefined);
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`Ended: ${message}`);
+        await this.serialise(async () => {
+          if (controller.signal.aborted || run.status === "stopping") {
+            this.finish(run, { status: "stopped" });
+          } else {
+            this.finish(run, { status: "failed", error: brief(message) });
+          }
+        });
+      } finally {
+        this.mediaRuns.delete(run.id);
+        void this.poll().catch(() => {});
+      }
+    })();
+  }
+
   stop(id: string) {
     return this.serialise(async () => {
       const run = this.runs.find((item) => item.id === id);
       if (!run) throw new RuntimeRequestError("No benchmark has that id.");
-      if (run.status === "running") await this.checkJob(run);
+      if (run.status === "running" && run.suite !== "radiance-media") await this.checkJob(run);
       if (!activeBenchmark(run) || run.status === "stopping") return run;
+      if (run.suite === "radiance-media") {
+        const active = this.mediaRuns.get(run.id);
+        if (active) {
+          run.status = "stopping";
+          this.save();
+          active.abort();
+        } else {
+          this.finish(run, { status: "stopped" });
+        }
+        return run;
+      }
       run.status = "stopping";
       this.save();
       await this.stopJob(run);
@@ -370,6 +806,7 @@ export class Benchmarks {
   private finish(run: BenchmarkRun, outcome: Partial<BenchmarkRun>) {
     Object.assign(run, outcome, { finishedAt: this.now });
     this.save();
+    if (!this.holding(run.workload)) this.queue?.wake();
   }
 
   private follow() {
@@ -384,12 +821,12 @@ export class Benchmarks {
     return (this.checking ??= this.serialise(async () => {
       const stopping = this.runs.find((run) => run.status === "stopping");
       if (stopping) {
-        await this.stopJob(stopping);
+        if (stopping.suite !== "radiance-media") await this.stopJob(stopping);
         if (this.runs.some((run) => run.status === "stopping")) return;
       }
       const running = this.runs.find((run) => run.status === "running");
       if (running) {
-        await this.checkJob(running);
+        if (running.suite !== "radiance-media") await this.checkJob(running);
         if (running.status === "running") return;
       }
       const index = this.runs.findIndex((run) => run.status === "queued");
@@ -399,8 +836,10 @@ export class Benchmarks {
         return;
       }
       const next = this.runs[index];
+      // Wait for already-accepted generation work on this workload before launching the next test.
+      if (this.queue?.busy(next.workload)) return;
       try {
-        const workload = this.workload(next.workload);
+        const workload = this.workload(next.workload, next.suite ?? "betterbench");
         if (!(await this.launch(next, workload))) return;
       } catch (error) {
         return this.finish(next, {
@@ -443,15 +882,31 @@ export class Benchmarks {
         reason ||
           (killed && "It ran out of memory (OOMKilled).") ||
           log.split("\n").filter(Boolean).at(-1) ||
-          "BetterBench gave no result.",
+          `${run.suite === "qualitybench" ? "QualityBench" : "BetterBench"} gave no result.`,
       ),
     });
   }
 
-  /** The last `lines` of the run's Job pod, as Settings › Workers shows a workload's. */
+  /** The last `lines` of the run's Job pod (or in-process Radiance test log). */
   async logs(id: string, lines: number): Promise<{ pods: RuntimePodLog[] }> {
     const run = this.runs.find((item) => item.id === id);
     if (!run) throw new RuntimeConflict("That benchmark is gone.");
+    if (run.suite === "radiance-media") {
+      const recorded = this.mediaLogs.get(run.id) ?? [];
+      return {
+        pods: recorded.length
+          ? [
+              {
+                name: `radiance-test-${run.id}`,
+                container: "studio",
+                phase: run.status === "running" ? "Running" : "Succeeded",
+                restarts: 0,
+                lines: recorded.slice(-lines),
+              },
+            ]
+          : [],
+      };
+    }
     const workload = this.options.workloads.find((item) => item.id === run.workload);
     if (!workload) return { pods: [] };
     const engine = new KubernetesEngine(this.options.request);

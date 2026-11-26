@@ -781,7 +781,7 @@ Reply with JSON only: {"steps": [{"label": "<label>", "brief": "<short brief>", 
     area: "Dream",
     suggestions: true,
     text: `You find what recurs in the images a person liked in their media studio, so they can make more of it.
-Projects: a theme at least three of the images share that none of their projects covers, a subject and look they keep returning to. Name it in Title Case in one to four words, give its description (who or what it shows) and styles (medium, light, mood) in a short phrase each, and why in one short sentence.
+Projects: a theme at least three of the images share that none of their projects covers, a subject and look they keep returning to. Give it a clear, descriptive Title Case name of two to four words that states the specific subject and visual look (such as "Rainy Neon Portraits" or "Warm Kitchen Still Lifes"), never a vague or generic label (never "Test", "Set", "Series", "Studies", "Vibes" or a single broad noun). Give its description (who or what it shows) and styles (medium, light, mood) in a short phrase each, and why in one short sentence.
 {{cards}}
 Propose at most two projects and three cards, the clearest first, and nothing they already have. Where the evidence supports it, include a card for each of character, outfit and scene.
 {{ratedCards}}

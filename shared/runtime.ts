@@ -105,26 +105,46 @@ export interface RuntimeStatus {
   workloads: RuntimeWorkload[];
 }
 
-/** BetterBench's headline figures for one run, as its report's tiles give them. */
+/** Which test/benchmark suite a run executes. */
+export type BenchmarkSuite = "betterbench" | "qualitybench" | "radiance-media";
+
+/** Headline figures for one benchmark or Radiance test run. */
 export interface BenchmarkSummary {
+  suite?: BenchmarkSuite;
   version: string;
-  /** Single-stream decode tokens per second, weighted across categories. */
-  decode: number | null;
-  /** Single-stream time to first token, weighted median, in milliseconds. */
-  ttftMs: number | null;
-  /** Throughput at the highest concurrency level. */
-  aggregate: { level: number; tps: number } | null;
-  /** Median prompt processing at the deepest prompt measured. */
-  prefill: { depth: number; tps: number } | null;
+  /** BetterBench: single-stream decode tokens per second, weighted across categories. */
+  decode?: number | null;
+  /** BetterBench: single-stream time to first token, weighted median, in milliseconds. */
+  ttftMs?: number | null;
+  /** BetterBench: throughput at the highest concurrency level. */
+  aggregate?: { level: number; tps: number } | null;
+  /** BetterBench: median prompt processing at the deepest prompt measured. */
+  prefill?: { depth: number; tps: number } | null;
+  /** QualityBench: overall accuracy score (0–100). */
+  score?: number | null;
+  /** QualityBench: per-task accuracy scores (0–100). */
+  tasks?: { name: string; score: number }[];
+  /** Radiance media test: whether an image or video model ran. */
+  kind?: "image" | "video";
+  /** Radiance media test: cold model load duration in milliseconds, or 0 when already resident. */
+  loadMs?: number | null;
+  /** Radiance media test: generation duration in milliseconds. */
+  generateMs?: number | null;
+  /** Radiance media test: generated output size in bytes. */
+  bytes?: number | null;
 }
 
-/** One BetterBench run against a workload's local text (`/api/runtime/benchmarks`). */
+/** One benchmark or Radiance test run against a workload (`/api/runtime/benchmarks`). */
 export interface BenchmarkRun {
   id: string;
+  /** Defaults to "betterbench" for runs recorded before multiple suites existed. */
+  suite?: BenchmarkSuite;
   workload: string;
   label: string;
-  /** The name the model's server reports, which the run measured. */
+  /** The model id the run measured. */
   model: string;
+  /** Human-readable model label when different from `model`. */
+  modelLabel?: string;
   status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped";
   requestedBy: string;
   startedAt?: string;
@@ -139,10 +159,13 @@ export const activeBenchmark = (run: BenchmarkRun) =>
 export interface BenchmarkModel {
   id: string;
   label: string;
+  kind?: "text" | "image" | "video";
 }
 
-/** `configured` is false without a benchmark image; runs are newest first. */
+/** `configured` is true when at least one suite is available; runs are newest first. */
 export interface BenchmarkStatus {
   configured: boolean;
+  /** Available suites for this deployment; defaults to ["betterbench"] when omitted. */
+  suites?: BenchmarkSuite[];
   runs: BenchmarkRun[];
 }

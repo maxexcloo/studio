@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Badge,
   Box,
   Group,
   Modal,
@@ -23,6 +24,7 @@ import {
   useState,
 } from "react";
 
+import type { DreamPassReason } from "../../../../shared/dream";
 import { loraName } from "../../../../shared/profiles";
 import { likeColour } from "../../theme";
 import type { MediaItem } from "../../types";
@@ -71,8 +73,20 @@ function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
     .filter((lora) => lora?.name && lora.enabled !== false)
     .map((lora) => String(lora.name));
+  const project = item.dream?.inputs?.project;
   return (
     <div className={classes.caption}>
+      {project && (
+        <Badge
+          size="xs"
+          variant="default"
+          mb={4}
+          w="fit-content"
+          leftSection={<icons.project size={12} />}
+        >
+          {project}
+        </Badge>
+      )}
       {heading && (
         <Text fw={600} lineClamp={full ? undefined : 1}>
           {heading}
@@ -258,7 +272,6 @@ export function DreamPreview({
   fly,
   close,
   act,
-  askPass,
   undo,
   quickRating,
   onSuggestionApplied,
@@ -272,8 +285,7 @@ export function DreamPreview({
   label: string;
   fly: RefObject<Fly | null>;
   close: () => void;
-  act: (choice: Choice["choice"]) => void;
-  askPass: () => void;
+  act: (choice: Choice["choice"], reason?: DreamPassReason) => void;
   undo: () => void;
   quickRating?: boolean;
   onSuggestionApplied?: () => void;
@@ -487,7 +499,6 @@ export function DreamPreview({
               card={card}
               quickRating={quickRating}
               act={act}
-              askPass={askPass}
               hidden={false}
               expanded
               singleImageComparison={card.kind === "pair" && item.type === "image"}

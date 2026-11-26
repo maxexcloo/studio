@@ -102,11 +102,10 @@ async function dreamAction(page: Page, name: string) {
 const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
   state.requests.map((request) => `${request.method} ${request.path}`);
 
-async function confirmPass(page: Page, reason?: string) {
-  const dialog = page.getByRole("dialog", { name: "Pass Reason", exact: true });
-  await expect(dialog.getByRole("radio", { name: "Not My Taste", exact: true })).toBeChecked();
-  if (reason) await dialog.getByRole("radio", { name: reason, exact: true }).check();
-  await dialog.getByRole("button", { name: "Pass", exact: true }).click();
+async function confirmPass(page: Page, reason = "Not My Taste") {
+  const menu = page.getByRole("menu", { name: "Pass Reason", exact: true });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: reason, exact: true }).click();
 }
 
 test("The Dream deck judges results with keys, a drag and its buttons", async ({
@@ -141,7 +140,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   const bar = page.getByRole("group", { name: "Dream Actions" });
   await expect
     .poll(() => bar.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)))
-    .toEqual(["Undo", "Pass", "Pass Reason", "Super Like", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Suggestions"]);
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeDisabled();
   // The square card after the wide one keeps the same box, so neither it nor the buttons move.
@@ -212,7 +211,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass", "Pass Reason", "Super Like", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "Super Like", "Accept", "Suggestions"]);
   await preview.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(preview).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -609,14 +608,21 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     ]);
 });
 
-test("Dream offers an explicit Pass Reason beside Pass", async ({ page }) => {
+test("Holding Pass opens the Pass Reason context menu", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, { unseen: ["one", "two"].map((id) => dreamItem(id)) });
   await page.goto("/dream");
-  await page
+  const pass = (await page
     .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Pass Reason", exact: true })
-    .click();
+    .getByRole("button", { name: "Pass", exact: true })
+    .boundingBox())!;
+  await page.mouse.move(pass.x + pass.width / 2, pass.y + pass.height / 2);
+  await page.mouse.down();
+  try {
+    await expect(page.getByRole("menu", { name: "Pass Reason", exact: true })).toBeVisible();
+  } finally {
+    await page.mouse.up();
+  }
   await confirmPass(page, "Glitch");
   await expect(current(page).getByRole("img", { name: "Dream prompt two" })).toBeVisible();
   await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ ids: ["one"], reason: "glitch" });
@@ -1186,7 +1192,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Pass", "Pass Reason", "A", "B", "Accept", "Suggestions"]);
+    .toEqual(["Undo", "Pass", "A", "B", "Accept", "Suggestions"]);
 
   // A side opens in the preview; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
@@ -1263,7 +1269,7 @@ test("A three-way comparison fits a small phone and can accept the selected side
   await page.goto("/dream");
   const card = page.getByRole("group", { name: "Which Style?", exact: true });
   const actions = page.getByRole("group", { name: "Comparison Answers" });
-  const buttons = ["Undo", "Pass", "Pass Reason", "A", "B", "C", "Accept", "Suggestions"];
+  const buttons = ["Undo", "Pass", "A", "B", "C", "Accept", "Suggestions"];
   await expect
     .poll(() =>
       actions.getByRole("button").evaluateAll((nodes) => nodes.map((node) => node.ariaLabel)),
@@ -1494,16 +1500,7 @@ test("The preview swipes between comparison sides and Super Likes the shown imag
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual([
-      "Undo",
-      "Pass Both",
-      "Pass",
-      "Pass Reason",
-      "Super Like",
-      "Accept",
-      "Accept Both",
-      "Suggestions",
-    ]);
+    .toEqual(["Undo", "Pass Both", "Pass", "Super Like", "Accept", "Accept Both", "Suggestions"]);
   await answers.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -1555,7 +1552,7 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   await page.mouse.move(pass.x + pass.width / 2, pass.y + pass.height / 2);
   await page.mouse.down();
   try {
-    await expect(page.getByRole("dialog", { name: "Pass Reason", exact: true })).toBeVisible();
+    await expect(page.getByRole("menu", { name: "Pass Reason", exact: true })).toBeVisible();
   } finally {
     await page.mouse.up();
   }
@@ -1878,9 +1875,9 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
     body: { paused: true },
   });
 
-  // More Turns switches from the card's menu and shows on the card.
+  // Higher Priority switches from the card's menu and shows on the card.
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
-  const moreTurns = page.getByRole("menuitemcheckbox", { name: "More Turns", exact: true });
+  const moreTurns = page.getByRole("menuitemcheckbox", { name: "Higher Priority", exact: true });
   await expect(moreTurns).toHaveAttribute("aria-checked", "false");
   await moreTurns.click();
   await expect(moreTurns).toHaveAttribute("aria-checked", "true");
@@ -1891,13 +1888,13 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   });
   await page.keyboard.press("Escape");
   await enabled.click({ force: true });
-  await expect(harbour).toContainText("More Turns");
+  await expect(harbour).toContainText("Higher Priority");
 
   // The detail view switches both; the card's menu deletes it.
   await harbour.getByRole("button", { name: "Open Harbour", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Harbour", exact: true });
   await expect(sheet.getByRole("switch", { name: "Enabled", exact: true })).toBeChecked();
-  const sheetTurns = sheet.getByRole("switch", { name: "More Turns", exact: true });
+  const sheetTurns = sheet.getByRole("switch", { name: "Higher Priority", exact: true });
   await expect(sheetTurns).toBeChecked();
   await sheetTurns.click({ force: true });
   await expect(sheetTurns).not.toBeChecked();
@@ -1944,7 +1941,10 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
   await page.goto("/dream/projects");
   // The empty view explains projects; New Project stays in the toolbar.
   await expect(
-    page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
+    page.getByText(
+      "Create a project to steer Dream with a brief, pinned cards, and generation limits.",
+      { exact: true },
+    ),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "New Project", exact: true })).toHaveCount(1);
   await page.getByRole("button", { name: "New Project", exact: true }).click();
@@ -2013,7 +2013,9 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
     ],
   });
   await page.goto("/dream/projects");
-  await expect(page.getByRole("region", { name: "Inbox (5)", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Dream Suggestions (5)", exact: true }),
+  ).toBeVisible();
 
   // A rule joins Settings › Taste, with Undo.
   const rule = page.getByRole("article", { name: "Add a Rule", exact: true });
@@ -2078,16 +2080,16 @@ test("The Inbox accepts, edits then accepts, declines with or without a reason a
   await mara.getByRole("button", { name: "Decline", exact: true }).click();
   await expect(mara).toBeHidden();
 
-  // Clearing the Inbox still asks first.
+  // Clearing Suggestions still asks first.
   await page
-    .getByRole("region", { name: "Inbox (1)", exact: true })
-    .getByRole("button", { name: "Clear Inbox", exact: true })
+    .getByRole("region", { name: "Dream Suggestions (1)", exact: true })
+    .getByRole("button", { name: "Clear Suggestions", exact: true })
     .click();
   await page
-    .getByRole("dialog", { name: "Clear Inbox", exact: true })
+    .getByRole("dialog", { name: "Clear Suggestions", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
     .click();
-  await expect(page.getByRole("region", { name: /^Inbox/ })).toBeHidden();
+  await expect(page.getByRole("region", { name: /^Dream Suggestions/ })).toBeHidden();
   expect(dream.requests.at(-1)).toEqual({
     method: "POST",
     path: "/api/dream/inbox/clear",
@@ -2103,7 +2105,10 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
   const dream = await serveDream(page);
   await page.goto("/dream/projects");
   await expect(
-    page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
+    page.getByText(
+      "Create a project to steer Dream with a brief, pinned cards, and generation limits.",
+      { exact: true },
+    ),
   ).toBeVisible();
 
   const cards = [
@@ -2121,7 +2126,7 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
     evidence: [dreamItem("first"), dreamItem("second")],
   }));
   await page.clock.fastForward("02:00");
-  const inbox = page.getByRole("region", { name: "Inbox (3)", exact: true });
+  const inbox = page.getByRole("region", { name: "Dream Suggestions (3)", exact: true });
   await expect(inbox).toBeVisible();
 
   for (const card of cards) {
@@ -2137,7 +2142,10 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
     });
   }
   await expect(
-    page.getByText("Dream keeps making work to each project's brief.", { exact: true }),
+    page.getByText(
+      "Create a project to steer Dream with a brief, pinned cards, and generation limits.",
+      { exact: true },
+    ),
   ).toBeVisible();
 });
 

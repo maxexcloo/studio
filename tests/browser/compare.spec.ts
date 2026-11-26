@@ -695,10 +695,10 @@ test("Variants of a result show their numbers, the axis they vary and propose a 
   await expect(slider).toHaveAttribute("aria-valuenow", "75");
   await page.getByText("Side by Side", { exact: true }).click();
 
-  // Picking one proposes it for the chat's project brief in Dream's Inbox.
+  // Picking one proposes it for the chat's project brief in Dream Suggestions.
   await page.getByRole("button", { name: "Pick B · Golden Dusk as Winner", exact: true }).click();
   await expect(
-    page.getByText("Proposed for Foxes's brief in Dream's Inbox", { exact: true }),
+    page.getByText("Proposed for Foxes's brief in Dream Suggestions", { exact: true }),
   ).toBeVisible();
 
   // Details carry no result number.

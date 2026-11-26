@@ -573,7 +573,7 @@ export function createInbox(options: {
           ...base,
           id: randomUUID(),
           key: `pacing:${project.id}:favour`,
-          title: `Give ${project.name} More Turns`,
+          title: `Give ${project.name} Higher Priority`,
           why: `You kept ${kept} of its last ${judged} results${reviewed}`,
           change: { favoured: true },
           evidence: (stats[project.id]?.results || [])
@@ -624,6 +624,33 @@ export function createInbox(options: {
         : [],
     );
   }
+  /** A clean, descriptive project name from a chat's series, set or result title. */
+  const genericProjectTitles = new Set([
+    "comparison",
+    "generation",
+    "generations",
+    "results",
+    "test",
+    "test set",
+    "untitled",
+    "untitled generation",
+    "untitled set",
+  ]);
+  const chatProjectName = (item: DreamItem) => {
+    const candidates = [
+      item.resultSet?.context?.series,
+      item.resultSet?.title,
+      item.title,
+      item.resultSet?.context?.character?.name,
+    ];
+    for (const candidate of candidates) {
+      const stripped = clean(candidate, maxProjectName)
+        .replace(/(?:\s*(?:[-–—]?\s*(?:part|batch|set|round|#)\s*|\s+))\d+$/i, "")
+        .trim();
+      if (stripped && !genericProjectTitles.has(lower(stripped))) return stripped;
+    }
+    return "";
+  };
   /** A chat earns a proposal when the account liked results from separate runs. */
   function chatsFor(ownerId: string, liked: DreamItem[]): Stored[] {
     const attached = projects.chats(ownerId);
@@ -644,7 +671,7 @@ export function createInbox(options: {
       if (evidence.length < 2) continue;
       const [first] = evidence;
       const subject = first.resultSet?.context?.character?.name;
-      const title = clean(first.resultSet?.title || first.title, maxProjectName);
+      const title = chatProjectName(first);
       if (!title || names.has(lower(title))) continue;
       names.add(lower(title));
       found.push({
@@ -652,7 +679,7 @@ export function createInbox(options: {
         key: `chat:${sourceChat}`,
         kind: "project",
         sourceChat,
-        title: `Continue ${title}`,
+        title: `Create Project: ${title}`,
         why: `You liked results from ${evidence.length} separate generations in this chat.`,
         at: stamp(),
         change: {

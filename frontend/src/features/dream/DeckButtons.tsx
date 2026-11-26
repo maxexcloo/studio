@@ -1,14 +1,23 @@
-import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
-import { Check, ChevronDown, X } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { ActionIcon, type MantineColor, Menu, Text, Tooltip } from "@mantine/core";
+import { Check, X } from "lucide-react";
+import { Fragment, type ReactNode, useState } from "react";
 
-import { likeColour } from "../../theme";
+import type { DreamPassReason } from "../../../../shared/dream";
+import { likeColour, menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useHold } from "../../ui/useHold";
 import { type Choice, dreamChoices } from "./choices";
 import type { DeckCard } from "./deck";
 
 import classes from "./DreamPage.module.css";
+
+export const passReasonLabels = {
+  taste: "Not My Taste",
+  similar: "Too Similar",
+  glitch: "Glitch",
+} satisfies Record<Exclude<DreamPassReason, "skip">, string>;
+const passReasons = Object.keys(passReasonLabels) as (keyof typeof passReasonLabels)[];
 
 /** Each answer's round button: its glyph, or a comparison side's letter, and its tint. */
 const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
@@ -39,11 +48,77 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
   );
 }
 
+function PassButton({
+  cardKey,
+  choice,
+  id,
+  title,
+  description,
+  act,
+}: {
+  cardKey: string;
+  choice: Choice["choice"];
+  id: string;
+  title: string;
+  description: string;
+  act: (choice: Choice["choice"], reason?: DreamPassReason) => void;
+}) {
+  const [openedFor, setOpenedFor] = useState<string>();
+  const opened = openedFor === cardKey;
+  const { consumeClick, ...hold } = useHold(cardKey, () => setOpenedFor(cardKey));
+  return (
+    <Menu
+      opened={opened}
+      onChange={(next) => {
+        if (!next) setOpenedFor(undefined);
+      }}
+      position="top"
+      width={menuWidth}
+      withinPortal
+    >
+      <PopupTooltip label={description}>
+        <Menu.Target>
+          <ActionIcon
+            className={classes.answer}
+            data-touch-target
+            variant="light"
+            color={looks[id].color}
+            radius="50%"
+            aria-label={title}
+            aria-description={description}
+            aria-keyshortcuts="Shift+F10"
+            data-pass
+            {...hold}
+            onClick={(event) => {
+              if (!consumeClick(event)) act(choice);
+            }}
+          >
+            {looks[id].glyph}
+          </ActionIcon>
+        </Menu.Target>
+      </PopupTooltip>
+      <Menu.Dropdown aria-label="Pass Reason">
+        <Menu.Label>Pass Reason</Menu.Label>
+        {passReasons.map((reason) => (
+          <Menu.Item
+            key={reason}
+            onClick={() => {
+              setOpenedFor(undefined);
+              act(choice, reason);
+            }}
+          >
+            {passReasonLabels[reason]}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
 /** The deck's verdicts, with its smaller Undo and Suggestions controls on either side. */
 export function DeckButtons({
   card,
   act,
-  askPass,
   hidden,
   expanded,
   singleImageComparison = false,
@@ -52,8 +127,7 @@ export function DeckButtons({
   quickRating = false,
 }: {
   card: DeckCard;
-  act: (choice: Choice["choice"]) => void;
-  askPass: () => void;
+  act: (choice: Choice["choice"], reason?: DreamPassReason) => void;
   hidden: boolean;
   expanded?: boolean;
   singleImageComparison?: boolean;
@@ -63,9 +137,7 @@ export function DeckButtons({
 }) {
   const comparison = card.kind === "pair" && !singleImageComparison;
   const answers = dreamChoices(card, singleImageComparison, quickRating).at(-1)!;
-  const reasonButton = answers.some(({ id }) => id === "discard") ? "discard" : "neither";
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
-  const { consumeClick, ...hold } = useHold(card.key, askPass);
   return (
     <div
       role="group"
@@ -91,56 +163,44 @@ export function DeckButtons({
               : !quickRating && (id === "keep" || id === "both")
                 ? "Keep Unrated and Teach Dream"
                 : undefined;
-        const answer = (
-          <Tooltip label={description ?? title}>
-            <ActionIcon
-              className={classes.answer}
-              data-touch-target
-              variant="light"
-              color={side ? "blue" : looks[id].color}
-              radius="50%"
-              data-size={
-                side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
-              }
-              aria-label={title}
-              aria-description={description}
-              aria-keyshortcuts={pass ? "Shift+F10" : undefined}
-              data-pass={pass || undefined}
-              {...(pass && hold)}
-              onClick={(event) => {
-                if (!pass || !consumeClick(event)) act(choice);
-              }}
-            >
-              {side ? (
-                <Text fw={700} fz={26}>
-                  {title}
-                </Text>
-              ) : (
-                looks[id].glyph
-              )}
-            </ActionIcon>
-          </Tooltip>
-        );
-        return pass && id === reasonButton ? (
-          <div key={id} className={classes.passChoices}>
-            {answer}
-            <Tooltip label="Pass Reason">
+        if (pass)
+          return (
+            <PassButton
+              key={id}
+              cardKey={card.key}
+              choice={choice}
+              id={id}
+              title={title}
+              description={description!}
+              act={act}
+            />
+          );
+        return (
+          <Fragment key={id}>
+            <Tooltip label={description ?? title}>
               <ActionIcon
-                className={classes.passReasonButton}
-                variant="default"
-                color="gray"
-                radius="xl"
-                size="sm"
+                className={classes.answer}
                 data-touch-target
-                aria-label="Pass Reason"
-                onClick={askPass}
+                variant="light"
+                color={side ? "blue" : looks[id].color}
+                radius="50%"
+                data-size={
+                  side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
+                }
+                aria-label={title}
+                aria-description={description}
+                onClick={() => act(choice)}
               >
-                <ChevronDown size={16} />
+                {side ? (
+                  <Text fw={700} fz={26}>
+                    {title}
+                  </Text>
+                ) : (
+                  looks[id].glyph
+                )}
               </ActionIcon>
             </Tooltip>
-          </div>
-        ) : (
-          <Fragment key={id}>{answer}</Fragment>
+          </Fragment>
         );
       })}
       {trailing}

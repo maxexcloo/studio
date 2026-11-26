@@ -192,8 +192,8 @@ recur across features.
   preview fills the stage above the verdicts and shares the viewer's
   gestures, top chrome, media controls and Details surface. Verdicts in
   fullscreen use the buttons. Passing a Dream result dislikes it and keeps it in
-  Discards for reference. The Pass Reason control beside Pass opens the
-  reason picker. Too Similar and Glitch pass without a rating and stay out of
+  Discards for reference. Holding Pass (or right-clicking or pressing Shift+F10
+  on it) opens the pass reason context menu. Too Similar and Glitch pass without a rating and stay out of
   Dream's preference keep rates.
   Comparisons in the deck and fullscreen video
   offer Pass, the lettered choices and Accept. Fullscreen image comparisons

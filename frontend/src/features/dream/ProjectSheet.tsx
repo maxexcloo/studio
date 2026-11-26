@@ -54,9 +54,9 @@ const fieldNames: Record<string, string> = {
   name: "Name",
   loras: "Favourite LoRAs",
   cards: "Pinned Cards",
-  constraints: "Allowed Inputs",
+  constraints: "Generation Limits",
   paused: "Status",
-  favoured: "More Turns",
+  favoured: "Higher Priority",
   created: "Created",
 };
 
@@ -241,14 +241,17 @@ function ProjectDetail({
     <Stack gap="lg">
       <ProjectStatsLine project={project} stats={stats} />
       <SettingGroup title="Status">
-        <SettingRow label="Enabled" description="Dream draws ideas from it.">
+        <SettingRow label="Enabled" description="Dream generates new ideas for this project.">
           <ProjectEnabled project={project} label="Enabled" />
         </SettingRow>
-        <SettingRow label="More Turns" description="Doubles its share of Dream's turns.">
+        <SettingRow
+          label="Higher Priority"
+          description="Gives this project twice as many Dream turns."
+        >
           <ProjectMoreTurns project={project} />
         </SettingRow>
       </SettingGroup>
-      <SettingGroup title="Brief">
+      <SettingGroup title="Creative Brief">
         <Stack gap={4}>
           {brief.map(([key, label]) => (
             <Text key={key} size="sm">
@@ -274,7 +277,7 @@ function ProjectDetail({
         </Stack>
       </SettingGroup>
       <ProjectPins cards={project.cards} />
-      <SettingGroup title="Allowed Inputs">
+      <SettingGroup title="Generation Limits">
         <Group gap={6}>
           {badges.length ? (
             badges.map((badge) => (
@@ -284,7 +287,7 @@ function ProjectDetail({
             ))
           ) : (
             <Text size="sm" c="dimmed">
-              Any inputs.
+              No limits set.
             </Text>
           )}
         </Group>

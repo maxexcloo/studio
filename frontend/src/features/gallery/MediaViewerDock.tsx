@@ -163,7 +163,7 @@ export function MediaViewerDock({
       )}
       {showThumbnails && setEntries.length > 1 && (
         <ResultStrip
-          label={`Set: ${item.resultSet?.title}`}
+          label={item.resultSet?.title ? `Set: ${item.resultSet.title}` : "Result Set"}
           entries={setEntries}
           current={item}
           choose={choose}

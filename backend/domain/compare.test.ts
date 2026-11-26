@@ -160,8 +160,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.deepEqual(
     jobs.map((job: { input: Record<string, unknown> }) => job.input.resultSet),
     [
-      { id: run.body.id, title: "Comparison", index: 0, variation: "Steps 20" },
-      { id: run.body.id, title: "Comparison", index: 1, variation: "Steps 40" },
+      { id: run.body.id, title: "Compare steps: Fox", index: 0, variation: "Steps 20" },
+      { id: run.body.id, title: "Compare steps: Fox", index: 1, variation: "Steps 40" },
     ],
   );
   assert.equal(new Set(jobs.map((job: { sessionId: string }) => job.sessionId)).size, 1);
