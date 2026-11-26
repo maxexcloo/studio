@@ -31,6 +31,7 @@ import {
   pausedReason,
   terminalStatuses,
 } from "../../../../shared/queue";
+import { queueJobTitle, queueSetTitle } from "../../../../shared/queueLabels";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { formatBytes } from "../../ui/bytes";
@@ -479,7 +480,7 @@ function QueueRow({
             <NameWithFlags
               name={
                 <Text size="sm" lineClamp={2}>
-                  {String(job.input?.prompt || "Generation")}
+                  {queueJobTitle(job)}
                 </Text>
               }
               flags={
@@ -536,7 +537,7 @@ function groupedEntries(
   all: QueueJob[],
   shown: QueueJob[],
   group: (job: QueueJob) => string | undefined,
-  title: (job: QueueJob) => string,
+  title: (members: QueueJob[]) => string,
 ): QueueEntry[] {
   const members = new Map<string, QueueJob[]>();
   for (const job of all) {
@@ -560,15 +561,13 @@ function groupedEntries(
     const created = {
       id: `set:${id}`,
       jobs: [job],
-      set: { id, title: title(together[0]), members: together },
+      set: { id, title: title(together), members: together },
     };
     groups.set(id, created);
     entries.push(created);
   }
   return entries;
 }
-const resultSetOf = (input: QueueJob["input"]) =>
-  input?.resultSet as { title?: string; variation?: string } | undefined;
 
 /**
  * The queue's rows in dispatch order, with each set where its first shown job is. Dream's work is
@@ -579,10 +578,7 @@ export function queueEntries(all: QueueJob[], waiting?: string[]): QueueEntry[] 
     all,
     jobsInDispatchOrder(all, waiting),
     (job) => (job.dream ? "dream" : job.queueSet),
-    (job) =>
-      job.dream
-        ? "Dream"
-        : String(resultSetOf(job.input)?.title || job.input?.prompt || "Generations"),
+    (members) => queueSetTitle(members),
   );
 }
 
@@ -596,7 +592,7 @@ function promptEntries({ jobs, set }: QueueEntry) {
     set!.members,
     jobs,
     (job) => (prompts ? job.queueBatch : undefined),
-    (job) => String(resultSetOf(job.input)?.variation || job.input?.prompt || "Generation"),
+    (members) => queueJobTitle(members[0]),
   );
 }
 

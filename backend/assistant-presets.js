@@ -512,3 +512,8 @@ const familyKey = (family) => String(family || "").replace(/-/g, "_");
 export function familyUpsampler(profile) {
   return upsamplers[familyKey(profile?.family)]?.() || null;
 }
+
+/** Specialised family prompt upsampler models (such as local/flux-pup), not general text LLMs. */
+export function upsamplerModels() {
+  return [...new Set(Object.values(upsamplers).map((factory) => factory().model))];
+}

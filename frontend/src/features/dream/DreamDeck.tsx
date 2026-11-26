@@ -1,11 +1,10 @@
-import { ActionIcon, Badge, Box, Button, Modal, Radio, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, Button, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
   useEffect,
-  useId,
   useRef,
   useState,
 } from "react";
@@ -14,10 +13,9 @@ import { flushSync } from "react-dom";
 import type { DreamPassReason } from "../../../../shared/dream";
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
-import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
+import { layerAbove } from "../../ui/popupClicks";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { usePrefetchImages, usePrefetchVideos } from "../../ui/usePrefetch";
 import { galleryKey } from "../gallery/queries";
@@ -77,12 +75,6 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
-const passLabels = {
-  taste: "Not My Taste",
-  similar: "Too Similar",
-  glitch: "Glitch",
-} satisfies Record<Exclude<DreamPassReason, "skip">, string>;
-const passReasons = Object.keys(passLabels) as (keyof typeof passLabels)[];
 export type Judgement = (
   | { card: SingleCard; verdict: Verdict; likedId?: string; overrides?: SetOverrides }
   | { card: PairDeckCard; verdict: PairAnswer }
@@ -246,10 +238,6 @@ export function DreamDeck({
   const [selected, setSelected] = useState<{ key: string; side: number }>();
   const [picked, setPicked] = useState<{ key: string; side: number } | null>(null);
   const [setDraft, setSetDraft] = useState<{ key: string; overrides: SetOverrides }>();
-  const [passing, setPassing] = useState<string>();
-  const [passReason, setPassReason] = useState(passReasons[0]);
-  const passDialogId = useId();
-  const closePass = closeWhenTop(passDialogId, () => setPassing(undefined));
   /** Puts a card back on the deck, after a failed verdict or an Undo. */
   const restore = (card: DeckCard) => {
     setCurrent(card);
@@ -340,11 +328,6 @@ export function DreamDeck({
   /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
   const isPass = (choice: Verdict | PairAnswer) =>
     !quickRating && (choice === "neither" || (top?.kind !== "set" && choice === "discard"));
-  const askPass = () => {
-    if (!top || busy.current) return;
-    setPassReason(passReasons[0]);
-    setPassing(top.key);
-  };
   async function act(choice: Verdict | PairAnswer, reason?: DreamPassReason) {
     if (!top || busy.current) return;
     const passReason = isPass(choice) ? (reason ?? "skip") : undefined;
@@ -569,8 +552,7 @@ export function DreamDeck({
       <DeckButtons
         card={top}
         quickRating={quickRating}
-        act={(choice) => void act(choice)}
-        askPass={askPass}
+        act={(choice, reason) => void act(choice, reason)}
         hidden={!!viewing}
         leading={undoButton}
         trailing={
@@ -605,40 +587,9 @@ export function DreamDeck({
           close={closePreview}
           label={cardLabel(top, true)}
           fly={previewFly}
-          act={(choice) => void act(choice)}
-          askPass={askPass}
+          act={(choice, reason) => void act(choice, reason)}
           undo={undo}
         />
-      )}
-      {passing === top.key && (
-        <Modal id={passDialogId} opened onClose={closePass} title="Pass Reason" size="xs">
-          <Radio.Group
-            aria-label="Pass Reason"
-            value={passReason}
-            onChange={(value) => setPassReason(value as keyof typeof passLabels)}
-          >
-            <Stack gap="sm">
-              {passReasons.map((reason) => (
-                <Radio
-                  key={reason}
-                  value={reason}
-                  label={passLabels[reason]}
-                  data-autofocus={reason === passReason || undefined}
-                />
-              ))}
-            </Stack>
-          </Radio.Group>
-          <DialogFooter onCancel={closePass}>
-            <Button
-              onClick={() => {
-                setPassing(undefined);
-                void act(top.kind === "pair" ? "neither" : "discard", passReason);
-              }}
-            >
-              Pass
-            </Button>
-          </DialogFooter>
-        </Modal>
       )}
     </>
   );

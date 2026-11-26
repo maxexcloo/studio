@@ -1,4 +1,5 @@
 import { activeStatuses, terminalStatuses } from "../../shared/queue.ts";
+import { queueJobTitle } from "../../shared/queueLabels.ts";
 import type { RuntimeJob, RuntimeQueueCancel } from "../../shared/runtime.ts";
 import { logEvent, logWarning } from "../crash-log.js";
 import type { WorkloadQueue } from "../runtime/controller.ts";
@@ -40,10 +41,7 @@ export function workloadQueue({
   const waitingLimit = 20;
   const row = (job: OwnedJob, queuePosition?: number): RuntimeJob => ({
     id: job.id,
-    title:
-      String(job.input.prompt || "")
-        .trim()
-        .slice(0, 80) || `Untitled ${job.operation}`,
+    title: queueJobTitle(job).slice(0, 80),
     status: job.status,
     since: job.admittedAt === undefined ? job.createdAt : new Date(job.admittedAt).toISOString(),
     ...(job.reason ? { reason: job.reason } : {}),

@@ -2146,7 +2146,7 @@ test("The Inbox offers liked chat work from separate generations and attaches it
   );
   await inbox.propose("alice");
   const [proposal] = inbox.read("alice").proposals;
-  assert.equal(proposal.title, "Continue Winter Journeys");
+  assert.equal(proposal.title, "Create Project: Winter Journeys");
   assert.equal(proposal.evidence.length, 2);
   assert.equal(inbox.drafts("alice").length, 0);
   assert.deepEqual(projects.chats("alice"), {});

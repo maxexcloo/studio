@@ -4,7 +4,7 @@ import type { BenchmarkModel, BenchmarkRun } from "../../shared/runtime.ts";
 import { logEvent } from "../crash-log.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { RadianceClient } from "../providers/radiance.ts";
-import { Benchmarks } from "./benchmarks.ts";
+import { type BenchmarkMediaModel, Benchmarks } from "./benchmarks.ts";
 import { RuntimeController, type RuntimeRecord } from "./controller.ts";
 import {
   KubernetesEngine,
@@ -25,11 +25,13 @@ export async function loadRuntime(
     fetchImpl = fetch,
     request,
     textModels,
+    mediaModels,
   }: {
     dataDir: string;
     fetchImpl?: typeof fetch;
     request?: KubernetesRequest;
     textModels?: () => Promise<BenchmarkModel[]>;
+    mediaModels?: () => Promise<BenchmarkMediaModel[]>;
   },
 ) {
   if (!environment.STUDIO_KUBERNETES_NAMESPACES) return undefined;
@@ -59,6 +61,7 @@ export async function loadRuntime(
     environment,
     fetchImpl,
     textModels,
+    mediaModels,
     ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
   const shutdown = new AbortController();

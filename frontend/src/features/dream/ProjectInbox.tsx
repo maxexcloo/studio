@@ -164,7 +164,7 @@ function DismissDialog({
           {error && <Alert color="red">{error}</Alert>}
           <DialogFooter pending={pending} onCancel={onClose}>
             <Button type="submit" loading={pending}>
-              {title === "Clear Inbox" ? "Clear" : "Decline"}
+              {title === "Clear Suggestions" ? "Clear" : "Decline"}
             </Button>
           </DialogFooter>
         </Stack>
@@ -592,13 +592,13 @@ export function ProjectInbox({ projects }: { projects: Project[] }) {
       )}
       {!!proposals.length && (
         <SettingGroup
-          title={`Inbox (${proposals.length})`}
+          title={`Dream Suggestions (${proposals.length})`}
           toolbar={
             <Button
               size="compact-sm"
               variant="subtle"
               color="gray"
-              aria-label="Clear Inbox"
+              aria-label="Clear Suggestions"
               onClick={() => {
                 clear.reset();
                 setClearing(true);
@@ -610,7 +610,7 @@ export function ProjectInbox({ projects }: { projects: Project[] }) {
         >
           <ProposalList proposals={proposals} projects={projects} />
           <DismissDialog
-            title="Clear Inbox"
+            title="Clear Suggestions"
             opened={clearing}
             pending={clear.isPending}
             error={clear.error?.message}

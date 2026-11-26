@@ -34,7 +34,7 @@ import { plural } from "../../ui/plural";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { useSettingsSection } from "../settings/SettingsNavigation";
-import { BenchmarkDialog, benchmarksQuery } from "./Benchmarks";
+import { BenchmarkDialog, benchmarksQuery, workloadSuites } from "./Benchmarks";
 import { LogDialog, LogText, PodLog, logTime, useRequester } from "./RuntimeLogs";
 
 export const runtimeStatusQuery = queryOptions({
@@ -563,7 +563,7 @@ export function RuntimeWorkloads({
               {stopsNow(item) ? "Stop Now" : "Restart"}
             </Menu.Item>
             <Menu.Divider />
-            {item.text && benchmarks?.configured && (
+            {workloadSuites(item, benchmarks).length > 0 && (
               <Menu.Item
                 leftSection={<icons.benchmark size={16} />}
                 disabled={benchmarking || item.phase !== "running"}

@@ -150,15 +150,14 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
     parentItemId: "hub",
     input: { prompt: "An amber bird at dusk", count: 2, steps: 28 },
   });
-  // Desktop shows the run in the strip; a phone's editor returns to the gallery.
+  // Submitting keeps the viewer open on every viewport and shows the new run in the strip.
+  await expect(viewer).toBeVisible();
   if (page.viewportSize()!.width >= 768) {
     await showViewerThumbnails(viewer);
     await expect(
       viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
     ).toHaveCount(2);
   } else {
-    await expect(viewer).toBeHidden();
-    await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
     const edit = viewer.getByRole("button", { name: "Edit", exact: true });

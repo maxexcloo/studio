@@ -18,7 +18,14 @@ import { useRemembered } from "../auth/useRemembered";
 import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useStageComparison } from "../compare/variants";
-import { assistMenu, changeTemplates, useChangeSuggestions } from "../generation/AskChange";
+import {
+  assistMenu,
+  changeTemplates,
+  instructionTemplates,
+  requestTool,
+  useChangeSuggestions,
+} from "../generation/AskChange";
+import { CustomDialog } from "../generation/CustomDialog";
 import { defaultProfile, useDraft, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import {
@@ -47,6 +54,7 @@ import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
 import { ReportIssueDialog, issues, useReportIssue } from "./ReportIssueDialog";
 import { useUpscaleAction } from "./UpscaleControls";
+import { useItemChange } from "./useItemChange";
 import { useItemMutation } from "./useItemMutation";
 import {
   type AnimateRequest,
@@ -235,6 +243,10 @@ interface MediaActionOptions {
   onSavePreset: () => void;
   /** Opens Animate's dialog: Custom…, or any template or suggested motion under Review Prompt. */
   onAnimate: (choice: AnimateRequest) => void;
+  /** Runs an Edit or Recreate request in the background from a tile when Review Prompt is off. */
+  onChange?: (mode: ViewerChange, request: string, profileId?: string) => void;
+  /** Opens Custom Edit/Recreate from a tile without opening the viewer when Review Prompt is off. */
+  onCustomChange?: (mode: ViewerChange, profileId?: string) => void;
   onVary: (
     direction: VariationDirection | "explore",
     prompt: string,
@@ -265,6 +277,8 @@ export function useMediaActions(
     onCompareUpload,
     onSavePreset,
     onAnimate,
+    onChange,
+    onCustomChange,
     onVary,
     onDelete,
     onReport,
@@ -458,7 +472,8 @@ export function useMediaActions(
         },
       ]
     : [];
-  // A tile starts the same prompt change by opening the item's viewer.
+  const [reviewChanges, setReviewChanges] = useMediaReview();
+  // A tile opens the viewer only when Review Prompt is on; otherwise changes run in the background.
   const openViewer = (mode: ViewerChange, change: ViewerAsk["change"], profileId?: string) => {
     onApplied();
     const { chat, set, show, similar, turn } = (location.state as GalleryState | null) || {};
@@ -476,13 +491,18 @@ export function useMediaActions(
   };
   const pick = (mode: ViewerChange, request: string) => {
     const profileId = mode === "edit" ? editProfileId : undefined;
-    return draft ? draft.pick(mode, request, profileId) : openViewer(mode, { request }, profileId);
+    if (draft) return draft.pick(mode, request, profileId);
+    if (reviewChanges || !onChange) return openViewer(mode, { request }, profileId);
+    onApplied();
+    onChange(mode, request, profileId);
   };
   const custom = (mode: ViewerChange) => {
     const profileId = mode === "edit" ? editProfileId : undefined;
-    return draft ? draft.custom(mode, profileId) : openViewer(mode, { custom: true }, profileId);
+    if (draft) return draft.custom(mode, profileId);
+    if (reviewChanges || !onCustomChange) return openViewer(mode, { custom: true }, profileId);
+    onApplied();
+    onCustomChange(mode, profileId);
   };
-  const [reviewChanges, setReviewChanges] = useMediaReview();
   const assistedChanges = ready && assisted;
   // Capture a viewer's draft only when its menu opens, so typing doesn't ask for new suggestions.
   const [suggestions, setSuggestions] = useState<{
@@ -833,14 +853,43 @@ export function useMediaDialogs(
   const [reporting, setReporting] = useState(false);
   const [comparingUpload, setComparingUpload] = useState(false);
   const [savingPreset, setSavingPreset] = useState(false);
+  const [customChange, setCustomChange] = useState<{
+    mode: ViewerChange;
+    profileId?: string;
+  } | null>(null);
+  const [customRequest, setCustomRequest] = useState("");
   const [varying, setVarying] = useState<{
     direction: VariationDirection | "explore";
     prompt: string;
     onApplied: () => void;
   }>();
+  const iteration = useMediaIteration(item);
+  const run = iterate ?? ((next: Iteration) => iteration.mutate(next));
+  const change = useItemChange<string>(item, {
+    iterate: run,
+    review: false,
+    show: () => {},
+    restore: () => {},
+  });
+  const assistant = useQuery(assistantQuery).data;
+  const imageAction = item.type === "image" ? customChange?.mode : undefined;
+  const templates = item.type === "image" ? (assistant?.changes ?? []) : [];
+  const customSuggestions = useChangeSuggestions({
+    query: nextStepsQuery(item, undefined, imageAction),
+    fresh: () => askNextSteps(item, true, undefined, imageAction),
+    enabled: change.available && Boolean(customChange),
+    onPick: setCustomRequest,
+  });
+  const sendChange = (mode: ViewerChange, request: string, profileId?: string) =>
+    change.send(request, typedPrompt(item), item.type === "video" ? "animate" : mode, profileId, {
+      preview: false,
+    });
   return {
     handlers: {
       onAnimate: setAnimating,
+      onChange: sendChange,
+      onCustomChange: (mode: ViewerChange, profileId?: string) =>
+        setCustomChange({ mode, profileId }),
       onReport: () => setReporting(true),
       onVary: (direction: VariationDirection | "explore", prompt: string, onApplied: () => void) =>
         setVarying({ direction, prompt, onApplied }),
@@ -862,6 +911,32 @@ export function useMediaDialogs(
             iterate={iterate}
             {...animating}
             onClose={() => setAnimating(null)}
+          />
+        )}
+        {customChange && (
+          <CustomDialog
+            opened
+            onClose={() => setCustomChange(null)}
+            title={
+              item.type === "video"
+                ? "Rewrite Video Prompt"
+                : imageAction === "edit"
+                  ? "Custom Edit"
+                  : "Custom Recreate"
+            }
+            action="Run"
+            draft={{ value: customRequest, onChange: setCustomRequest }}
+            tools={
+              change.available
+                ? [
+                    requestTool(
+                      instructionTemplates(templates, setCustomRequest, undefined, imageAction),
+                      customSuggestions,
+                    ),
+                  ]
+                : undefined
+            }
+            onSend={(request) => sendChange(customChange.mode, request, customChange.profileId)}
           />
         )}
         {reporting && (

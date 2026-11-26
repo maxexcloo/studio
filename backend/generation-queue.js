@@ -183,6 +183,8 @@ export function createGenerationQueue({
       if (!job.backend || !workerById(job.backend))
         return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
+      if (workloads.some((id) => runtime?.benchmarks?.holding(id)))
+        return `Waiting for the benchmark on ${workerById(job.backend).name} to finish.`;
       // A job moved to another worker leaves the lease its first worker gave it.
       const held = mediaLeases.get(job.id);
       if (held && !workloads.includes(held.workload.id)) releaseLease(job.id);
@@ -428,6 +430,13 @@ export function createGenerationQueue({
       endRun: (job, status, reason) => setTerminalJob(job.id, { status, error: reason }),
     }),
   );
+  runtime?.benchmarks?.useQueue({
+    busy: (workloadId) =>
+      store
+        .openJobs()
+        .some((job) => acceptedWork(job) && managedWorkloads(job).includes(workloadId)),
+    wake: () => void generationQueue.tick(),
+  });
   async function validateGenerationInput(input, account) {
     if (input.writing === undefined) return validateGeneration(input, account);
     if (typeof input.writing?.prompt === "string") {

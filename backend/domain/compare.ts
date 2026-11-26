@@ -3,7 +3,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import {
   type ComparisonRating,
   compareVariants,
-  comparisonSetTitle,
+  comparisonTitle,
   letter,
 } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
@@ -62,9 +62,9 @@ interface Router {
 }
 
 /** The result set a compare run's variant `index` belongs to, named by its label. */
-const comparisonSet = (id: string, index: number, label: string) => ({
+const comparisonSet = (id: string, index: number, label: string, title: string) => ({
   id,
-  title: comparisonSetTitle,
+  title,
   index,
   variation: label,
 });
@@ -510,11 +510,15 @@ export function registerCompareRoutes(
     const shared = own.find(Boolean) ?? String(randomInt(2 ** 32));
     const seeds = own.map((seed) => seed ?? shared);
     const id = randomUUID();
+    const setTitle = comparisonTitle(
+      variants[0]?.input?.prompt,
+      typeof axis === "string" ? axis : undefined,
+    );
     const session = (sessionId as string | undefined) || store.createSession(ownerId).id;
     const jobIds: string[] = [];
     for (const [index, variant] of variants.entries()) {
       const { clientJobId: _clientJobId, ...input } = variant.input as GenerationInput;
-      const resultSet = comparisonSet(id, index, String(variant.label).trim());
+      const resultSet = comparisonSet(id, index, String(variant.label).trim(), setTitle);
       const result = await options.admit(
         { ...input, kind: "image", seed: seeds[index], count: 1, resultSet },
         account ?? undefined,

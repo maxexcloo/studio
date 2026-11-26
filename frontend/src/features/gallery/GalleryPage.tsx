@@ -1012,7 +1012,7 @@ function Gallery() {
               ? [
                   {
                     key: "set",
-                    label: `Set: ${loaded[0]?.resultSet?.id === setId ? loaded[0].resultSet.title || "Results" : "Results"}`,
+                    label: `Set: ${loaded[0]?.resultSet?.id === setId ? loaded[0].resultSet.title || "Untitled Set" : "Selected Set"}`,
                     remove: () => dropState("set"),
                   },
                 ]

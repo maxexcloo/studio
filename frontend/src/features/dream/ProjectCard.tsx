@@ -31,7 +31,7 @@ import { type DreamItem, projectPath, projectsQuery } from "./queries";
 
 const resultsShown = 8;
 
-/** A project's flags, which follow its name: Disabled, or More Turns where set. */
+/** A project's flags, which follow its name: Disabled, or Higher Priority where set. */
 export function ProjectFlags({ project }: { project: Project }) {
   if (project.paused)
     return (
@@ -41,7 +41,7 @@ export function ProjectFlags({ project }: { project: Project }) {
     );
   return project.favoured ? (
     <Badge variant="light" style={{ flexShrink: 0 }}>
-      More Turns
+      Higher Priority
     </Badge>
   ) : null;
 }
@@ -62,8 +62,8 @@ export function ProjectStatsLine({
     ? [
         `Kept ${stats.kept}`,
         `Liked ${stats.liked}`,
-        `Missed ${stats.missed}`,
-        ...(stats.review === null ? [] : [`Review ${stats.review.toFixed(1)}`]),
+        `Missed Brief ${stats.missed}`,
+        ...(stats.review === null ? [] : [`Brief Score ${stats.review.toFixed(1)}/10`]),
       ]
     : [];
   return (
@@ -80,10 +80,10 @@ export function ProjectStatsLine({
       {!project.paused && stats && stats.share < 1 && (
         <Group gap="xs" wrap="nowrap">
           <Progress.Root flex={1} size="sm">
-            <Progress.Section value={share} aria-label={`${share}% of project turns`} />
+            <Progress.Section value={share} aria-label={`${share}% of Dream project turns`} />
           </Progress.Root>
           <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-            {share}% of project turns
+            {share}% of Dream project turns
           </Text>
         </Group>
       )}
@@ -134,7 +134,7 @@ export function ProjectMoreTurns({ project }: { project: Project }) {
   const save = useProjectSwitch(project);
   return (
     <Switch
-      aria-label="More Turns"
+      aria-label="Higher Priority"
       checked={Boolean(project.favoured)}
       onChange={(event) => save.mutate({ favoured: event.currentTarget.checked })}
     />
@@ -262,7 +262,7 @@ export function ProjectCard({
                   }
                   onClick={() => favour.mutate({ favoured: !project.favoured })}
                 >
-                  More Turns
+                  Higher Priority
                 </Menu.Item>
                 <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
                   Edit

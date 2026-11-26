@@ -23,6 +23,7 @@ const qwen = "qwen3.8-27b-iq4r";
 const gemma = "gemma-4-31b-heretic";
 const textModels = async () => [
   { id: "local/auto", label: "Auto" },
+  { id: "local/flux-pup", label: "FLUX Prompt Upsampler" },
   { id: `local/${qwen}`, label: "Qwen 3.8 27B" },
   { id: `local/${gemma}`, label: "Gemma 4 31B" },
   { id: "local/stale", label: "Stale" },
@@ -34,7 +35,9 @@ const modelResponse = () =>
     data: [
       { id: qwen, state: "resident" },
       { id: gemma, state: "cold" },
+      { id: "flux-pup", state: "resident" },
       { id: "qwen-image", state: "resident" },
+      { id: "ltx-video", state: "cold" },
       { id: "failed", state: "failed" },
     ],
   });
@@ -146,9 +149,13 @@ test("a benchmark batch runs one Job at a time and resumes its queued model afte
   };
   const benchmarks = new Benchmarks(options);
   assert.deepEqual(await benchmarks.models("radiance"), [
-    { id: qwen, label: "Qwen 3.8 27B" },
-    { id: gemma, label: "Gemma 4 31B" },
+    { id: qwen, label: "Qwen 3.8 27B", kind: "text" },
+    { id: gemma, label: "Gemma 4 31B", kind: "text" },
   ]);
+  await assert.rejects(
+    benchmarks.start("radiance", "account:admin", ["flux-pup"]),
+    /Choose available/,
+  );
   await assert.rejects(benchmarks.start("radiance", "account:admin", []), /Choose available/);
   await assert.rejects(
     benchmarks.start("radiance", "account:admin", [gemma, "qwen-image"]),
@@ -307,4 +314,100 @@ test("a stopped model refuses a benchmark before any Job starts", async () => {
     /Radiance isn't answering: start it first/,
   );
   assert.deepEqual(benchmarks.list().runs, []);
+});
+
+test("QualityBench builds a qualitybench Job and parses quality score summaries", () => {
+  const job = benchmarkJob({
+    name: "studio-benchmark-qb1",
+    workload: radiance,
+    model: qwen,
+    image: "ghcr.io/maxexcloo/qualitybench:latest",
+    secret: "radiance",
+    suite: "qualitybench",
+  });
+  assert.equal(
+    job.spec.template.metadata.labels["studio.excloo.dev/benchmark-suite"],
+    "qualitybench",
+  );
+  assert.equal(job.spec.template.spec.containers[0].image, "ghcr.io/maxexcloo/qualitybench:latest");
+  assert.deepEqual(
+    parseBenchmarkLog(
+      'done\nSTUDIO-BENCHMARK {"suite":"qualitybench","version":"0.2.0","score":84.5,"tasks":[{"name":"gsm8k","score":91.2},{"name":"ifeval","score":77.8}]}\n',
+    ),
+    {
+      suite: "qualitybench",
+      version: "0.2.0",
+      score: 84.5,
+      tasks: [
+        { name: "gsm8k", score: 91.2 },
+        { name: "ifeval", score: 77.8 },
+      ],
+    },
+  );
+});
+
+test("Radiance media tests run image smoke checks in-process and hold the queue while active", async () => {
+  let busy = true;
+  let woke = 0;
+  let now = 1_000_000;
+  const fetchImpl = (async (url: string) => {
+    if (url.endsWith("/v1/models")) return modelResponse();
+    if (url.endsWith("/v1/images/generations")) {
+      now += 1500;
+      return Response.json({ data: [{ b64_json: Buffer.from("png-bytes").toString("base64") }] });
+    }
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+  const benchmarks = new Benchmarks({
+    request: async () => assert.fail("no Kubernetes call for radiance-media"),
+    workloads: [radiance],
+    environment: { STUDIO_RADIANCE_KEY: "fixture-key" },
+    fetchImpl,
+    now: () => now,
+    pollMs: 60_000,
+    mediaModels: async () => [
+      { id: "custom:qwen-image", label: "Qwen Image", kind: "image", radianceModel: "qwen-image" },
+      { id: "custom:ltx-video", label: "LTX Video", kind: "video", radianceModel: "ltx-video" },
+    ],
+  });
+  benchmarks.useQueue({
+    busy: () => busy,
+    wake: () => {
+      woke += 1;
+    },
+  });
+  assert.equal(benchmarks.configured, true);
+  assert.deepEqual(benchmarks.suites, ["radiance-media"]);
+  assert.deepEqual(await benchmarks.models("radiance", "radiance-media"), [
+    { id: "custom:qwen-image", label: "Qwen Image", kind: "image" },
+    { id: "custom:ltx-video", label: "LTX Video", kind: "video" },
+  ]);
+
+  // While Studio work is in flight, the test queues and holds the workload from new jobs.
+  const [run] = await benchmarks.start(
+    "radiance",
+    "account:admin",
+    ["custom:qwen-image"],
+    "radiance-media",
+  );
+  assert.equal(run.status, "queued");
+  assert.equal(benchmarks.holding("radiance"), true);
+
+  // Once in-flight work finishes, poll launches the Radiance media test and wakes the queue on completion.
+  busy = false;
+  await benchmarks.poll();
+  for (let i = 0; i < 20 && benchmarks.list().runs[0].status === "running"; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  const done = benchmarks.list().runs[0];
+  assert.equal(done.status, "completed");
+  assert.equal(done.summary?.suite, "radiance-media");
+  assert.equal(done.summary?.kind, "image");
+  assert.equal(done.summary?.generateMs, 1500);
+  assert.equal(done.summary?.bytes, 9);
+  assert.equal(benchmarks.holding("radiance"), false);
+  assert.equal(woke, 1);
+  const logs = await benchmarks.logs(done.id, 50);
+  assert.equal(logs.pods.length, 1);
+  assert.ok(logs.pods[0].lines.some((line) => line.includes("Testing Qwen Image")));
 });

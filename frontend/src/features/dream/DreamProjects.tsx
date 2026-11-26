@@ -141,7 +141,7 @@ export function DreamProjects({
           {projects.error.message}
         </Alert>
       ) : !list.length && inbox.isPending ? (
-        <LoadingState fill label="Loading Inbox" />
+        <LoadingState fill label="Loading Suggestions" />
       ) : (
         <>
           {list.length > 0 ? (
@@ -161,7 +161,9 @@ export function DreamProjects({
               ))}
             </Stack>
           ) : (
-            <EmptyState>Dream keeps making work to each project's brief.</EmptyState>
+            <EmptyState>
+              Create a project to steer Dream with a brief, pinned cards, and generation limits.
+            </EmptyState>
           )}
           <ProjectInbox projects={list} />
         </>

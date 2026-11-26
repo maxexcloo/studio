@@ -214,17 +214,6 @@
   gap: min(var(--mantine-spacing-md), 2%);
   padding-bottom: calc(var(--mantine-spacing-xs) + env(safe-area-inset-bottom));
 }
-.passChoices {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.buttons[data-comparison-size] .passReasonButton {
-  position: absolute;
-  z-index: 1;
-  inset-block-start: -10px;
-  inset-inline-end: -5px;
-}
 .answer {
   --answer-size: 58px;
   flex: none;
