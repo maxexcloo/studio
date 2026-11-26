@@ -1778,8 +1778,10 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await showView(page, "Projects");
   const coast = page.getByRole("region", { name: "Coast", exact: true });
   await expect(coast).toContainText("Kept 3");
-  await expect(coast).toContainText("Review 6.5");
-  await expect(coast.getByRole("progressbar", { name: "60% of project turns" })).toBeVisible();
+  await expect(coast).toContainText("Brief Score 6.5/10");
+  await expect(
+    coast.getByRole("progressbar", { name: "60% of Dream project turns" }),
+  ).toBeVisible();
 
   // The detail view lists a chat's change and its words with Undo, which restores what it replaced.
   await coast.getByRole("button", { name: "Open Coast", exact: true }).click();
@@ -1789,7 +1791,9 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await expect(changes).toContainText("Chat · Brief");
   await expect(changes).toContainText("Brief: GullsSeabirds");
   await changes.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(detail.getByRole("region", { name: "Brief", exact: true })).toContainText("Gulls");
+  await expect(detail.getByRole("region", { name: "Creative Brief", exact: true })).toContainText(
+    "Gulls",
+  );
   await expect(changes).toContainText("Undone");
   await expect(changes.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
 
