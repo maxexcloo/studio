@@ -71,7 +71,6 @@ function PassButton({
       onChange={(next) => {
         if (!next) setOpenedFor(undefined);
       }}
-      withRoles={false}
       position="top"
       width={menuWidth}
       withinPortal
@@ -101,7 +100,7 @@ function PassButton({
           </Tooltip>
         </span>
       </Popover.Target>
-      <Menu.Dropdown aria-label="Pass Reason">
+      <Menu.Dropdown aria-labelledby={undefined} aria-label="Pass Reason">
         <Menu.Label>Pass Reason</Menu.Label>
         {passReasons.map((reason) => (
           <Menu.Item
