@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/stilldeadcode/radiance:2.2.0 AS radiance
+FROM docker.io/stilldeadcode/radiance:2.3.0 AS radiance
 FROM docker.io/yanwk/comfyui-boot:rocm-20261119 AS comfyui-boot
 
 FROM comfyui-boot AS sources
