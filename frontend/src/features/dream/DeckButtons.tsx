@@ -1,11 +1,10 @@
-import { ActionIcon, type MantineColor, Menu, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, type MantineColor, Menu, Popover, Text, Tooltip } from "@mantine/core";
 import { Check, X } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 
 import type { DreamPassReason } from "../../../../shared/dream";
 import { likeColour, menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
-import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useHold } from "../../ui/useHold";
 import { type Choice, dreamChoices } from "./choices";
 import type { DeckCard } from "./deck";
@@ -76,27 +75,31 @@ function PassButton({
       width={menuWidth}
       withinPortal
     >
-      <PopupTooltip label={description}>
-        <Menu.Target>
-          <ActionIcon
-            className={classes.answer}
-            data-touch-target
-            variant="light"
-            color={looks[id].color}
-            radius="50%"
-            aria-label={title}
-            aria-description={description}
-            aria-keyshortcuts="Shift+F10"
-            data-pass
-            {...hold}
-            onClick={(event) => {
-              if (!consumeClick(event)) act(choice);
-            }}
-          >
-            {looks[id].glyph}
-          </ActionIcon>
-        </Menu.Target>
-      </PopupTooltip>
+      <Popover.Target popupType="menu">
+        <span style={{ display: "inline-flex" }}>
+          <Tooltip label={description} disabled={opened}>
+            <ActionIcon
+              className={classes.answer}
+              data-touch-target
+              variant="light"
+              color={looks[id].color}
+              radius="50%"
+              aria-label={title}
+              aria-description={description}
+              aria-keyshortcuts="Shift+F10"
+              aria-haspopup="menu"
+              aria-expanded={opened}
+              data-pass
+              {...hold}
+              onClick={(event) => {
+                if (!consumeClick(event)) act(choice);
+              }}
+            >
+              {looks[id].glyph}
+            </ActionIcon>
+          </Tooltip>
+        </span>
+      </Popover.Target>
       <Menu.Dropdown aria-label="Pass Reason" aria-labelledby="">
         <Menu.Label>Pass Reason</Menu.Label>
         {passReasons.map((reason) => (
