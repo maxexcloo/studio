@@ -100,7 +100,7 @@ function PassButton({
           </Tooltip>
         </span>
       </Popover.Target>
-      <Menu.Dropdown aria-labelledby={undefined} aria-label="Pass Reason">
+      <Menu.Dropdown aria-label="Pass Reason" aria-labelledby="">
         <Menu.Label>Pass Reason</Menu.Label>
         {passReasons.map((reason) => (
           <Menu.Item
